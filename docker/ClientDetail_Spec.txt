@@ -1,0 +1,36 @@
+📄 Client Detail Page Specification
+
+1. 🔐 Access & Permissions
+- Only the advisor who owns the client should be able to view this page.
+- If another user attempts to access it, redirect them to the client list page.
+
+2. 👁️ Displayed Information
+Show the following:
+- Basic Client Info: First name, Last name, Email, Birthdate, Gender, Tax status
+- Spouse Info (if applicable): First name, Last name, Birthdate, Gender
+- Notes (rich text)
+- Status (e.g., Draft, In Progress, Reviewed, Archived)
+
+3. 🧰 Actions on Page
+- Edit client info (link to `/clients/:id/edit`)
+- View/manage financial scenarios (list + add new)
+- Delete client
+- Add new notes/activity log
+- Show CRM integration status with label and check:
+  - Connected to: Wealthbox, Pipedrive, Redtail (if matched in CRM)
+  - Greyed out “Not in CRM” if unmatched
+
+4. 🔄 Layout Preferences
+- Single scrollable page with sections
+- Each scenario displayed in rows: name, two placeholder charts, last updated date, buttons: View | Duplicate | Edit | Share
+- “Compare Scenarios” button that appears when at least 2 are selected
+
+5. 🧪 Technical Notes
+- Vue component: `ClientDetail.vue`
+- Load data on mount from `/api/clients/:id/`
+- Include spouse and basic scenario info in API response
+- No inline editing fields
+
+6. 📌 Additional Tasks
+- Provide scenario schema sample
+- Seed database with sample scenarios tied to clients during build process

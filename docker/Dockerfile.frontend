@@ -1,0 +1,16 @@
+FROM node:18-bullseye
+
+WORKDIR /app
+
+# ✅ Disable native Rollup binary resolution for ARM (critical fix)
+# ENV ROLLUP_NO_BINARY=true
+
+COPY frontend/package*.json ./
+
+# Reinstall everything fresh
+RUN npm install
+
+COPY frontend/ .
+
+EXPOSE 3000
+CMD ["npm", "run", "dev"]

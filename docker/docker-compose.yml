@@ -1,0 +1,47 @@
+
+version: "3.9"
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      # - ../frontend:/app
+      - ../frontend/src:/app/src
+      - ../frontend/public:/app/public
+    working_dir: /app
+    command: ["npm", "run", "dev"]
+  
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    working_dir: /app
+    depends_on:
+      - db
+    entrypoint: /bin/sh
+    command: >
+      -c "./wait-for-it.sh db:5432 -- 
+      && python manage.py migrate 
+      && python manage.py seed_data 
+      && gunicorn retirementadvisorpro.wsgi:application --bind 0.0.0.0:8000"
+
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: retirementadvisorpro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
