@@ -147,19 +147,30 @@ export default {
       const clientId = this.$route.params.id;
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
-      const payload = { ...this.form };
+      const {
+        spouse_first_name,
+        spouse_last_name,
+        spouse_birthdate,
+        spouse_gender,
+        ...baseForm
+      } = this.form;
+
+      const payload = {
+        ...baseForm,
+        notes: String(this.form.notes || "")
+      };
 
       if (this.showSpouseFields) {
         payload.spouse = {
-          first_name: this.form.spouse_first_name,
-          last_name: this.form.spouse_last_name,
-          birthdate: this.form.spouse_birthdate,
-          gender: this.form.spouse_gender,
+          first_name: spouse_first_name,
+          last_name: spouse_last_name,
+          birthdate: spouse_birthdate,
+          gender: spouse_gender,
         };
       }
 
       try {
-        await axios.patch(`http://localhost:8000/api/clients/${clientId}/`, payload, { headers });
+        await axios.patch(`http://localhost:8000/api/clients/${clientId}/edit/`, payload, { headers });
         this.$router.push(`/clients/${clientId}`);
       } catch (error) {
         if (error.response?.data) {

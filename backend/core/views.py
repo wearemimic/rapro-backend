@@ -138,6 +138,7 @@ class ClientEditView(generics.RetrieveUpdateAPIView):
     queryset = Client.objects.all()
     serializer_class = ClientEditSerializer
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     def get_queryset(self):
         user = self.request.user
@@ -156,6 +157,8 @@ class ClientCreateView(APIView):
     def post(self, request):
         serializer = ClientCreateSerializer(data=self.request.data, context={'request': self.request})
         if serializer.is_valid():
-            serializer.save(advisor=self.request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            validated_data = serializer.validated_data.copy()
+            validated_data.pop('advisor', None)  # Remove advisor if it's already in validated_data
+            client = serializer.save(advisor=self.request.user)
+            return Response(ClientDetailSerializer(client).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
