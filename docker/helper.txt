@@ -1,0 +1,3 @@
+# access the DB via shell
+
+(venv) marka@Mac docker % docker compose exec db psql -U postgres -d retirementadvisorpro

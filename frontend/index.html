@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + Vue</title>
+    <title>Retirement Advisor Pro</title>
     <link rel="stylesheet" href="/assets/css/theme.min.css">
     <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/font/bootstrap-icons.css">
   
@@ -13,9 +13,25 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
-    <script src="/assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/assets/vendor/hs-mega-menu/dist/hs-mega-menu.min.js"></script>
     <!-- Theme JS -->
     <script src="/assets/js/theme.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.min.js"></script>
+
+    <!-- Front's HSChartJS wrapper -->
+    <!-- <script src="/assets/js/hs.theme-appearance.js"></script>
+    <script src="/assets/js/hs.theme-appearance-charts.js"></script>  -->
+    <script src="/assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/vendor/hs-mega-menu/dist/hs-mega-menu.min.js"></script>
+    
   </body>
+  <script>
+    (function() {
+      // INITIALIZATION OF CHARTJS
+      // =======================================================
+      document.querySelectorAll('.js-chart').forEach(item => {
+        HSCore.components.HSChartJS.init(item)
+      })
+    })();
+  </script>
 </html>

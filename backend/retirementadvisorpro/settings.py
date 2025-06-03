@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 from django.conf import settings
 from django.conf.urls.static import static
+from datetime import timedelta
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -81,7 +82,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'login': '5/min',  # specific to login
-        'user': '10/min',      # authenticated users: 10 requests per minute
+        'user': '15/min',      # authenticated users: 10 requests per minute
         'anon': '5/min',       # anonymous users: 5 requests per minute
     }
 }
@@ -122,7 +123,13 @@ DATABASES = {
     }
 }
 
-
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),  # or longer
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 

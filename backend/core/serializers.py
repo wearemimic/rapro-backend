@@ -1,7 +1,10 @@
 # core/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import CustomUser, Client, Scenario 
+from .models import CustomUser, Client, Scenario, Spouse
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -35,12 +38,45 @@ class UserSerializer(serializers.ModelSerializer):
 
         return instance
     
-
 class SpouseSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Client
-        fields = ['spouse_first_name', 'spouse_last_name', 'spouse_birthdate', 'spouse_gender']
+        model = Spouse
+        fields = ['first_name', 'last_name', 'birthdate', 'gender']
 
+class ClientCreateSerializer(serializers.ModelSerializer):
+    spouse = SpouseSerializer(required=False)
+
+    class Meta:
+        model = Client
+        fields = [
+            "id", "first_name", "last_name", "email", "birthdate", "gender",
+            "tax_status", "status", "notes", "spouse"
+        ]
+        extra_kwargs = {
+            "advisor": {"read_only": True}
+        }
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        advisor = request.user
+
+        # if not advisor or not advisor.is_authenticated:
+            # raise serializers.ValidationError({"advisor": ["Invalid or missing advisor."]})
+        
+        validated_data.pop("advisor", None)
+
+        spouse_data = validated_data.pop('spouse', None)
+        client = Client.objects.create(advisor=advisor, **validated_data)
+
+        if spouse_data:
+            try:
+                Spouse.objects.create(client=client, **spouse_data)
+            except Exception as e:
+                logger.error(f"Error saving spouse info for client {client.id}: {e}")
+                # raise serializers.ValidationError({"spouse": f"Error saving spouse info: {str(e)}"})
+
+        return client
+    
 class ClientSerializer(serializers.ModelSerializer):
     advisor = serializers.HiddenField(default=serializers.CurrentUserDefault())
     spouse_first_name = serializers.CharField(required=False, allow_blank=True)
@@ -59,16 +95,35 @@ class ClientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'status', 'advisor', 'created_at', 'updated_at']
 
-
-
+class ClientEditSerializer(ClientSerializer):
+    class Meta(ClientSerializer.Meta):
+        read_only_fields = ['id', 'advisor', 'created_at', 'updated_at']
 
 class ScenarioSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Scenario
         fields = ['id', 'name', 'status', 'last_updated']  # Adjust as needed
 
-class ClientDetailSerializer(ClientSerializer):
-    scenarios = ScenarioSummarySerializer(many=True, read_only=True, source='scenario_set')
+# class ClientDetailSerializer(ClientSerializer):
+#     scenarios = ScenarioSummarySerializer(many=True, read_only=True, source='scenario_set')
 
-    class Meta(ClientSerializer.Meta):
-        fields = ClientSerializer.Meta.fields + ['scenarios']
+#     class Meta(ClientSerializer.Meta):
+#         fields = ClientSerializer.Meta.fields + ['scenarios']
+
+class ClientDetailSerializer(serializers.ModelSerializer):
+    spouse = SpouseSerializer(read_only=True)
+
+    class Meta:
+        model = Client
+        fields = [
+            'id',
+            'first_name',
+            'last_name',
+            'email',
+            'birthdate',
+            'gender',
+            'tax_status',
+            'notes',
+            'status',
+            'spouse'
+        ]

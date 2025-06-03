@@ -17,6 +17,10 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(router);
 
+import { useAuthStore } from './stores/auth';
+const authStore = useAuthStore();
+authStore.init(); // ✅ Ensure axios always has the token
+
 // Toast configuration (optional customization)
 app.use(Toast, {
   position: POSITION.TOP_RIGHT,
