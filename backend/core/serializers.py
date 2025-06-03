@@ -95,23 +95,45 @@ class ClientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'status', 'advisor', 'created_at', 'updated_at']
 
-class ClientEditSerializer(ClientSerializer):
-    class Meta(ClientSerializer.Meta):
+class ClientEditSerializer(serializers.ModelSerializer):
+    spouse = SpouseSerializer(required=False)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = Client
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'birthdate', 'gender',
+            'tax_status', 'status', 'notes', 'spouse'
+        ]
         read_only_fields = ['id', 'advisor', 'created_at', 'updated_at']
+
+    def update(self, instance, validated_data):
+        spouse_data = validated_data.pop('spouse', None)
+
+        # Update client fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if spouse_data:
+            spouse, _ = Spouse.objects.get_or_create(client=instance)
+            for attr, value in spouse_data.items():
+                setattr(spouse, attr, value)
+            spouse.save()
+        elif instance.spouse and instance.tax_status.lower() == 'single':
+            instance.spouse.delete()
+
+        return instance
+
 
 class ScenarioSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Scenario
         fields = ['id', 'name', 'status', 'last_updated']  # Adjust as needed
 
-# class ClientDetailSerializer(ClientSerializer):
-#     scenarios = ScenarioSummarySerializer(many=True, read_only=True, source='scenario_set')
-
-#     class Meta(ClientSerializer.Meta):
-#         fields = ClientSerializer.Meta.fields + ['scenarios']
-
 class ClientDetailSerializer(serializers.ModelSerializer):
     spouse = SpouseSerializer(read_only=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Client
