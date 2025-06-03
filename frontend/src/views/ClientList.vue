@@ -13,6 +13,17 @@
       </div>
     </div>
 
+    <div class="mb-3">
+      <label for="statusFilter" class="form-label me-2">Filter by Status:</label>
+      <select v-model="statusFilter" class="form-select w-auto d-inline" id="statusFilter">
+        <option value="">All</option>
+        <option value="Draft">Draft</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Reviewed">Reviewed</option>
+        <option value="Archived">Archived</option>
+      </select>
+    </div>
+
     <div class="mb-2 text-muted">Total clients retrieved: {{ clients.length }}</div>
 
     <table v-if="clients.length && !isLoading" class="table table-hover">
@@ -21,7 +32,6 @@
           <th>First Name</th>
           <th>Last Name</th>
           <th>Email</th>
-          <th>Birthdate</th>
           <th>Tax Status</th>
           <th>Status</th>
           <th>Actions</th>
@@ -32,7 +42,6 @@
           <td>{{ client.first_name }}</td>
           <td>{{ client.last_name }}</td>
           <td>{{ client.email }}</td>
-          <td>{{ client.birthdate }}</td>
           <td>{{ client.tax_status }}</td>
           <td>{{ client.status }}</td>
           <td>
@@ -73,15 +82,19 @@ export default {
       sortDirection: 'asc',
       currentPage: 1,
       perPage: 5,
+      statusFilter: '',
     }
   },
   computed: {
     filteredClients() {
       const query = this.searchQuery.toLowerCase()
-      return this.clients.filter(c =>
-        c.first_name.toLowerCase().includes(query) ||
-        c.last_name.toLowerCase().includes(query)
-      )
+      return this.clients.filter(c => {
+        const nameMatch = c.first_name.toLowerCase().includes(query) || c.last_name.toLowerCase().includes(query)
+        const statusMatch = this.statusFilter
+          ? c.status.toLowerCase() === this.statusFilter.toLowerCase()
+          : c.status.toLowerCase() !== 'archived'
+        return nameMatch && statusMatch
+      })
     },
     sortedClients() {
       return [...this.filteredClients].sort((a, b) => {

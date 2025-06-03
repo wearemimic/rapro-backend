@@ -96,7 +96,7 @@ class ClientSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'status', 'advisor', 'created_at', 'updated_at']
 
 class ClientEditSerializer(serializers.ModelSerializer):
-    spouse = SpouseSerializer(required=False)
+    spouse = SpouseSerializer(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
@@ -115,13 +115,20 @@ class ClientEditSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
 
-        if spouse_data:
-            spouse, _ = Spouse.objects.get_or_create(client=instance)
-            for attr, value in spouse_data.items():
-                setattr(spouse, attr, value)
-            spouse.save()
-        elif instance.spouse and instance.tax_status.lower() == 'single':
-            instance.spouse.delete()
+        # Handle spouse logic only if not single
+        if instance.tax_status.lower() != 'single':
+            if spouse_data and any(spouse_data.values()):
+                spouse, _ = Spouse.objects.get_or_create(client=instance)
+                for attr, value in spouse_data.items():
+                    setattr(spouse, attr, value)
+                spouse.save()
+        else:
+            # If single and spouse exists, delete it
+            try:
+                if instance.spouse:
+                    instance.spouse.delete()
+            except Spouse.DoesNotExist:
+                pass
 
         return instance
 
