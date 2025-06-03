@@ -31,7 +31,7 @@
                 <div class="col-6">
                   <!-- Pie Chart -->
                   <div class="chartjs-custom" style="height: 13rem;">
-                    <canvas class="js-chart" data-hs-chartjs-options='{
+                    <canvas id="updatingDoughnutChart" data-hs-chartjs-options='{
                                     "type": "doughnut",
                                     "data": {
                                       "labels": ["USD", "USD", "USD"],
@@ -105,7 +105,7 @@
                 <div class="col-6">
                   <!-- Chart -->
                   <div class="chartjs-custom" style="height: 3rem;">
-                    <canvas class="js-chart" data-hs-chartjs-options='{
+                    <canvas id="updatingDoughnutChart" class="js-chart" data-hs-chartjs-options='{
                               "type": "line",
                               "data": {
                                  "labels": ["1 May","2 May","3 May","4 May","5 May","6 May","7 May","8 May","9 May","10 May","11 May","12 May","13 May","14 May","15 May","16 May","17 May","18 May","19 May","20 May","21 May","22 May","23 May","24 May","25 May","26 May","27 May","28 May","29 May","30 May","31 May"],
@@ -460,10 +460,40 @@ export default {
     },
     editClient(clientId) {
       this.$router.push({ name: 'ClientEdit', params: { id: clientId } }) // placeholder
+    },initHSChart() {
+      const chartEl = document.querySelector('#updatingDoughnutChart');
+      if (!chartEl || !window.HSCore) return;
+
+      HSCore.components.HSChartJS.init(chartEl);
+
+      const datasets = [
+        [ [45, 25, 30] ],
+        [ [35, 50, 15] ]
+      ];
+
+      const updatingChart = HSCore.components.HSChartJS.getItem('updatingDoughnutChart');
+
+      if (!updatingChart) return;
+
+      updatingChart.data.datasets.forEach((dataset, key) => {
+        dataset.data = datasets[0][key];
+      });
+      updatingChart.update();
+
+      document.querySelectorAll('[data-toggle="chart-doughnut"]').forEach(item => {
+        item.addEventListener('click', e => {
+          const keyDataset = e.currentTarget.getAttribute('data-datasets');
+          updatingChart.data.datasets.forEach((dataset, key) => {
+            dataset.data = datasets[keyDataset][key];
+          });
+          updatingChart.update();
+        });
+      });
     }
   },
   mounted() {
     this.fetchClients()
+    this.initHSChart();
   },
   watch: {
     currentPage() {
@@ -475,4 +505,7 @@ export default {
     }
   }
 }
+
+
+
 </script>

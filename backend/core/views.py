@@ -14,7 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import Client
 from rest_framework.exceptions import PermissionDenied
-from .serializers import ClientDetailSerializer
+from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer
 
 User = get_user_model()
 
@@ -46,6 +46,7 @@ def login_view(request):
     refresh = RefreshToken.for_user(user)
     return Response({
         'access': str(refresh.access_token),
+        'refresh': str(refresh),
         'user': {
             'id': user.id,
             'email': user.email,
@@ -119,17 +120,7 @@ class AdvisorClientListView(generics.ListAPIView):
     def get_queryset(self):
         return Client.objects.filter(advisor=self.request.user)
     
-class ClientCreateView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, format=None):
-        serializer = ClientSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save(advisor=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+  
 class ClientDetailView(generics.RetrieveAPIView):
     queryset = Client.objects.all()
     serializer_class = ClientDetailSerializer
@@ -142,3 +133,29 @@ class ClientDetailView(generics.RetrieveAPIView):
         if client.advisor != self.request.user:
             raise PermissionDenied("You do not have permission to view this client.")
         return client
+    
+class ClientEditView(generics.RetrieveUpdateAPIView):
+    queryset = Client.objects.all()
+    serializer_class = ClientEditSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return Client.objects.all()
+        return Client.objects.filter(advisor=user)
+
+    def get_object(self):
+        client = get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
+        return client
+    
+class ClientCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request):
+        serializer = ClientCreateSerializer(data=self.request.data, context={'request': self.request})
+        if serializer.is_valid():
+            serializer.save(advisor=self.request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

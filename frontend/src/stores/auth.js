@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import axios from 'axios';
 
 
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -11,6 +12,48 @@ export const useAuthStore = defineStore('auth', {
   }),
   persist: true,
   actions: {
+    init() {
+      const token = this.token || localStorage.getItem('token');
+      if (token) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        this.setupAxiosInterceptor();
+      }
+    },
+    setupAxiosInterceptor() {
+      axios.interceptors.response.use(
+        response => response,
+        async error => {
+          const originalRequest = error.config;
+
+          if (
+            error.response &&
+            error.response.status === 401 &&
+            !originalRequest._retry &&
+            localStorage.getItem('refresh_token')
+          ) {
+            originalRequest._retry = true;
+            try {
+              const res = await axios.post('http://localhost:8000/api/token/refresh/', {
+                refresh: localStorage.getItem('refresh_token'),
+              });
+
+              const newToken = res.data.access;
+              this.token = newToken;
+              localStorage.setItem('token', newToken);
+              axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+
+              return axios(originalRequest);
+            } catch (refreshError) {
+              console.error('Token refresh failed:', refreshError);
+              this.logout(); // Optional: force logout
+            }
+          }
+
+          return Promise.reject(error);
+        }
+      );
+    },
     async login(credentials) {
       this.loading = true;
       this.error = null;
@@ -22,6 +65,7 @@ export const useAuthStore = defineStore('auth', {
         });
 
         this.token = response.data.access;
+        localStorage.setItem('refresh_token', response.data.refresh);
         this.user = response.data.user; // <-- this may throw if `user` is undefined
 
         localStorage.setItem('token', this.token);
@@ -59,6 +103,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = null;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('refresh_token');
     }
   },
   
