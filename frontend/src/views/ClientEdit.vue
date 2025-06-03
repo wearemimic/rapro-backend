@@ -88,6 +88,7 @@
       </div>
 
       <button type="submit" class="btn btn-primary">Save Changes</button>
+      <button type="button" class="btn btn-secondary ms-2" @click="cancelEdit">Cancel</button>
     </form>
   </div>
 </template>
@@ -179,6 +180,10 @@ export default {
           console.error("Client update failed", error);
         }
       }
+    },
+    cancelEdit() {
+      const clientId = this.$route.params.id;
+      this.$router.push(`/clients/${clientId}`);
     }
   }
 };

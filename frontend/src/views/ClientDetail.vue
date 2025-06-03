@@ -146,15 +146,37 @@ export default {
   },
   methods: {
     async deleteClient() {
-      if (!confirm('Are you sure you want to delete this client?')) return;
-      try {
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        await axios.delete(`http://localhost:8000/api/clients/${this.client.id}/`, { headers });
-        this.$router.push('/clients');
-      } catch (error) {
-        console.error('Failed to delete client:', error);
-      }
+        if (!confirm('Are you sure you want to archive this client?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            const payload = {
+                status: 'archived',
+                first_name: this.client.first_name,
+                last_name: this.client.last_name,
+                email: this.client.email,
+                birthdate: this.client.birthdate,
+                gender: this.client.gender,
+                tax_status: this.client.tax_status,
+                notes: this.client.notes || '',
+                spouse: this.client.spouse && this.client.tax_status !== 'Single' ? {
+                  first_name: this.client.spouse.first_name,
+                  last_name: this.client.spouse.last_name,
+                  birthdate: this.client.spouse.birthdate,
+                  gender: this.client.spouse.gender,
+                } : null
+            };
+
+            console.log("Payload being sent:", payload);
+            if (payload.spouse === null) {
+                delete payload.spouse;
+            }
+
+            await axios.patch(`http://localhost:8000/api/clients/${this.client.id}/edit/`, payload, { headers });
+            this.$router.push('/clients');
+        } catch (error) {
+            console.error('Failed to archive client:', error.response?.data || error.message);
+        }
     }
   }
 };
