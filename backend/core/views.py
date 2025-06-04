@@ -15,6 +15,7 @@ from django.utils.decorators import method_decorator
 from .models import Client
 from rest_framework.exceptions import PermissionDenied
 from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer
+from .serializers import ScenarioCreateSerializer
 
 User = get_user_model()
 
@@ -161,4 +162,14 @@ class ClientCreateView(APIView):
             validated_data.pop('advisor', None)  # Remove advisor if it's already in validated_data
             client = serializer.save(advisor=self.request.user)
             return Response(ClientDetailSerializer(client).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class ScenarioCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request, client_id):
+        serializer = ScenarioCreateSerializer(data=request.data, context={'request': request, 'client_id': client_id})
+        if serializer.is_valid():
+            scenario = serializer.save()
+            return Response({'id': scenario.id, 'message': 'Scenario created successfully'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

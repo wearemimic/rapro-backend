@@ -7,3 +7,5 @@ gunicorn
 psycopg2-binary
 pillow
 django-extensions>=4.1
+pytest
+pytest-django
