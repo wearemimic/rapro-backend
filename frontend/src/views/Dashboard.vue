@@ -293,46 +293,58 @@
     <!-- Card -->
       <div class="card mb-3 mb-lg-5">
         <!-- Table -->
-        <div class="mb-3 d-flex justify-content-between">
-          <input type="text" v-model="searchQuery" placeholder="Search by name..." class="form-control w-50" />
-          <div>
-            <button class="btn btn-sm btn-outline-secondary" @click="toggleSort('last_name')">Sort by Last Name</button>
-            <button class="btn btn-sm btn-outline-secondary" @click="toggleSort('created_at')">Sort by Created</button>
-          </div>
-        </div>
-        <table v-if="clients.length && !isLoading" class="table table-borderless table-thead-bordered table-nowrap table-align-middle card-table">
-          <!-- <table  class="table table-hover"> -->
-          <thead class="thead-light">
-            <tr>
-              <th>First Name</th>
-              <th>Last Name</th>
-              <th>Email</th>
-              <th>Birthdate</th>
-              <th>Tax Status</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="client in paginatedClients" :key="client.id">
-              <td>{{ client.first_name }}</td>
-              <td>{{ client.last_name }}</td>
-              <td>{{ client.email }}</td>
-              <td>{{ client.birthdate }}</td>
-              <td>{{ client.tax_status }}</td>
-              <td>{{ client.status }}</td>
-              <td>
-                <button class="btn btn-sm btn-outline-primary" @click="viewClient(client.id)">View</button>
-                <button class="btn btn-sm btn-outline-secondary" @click="editClient(client.id)">Edit</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="totalPages > 1" class="mt-3">
-          <button class="btn btn-sm btn-light" @click="changePage(currentPage - 1)" :disabled="currentPage === 1">Previous</button>
-          <span class="mx-2">Page {{ currentPage }} of {{ totalPages }}</span>
-          <button class="btn btn-sm btn-light" @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages">Next</button>
-        </div>
+         <div class="mb-3 d-flex justify-content-between">
+      <input type="text" v-model="searchQuery" placeholder="Search by name..." class="form-control w-50" />
+      <div>
+        <button class="btn btn-sm btn-outline-secondary" @click="toggleSort('last_name')">Sort by Last Name</button>
+        <button class="btn btn-sm btn-outline-secondary" @click="toggleSort('created_at')">Sort by Created</button>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="statusFilter" class="form-label me-2">Filter by Status:</label>
+      <select v-model="statusFilter" class="form-select w-auto d-inline" id="statusFilter">
+        <option value="">All</option>
+        <option value="Draft">Draft</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Reviewed">Reviewed</option>
+        <option value="Archived">Archived</option>
+      </select>
+    </div>
+
+    <div class="mb-2 text-muted">Total clients retrieved: {{ clients.length }}</div>
+
+    <table v-if="clients.length && !isLoading" class="table table-hover">
+      <thead class="thead-light">
+        <tr>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Email</th>
+          <th>Tax Status</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="client in paginatedClients" :key="client.id">
+          <td>{{ client.first_name }}</td>
+          <td>{{ client.last_name }}</td>
+          <td>{{ client.email }}</td>
+          <td>{{ client.tax_status }}</td>
+          <td>{{ client.status }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary" @click="viewClient(client.id)">View</button>
+            <button class="btn btn-sm btn-outline-secondary" @click="editClient(client.id)">Edit</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div v-if="totalPages > 1" class="mt-3">
+      <button class="btn btn-sm btn-light" @click="changePage(currentPage - 1)" :disabled="currentPage === 1">Previous</button>
+      <span class="mx-2">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button class="btn btn-sm btn-light" @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages">Next</button>
+    </div>
 
     <div v-if="!clients.length && !isLoading" class="alert alert-warning">
       No clients found.
@@ -342,45 +354,7 @@
         <!-- End Table -->
 
         <!-- Footer -->
-        <div class="card-footer">
-          <!-- Pagination -->
-          <div class="row justify-content-center justify-content-sm-between align-items-sm-center">
-            <div class="col-sm mb-2 mb-sm-0">
-              <div class="d-flex justify-content-center justify-content-sm-start align-items-center">
-                <span class="me-2">Showing:</span>
-
-                <!-- Select -->
-                <div class="tom-select-custom">
-                  <select id="datatableEntries" class="js-select form-select form-select-borderless w-auto" autocomplete="off" data-hs-tom-select-options='{
-                            "searchInDropdown": false,
-                            "hideSearch": true
-                          }'>
-                    <option value="4">4</option>
-                    <option value="6">6</option>
-                    <option value="8" selected>8</option>
-                    <option value="12">12</option>
-                  </select>
-                </div>
-                <!-- End Select -->
-
-                <span class="text-secondary me-2">of</span>
-
-                <!-- Pagination Quantity -->
-                <span id="datatableWithPaginationInfoTotalQty"></span>
-              </div>
-            </div>
-            <!-- End Col -->
-
-            <div class="col-sm-auto">
-              <div class="d-flex justify-content-center justify-content-sm-end">
-                <!-- Pagination -->
-                <nav id="datatablePagination" aria-label="Activity pagination"></nav>
-              </div>
-            </div>
-            <!-- End Col -->
-          </div>
-          <!-- End Pagination -->
-        </div>
+        
         <!-- End Footer -->
       </div>
       <!-- End Card -->
@@ -405,15 +379,19 @@ export default {
       sortDirection: 'asc',
       currentPage: 1,
       perPage: 5,
+      statusFilter: '',
     }
   },
   computed: {
     filteredClients() {
       const query = this.searchQuery.toLowerCase()
-      return this.clients.filter(c =>
-        c.first_name.toLowerCase().includes(query) ||
-        c.last_name.toLowerCase().includes(query)
-      )
+      return this.clients.filter(c => {
+        const nameMatch = c.first_name.toLowerCase().includes(query) || c.last_name.toLowerCase().includes(query)
+        const statusMatch = this.statusFilter
+          ? c.status.toLowerCase() === this.statusFilter.toLowerCase()
+          : c.status.toLowerCase() !== 'archived'
+        return nameMatch && statusMatch
+      })
     },
     sortedClients() {
       return [...this.filteredClients].sort((a, b) => {
@@ -436,6 +414,7 @@ export default {
         try {
             const response = await axios.get('http://localhost:8000/api/clients/') // ← simpler, no params yet
             this.clients = response.data
+            console.log('Fetched clients:', this.clients.length)  // Debug
         } catch (err) {
             this.error = err.response?.data?.detail || err.message
         } finally {
@@ -460,48 +439,14 @@ export default {
     },
     editClient(clientId) {
       this.$router.push({ name: 'ClientEdit', params: { id: clientId } }) // placeholder
-    },initHSChart() {
-      const chartEl = document.querySelector('#updatingDoughnutChart');
-      if (!chartEl || !window.HSCore) return;
-
-      HSCore.components.HSChartJS.init(chartEl);
-
-      const datasets = [
-        [ [45, 25, 30] ],
-        [ [35, 50, 15] ]
-      ];
-
-      const updatingChart = HSCore.components.HSChartJS.getItem('updatingDoughnutChart');
-
-      if (!updatingChart) return;
-
-      updatingChart.data.datasets.forEach((dataset, key) => {
-        dataset.data = datasets[0][key];
-      });
-      updatingChart.update();
-
-      document.querySelectorAll('[data-toggle="chart-doughnut"]').forEach(item => {
-        item.addEventListener('click', e => {
-          const keyDataset = e.currentTarget.getAttribute('data-datasets');
-          updatingChart.data.datasets.forEach((dataset, key) => {
-            dataset.data = datasets[keyDataset][key];
-          });
-          updatingChart.update();
-        });
-      });
     }
   },
   mounted() {
     this.fetchClients()
-    this.initHSChart();
   },
   watch: {
-    currentPage() {
-      this.fetchClients()
-    },
     searchQuery() {
       this.currentPage = 1
-      this.fetchClients()
     }
   }
 }

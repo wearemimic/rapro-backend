@@ -7,6 +7,7 @@
     <title>Retirement Advisor Pro</title>
     <link rel="stylesheet" href="/assets/css/theme.min.css">
     <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/font/bootstrap-icons.css">
+    <script src="/assets/vendor/hs-toggle-switch/dist/hs-toggle-switch.min.js"></script>
   
   <!-- Add other CSS files here as needed -->
   </head>
@@ -23,10 +24,15 @@
     <script src="/assets/js/hs.theme-appearance-charts.js"></script>  -->
     <script src="/assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/vendor/hs-mega-menu/dist/hs-mega-menu.min.js"></script>
+
+  
     
   </body>
   <script>
     (function() {
+      // INITIALIZATION OF TOGGLE SWITCH
+        // =======================================================
+        new HSToggleSwitch('.js-toggle-switch')
       // INITIALIZATION OF CHARTJS
       // =======================================================
       document.querySelectorAll('.js-chart').forEach(item => {
