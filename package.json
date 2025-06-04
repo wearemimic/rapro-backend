@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "pinia": "^3.0.2"
+    "pinia": "^3.0.2",
+    "uuid": "^11.1.0"
   }
 }
