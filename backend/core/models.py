@@ -113,6 +113,53 @@ class Spouse(models.Model):
 class Scenario(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='scenarios')
     name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    retirement_age = models.PositiveIntegerField(default=65)
+    medicare_age = models.PositiveIntegerField(default=65)
+    spouse_retirement_age = models.PositiveIntegerField(blank=True, null=True, default=65)
+    spouse_medicare_age = models.PositiveIntegerField(blank=True, null=True, default=65)
+    mortality_age = models.PositiveIntegerField(default=90)
+    spouse_mortality_age = models.PositiveIntegerField(blank=True, null=True, default=90)
+    retirement_year = models.PositiveIntegerField(default=2025)
+    share_with_client = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    # Add other financial fields here like MAGI, IRMAA flags, income projections, etc.
+
+    def __str__(self):
+        return f"{self.name} ({self.client.first_name})"
+
+
+# IncomeSource model
+class IncomeSource(models.Model):
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name='income_sources')
+    owned_by = models.CharField(max_length=10, choices=[('self', 'Self'), ('spouse', 'Spouse')])
+    income_type = models.CharField(max_length=200)
+    income_name = models.CharField(max_length=50)
+    balance_at_retirement = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    monthly_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    age_to_begin_withdrawal = models.PositiveIntegerField(null=True, blank=True)
+    age_to_end_withdrawal = models.PositiveIntegerField()
+    rate_of_return = models.FloatField(default=0)
+    cola = models.FloatField(default=0)
+    exclusion_ratio = models.FloatField(default=0)
+    tax_rate = models.FloatField(default=0)
+
+    def __str__(self):
+        return f"{self.income_type} for {self.scenario.name}"
+
+
+# YearlyCalculation model
+class YearlyCalculation(models.Model):
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name='yearly_calculations')
+    year = models.PositiveIntegerField()
+    age = models.PositiveIntegerField()
+    spouse_age = models.PositiveIntegerField(null=True, blank=True)
+    total_income = models.DecimalField(max_digits=12, decimal_places=2)
+    taxable_income = models.DecimalField(max_digits=12, decimal_places=2)
+    federal_tax = models.DecimalField(max_digits=12, decimal_places=2)
+    medicare_base = models.DecimalField(max_digits=12, decimal_places=2)
+    irmaa_surcharge = models.DecimalField(max_digits=12, decimal_places=2)
+    net_income = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.year} - {self.scenario.name}"

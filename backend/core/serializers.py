@@ -1,3 +1,4 @@
+from .models import IncomeSource
 # core/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.models import User
@@ -156,3 +157,30 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             'status',
             'spouse'
         ]
+
+
+# --- Additional serializers for IncomeSource and Scenario creation ---
+
+class IncomeSourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncomeSource
+        exclude = ['scenario']
+
+
+class ScenarioCreateSerializer(serializers.ModelSerializer):
+    income_sources = IncomeSourceSerializer(many=True, required=False)
+
+    class Meta:
+        model = Scenario
+        fields = [
+            'id', 'client', 'name', 'description', 'retirement_age', 'medicare_age',
+            'spouse_retirement_age', 'spouse_medicare_age', 'mortality_age',
+            'spouse_mortality_age', 'retirement_year', 'share_with_client', 'income_sources'
+        ]
+
+    def create(self, validated_data):
+        income_data = validated_data.pop('income_sources', [])
+        scenario = Scenario.objects.create(**validated_data)
+        for income in income_data:
+            IncomeSource.objects.create(scenario=scenario, **income)
+        return scenario

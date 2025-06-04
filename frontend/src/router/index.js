@@ -21,7 +21,8 @@ const routes = [
       { path: 'clients', name: 'Clients', component: ClientList, meta: { requiresAuth: true } },
       { path: 'clients/create', name: 'ClientsCreate', component: ClientsCreate, meta: { requiresAuth: true } },
       { path: 'clients/:id', name: 'ClientDetail', component: () => import('@/views/ClientDetail.vue'), meta: { requiresAuth: true } },
-      { path: 'clients/:id/edit', name: 'ClientEdit', component: () => import('@/views/ClientEdit.vue'), meta: { requiresAuth: true } }
+      { path: 'clients/:id/edit', name: 'ClientEdit', component: () => import('@/views/ClientEdit.vue'), meta: { requiresAuth: true } },
+      { path: 'clients/:id/scenarios/new', name: 'ScenarioCreate', component: () => import('@/views/ScenarioCreate.vue'), meta: { requiresAuth: true }, props: true }
     ]
   }
 ]

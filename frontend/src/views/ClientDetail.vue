@@ -72,45 +72,38 @@
                                     <div class="card-header">
                                         <h4 class="card-header-title">Scenarios</h4>
                                     </div>
-                                    <!-- End Header -->
 
-                                    <!-- Body -->
                                     <div class="card-body">
-                                        <!-- Table -->
+                                      <div v-if="client && client.scenarios && client.scenarios.length">
                                         <table class="table">
-                                            <thead class="thead-light">
-                                                <tr>
-                                                <th scope="col">#</th>
-                                                <th scope="col">First</th>
-                                                <th scope="col">Last</th>
-                                                <th scope="col">Handle</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                <th scope="row">1</th>
-                                                <td>Mark</td>
-                                                <td>Otto</td>
-                                                <td>@mdo</td>
-                                                </tr>
-                                                <tr>
-                                                <th scope="row">2</th>
-                                                <td>Jacob</td>
-                                                <td>Thornton</td>
-                                                <td>@fat</td>
-                                                </tr>
-                                                <tr>
-                                                <th scope="row">3</th>
-                                                <td>Larry</td>
-                                                <td>the Bird</td>
-                                                <td>@twitter</td>
-                                                </tr>
-                                            </tbody>
+                                          <thead class="thead-light">
+                                            <tr>
+                                              <th scope="col">#</th>
+                                              <th scope="col">Name</th>
+                                              <th scope="col">Last Updated</th>
+                                              <th scope="col">Actions</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <tr v-for="(scenario, index) in client.scenarios" :key="scenario.id">
+                                              <th scope="row">{{ index + 1 }}</th>
+                                              <td>{{ scenario.name }}</td>
+                                              <td>{{ scenario.updated_at }}</td>
+                                              <td>
+                                                <router-link :to="`/scenarios/${scenario.id}`" class="btn btn-sm btn-outline-primary">View</router-link>
+                                              </td>
+                                            </tr>
+                                          </tbody>
                                         </table>
-                                        <!-- End Table -->
+                                      </div>
+                                      <div v-else>
+                                        
+                                        <div class="text-center" style="margin:50px;">
+                                          <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Create Your First Scenario!</router-link>
+                                        </div>
+                                      </div>
                                     </div>
-                                    
-                                </div>
+                                  </div>
                             </div>
                         </div>
                     </div>
