@@ -137,11 +137,12 @@ class ClientEditSerializer(serializers.ModelSerializer):
 class ScenarioSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Scenario
-        fields = ['id', 'name', 'status', 'last_updated']  # Adjust as needed
+        fields = ['id', 'name', 'updated_at']  # Adjust as needed
 
 class ClientDetailSerializer(serializers.ModelSerializer):
     spouse = SpouseSerializer(read_only=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    scenarios = ScenarioSummarySerializer(many=True, read_only=True)
 
     class Meta:
         model = Client
@@ -155,7 +156,8 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             'tax_status',
             'notes',
             'status',
-            'spouse'
+            'spouse',
+            'scenarios'
         ]
 
 

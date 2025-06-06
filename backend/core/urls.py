@@ -2,6 +2,7 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView
+from .views import ScenarioCreateView, create_scenario, run_scenario_calculation
 
 urlpatterns = [
     path('logout/', logout_view, name='logout'),
@@ -12,6 +13,8 @@ urlpatterns = [
     path('clients/create/', ClientCreateView.as_view(), name='client-create'),
     path('clients/<int:pk>/', ClientDetailView.as_view(), name='client-detail'),
     path('clients/<int:pk>/edit/', ClientEditView.as_view(), name='client-edit'),
+    path('clients/<int:client_id>/scenarios/create/', create_scenario, name='scenario-create'),
+    path('scenarios/<int:scenario_id>/calculate/', run_scenario_calculation, name='scenario-calculate'),
 ]
 
 if settings.DEBUG:

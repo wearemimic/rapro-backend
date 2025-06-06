@@ -111,7 +111,7 @@ class Spouse(models.Model):
         return f"Spouse of {self.client.first_name} {self.client.last_name}"
     
 class Scenario(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='scenarios')
+    client = models.ForeignKey(Client, related_name='scenarios', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     retirement_age = models.PositiveIntegerField(default=65)
@@ -132,11 +132,16 @@ class Scenario(models.Model):
 # IncomeSource model
 class IncomeSource(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name='income_sources')
-    owned_by = models.CharField(max_length=10, choices=[('self', 'Self'), ('spouse', 'Spouse')])
+    OWNED_BY_CHOICES = [
+        ('primary', 'Primary'),
+        ('spouse', 'Spouse')
+    ]
+    owned_by = models.CharField(max_length=10, choices=OWNED_BY_CHOICES)
     income_type = models.CharField(max_length=200)
     income_name = models.CharField(max_length=50)
     balance_at_retirement = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     monthly_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monthly_contribution = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     age_to_begin_withdrawal = models.PositiveIntegerField(null=True, blank=True)
     age_to_end_withdrawal = models.PositiveIntegerField()
     rate_of_return = models.FloatField(default=0)
