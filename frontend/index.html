@@ -8,36 +8,48 @@
     <link rel="stylesheet" href="/assets/css/theme.min.css">
     <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/font/bootstrap-icons.css">
     <script src="/assets/vendor/hs-toggle-switch/dist/hs-toggle-switch.min.js"></script>
+    <script src="/assets/vendor/chart.js/dist/Chart.min.js"></script>
+    <script src="/assets/vendor/chartjs-chart-matrix/dist/chartjs-chart-matrix.min.js"></script>
+    <script src="/assets/vendor/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   
   <!-- Add other CSS files here as needed -->
   </head>
   <body>
+    
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
     <!-- Theme JS -->
     <script src="/assets/js/theme.min.js"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.min.js"></script>
 
     <!-- Front's HSChartJS wrapper -->
-    <!-- <script src="/assets/js/hs.theme-appearance.js"></script>
-    <script src="/assets/js/hs.theme-appearance-charts.js"></script>  -->
+
     <script src="/assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/vendor/hs-mega-menu/dist/hs-mega-menu.min.js"></script>
 
-  
+    <script src="/assets/vendor/jquery/dist/jquery.min.js"></script>
+    <script src="/assets/vendor/jquery-migrate/dist/jquery-migrate.min.js"></script>
+    <script src="/assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- JS Implementing Plugins -->
+    <script src="/assets/vendor/hs-navbar-vertical-aside/dist/hs-navbar-vertical-aside.min.js"></script>
+    <script src="/assets/vendor/hs-form-search/dist/hs-form-search.min.js"></script>
+
+    <script src="/assets/vendor/hs-nav-scroller/dist/hs-nav-scroller.min.js"></script>
+    <script src="/assets/vendor/tom-select/dist/js/tom-select.complete.min.js"></script>
+    <script src="/assets/vendor/flatpickr/dist/flatpickr.min.js"></script>
+    <script src="/assets/vendor/daterangepicker/moment.min.js"></script>
+    <script src="/assets/vendor/daterangepicker/daterangepicker.js"></script>
     
+    
+    <script src="/assets/vendor/clipboard/dist/clipboard.min.js"></script>
+    <script src="/assets/vendor/appear/dist/appear.min.js"></script>
+    
+    <script src="/assets/vendor/circles.js/circles.min.js"></script>
+    <script>
+      console.log('Circles global:', typeof Circles, Circles);
+    </script>
+
+  <!-- JS Front -->
   </body>
-  <script>
-    (function() {
-      // INITIALIZATION OF TOGGLE SWITCH
-        // =======================================================
-        new HSToggleSwitch('.js-toggle-switch')
-      // INITIALIZATION OF CHARTJS
-      // =======================================================
-      document.querySelectorAll('.js-chart').forEach(item => {
-        HSCore.components.HSChartJS.init(item)
-      })
-    })();
-  </script>
+
 </html>

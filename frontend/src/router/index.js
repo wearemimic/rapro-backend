@@ -7,6 +7,7 @@ import Signup from '@/views/Signup.vue'
 import Login from '@/views/Login.vue'
 import ClientList from '@/views/ClientList.vue'
 import ClientsCreate from '@/views/ClientCreate.vue'
+import ScenarioDetail from '@/views/ScenarioDetail.vue'
 
 
 const routes = [
@@ -22,7 +23,8 @@ const routes = [
       { path: 'clients/create', name: 'ClientsCreate', component: ClientsCreate, meta: { requiresAuth: true } },
       { path: 'clients/:id', name: 'ClientDetail', component: () => import('@/views/ClientDetail.vue'), meta: { requiresAuth: true } },
       { path: 'clients/:id/edit', name: 'ClientEdit', component: () => import('@/views/ClientEdit.vue'), meta: { requiresAuth: true } },
-      { path: 'clients/:id/scenarios/new', name: 'ScenarioCreate', component: () => import('@/views/ScenarioCreate.vue'), meta: { requiresAuth: true }, props: true }
+      { path: 'clients/:id/scenarios/new', name: 'ScenarioCreate', component: () => import('@/views/ScenarioCreate.vue'), meta: { requiresAuth: true }, props: true },
+      { path: 'clients/:id/scenarios/detail/:scenarioid', name: 'ScenarioDetail', component: ScenarioDetail, meta: { requiresAuth: true } },
     ]
   }
 ]

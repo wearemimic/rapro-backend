@@ -12,10 +12,11 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Client
+from .models import Scenario, Client
 from rest_framework.exceptions import PermissionDenied
 from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer
 from .serializers import ScenarioCreateSerializer
+from .scenario_processor import ScenarioProcessor
 
 User = get_user_model()
 
@@ -97,7 +98,18 @@ def register_view(request):
         }
     })
 
-
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def run_scenario_calculation(request, scenario_id):
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        # New instantiation: only pass scenario_id and debug
+        processor = ScenarioProcessor(scenario_id=scenario.id, debug=True)
+        result = processor.calculate()
+        return Response(result)
+    except Scenario.DoesNotExist:
+        return Response({"error": "Scenario not found."}, status=404)
+    
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
@@ -112,6 +124,23 @@ def profile_view(request):
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
     
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_scenario(request, client_id):
+    try:
+        client = Client.objects.get(id=client_id, advisor=request.user)
+    except Client.DoesNotExist:
+        return Response({'error': 'Client not found or access denied.'}, status=404)
+
+    data = request.data.copy()
+    data['client'] = client.id
+
+    serializer = ScenarioCreateSerializer(data=data, context={'request': request})
+    if serializer.is_valid():
+        scenario = serializer.save()
+        return Response({'id': scenario.id}, status=201)
+    else:
+        return Response(serializer.errors, status=400)  
 
 class AdvisorClientListView(generics.ListAPIView):
     serializer_class = ClientSerializer
@@ -163,6 +192,7 @@ class ClientCreateView(APIView):
             client = serializer.save(advisor=self.request.user)
             return Response(ClientDetailSerializer(client).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 class ScenarioCreateView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -173,3 +203,4 @@ class ScenarioCreateView(APIView):
             scenario = serializer.save()
             return Response({'id': scenario.id, 'message': 'Scenario created successfully'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    

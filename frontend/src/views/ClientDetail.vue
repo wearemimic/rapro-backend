@@ -3,14 +3,14 @@
     <!-- Content -->
         <div class="content container-fluid">
             <div class="row justify-content-lg-center">
-                <h2>Client Details: {{ client.first_name }} {{ client.last_name }}</h2>
                 <div class="col-lg-12">
                     <div class="row">
-                        <div class="col-lg-4">  
+                        <div class="col-lg-4" style="margin-top:-30px;">  
                             <div class="container mt-5" v-if="client">
                                 <div class="card mb-4">
                                     <div class="card-body">
                                         <h5 class="card-title">Basic Info</h5>
+                                        <h2>{{ client.first_name }} {{ client.last_name }}</h2>
                                         <p><strong>Email:</strong> {{ client.email }}</p>
                                         <p><strong>Birthdate:</strong> {{ client.birthdate }}</p>
                                         <p><strong>Gender:</strong> {{ client.gender }}</p>
@@ -42,17 +42,7 @@
                                         <p><i class="bi bi-x-circle text-muted"></i> Client not in CRM</p>
                                     </div>
                                 </div>
-                                <div class="card mb-4" v-if="client.scenarios && client.scenarios.length">
-                                    <div class="card-body">
-                                        <h5 class="card-title">Scenarios</h5>
-                                        <ul>
-                                        <li v-for="scenario in client.scenarios" :key="scenario.id">
-                                            {{ scenario.name }} - Last Updated: {{ scenario.updated_at }}
-                                        </li>
-                                        </ul>
-                                        <button class="btn btn-outline-primary mt-2" disabled>Compare Scenarios (Coming Soon)</button>
-                                    </div>
-                                </div>
+                                
 
                                 <div class="mb-3">
                                 <router-link :to="`/clients/${client.id}/edit`" class="btn btn-secondary">Edit</router-link>
@@ -90,7 +80,15 @@
                                               <td>{{ scenario.name }}</td>
                                               <td>{{ scenario.updated_at }}</td>
                                               <td>
-                                                <router-link :to="`/scenarios/${scenario.id}`" class="btn btn-sm btn-outline-primary">View</router-link>
+                                                <router-link :to="{ 
+                                                  name: 'ScenarioDetail',
+                                                  params: { clientId: client.id, scenarioid: scenario.id },
+                                                  state: { scenarios: client.scenarios }
+                                                  }"
+                                                  class="btn btn-sm btn-outline-primary">
+                                                  View
+                                                </router-link>
+                                                <!-- <router-link :to="`/clients/${client.id}/scenarios/detail/${scenario.id}`" class="btn btn-sm btn-outline-primary">View</router-link>-->
                                               </td>
                                             </tr>
                                           </tbody>
