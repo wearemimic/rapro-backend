@@ -573,9 +573,10 @@
               </div>
             </div>
             <div v-show="activeTab === 'worksheets'" class="tab-pane active">
+              
               <div class="card mb-3 mb-lg-5">
                 <div class="card-body">
-                  <p>This is the Social Security Worksheets section.</p>
+                  <canvas id="breakevenChart" style="width: 100%; height: 300px;"></canvas>
                 </div>
               </div>
             </div>
@@ -672,6 +673,7 @@ export default {
       activeTab: 'financial',
       partBInflationRate: 7.42,
       partDInflationRate: 6.73,
+      breakevenChartInstance: null,
     };
   },
   mounted() {
@@ -974,6 +976,73 @@ export default {
             });
           }
         }
+        // Add Breakeven Chart logic if on the worksheets tab
+        if (this.activeTab === 'worksheets') {
+          const ctxBreakEven = document.getElementById('breakevenChart');
+          if (ctxBreakEven && this.scenarioResults.length) {
+            // Destroy previous chart instance if it exists
+            if (this.breakevenChartInstance) {
+              this.breakevenChartInstance.destroy();
+            }
+            const baseYear = this.scenarioResults[0].year;
+            const fraAge = this.client?.fra_age || 67;
+            const lifeExpectancy = this.client?.mortality_age || 90;
+            const baseAnnualBenefit = parseFloat(this.scenarioResults.find(r => r.primary_age === fraAge)?.social_security_benefit || 0);
+            const getBenefit = (claimAge) => {
+              const diff = claimAge - fraAge;
+              if (diff === 0) return baseAnnualBenefit;
+              if (diff < 0) return baseAnnualBenefit * (1 - 0.065 * (fraAge - claimAge));
+              return baseAnnualBenefit * (1 + 0.08 * (claimAge - fraAge));
+            };
+
+            const datasets = [];
+            for (let claimAge = 62; claimAge <= 70; claimAge++) {
+              let cumulative = 0;
+              const data = [];
+              for (let age = claimAge; age <= lifeExpectancy; age++) {
+                const benefit = getBenefit(claimAge);
+                cumulative += benefit;
+                data.push(cumulative);
+              }
+              datasets.push({
+                label: `Claim at ${claimAge}`,
+                data,
+                fill: false,
+                borderWidth: 2,
+                tension: 0.3
+              });
+            }
+
+            const labels = [];
+            for (let age = 62; age <= lifeExpectancy; age++) {
+              labels.push(age.toString());
+            }
+
+            this.breakevenChartInstance = new Chart(ctxBreakEven, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: datasets
+              },
+              options: {
+                responsive: true,
+                plugins: {
+                  legend: { position: 'bottom' },
+                  tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                  x: {
+                    title: { display: true, text: 'Age' }
+                  },
+                  y: {
+                    title: { display: true, text: 'Cumulative Benefits ($)' },
+                    beginAtZero: true
+                  }
+                }
+              }
+            });
+          }
+        }
       });
     },
     initializeCircles() {
@@ -1041,7 +1110,7 @@ export default {
   watch: {
     activeTab(newVal) {
       console.log("Active tab changed to:", newVal);
-      if (newVal === 'socialSecurity' || newVal === 'medicare') {
+      if (['socialSecurity', 'medicare', 'worksheets'].includes(newVal)) {
         console.log("🔍 Debug - scenarioResults:", this.scenarioResults);
         if (this.scenarioResults.length) {
           console.log("🔍 Debug - First row year:", this.scenarioResults[0].year);
