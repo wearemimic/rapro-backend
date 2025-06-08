@@ -22,25 +22,13 @@
                 <div class="row align-items-center">
                   <div class="col-auto">
                     <span>Client:</span>
-                    <a href="#">< Client Name(s) ></a>
+                    <a href="/clients/{clientId}">{{ formatClientName(client) }}</a>
                   </div>
                   <!-- End Col -->
 
                   <div class="col-auto">
                     <div class="row align-items-center g-0">
-                      <div class="col-auto">Due date:</div>
-
-                      <!-- Flatpickr -->
-                      <div class="col flatpickr-custom-position-fix-sm-down">
-                        <div id="projectDeadlineFlatpickr" class="js-flatpickr flatpickr-custom flatpickr-custom-borderless input-group input-group-sm" data-hs-flatpickr-options='{
-                                "appendTo": "#projectDeadlineFlatpickr",
-                                "dateFormat": "d/m/Y",
-                                "wrap": true
-                              }'>
-                          <input type="text" class="flatpickr-custom-form-control form-control" placeholder="Select dates" data-input value="29/06/2020">
-                          
-                        </div>
-                      </div>
+                      
                       <!-- End Flatpickr -->
                     </div>
                   </div>
@@ -390,7 +378,7 @@
                         <tr v-for="(row, index) in scenarioResults" :key="index">
                           <td>{{ row.year }}</td>
                           <td>{{ row.primary_age }}</td>
-                          <td>${{ parseFloat(row.social_security_benefit || 0).toFixed(2) }}</td>
+                          <td>${{ parseFloat(row.ss_income || 0).toFixed(2) }}</td>
                           <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
                           <td>{{ (parseFloat(row.ssi_taxed || 0) * 100).toFixed(2) }}%</td>
                           <td class="bg-success text-white">${{ parseFloat(row.remaining_ssi || 0).toFixed(2) }}</td>
@@ -726,6 +714,7 @@ export default {
         this.selectedScenarioId = this.scenario?.id || null;
         this.initPlugins();
         this.fetchScenarioData();
+        console.log('Client Tax Status:', this.client?.tax_status);
       })
       .catch(error => {
         console.error('Error loading client and scenario:', error);
@@ -775,60 +764,81 @@ export default {
     },
     initializeChartJS() {
       this.$nextTick(() => {
-        const ctx = document.getElementById('financial_overview_chart');
+        const ctx = document.getElementById(this.activeTab === 'socialSecurity' ? 'socialSecurityChart' : 'financial_overview_chart');
         if (ctx && this.scenarioResults.length) {
           if (this.chartInstance) {
             this.chartInstance.destroy();
           }
 
+          const datasets = this.activeTab === 'socialSecurity' ? [
+            {
+              type: 'line',
+              label: 'Social Security Benefit',
+              data: this.scenarioResults.map(row => parseFloat(row.ss_income || 0)),
+              borderColor: "#377dff",
+              backgroundColor: "rgba(55, 125, 255, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Total Medicare',
+              data: this.scenarioResults.map(row => parseFloat(row.total_medicare || 0)),
+              backgroundColor: "#ffc107",
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            }
+          ] : [
+            {
+              type: 'line',
+              label: 'Total Income',
+              data: this.scenarioResults.map(row => parseFloat(row.gross_income)),
+              borderColor: "#377dff",
+              backgroundColor: "rgba(55, 125, 255, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: 'Remaining Income',
+              data: this.scenarioResults.map(row => {
+                const gross = parseFloat(row.gross_income);
+                const tax = parseFloat(row.federal_tax);
+                const medicare = parseFloat(row.total_medicare);
+                const remaining = gross - (tax + medicare);
+                return parseFloat(remaining.toFixed(2));
+              }),
+              borderColor: "#00c9db",
+              backgroundColor: "rgba(0, 201, 219, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Federal Tax',
+              data: this.scenarioResults.map(row => parseFloat(row.federal_tax)),
+              backgroundColor: "#ff6b6b",
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Total Medicare',
+              data: this.scenarioResults.map(row => parseFloat(row.total_medicare)),
+              backgroundColor: "#ffc107",
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            }
+          ];
+
           this.chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
               labels: this.scenarioResults.map(row => row.year.toString()),
-              datasets: [
-                {
-                  type: 'line',
-                  label: 'Total Income',
-                  data: this.scenarioResults.map(row => parseFloat(row.gross_income)),
-                  borderColor: "#377dff",
-                  backgroundColor: "rgba(55, 125, 255, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'line',
-                  label: 'Remaining Income',
-                  data: this.scenarioResults.map(row => {
-                    const gross = parseFloat(row.gross_income);
-                    const tax = parseFloat(row.federal_tax);
-                    const medicare = parseFloat(row.total_medicare);
-                    const remaining = gross - (tax + medicare);
-                    return parseFloat(remaining.toFixed(2));
-                  }),
-                  borderColor: "#00c9db",
-                  backgroundColor: "rgba(0, 201, 219, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'Federal Tax',
-                  data: this.scenarioResults.map(row => parseFloat(row.federal_tax)),
-                  backgroundColor: "#ff6b6b",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'Total Medicare',
-                  data: this.scenarioResults.map(row => parseFloat(row.total_medicare)),
-                  backgroundColor: "#ffc107",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                }
-              ]
+              datasets: datasets
             },
             options: {
               responsive: true,
@@ -863,234 +873,6 @@ export default {
               }
             }
           });
-        }
-        // Add Social Security Chart logic if on the appropriate tab
-        if (this.activeTab === 'socialSecurity') {
-          const ctxSS = document.getElementById('socialSecurityChart');
-          if (ctxSS && this.scenarioResults.length) {
-            const parseNumber = val => parseFloat(String(val).replace(/,/g, '')) || 0;
-            const labels = this.scenarioResults.map(row => row.year.toString());
-            const ssiBenefit = this.scenarioResults.map(row => parseNumber(row.social_security_benefit));
-            const remainingSSI = this.scenarioResults.map(row => parseNumber(row.remaining_ssi));
-            const medicareCost = this.scenarioResults.map(row => parseNumber(row.total_medicare));
-
-            new Chart(ctxSS, {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [
-                  {
-                    type: 'line',
-                    label: 'SSI Benefit',
-                    data: ssiBenefit,
-                    borderColor: '#377dff',
-                    backgroundColor: 'rgba(55, 125, 255, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y'
-                  },
-                  {
-                    type: 'line',
-                    label: 'Remaining SSI Benefit',
-                    data: remainingSSI,
-                    borderColor: '#00c9db',
-                    backgroundColor: 'rgba(0, 201, 219, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y'
-                  },
-                  {
-                    label: 'Total Medicare Expense',
-                    data: medicareCost,
-                    backgroundColor: '#ffc107',
-                    stack: 'Stack 0',
-                    yAxisID: 'y'
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    stacked: true,
-                    title: {
-                      display: true,
-                      text: 'Year'
-                    }
-                  },
-                  y: {
-                    stacked: false,
-                    title: {
-                      display: true,
-                      text: 'Amount ($)'
-                    },
-                    ticks: {
-                      beginAtZero: true
-                    }
-                  }
-                },
-                plugins: {
-                  tooltip: {
-                    mode: 'index',
-                    intersect: false
-                  },
-                  legend: {
-                    position: 'bottom'
-                  }
-                }
-              }
-            });
-          }
-        }
-        // Add Medicare Chart logic if on the appropriate tab
-        if (this.activeTab === 'medicare') {
-          const ctxMedicare = document.getElementById('medicareChart');
-          if (ctxMedicare && this.scenarioResults.length) {
-            const parseNumber = val => parseFloat(String(val).replace(/,/g, '')) || 0;
-            const labels = this.scenarioResults.map(row => row.year.toString());
-            const totalIncome = this.scenarioResults.map(row => parseNumber(row.gross_income));
-            const partB = this.scenarioResults.map(row => parseNumber(row.part_b));
-            const partD = this.scenarioResults.map(row => parseNumber(row.part_d));
-
-            new Chart(ctxMedicare, {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [
-                  {
-                    type: 'line',
-                    label: 'Total Income',
-                    data: totalIncome,
-                    borderColor: '#377dff',
-                    backgroundColor: 'rgba(55, 125, 255, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y'
-                  },
-                  {
-                    label: 'Part B',
-                    data: partB,
-                    backgroundColor: '#ff6b6b',
-                    stack: 'Stack 0',
-                    yAxisID: 'y'
-                  },
-                  {
-                    label: 'Part D',
-                    data: partD,
-                    backgroundColor: '#00c9db',
-                    stack: 'Stack 0',
-                    yAxisID: 'y'
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    stacked: true,
-                    title: {
-                      display: true,
-                      text: 'Year'
-                    }
-                  },
-                  y: {
-                    stacked: true,
-                    title: {
-                      display: true,
-                      text: 'Amount ($)'
-                    },
-                    ticks: {
-                      beginAtZero: true
-                    }
-                  }
-                },
-                plugins: {
-                  tooltip: {
-                    mode: 'index',
-                    intersect: false
-                  },
-                  legend: {
-                    position: 'bottom'
-                  }
-                }
-              }
-            });
-          }
-        }
-        // Add Breakeven Chart logic if on the worksheets tab
-        if (this.activeTab === 'worksheets') {
-          const ctxBreakEven = document.getElementById('breakevenChart');
-          if (ctxBreakEven && this.scenarioResults.length) {
-            // Destroy previous chart instance if it exists
-            if (this.breakevenChartInstance) {
-              this.breakevenChartInstance.destroy();
-            }
-
-            const fraAge = this.client?.fra_age || 67;
-            const lifeExpectancy = this.client?.mortality_age || 90;
-
-            const benefitByAge = {
-              62: 37800,
-              63: 40776,
-              64: 43740,
-              65: 47256,
-              66: 50496,
-              67: 54000,
-              68: 58320,
-              69: 62640,
-              70: 66960,
-            };
-
-            // Updated getCumulative to apply COLA
-            const getCumulative = (startAge, annualBenefit) => {
-              let total = 0;
-              const data = [];
-              for (let age = 62; age <= lifeExpectancy; age++) {
-                if (age >= startAge) {
-                  total += annualBenefit * Math.pow(1 + this.socialSecurityCola / 100, age - startAge);
-                }
-                data.push(parseFloat(total.toFixed(2)));
-              }
-              return data;
-            };
-
-            // Assign each line a unique color using a predefined array of colors
-            const colors = ['#377dff', '#00c9db', '#ff6b6b', '#ffc107', '#28a745', '#6f42c1', '#fd7e14', '#20c997', '#6610f2'];
-            const datasets = Object.entries(benefitByAge).map(([age, benefit], index) => ({
-              label: `Claim at ${age}`,
-              data: getCumulative(parseInt(age), benefit),
-              borderColor: colors[index % colors.length],
-              borderWidth: 2,
-              tension: 0.3,
-              fill: false
-            }));
-
-            const labels = Array.from({ length: lifeExpectancy - 61 }, (_, i) => (62 + i).toString());
-
-            this.breakevenChartInstance = new Chart(ctxBreakEven, {
-              type: 'line',
-              data: {
-                labels,
-                datasets
-              },
-              options: {
-                responsive: true,
-                plugins: {
-                  legend: { position: 'bottom' },
-                  tooltip: { mode: 'index', intersect: false },
-                },
-                scales: {
-                  x: {
-                    title: { display: true, text: 'Age' }
-                  },
-                  y: {
-                    title: { display: true, text: 'Cumulative Benefit ($)' },
-                    beginAtZero: true
-                  }
-                }
-              }
-            });
-          }
         }
       });
     },
@@ -1157,6 +939,7 @@ export default {
       axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/calculate/`, { headers })
         .then(response => {
           this.scenarioResults = response.data;
+          console.log('API Response:', response.data);
           // Re-initialize chart with new data
           this.initializeChartJS();
         })
@@ -1210,7 +993,7 @@ export default {
         tableData = this.scenarioResults.map(row => ({
           year: row.year,
           primary_age: row.primary_age,
-          social_security_benefit: row.social_security_benefit,
+          social_security_benefit: row.ss_income,
           total_medicare: row.total_medicare,
           ssi_taxed: row.ssi_taxed,
           remaining_ssi: row.remaining_ssi
@@ -1259,7 +1042,7 @@ export default {
         tableData = this.scenarioResults.map(row => ({
           year: row.year,
           primary_age: row.primary_age,
-          social_security_benefit: row.social_security_benefit,
+          social_security_benefit: row.ss_income,
           total_medicare: row.total_medicare,
           ssi_taxed: row.ssi_taxed,
           remaining_ssi: row.remaining_ssi
@@ -1293,7 +1076,7 @@ export default {
         tableData = this.scenarioResults.map(row => ({
           year: row.year,
           primary_age: row.primary_age,
-          social_security_benefit: row.social_security_benefit,
+          social_security_benefit: row.ss_income,
           total_medicare: row.total_medicare,
           ssi_taxed: row.ssi_taxed,
           remaining_ssi: row.remaining_ssi
@@ -1320,6 +1103,16 @@ export default {
       link.href = URL.createObjectURL(blob);
       link.download = `${this.activeTab}-scenario-data.csv`;
       link.click();
+    },
+    formatClientName(client) {
+      if (!client) return '';
+      const firstName = client.first_name || '';
+      const lastName = client.last_name || '';
+      const spouseName = client.spouse_name || '';
+      if (spouseName) {
+        return `${firstName} and ${spouseName} ${lastName}`;
+      }
+      return `${firstName} ${lastName}`;
     }
   },
   computed: {

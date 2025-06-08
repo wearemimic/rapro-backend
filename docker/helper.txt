@@ -4,3 +4,7 @@
 
 # Running migrate in the venv
 docker compose exec backend python manage.py migrate
+
+
+# Database Schema Dump to create schema doc for AI
+docker exec -it docker-db-1 pg_dump -U postgres -s retirementadvisorpro > schema.sql

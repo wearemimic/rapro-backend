@@ -139,7 +139,7 @@ class IncomeSource(models.Model):
     owned_by = models.CharField(max_length=10, choices=OWNED_BY_CHOICES)
     income_type = models.CharField(max_length=200)
     income_name = models.CharField(max_length=50)
-    balance_at_retirement = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    current_asset_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     monthly_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     monthly_contribution = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     age_to_begin_withdrawal = models.PositiveIntegerField(null=True, blank=True)

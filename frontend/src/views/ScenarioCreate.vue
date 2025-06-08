@@ -604,7 +604,7 @@ async function submitScenario() {
       sanitized.owned_by = row.owned_by;
       sanitized.income_type = row.income_type;
       sanitized.income_name = row.income_type.replace(/_/g, ' ');
-      sanitized.balance_at_retirement = row.current_balance;
+      sanitized.current_asset_balance = row.current_balance;
       sanitized.monthly_amount = row.withdrawal_amount || row.amount_at_fra || 0;
       sanitized.monthly_contribution = row.monthly_contribution || 0;
       sanitized.age_to_begin_withdrawal = row.start_age;
