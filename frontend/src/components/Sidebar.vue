@@ -1,5 +1,5 @@
 <template>
-  <aside id="sidebar" class="sidebar">
+  <aside id="sidebar" class="sidebar" style="width:200px;">
     <div class="navbar-vertical-container">
       <div class="navbar-vertical-footer-offset">
         <!-- Logo -->
@@ -26,14 +26,12 @@
           <div id="navbarVerticalMenu" class="nav nav-pills nav-vertical card-navbar-nav">
             <!-- Collapse -->
             <div class="nav-item">
-              <a class="nav-link dropdown-toggle active" href="#navbarVerticalMenuDashboards" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuDashboards" aria-expanded="true" aria-controls="navbarVerticalMenuDashboards">
-                <i class="bi-house-door nav-icon"></i>
-                <span class="nav-link-title">Dashboards</span>
+              <a class="nav-link" href="/dashboard" role="button"  aria-expanded="true" aria-controls="navbarVerticalMenuDashboards">
+                <i class="bi-people nav-icon"></i>
+                <span class="nav-link-title">Dashboard</span>
               </a>
 
-              <div id="navbarVerticalMenuDashboards" class="nav-collapse collapse show" data-bs-parent="#navbarVerticalMenu">
-                <a class="nav-link active" href="/dashboard">Default</a>
-              </div>
+              
             </div>
             <!-- End Collapse -->
             <!-- Collapse -->
@@ -55,22 +53,7 @@
               </div>
               <!-- End Collapse -->
 
-              <!-- Collapse -->
-              <div class="nav-item">
-                <a class="nav-link dropdown-toggle " href="#navbarVerticalMenuPagesUserProfileMenu" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuPagesUserProfileMenu" aria-expanded="false" aria-controls="navbarVerticalMenuPagesUserProfileMenu">
-                  <i class="bi-person nav-icon"></i>
-                  <span class="nav-link-title">User Profile <span class="badge bg-primary rounded-pill ms-1">5</span></span>
-                </a>
-
-                <div id="navbarVerticalMenuPagesUserProfileMenu" class="nav-collapse collapse " data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link " href="./user-profile.html">Profile</a>
-                  <a class="nav-link " href="./user-profile-teams.html">Teams</a>
-                  <a class="nav-link " href="./user-profile-projects.html">Projects</a>
-                  <a class="nav-link " href="./user-profile-connections.html">Connections</a>
-                  <a class="nav-link " href="./user-profile-my-profile.html">My Profile</a>
-                </div>
-              </div>
-              <!-- End Collapse -->
+              
 
               <!-- Collapse -->
               <div class="nav-item">
@@ -82,7 +65,20 @@
                 <div id="navbarVerticalMenuPagesAccountMenu" class="nav-collapse collapse " data-bs-parent="#navbarVerticalMenuPagesMenu">
                   <a class="nav-link " href="./account-settings.html">Settings</a>
                   <a class="nav-link " href="./account-billing.html">Billing</a>
-                  <a class="nav-link " href="./account-invoice.html">Invoice</a>
+                  <a class="nav-link " href="./account-white-label.html">White Label</a>
+                </div>
+              </div>
+              <!-- End Collapse -->
+
+              <!-- Collapse -->
+              <div class="nav-item">
+                <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuIntegrationsMenu" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuIntegrationsMenu" aria-expanded="false" aria-controls="navbarVerticalMenuIntegrationsMenu">
+                  <i class="bi-plug nav-icon"></i>
+                  <span class="nav-link-title">Integrations</span>
+                </a>
+
+                <div id="navbarVerticalMenuIntegrationsMenu" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">CRM</a>
                 </div>
               </div>
               <!-- End Collapse -->
@@ -90,12 +86,7 @@
             <!-- End Collapse -->
 
 
-            <div class="nav-item">
-              <a class="nav-link " href="./apps-file-manager.html" data-placement="left">
-                <i class="bi-folder2-open nav-icon"></i>
-                <span class="nav-link-title">File Manager</span>
-              </a>
-            </div>
+          
 
           </div>
 

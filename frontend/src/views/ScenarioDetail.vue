@@ -22,25 +22,13 @@
                 <div class="row align-items-center">
                   <div class="col-auto">
                     <span>Client:</span>
-                    <a href="#">< Client Name(s) ></a>
+                    <a href="/clients/{clientId}">{{ formatClientName(client) }}</a>
                   </div>
                   <!-- End Col -->
 
                   <div class="col-auto">
                     <div class="row align-items-center g-0">
-                      <div class="col-auto">Due date:</div>
-
-                      <!-- Flatpickr -->
-                      <div class="col flatpickr-custom-position-fix-sm-down">
-                        <div id="projectDeadlineFlatpickr" class="js-flatpickr flatpickr-custom flatpickr-custom-borderless input-group input-group-sm" data-hs-flatpickr-options='{
-                                "appendTo": "#projectDeadlineFlatpickr",
-                                "dateFormat": "d/m/Y",
-                                "wrap": true
-                              }'>
-                          <input type="text" class="flatpickr-custom-form-control form-control" placeholder="Select dates" data-input value="29/06/2020">
-                          
-                        </div>
-                      </div>
+                      
                       <!-- End Flatpickr -->
                     </div>
                   </div>
@@ -288,33 +276,26 @@
 
                   <!-- Dropdown -->
                   <div class="dropdown">
-                    <button type="button" class="btn btn-white btn-sm dropdown-toggle" id="usersExportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('financial')" :aria-expanded="isDropdownOpen.financial">
                       <i class="bi-download me-2"></i> Export
                     </button>
 
-                    <div class="dropdown-menu dropdown-menu-sm-end" aria-labelledby="usersExportDropdown">
-                      <span class="dropdown-header">Options</span>
-                      <a id="export-copy" class="dropdown-item" href="javascript:;">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="./assets/svg/illustrations/copy-icon.svg" alt="Image Description">
-                        Copy
+                    <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.financial }" aria-labelledby="usersExportDropdown">
+                      <span class="dropdown-header">Export Options</span>
+                      <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
+                        Export graph and table to Excel
                       </a>
-                      <a id="export-print" class="dropdown-item" href="javascript:;">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="./assets/svg/illustrations/print-icon.svg" alt="Image Description">
-                        Print
+                      <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
+                        Export graph and data to PDF
                       </a>
-                      <div class="dropdown-divider"></div>
-                      <span class="dropdown-header">Download options</span>
-                      <a id="export-excel" class="dropdown-item" href="javascript:;">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="./assets/svg/brands/excel-icon.svg" alt="Image Description">
-                        Excel
+                      <a id="export-graph" class="dropdown-item" href="javascript:;">
+                        Export graph only
                       </a>
-                      <a id="export-csv" class="dropdown-item" href="javascript:;">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="./assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                        .CSV
-                      </a>
-                      <a id="export-pdf" class="dropdown-item" href="javascript:;">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="./assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                        PDF
+                      <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
+                        Export table only as CSV
                       </a>
                     </div>
                   </div>
@@ -325,90 +306,7 @@
                 <!-- Body -->
                 <div class="card-body">
                   <!-- Bar Chart -->
-                  <canvas id="project" class="js-chart" style="width: 100%;height:300px;" data-hs-chartjs-options='{
-                            "type": "line",
-                            "data": {
-                              "labels": ["Feb","Jan","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-                              "datasets": [{
-                                "data": [18,51,60,38,88,50,40,52,88,80,60,70],
-                                "backgroundColor": ["rgba(55, 125, 255, 0)", "rgba(255, 255, 255, 0)"],
-                                "borderColor": "#377dff",
-                                "borderWidth": 2,
-                                "pointRadius": 0,
-                                "pointBorderColor": "#fff",
-                                "pointBackgroundColor": "#377dff",
-                                "pointHoverRadius": 0,
-                                "hoverBorderColor": "#fff",
-                                "hoverBackgroundColor": "#377dff",
-                                "tension": 0.4
-                              },
-                              {
-                                "data": [27,38,60,77,40,50,49,29,42,27,42,50],
-                                "backgroundColor": ["rgba(0, 201, 219, 0)", "rgba(255, 255, 255, 0)"],
-                                "borderColor": "#00c9db",
-                                "borderWidth": 2,
-                                "pointRadius": 0,
-                                "pointBorderColor": "#fff",
-                                "pointBackgroundColor": "#00c9db",
-                                "pointHoverRadius": 0,
-                                "hoverBorderColor": "#fff",
-                                "hoverBackgroundColor": "#00c9db",
-                                "tension": 0.4
-                              }]
-                            },
-                            "options": {
-                              "gradientPosition": {"y1": 200},
-                              "scales": {
-                                  "y": {
-                                    "grid": {
-                                      "color": "#e7eaf3",
-                                      "drawBorder": false,
-                                      "zeroLineColor": "#e7eaf3"
-                                    },
-                                    "ticks": {
-                                      "min": 0,
-                                      "max": 100,
-                                      "stepSize": 20,
-                                      "color": "#97a4af",                                
-                                      "font": {
-                                        "family": "Open Sans, sans-serif"
-                                      },
-                                      "padding": 10,
-                                      "postfix": "k"
-                                    }
-                                  },
-                                  "x": {
-                                    "grid": {
-                                      "display": false,
-                                      "drawBorder": false
-                                    },
-                                    "ticks": {
-                                    "color": "#97a4af",
-                                      "font": {
-                                        "family": "Open Sans, sans-serif"
-                                      },
-                                      "padding": 5
-                                    }
-                                  }
-                              },
-                              "plugins": {
-                                "tooltip": {
-                                  "prefix": "$",
-                                  "postfix": "k",
-                                  "hasIndicator": true,
-                                  "mode": "index",
-                                  "intersect": false,
-                                  "lineMode": true,
-                                  "lineWithLineColor": "rgba(19, 33, 68, 0.075)"
-                                }
-                              },
-                              "hover": {
-                                "mode": "nearest",
-                                "intersect": true
-                              }
-                            }
-                          }'>
-                  </canvas>
+                  <canvas id="financial_overview_chart" style="width: 100%; height: 300px !important;"></canvas>
                   <!-- End Bar Chart -->
                 </div>
                 <!-- End Body -->
@@ -416,15 +314,7 @@
               <!-- End Card -->
               <div class="card mb-3 mb-lg-5">
                 <!-- Header -->
-                <div class="dropdown mb-3">
-                    <button class="btn btn-outline-primary dropdown-toggle" type="button" id="downloadDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                      Download
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="downloadDropdown">
-                      <li><a class="dropdown-item" href="#" @click.prevent="downloadTable('csv')">Download CSV</a></li>
-                      <li><a class="dropdown-item" href="#" @click.prevent="downloadTable('excel')">Download Excel</a></li>
-                    </ul>
-                  </div>
+                
                 <div class="card-header card-header-content-between">
                   <div v-if="scenarioResults.length" class="table-responsive mt-4">
                     <table class="table table-hover">
@@ -460,16 +350,65 @@
                   </div>
                 </div>
               </div>
+              <div class="card mb-3 mb-lg-5">
+                <!-- Header -->
+                <div class="card-header card-header-content-between">
+                  <h5 class="mb-4">401k Year-by-Year Details</h5>
+                  <div class="table-responsive">
+                    <table class="table table-hover">
+                      <thead class="thead-light">
+                        <tr>
+                          <th>Year</th>
+                          <th>401k Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in scenarioResults" :key="row.year">
+                          <td>{{ row.year }}</td>
+                          <td>${{ row["401k_balance"] }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
               <!-- End Card -->
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active">
               <!-- Social Security Chart Card -->
+
               <div class="card mb-3 mb-lg-5">
+                <div class="card-header card-header-content-between">
+                  <div class="dropdown">
+                    <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('socialSecurity')" :aria-expanded="isDropdownOpen.socialSecurity">
+                      <i class="bi-download me-2"></i> Export
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.socialSecurity }" aria-labelledby="usersExportDropdown">
+                      <span class="dropdown-header">Export Options</span>
+                      <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
+                        Export graph and table to Excel
+                      </a>
+                      <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
+                        Export graph and data to PDF
+                      </a>
+                      <a id="export-graph" class="dropdown-item" href="javascript:;">
+                        Export graph only
+                      </a>
+                      <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
+                        Export table only as CSV
+                      </a>
+                    </div>
+                  </div>
+                </div>
                 <div class="card-body">
-                  <canvas id="socialSecurityChart" style="width: 100%; height: 300px;"></canvas>
+                  <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
                 </div>
               </div>
               <div class="card mb-3 mb-lg-5">
+                
                 <div class="card-body">
                   <h5 class="mb-4">IMPACT ON SOCIAL SECURITY CHECK (PRIMARY)</h5>
                   <div class="table-responsive">
@@ -488,16 +427,17 @@
                         <tr v-for="(row, index) in scenarioResults" :key="index">
                           <td>{{ row.year }}</td>
                           <td>{{ row.primary_age }}</td>
-                          <td>${{ parseFloat(row.social_security_benefit || 0).toFixed(2) }}</td>
+                          <td>${{ parseFloat(row.ss_income || 0).toFixed(2) }}</td>
                           <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
-                          <td>{{ (parseFloat(row.ssi_taxed || 0) * 100).toFixed(2) }}%</td>
-                          <td class="bg-success text-white">${{ parseFloat(row.remaining_ssi || 0).toFixed(2) }}</td>
+                          <td></td>
+                          <td class="bg-success text-white">${{ (parseFloat(row.ss_income || 0) - parseFloat(row.total_medicare || 0)).toFixed(2) }}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 </div>
               </div>
+              
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active">
               <!-- Medicare Chart Card -->
@@ -557,11 +497,39 @@
                   </div>
                 </div>
               </div>
+              <div class="dropdown">
+                <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('medicare')" :aria-expanded="isDropdownOpen.medicare">
+                  <i class="bi-download me-2"></i> Export
+                </button>
+                <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.medicare }" aria-labelledby="usersExportDropdown">
+                  <span class="dropdown-header">Export Options</span>
+                  <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
+                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
+                    Export graph and table to Excel
+                  </a>
+                  <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
+                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
+                    Export graph and data to PDF
+                  </a>
+                  <a id="export-graph" class="dropdown-item" href="javascript:;">
+                    Export graph only
+                  </a>
+                  <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
+                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
+                    Export table only as CSV
+                  </a>
+                </div>
+              </div>
             </div>
             <div v-show="activeTab === 'income'" class="tab-pane active">
               <div class="card mb-3 mb-lg-5">
                 <div class="card-body">
-                  <p>This is the Income section.</p>
+                  <h5 class="mb-4">Types of Income in Scenario</h5>
+                  <ul>
+                    <li v-for="incomeType in incomeFields" :key="incomeType">
+                      {{ incomeType }}
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -573,10 +541,69 @@
               </div>
             </div>
             <div v-show="activeTab === 'worksheets'" class="tab-pane active">
-              
+              <div class="mb-3">
+                <label for="colaInput" class="form-label">Social Security COLA (%)</label>
+                <input type="number" class="form-control" id="colaInput" v-model.number="socialSecurityCola" @change="initializeChartJS" min="0" step="0.1">
+              </div>
               <div class="card mb-3 mb-lg-5">
                 <div class="card-body">
-                  <canvas id="breakevenChart" style="width: 100%; height: 300px;"></canvas>
+                  <canvas id="breakevenChart" style="width: 100%; height: 300px !important;"></canvas>
+                </div>
+              </div>
+              <!-- Social Security Claim Comparison Table -->
+              <div class="card mt-3 mb-lg-5">
+                <div class="card-body">
+                  <h5 class="mb-4">Social Security Claim Comparison</h5>
+                  <div class="table-responsive">
+                    <table class="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Age</th>
+                          <th>Monthly Amount</th>
+                          <th>Total Lifetime Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(benefit, age) in benefitByAge" :key="age">
+                          <td>{{ age }}</td>
+                          <td>${{ (benefit / 12).toFixed(2) }}</td>
+                          <td>
+                            ${{ 
+                              (
+                                Array.from({ length: client?.mortality_age - age + 1 }, (_, i) =>
+                                  (benefit * Math.pow(1 + socialSecurityCola / 100, i))
+                                ).reduce((acc, val) => acc + val, 0)
+                              ).toFixed(2) 
+                            }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <!-- End Social Security Claim Comparison Table -->
+              <div class="dropdown">
+                <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('worksheets')" :aria-expanded="isDropdownOpen.worksheets">
+                  <i class="bi-download me-2"></i> Export
+                </button>
+                <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.worksheets }" aria-labelledby="usersExportDropdown">
+                  <span class="dropdown-header">Export Options</span>
+                  <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
+                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
+                    Export graph and table to Excel
+                  </a>
+                  <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
+                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
+                    Export graph and data to PDF
+                  </a>
+                  <a id="export-graph" class="dropdown-item" href="javascript:;">
+                    Export graph only
+                  </a>
+                  <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
+                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
+                    Export table only as CSV
+                  </a>
                 </div>
               </div>
             </div>
@@ -631,6 +658,10 @@
 
 <script>
 import axios from 'axios'
+import { jsPDF } from 'jspdf';
+import { applyPlugin } from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+
 
 import {
   Chart,
@@ -659,6 +690,9 @@ Chart.register(
   CategoryScale
 );
 
+// Apply the plugin to jsPDF
+applyPlugin(jsPDF);
+
 const token = localStorage.getItem('token')
 const headers = { Authorization: `Bearer ${token}` }
 
@@ -674,6 +708,24 @@ export default {
       partBInflationRate: 7.42,
       partDInflationRate: 6.73,
       breakevenChartInstance: null,
+      socialSecurityCola: 0,
+      benefitByAge: {
+        62: 37800,
+        63: 40776,
+        64: 43740,
+        65: 47256,
+        66: 50496,
+        67: 54000,
+        68: 58320,
+        69: 62640,
+        70: 66960,
+      },
+      isDropdownOpen: {
+        financial: false,
+        socialSecurity: false,
+        medicare: false,
+        worksheets: false
+      }
     };
   },
   mounted() {
@@ -690,10 +742,18 @@ export default {
         this.selectedScenarioId = this.scenario?.id || null;
         this.initPlugins();
         this.fetchScenarioData();
+        console.log('Client Tax Status:', this.client?.tax_status);
       })
       .catch(error => {
         console.error('Error loading client and scenario:', error);
       });
+
+    // Add event listener for clicks outside the dropdown
+    document.addEventListener('click', this.handleClickOutside);
+  },
+  beforeUnmount() {
+    // Remove event listener when component is destroyed
+    document.removeEventListener('click', this.handleClickOutside);
   },
   methods: {
     downloadTable(format) {
@@ -732,76 +792,160 @@ export default {
     },
     initializeChartJS() {
       this.$nextTick(() => {
-        const ctx = document.getElementById('project');
+        const ctx = document.getElementById(
+          this.activeTab === 'worksheets' ? 'breakevenChart' :
+          this.activeTab === 'medicare' ? 'medicareChart' :
+          this.activeTab === 'socialSecurity' ? 'socialSecurityChart' :
+          'financial_overview_chart'
+        );
         if (ctx && this.scenarioResults.length) {
-          // Robust number parsing function
-          const parseNumber = val => parseFloat(String(val).replace(/,/g, '')) || 0;
-          const labels = this.scenarioResults.map(row => row.year.toString());
-          // Calculate remainingIncome with explicit tax and medicare variables
-          const remainingIncome1 = this.scenarioResults.map(row => {
-            const gross = parseNumber(row.gross_income);
-            const tax = parseNumber(row.federal_tax);
-            const medicare = parseNumber(row.total_medicare);
-            const remaining = gross - (tax + medicare);
-            return parseFloat(remaining.toFixed(2));
-          });
-          const grossIncome = this.scenarioResults.map(row => parseNumber(row.gross_income));
-          const federalTax = this.scenarioResults.map(row => parseNumber(row.federal_tax));
-          const totalMedicare = this.scenarioResults.map(row => parseNumber(row.total_medicare));
+          if (this.chartInstance) {
+            this.chartInstance.destroy();
+          }
 
-          new Chart(ctx, {
-            type: 'bar',
-            data: {
-              labels: labels,
-              datasets: [
-                {
-                  type: 'line',
-                  label: 'Gross Income',
-                  data: grossIncome,
-                  borderColor: "#377dff",
-                  backgroundColor: "rgba(55, 125, 255, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'line',
-                  label: 'Remaining Income',
-                  data: remainingIncome1,
-                  borderColor: "#00c9db",
-                  backgroundColor: "rgba(0, 201, 219, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  label: 'Federal Tax',
-                  data: federalTax,
-                  backgroundColor: "#ff6b6b",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                },
-                {
-                  label: 'Total Medicare',
-                  data: totalMedicare,
-                  backgroundColor: "#ffc107",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
+          console.log('Scenario Results:', this.scenarioResults);
+          console.log('Remaining SSI Benefit Data:', this.scenarioResults.map(row => parseFloat(row.remaining_ssi || 0)));
+
+          const datasets = this.activeTab === 'worksheets' ? [
+            ...Object.entries(this.benefitByAge).map(([age, benefit], i) => {
+              const label = `Total Lifetime Value (Age ${age})`;
+              const data = [];
+              console.log(`Processing Age: ${age}, Benefit: ${benefit}`);
+              let cumulativeIncome = 0;
+              const startYear = 62 + (age - 62); // Adjust the start year based on age
+              for (let year = 62; year <= 90; year++) {
+                if (year >= startYear) {
+                  cumulativeIncome += benefit;
+                  data.push(cumulativeIncome);
+                } else {
+                  data.push(null); // Fill with null or zero until the start year
                 }
-              ]
+                console.log(`Year: ${year}, Cumulative Income: ${cumulativeIncome}`);
+              }
+              return {
+                type: 'line',
+                label,
+                data,
+                borderColor: `hsl(${(i * 40) % 360}, 70%, 50%)`,
+                backgroundColor: `hsla(${(i * 40) % 360}, 70%, 50%, 0.1)`,
+                borderWidth: 2,
+                tension: 0.3,
+                yAxisID: 'y'
+              };
+            })
+          ] : this.activeTab === 'socialSecurity' ? [
+            {
+              type: 'line',
+              label: 'SSI Benefit',
+              data: this.scenarioResults.map(row => parseFloat(row.ss_income || 0)),
+              borderColor: "#377dff",
+              backgroundColor: "rgba(55, 125, 255, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: 'Remaining SSI Benefit',
+              data: this.scenarioResults.map(row => {
+                const ssiBenefit = parseFloat(row.ss_income || 0);
+                const medicareExpense = parseFloat(row.total_medicare || 0);
+                const remainingSSI = ssiBenefit - medicareExpense;
+                console.log(`Year: ${row.year}, SSI Benefit: ${ssiBenefit}, Medicare Expense: ${medicareExpense}, Remaining SSI: ${remainingSSI}`);
+                return remainingSSI;
+              }),
+              borderColor: "#00c9db",
+              backgroundColor: "rgba(0, 201, 219, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Medicare Expense',
+              data: this.scenarioResults.map(row => parseFloat(row.total_medicare || 0)),
+              backgroundColor: "#ffc107",
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            }
+          ] : this.activeTab === 'medicare' ? [
+            {
+            type: 'line',
+            label: 'Total Income',
+            data: this.scenarioResults.map(row => parseFloat(row.gross_income || 0)),
+            borderColor: "#377dff",
+            backgroundColor: "rgba(55, 125, 255, 0.1)",
+            borderWidth: 2,
+            tension: 0.3,
+            yAxisID: 'y'
+          }
+          ] : [
+            {
+              type: 'line',
+              label: 'Total Income',
+              data: this.scenarioResults.map(row => parseFloat(row.gross_income)),
+              borderColor: "#377dff",
+              backgroundColor: "rgba(55, 125, 255, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: 'Remaining Income',
+              data: this.scenarioResults.map(row => {
+                const gross = parseFloat(row.gross_income);
+                const tax = parseFloat(row.federal_tax);
+                const medicare = parseFloat(row.total_medicare);
+                const remaining = gross - (tax + medicare);
+                return parseFloat(remaining.toFixed(2));
+              }),
+              borderColor: "#00c9db",
+              backgroundColor: "rgba(0, 201, 219, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Federal Tax',
+              data: this.scenarioResults.map(row => parseFloat(row.federal_tax)),
+              backgroundColor: "#ff6b6b",
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Total Medicare',
+              data: this.scenarioResults.map(row => parseFloat(row.total_medicare)),
+              backgroundColor: "#ffc107",
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            }
+          ];
+
+          console.log('Datasets:', datasets);
+          console.log('Chart Context:', ctx);
+
+          this.chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: this.scenarioResults.map(row => row.year.toString()), // Use actual years from data
+              datasets: datasets
             },
             options: {
               responsive: true,
+              maintainAspectRatio: false,
               scales: {
                 x: {
-                  stacked: true,
+                  stacked: false,
                   title: {
                     display: true,
                     text: 'Year'
                   }
                 },
                 y: {
-                  stacked: true,
+                  stacked: false,
                   title: {
                     display: true,
                     text: 'Amount ($)'
@@ -823,226 +967,6 @@ export default {
             }
           });
         }
-        // Add Social Security Chart logic if on the appropriate tab
-        if (this.activeTab === 'socialSecurity') {
-          const ctxSS = document.getElementById('socialSecurityChart');
-          if (ctxSS && this.scenarioResults.length) {
-            const parseNumber = val => parseFloat(String(val).replace(/,/g, '')) || 0;
-            const labels = this.scenarioResults.map(row => row.year.toString());
-            const ssiBenefit = this.scenarioResults.map(row => parseNumber(row.social_security_benefit));
-            const remainingSSI = this.scenarioResults.map(row => parseNumber(row.remaining_ssi));
-            const medicareCost = this.scenarioResults.map(row => parseNumber(row.total_medicare));
-
-            new Chart(ctxSS, {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [
-                  {
-                    type: 'line',
-                    label: 'SSI Benefit',
-                    data: ssiBenefit,
-                    borderColor: '#377dff',
-                    backgroundColor: 'rgba(55, 125, 255, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y'
-                  },
-                  {
-                    type: 'line',
-                    label: 'Remaining SSI Benefit',
-                    data: remainingSSI,
-                    borderColor: '#00c9db',
-                    backgroundColor: 'rgba(0, 201, 219, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y'
-                  },
-                  {
-                    label: 'Total Medicare Expense',
-                    data: medicareCost,
-                    backgroundColor: '#ffc107',
-                    stack: 'Stack 0',
-                    yAxisID: 'y'
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    stacked: true,
-                    title: {
-                      display: true,
-                      text: 'Year'
-                    }
-                  },
-                  y: {
-                    stacked: false,
-                    title: {
-                      display: true,
-                      text: 'Amount ($)'
-                    },
-                    ticks: {
-                      beginAtZero: true
-                    }
-                  }
-                },
-                plugins: {
-                  tooltip: {
-                    mode: 'index',
-                    intersect: false
-                  },
-                  legend: {
-                    position: 'bottom'
-                  }
-                }
-              }
-            });
-          }
-        }
-        // Add Medicare Chart logic if on the appropriate tab
-        if (this.activeTab === 'medicare') {
-          const ctxMedicare = document.getElementById('medicareChart');
-          if (ctxMedicare && this.scenarioResults.length) {
-            const parseNumber = val => parseFloat(String(val).replace(/,/g, '')) || 0;
-            const labels = this.scenarioResults.map(row => row.year.toString());
-            const totalIncome = this.scenarioResults.map(row => parseNumber(row.gross_income));
-            const partB = this.scenarioResults.map(row => parseNumber(row.part_b));
-            const partD = this.scenarioResults.map(row => parseNumber(row.part_d));
-
-            new Chart(ctxMedicare, {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [
-                  {
-                    type: 'line',
-                    label: 'Total Income',
-                    data: totalIncome,
-                    borderColor: '#377dff',
-                    backgroundColor: 'rgba(55, 125, 255, 0.1)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    yAxisID: 'y'
-                  },
-                  {
-                    label: 'Part B',
-                    data: partB,
-                    backgroundColor: '#ff6b6b',
-                    stack: 'Stack 0',
-                    yAxisID: 'y'
-                  },
-                  {
-                    label: 'Part D',
-                    data: partD,
-                    backgroundColor: '#00c9db',
-                    stack: 'Stack 0',
-                    yAxisID: 'y'
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    stacked: true,
-                    title: {
-                      display: true,
-                      text: 'Year'
-                    }
-                  },
-                  y: {
-                    stacked: true,
-                    title: {
-                      display: true,
-                      text: 'Amount ($)'
-                    },
-                    ticks: {
-                      beginAtZero: true
-                    }
-                  }
-                },
-                plugins: {
-                  tooltip: {
-                    mode: 'index',
-                    intersect: false
-                  },
-                  legend: {
-                    position: 'bottom'
-                  }
-                }
-              }
-            });
-          }
-        }
-        // Add Breakeven Chart logic if on the worksheets tab
-        if (this.activeTab === 'worksheets') {
-          const ctxBreakEven = document.getElementById('breakevenChart');
-          if (ctxBreakEven && this.scenarioResults.length) {
-            // Destroy previous chart instance if it exists
-            if (this.breakevenChartInstance) {
-              this.breakevenChartInstance.destroy();
-            }
-            const baseYear = this.scenarioResults[0].year;
-            const fraAge = this.client?.fra_age || 67;
-            const lifeExpectancy = this.client?.mortality_age || 90;
-            const baseAnnualBenefit = parseFloat(this.scenarioResults.find(r => r.primary_age === fraAge)?.social_security_benefit || 0);
-            const getBenefit = (claimAge) => {
-              const diff = claimAge - fraAge;
-              if (diff === 0) return baseAnnualBenefit;
-              if (diff < 0) return baseAnnualBenefit * (1 - 0.065 * (fraAge - claimAge));
-              return baseAnnualBenefit * (1 + 0.08 * (claimAge - fraAge));
-            };
-
-            const datasets = [];
-            for (let claimAge = 62; claimAge <= 70; claimAge++) {
-              let cumulative = 0;
-              const data = [];
-              for (let age = claimAge; age <= lifeExpectancy; age++) {
-                const benefit = getBenefit(claimAge);
-                cumulative += benefit;
-                data.push(cumulative);
-              }
-              datasets.push({
-                label: `Claim at ${claimAge}`,
-                data,
-                fill: false,
-                borderWidth: 2,
-                tension: 0.3
-              });
-            }
-
-            const labels = [];
-            for (let age = 62; age <= lifeExpectancy; age++) {
-              labels.push(age.toString());
-            }
-
-            this.breakevenChartInstance = new Chart(ctxBreakEven, {
-              type: 'line',
-              data: {
-                labels: labels,
-                datasets: datasets
-              },
-              options: {
-                responsive: true,
-                plugins: {
-                  legend: { position: 'bottom' },
-                  tooltip: { mode: 'index', intersect: false }
-                },
-                scales: {
-                  x: {
-                    title: { display: true, text: 'Age' }
-                  },
-                  y: {
-                    title: { display: true, text: 'Cumulative Benefits ($)' },
-                    beginAtZero: true
-                  }
-                }
-              }
-            });
-          }
-        }
       });
     },
     initializeCircles() {
@@ -1057,7 +981,16 @@ export default {
                         if (!el.dataset.initialized) {
                             const options = JSON.parse(el.getAttribute('data-hs-circles-options') || '{}');
                             console.log('Creating circle for element:', el.id, options);
-                            CirclesGlobal.create({ id: el.id, ...options });
+                            const defaultOptions = {
+                                radius: 25,
+                                width: 7,
+                                fgStrokeLinecap: 'round',
+                                textFontSize: 14,
+                                additionalText: '%',
+                                textClass: 'circles-chart-content',
+                                textColor: '#377dff'
+                            };
+                            CirclesGlobal.create({ id: el.id, ...defaultOptions, ...options });
                             el.dataset.initialized = 'true';
                         }
                     });
@@ -1099,6 +1032,7 @@ export default {
       axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/calculate/`, { headers })
         .then(response => {
           this.scenarioResults = response.data;
+          console.log('API Response:', response.data);
           // Re-initialize chart with new data
           this.initializeChartJS();
         })
@@ -1106,6 +1040,190 @@ export default {
           console.error("Error loading scenario data:", error);
         });
     },
+    toggleDropdown(tab) {
+      // Close all dropdowns first
+      for (const key in this.isDropdownOpen) {
+        if (key !== tab) {
+          this.isDropdownOpen[key] = false;
+        }
+      }
+      // Toggle the selected dropdown
+      this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
+    },
+    handleClickOutside(event) {
+      console.log('handleClickOutside triggered');
+      const dropdowns = {
+        financial: this.$refs.financialDropdown,
+        socialSecurity: this.$refs.socialSecurityDropdown,
+        medicare: this.$refs.medicareDropdown,
+        worksheets: this.$refs.worksheetsDropdown
+      };
+
+      for (const [tab, dropdown] of Object.entries(dropdowns)) {
+        if (dropdown) {
+          console.log(`Checking dropdown for tab: ${tab}`);
+          console.log(`Dropdown contains event target: ${dropdown.contains(event.target)}`);
+          console.log(`Dropdown open state before: ${this.isDropdownOpen[tab]}`);
+          if (!dropdown.contains(event.target) && this.isDropdownOpen[tab]) {
+            console.log(`Closing dropdown for tab: ${tab}`);
+            this.isDropdownOpen[tab] = false;
+          }
+          console.log(`Dropdown open state after: ${this.isDropdownOpen[tab]}`);
+        }
+      }
+    },
+    exportGraphAndDataToPDF() {
+      console.log('Exporting graph and data to PDF...');
+      const doc = new jsPDF();
+      let canvasId, tableData;
+
+      // Determine which graph and table to export based on the active tab
+      if (this.activeTab === 'financial') {
+        canvasId = 'financial_overview_chart';
+        tableData = this.scenarioResults;
+      } else if (this.activeTab === 'socialSecurity') {
+        canvasId = 'socialSecurityChart';
+        tableData = this.scenarioResults.map(row => ({
+          year: row.year,
+          primary_age: row.primary_age,
+          social_security_benefit: row.ss_income,
+          total_medicare: row.total_medicare,
+          ssi_taxed: row.ssi_taxed,
+          remaining_ssi: row.remaining_ssi
+        }));
+      } else if (this.activeTab === 'medicare') {
+        canvasId = 'medicareChart';
+        tableData = this.scenarioResults.map(row => ({
+          year: row.year,
+          primary_age: row.primary_age,
+          gross_income: row.gross_income,
+          medicare_income: row.medicare_income,
+          part_b: row.part_b,
+          part_d: row.part_d,
+          total_medicare: row.total_medicare
+        }));
+      } else if (this.activeTab === 'worksheets') {
+        canvasId = 'breakevenChart';
+        tableData = this.benefitByAge;
+      }
+
+      // Capture the graph as an image
+      const canvas = document.getElementById(canvasId);
+      if (canvas) {
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', 10, 10, 180, 80); // Adjust the position and size as needed
+      }
+
+      // Add the table data
+      const headers = Object.keys(tableData[0]).map(key => key.replace(/_/g, ' ').toUpperCase());
+      const data = tableData.map(row => Object.values(row));
+
+      doc.autoTable({
+        head: [headers],
+        body: data,
+        startY: 100 // Adjust the start position as needed
+      });
+
+      doc.save(`${this.activeTab}-graph-and-data.pdf`);
+    },
+    exportGraphAndDataToExcel() {
+      let tableData;
+
+      if (this.activeTab === 'financial') {
+        tableData = this.scenarioResults;
+      } else if (this.activeTab === 'socialSecurity') {
+        tableData = this.scenarioResults.map(row => ({
+          year: row.year,
+          primary_age: row.primary_age,
+          social_security_benefit: row.ss_income,
+          total_medicare: row.total_medicare,
+          ssi_taxed: row.ssi_taxed,
+          remaining_ssi: row.remaining_ssi
+        }));
+      } else if (this.activeTab === 'medicare') {
+        tableData = this.scenarioResults.map(row => ({
+          year: row.year,
+          primary_age: row.primary_age,
+          gross_income: row.gross_income,
+          medicare_income: row.medicare_income,
+          part_b: row.part_b,
+          part_d: row.part_d,
+          total_medicare: row.total_medicare
+        }));
+      } else if (this.activeTab === 'worksheets') {
+        tableData = this.benefitByAge;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(tableData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Scenario Data');
+      XLSX.writeFile(wb, `${this.activeTab}-scenario-data.xlsx`);
+    },
+    exportTableToCSV() {
+      console.log('Exporting table to CSV...');
+      let tableData;
+
+      if (this.activeTab === 'financial') {
+        tableData = this.scenarioResults;
+      } else if (this.activeTab === 'socialSecurity') {
+        tableData = this.scenarioResults.map(row => ({
+          year: row.year,
+          primary_age: row.primary_age,
+          social_security_benefit: row.ss_income,
+          total_medicare: row.total_medicare,
+          ssi_taxed: row.ssi_taxed,
+          remaining_ssi: row.remaining_ssi
+        }));
+      } else if (this.activeTab === 'medicare') {
+        tableData = this.scenarioResults.map(row => ({
+          year: row.year,
+          primary_age: row.primary_age,
+          gross_income: row.gross_income,
+          medicare_income: row.medicare_income,
+          part_b: row.part_b,
+          part_d: row.part_d,
+          total_medicare: row.total_medicare
+        }));
+      } else if (this.activeTab === 'worksheets') {
+        tableData = this.benefitByAge;
+      }
+
+      const headers = Object.keys(tableData[0]).map(key => key.replace(/_/g, ' ').toUpperCase());
+      const data = tableData.map(row => Object.values(row));
+      const csvContent = [headers.join(','), ...data.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${this.activeTab}-scenario-data.csv`;
+      link.click();
+    },
+    formatClientName(client) {
+      if (!client) return '';
+      const firstName = client.first_name || '';
+      const lastName = client.last_name || '';
+      const spouseName = client.spouse_name || '';
+      if (spouseName) {
+        return `${firstName} and ${spouseName} ${lastName}`;
+      }
+      return `${firstName} ${lastName}`;
+    },
+    
+  },
+  computed: {
+    incomeFields() {
+      if (!this.scenarioResults.length) return [];
+
+      const firstRow = this.scenarioResults[0];
+      const knownKeys = [
+        'year', 'primary_age', 'spouse_age', 'gross_income', 'taxable_income', 
+        'federal_tax', 'total_medicare', 'remaining_ssi', 'social_security_benefit',
+        'part_b', 'part_d', 'medicare_income'
+      ];
+
+      // List any field that seems to represent income but is not excluded
+      return Object.keys(firstRow)
+        .filter(key => key.includes('income') && !knownKeys.includes(key));
+    }
   },
   watch: {
     activeTab(newVal) {

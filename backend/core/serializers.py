@@ -177,7 +177,8 @@ class ScenarioCreateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'client', 'name', 'description', 'retirement_age', 'medicare_age',
             'spouse_retirement_age', 'spouse_medicare_age', 'mortality_age',
-            'spouse_mortality_age', 'retirement_year', 'share_with_client', 'income_sources'
+            'spouse_mortality_age', 'retirement_year', 'share_with_client', 'income_sources',
+            'part_b_inflation_rate', 'part_d_inflation_rate'
         ]
 
     def create(self, validated_data):
