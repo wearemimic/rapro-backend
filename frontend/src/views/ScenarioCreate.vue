@@ -40,6 +40,20 @@
               <input class="form-check-input" type="checkbox" v-model="scenario.apply_standard_deduction" />
             </div>
           </div>
+          <div class="mb-3">
+            <label class="block mt-4 mb-1 font-medium">Medicare Part B Inflation Rate</label>
+            <select v-model="scenario.part_b_inflation_rate" class="form-control">
+              <option value="6">6%</option>
+              <option value="7">7%</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="block mt-4 mb-1 font-medium">Medicare Part D Inflation Rate</label>
+            <select v-model="scenario.part_d_inflation_rate" class="form-control">
+              <option value="6">6%</option>
+              <option value="7">7%</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="card" style="max-width: 16rem;margin-left:10px;">
@@ -538,6 +552,8 @@ const scenario = ref({
   primary_blind: false,
   spouse_blind: false,
   is_dependent: false,
+  part_b_inflation_rate: '6',
+  part_d_inflation_rate: '6',
 });
 
 const incomeTypes = [
@@ -634,6 +650,8 @@ async function submitScenario() {
       primary_blind: scenario.value.primary_blind,
       spouse_blind: scenario.value.spouse_blind,
       is_dependent: scenario.value.is_dependent,
+      part_b_inflation_rate: scenario.value.part_b_inflation_rate,
+      part_d_inflation_rate: scenario.value.part_d_inflation_rate,
     };
     console.log("🚀 Payload to submit:", payload);
     const response = await axios.post(

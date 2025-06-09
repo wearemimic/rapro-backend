@@ -124,6 +124,8 @@ class Scenario(models.Model):
     share_with_client = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    part_b_inflation_rate = models.FloatField(default=6.0)
+    part_d_inflation_rate = models.FloatField(default=6.0)
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

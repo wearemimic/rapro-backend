@@ -4,7 +4,7 @@
     <Sidebar />
     <div class="main-content">
       <Header />
-      <main>
+      <main style="background-color:rgb(242, 242, 242);">
        <router-view v-slot="{ Component }">
           <transition name="fade">
             <component :is="Component" />

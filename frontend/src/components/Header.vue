@@ -1,5 +1,5 @@
 <template>
-  <header id="header" class="navbar navbar-expand-lg navbar-fixed navbar-height navbar-container navbar-bordered bg-white">
+  <header id="header" class="navbar navbar-expand-lg navbar-fixed navbar-height navbar-container navbar-bordered" style="background-color:#377dff;">
     <div class="navbar-nav-wrap">
       <!-- Logo -->
       <a class="navbar-brand" href="#">

@@ -350,16 +350,65 @@
                   </div>
                 </div>
               </div>
+              <div class="card mb-3 mb-lg-5">
+                <!-- Header -->
+                <div class="card-header card-header-content-between">
+                  <h5 class="mb-4">401k Year-by-Year Details</h5>
+                  <div class="table-responsive">
+                    <table class="table table-hover">
+                      <thead class="thead-light">
+                        <tr>
+                          <th>Year</th>
+                          <th>401k Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in scenarioResults" :key="row.year">
+                          <td>{{ row.year }}</td>
+                          <td>${{ row["401k_balance"] }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
               <!-- End Card -->
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active">
               <!-- Social Security Chart Card -->
+
               <div class="card mb-3 mb-lg-5">
+                <div class="card-header card-header-content-between">
+                  <div class="dropdown">
+                    <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('socialSecurity')" :aria-expanded="isDropdownOpen.socialSecurity">
+                      <i class="bi-download me-2"></i> Export
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.socialSecurity }" aria-labelledby="usersExportDropdown">
+                      <span class="dropdown-header">Export Options</span>
+                      <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
+                        Export graph and table to Excel
+                      </a>
+                      <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
+                        Export graph and data to PDF
+                      </a>
+                      <a id="export-graph" class="dropdown-item" href="javascript:;">
+                        Export graph only
+                      </a>
+                      <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
+                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
+                        Export table only as CSV
+                      </a>
+                    </div>
+                  </div>
+                </div>
                 <div class="card-body">
                   <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
                 </div>
               </div>
               <div class="card mb-3 mb-lg-5">
+                
                 <div class="card-body">
                   <h5 class="mb-4">IMPACT ON SOCIAL SECURITY CHECK (PRIMARY)</h5>
                   <div class="table-responsive">
@@ -380,37 +429,15 @@
                           <td>{{ row.primary_age }}</td>
                           <td>${{ parseFloat(row.ss_income || 0).toFixed(2) }}</td>
                           <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
-                          <td>{{ (parseFloat(row.ssi_taxed || 0) * 100).toFixed(2) }}%</td>
-                          <td class="bg-success text-white">${{ parseFloat(row.remaining_ssi || 0).toFixed(2) }}</td>
+                          <td></td>
+                          <td class="bg-success text-white">${{ (parseFloat(row.ss_income || 0) - parseFloat(row.total_medicare || 0)).toFixed(2) }}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 </div>
               </div>
-              <div class="dropdown">
-                <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('socialSecurity')" :aria-expanded="isDropdownOpen.socialSecurity">
-                  <i class="bi-download me-2"></i> Export
-                </button>
-                <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.socialSecurity }" aria-labelledby="usersExportDropdown">
-                  <span class="dropdown-header">Export Options</span>
-                  <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-                    Export graph and table to Excel
-                  </a>
-                  <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                    Export graph and data to PDF
-                  </a>
-                  <a id="export-graph" class="dropdown-item" href="javascript:;">
-                    Export graph only
-                  </a>
-                  <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                    Export table only as CSV
-                  </a>
-                </div>
-              </div>
+              
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active">
               <!-- Medicare Chart Card -->
@@ -635,6 +662,7 @@ import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
+
 import {
   Chart,
   LineController,
@@ -764,16 +792,51 @@ export default {
     },
     initializeChartJS() {
       this.$nextTick(() => {
-        const ctx = document.getElementById(this.activeTab === 'socialSecurity' ? 'socialSecurityChart' : 'financial_overview_chart');
+        const ctx = document.getElementById(
+          this.activeTab === 'worksheets' ? 'breakevenChart' :
+          this.activeTab === 'medicare' ? 'medicareChart' :
+          this.activeTab === 'socialSecurity' ? 'socialSecurityChart' :
+          'financial_overview_chart'
+        );
         if (ctx && this.scenarioResults.length) {
           if (this.chartInstance) {
             this.chartInstance.destroy();
           }
 
-          const datasets = this.activeTab === 'socialSecurity' ? [
+          console.log('Scenario Results:', this.scenarioResults);
+          console.log('Remaining SSI Benefit Data:', this.scenarioResults.map(row => parseFloat(row.remaining_ssi || 0)));
+
+          const datasets = this.activeTab === 'worksheets' ? [
+            ...Object.entries(this.benefitByAge).map(([age, benefit], i) => {
+              const label = `Total Lifetime Value (Age ${age})`;
+              const data = [];
+              console.log(`Processing Age: ${age}, Benefit: ${benefit}`);
+              let cumulativeIncome = 0;
+              const startYear = 62 + (age - 62); // Adjust the start year based on age
+              for (let year = 62; year <= 90; year++) {
+                if (year >= startYear) {
+                  cumulativeIncome += benefit;
+                  data.push(cumulativeIncome);
+                } else {
+                  data.push(null); // Fill with null or zero until the start year
+                }
+                console.log(`Year: ${year}, Cumulative Income: ${cumulativeIncome}`);
+              }
+              return {
+                type: 'line',
+                label,
+                data,
+                borderColor: `hsl(${(i * 40) % 360}, 70%, 50%)`,
+                backgroundColor: `hsla(${(i * 40) % 360}, 70%, 50%, 0.1)`,
+                borderWidth: 2,
+                tension: 0.3,
+                yAxisID: 'y'
+              };
+            })
+          ] : this.activeTab === 'socialSecurity' ? [
             {
               type: 'line',
-              label: 'Social Security Benefit',
+              label: 'SSI Benefit',
               data: this.scenarioResults.map(row => parseFloat(row.ss_income || 0)),
               borderColor: "#377dff",
               backgroundColor: "rgba(55, 125, 255, 0.1)",
@@ -782,13 +845,40 @@ export default {
               yAxisID: 'y'
             },
             {
+              type: 'line',
+              label: 'Remaining SSI Benefit',
+              data: this.scenarioResults.map(row => {
+                const ssiBenefit = parseFloat(row.ss_income || 0);
+                const medicareExpense = parseFloat(row.total_medicare || 0);
+                const remainingSSI = ssiBenefit - medicareExpense;
+                console.log(`Year: ${row.year}, SSI Benefit: ${ssiBenefit}, Medicare Expense: ${medicareExpense}, Remaining SSI: ${remainingSSI}`);
+                return remainingSSI;
+              }),
+              borderColor: "#00c9db",
+              backgroundColor: "rgba(0, 201, 219, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            },
+            {
               type: 'bar',
-              label: 'Total Medicare',
+              label: 'Medicare Expense',
               data: this.scenarioResults.map(row => parseFloat(row.total_medicare || 0)),
               backgroundColor: "#ffc107",
               stack: 'Stack 0',
               yAxisID: 'y'
             }
+          ] : this.activeTab === 'medicare' ? [
+            {
+            type: 'line',
+            label: 'Total Income',
+            data: this.scenarioResults.map(row => parseFloat(row.gross_income || 0)),
+            borderColor: "#377dff",
+            backgroundColor: "rgba(55, 125, 255, 0.1)",
+            borderWidth: 2,
+            tension: 0.3,
+            yAxisID: 'y'
+          }
           ] : [
             {
               type: 'line',
@@ -834,10 +924,13 @@ export default {
             }
           ];
 
+          console.log('Datasets:', datasets);
+          console.log('Chart Context:', ctx);
+
           this.chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: this.scenarioResults.map(row => row.year.toString()),
+              labels: this.scenarioResults.map(row => row.year.toString()), // Use actual years from data
               datasets: datasets
             },
             options: {
@@ -1113,7 +1206,8 @@ export default {
         return `${firstName} and ${spouseName} ${lastName}`;
       }
       return `${firstName} ${lastName}`;
-    }
+    },
+    
   },
   computed: {
     incomeFields() {

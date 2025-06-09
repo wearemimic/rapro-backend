@@ -1,5 +1,5 @@
 <template>
-  <aside id="sidebar" class="sidebar">
+  <aside id="sidebar" class="sidebar" style="width:200px;">
     <div class="navbar-vertical-container">
       <div class="navbar-vertical-footer-offset">
         <!-- Logo -->

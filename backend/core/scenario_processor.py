@@ -112,10 +112,13 @@ class ScenarioProcessor:
 
             gross_income = self._calculate_gross_income(year)
             ss_income = self._calculate_social_security(year)
-            taxable_income = self._calculate_taxable_income(gross_income, ss_income)
+            taxable_ss = calculate_taxable_social_security(ss_income, gross_income, 0, self.tax_status)  # Assuming no tax-exempt interest for simplicity
+            taxable_income = (gross_income - ss_income) + taxable_ss  # Corrected to add only the taxable portion
             federal_tax = self._calculate_federal_tax(taxable_income)
             cumulative_federal_tax += federal_tax
-            medicare_base, irmaa, total_medicare = self._calculate_medicare_costs(taxable_income)
+            medicare_base, irmaa, total_medicare = self._calculate_medicare_costs(taxable_income, year)
+            # Convert total_medicare to Decimal for subtraction
+            total_medicare = Decimal(total_medicare)
             net_income = gross_income + ss_income - federal_tax - total_medicare
 
             summary = {
@@ -124,6 +127,7 @@ class ScenarioProcessor:
                 "spouse_age": spouse_age if self.tax_status != "Single" else None,
                 "gross_income": round(gross_income, 2),
                 "ss_income": round(ss_income, 2),
+                "taxable_ss": round(taxable_ss, 2),  # Store taxable Social Security
                 "taxable_income": round(taxable_income, 2),
                 "federal_tax": round(federal_tax, 2),
                 "cumulative_federal_tax": round(cumulative_federal_tax, 2),
@@ -205,8 +209,10 @@ class ScenarioProcessor:
             self._log_debug(f"Year {year} - Asset type '{asset.get('income_type')}' does not have a balance. Calculating income only.")
             return 0
 
-        # Calculate annual contributions
-        annual_contribution = monthly_contribution * 12
+        # Calculate annual contributions only if current age is less than start age
+        annual_contribution = 0
+        if current_age < start_age:
+            annual_contribution = monthly_contribution * 12
 
         # Fetch the account balance at the start of the year
         current_balance = asset.get("current_asset_balance", 0)
@@ -214,40 +220,20 @@ class ScenarioProcessor:
         self._log_debug(f"Year {year} - Initial 401k Balance: {current_balance}")
         self._log_debug(f"Year {year} - Annual Contribution: {annual_contribution}")
 
-        # Apply contributions
-        current_balance += annual_contribution
+        # Calculate the number of years until retirement
+        retirement_age = asset.get("age_to_begin_withdrawal", 65)
+        years_until_retirement = max(0, retirement_age - current_age)
 
-        self._log_debug(f"Year {year} - Balance after Contribution: {current_balance}")
+        # Iterate over each year until retirement
+        for _ in range(years_until_retirement):
+            # Apply contributions
+            current_balance += annual_contribution
+            
+            # Apply growth
+            current_balance *= (1 + rate_of_return)
 
-        # Calculate withdrawals
-        annual_withdrawal = 0
-
-        if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
-            monthly_amount = asset.get("monthly_amount", 0)
-            annual_withdrawal = monthly_amount * 12
-
-        # Apply RMDs if applicable
-        rmd_amount = 0
-        if asset.get("income_type") in ["401k", "IRA"]:
-            rmd_amount = self._calculate_rmd(asset, year)
-
-        self._log_debug(f"Year {year} - Calculated RMD: {rmd_amount}")
-        self._log_debug(f"Year {year} - Specified Withdrawal: {annual_withdrawal}")
-
-        # Take the higher of RMD or specified withdrawal
-        if rmd_amount > annual_withdrawal:
-            current_balance -= rmd_amount
-            self._log_debug(f"Year {year} - RMD taken: {rmd_amount}")
-        else:
-            current_balance -= annual_withdrawal
-            self._log_debug(f"Year {year} - Withdrawal taken: {annual_withdrawal}")
-
-        self._log_debug(f"Year {year} - Balance after Withdrawals: {current_balance}")
-
-        # Apply growth at the end of the year
-        current_balance *= (1 + rate_of_return)
-
-        self._log_debug(f"Year {year} - Balance after Growth: {current_balance}")
+        # Log the balance after applying contributions and growth over multiple years
+        self._log_debug(f"Year {year} - 401k/IRA Balance after Contributions and Growth over {years_until_retirement} years: {current_balance}")
 
         # Update the asset balance for the next year
         asset["previous_year_balance"] = current_balance
@@ -298,7 +284,7 @@ class ScenarioProcessor:
                 current_age = year - birthdate.year
                 start_age = asset.get("age_to_begin_withdrawal")
                 end_age = asset.get("age_to_end_withdrawal")
-                cola = Decimal(asset.get("cola", 0)) / 100
+                cola = Decimal('0.02')  # Set COLA to 2% for Social Security
 
                 self._log_debug(f"  SS Asset: {asset}, Current Age: {current_age}, Start Age: {start_age}, End Age: {end_age}, COLA: {cola}")
 
@@ -320,13 +306,122 @@ class ScenarioProcessor:
             return taxable_income * Decimal("0.15")
         return taxable_income * Decimal("0.12")
 
-    def _calculate_medicare_costs(self, taxable_income):
+    def _calculate_medicare_costs(self, taxable_income, year):
+        self._log_debug(f"Calculating Medicare costs based on taxable income: {taxable_income}")
         base = 1700
         irmaa = 0
-        if taxable_income > 97000:
-            irmaa = 1000
-        return base, irmaa, base + irmaa
+
+        # Determine IRMAA based on filing status and taxable income
+        if self.tax_status == "Single":
+            if taxable_income > 500000:
+                irmaa = 616
+            elif taxable_income > 200000:
+                irmaa = 581
+            elif taxable_income > 167000:
+                irmaa = 472.80
+            elif taxable_income > 133000:
+                irmaa = 364.90
+            elif taxable_income > 106000:
+                irmaa = 256.90
+            elif taxable_income < 106000:
+                irmaa = 185.00
+        elif self.tax_status == "Married Filing Jointly":
+            if taxable_income > 750000:
+                irmaa = 616
+            elif taxable_income > 400000:
+                irmaa = 581
+            elif taxable_income > 334000:
+                irmaa = 472.80
+            elif taxable_income > 266000:
+                irmaa = 364.90
+            elif taxable_income > 212000:
+                irmaa = 256.90
+            elif taxable_income < 212000:
+                irmaa = 185.00
+        elif self.tax_status == "Married Filing Separately":
+            if taxable_income > 394000:
+                irmaa = 443.90
+            elif taxable_income > 106000:
+                irmaa = 406.90
+            elif taxable_income < 106000:
+                irmaa = 406.90
+
+        # Retrieve inflation rates from the scenario
+        part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
+        part_d_inflation_rate = Decimal(self.scenario.part_d_inflation_rate) / 100
+
+        # Convert irmaa to Decimal before applying the inflation rate
+        irmaa = Decimal(irmaa)
+        irmaa *= (1 + part_d_inflation_rate)
+
+        # Adjust the base and IRMAA costs by the inflation rates
+        base *= (1 + part_b_inflation_rate)
+
+        # Calculate the number of years until the current year
+        current_year = datetime.datetime.now().year
+        years_until_current = year - current_year
+
+        # Apply inflation for each year until the current year
+        for _ in range(years_until_current):
+            base *= (1 + part_b_inflation_rate)
+            irmaa *= (1 + part_d_inflation_rate)
+
+        # Log the adjusted values
+        self._log_debug(f"Year {year} - Inflated Medicare Base: {base}, Inflated IRMAA: {irmaa}")
+
+        total_medicare = irmaa * 12
+        self._log_debug(f"Adjusted Medicare Base: {base}, Adjusted IRMAA: {irmaa}, Total Medicare: {total_medicare}")
+        return base, irmaa, total_medicare
 
     def _log_debug(self, message):
         if self.debug:
             print(f"🔍 Debug: {message}")
+
+def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, filing_status):
+    # Convert inputs to Decimal for consistency
+    ss_benefits = Decimal(ss_benefits)
+    agi = Decimal(agi)
+    tax_exempt_interest = Decimal(tax_exempt_interest)
+
+    # Calculate provisional income
+    provisional_income = agi + tax_exempt_interest + Decimal('0.5') * ss_benefits
+
+    # Determine the base and additional thresholds based on filing status
+    if filing_status == "Single":
+        base_threshold = Decimal('25000')
+        additional_threshold = Decimal('34000')
+    elif filing_status == "Married Filing Jointly":
+        base_threshold = Decimal('32000')
+        additional_threshold = Decimal('44000')
+    else:
+        raise ValueError("Unsupported filing status")
+
+    # Calculate the taxable portion of Social Security benefits
+    if provisional_income <= base_threshold:
+        taxable_ss = Decimal('0')
+    elif provisional_income <= additional_threshold:
+        taxable_ss = Decimal('0.5') * (provisional_income - base_threshold)
+    else:
+        taxable_ss = Decimal('0.85') * ss_benefits
+
+    # Ensure the taxable amount does not exceed 85% of the benefits
+    taxable_ss = min(taxable_ss, Decimal('0.85') * ss_benefits)
+
+    return taxable_ss
+
+def calculate_asset_value_at_retirement(current_balance, monthly_contribution, annual_growth_rate, years_until_retirement, years_in_retirement):
+    # Convert annual growth rate to monthly
+    monthly_growth_rate = Decimal(annual_growth_rate) / Decimal('12') / Decimal('100')
+
+    # Calculate the number of months until retirement
+    months_until_retirement = years_until_retirement * 12
+
+    # Accumulation phase: calculate future value with contributions
+    future_value_at_retirement = current_balance * (1 + monthly_growth_rate) ** months_until_retirement
+    future_value_at_retirement += monthly_contribution * (((1 + monthly_growth_rate) ** months_until_retirement - 1) / monthly_growth_rate)
+
+    # Decumulation phase: calculate future value without contributions
+    months_in_retirement = years_in_retirement * 12
+    future_value_at_end_of_retirement = future_value_at_retirement * (1 + monthly_growth_rate) ** months_in_retirement
+
+    return future_value_at_end_of_retirement

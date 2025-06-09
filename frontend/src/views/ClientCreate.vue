@@ -1,82 +1,88 @@
 <template>
   <div class="container mt-5">
-    <h2>Create New Client</h2>
     <form @submit.prevent="submitForm">
-      <div class="row">
-        <div class="col-md-6 mb-3">
-          <label>First Name</label>
-          <input v-model="form.first_name" class="form-control" required minlength="5" maxlength="30">
+      <div class="card card-hover-shadow h-100" style="margin-top:60px;">
+        <div class="card-title">
+        <h3>New Contact</h3>
         </div>
-        <div class="col-md-6 mb-3">
-          <label>Last Name</label>
-          <input v-model="form.last_name" class="form-control" required minlength="5" maxlength="30">
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label>Email</label>
-        <input v-model="form.email" type="email" class="form-control" required>
-      </div>
-
-      <div class="row">
-        <div class="col-md-4 mb-3">
-          <label>Birthdate</label>
-          <input v-model="form.birthdate" type="date" class="form-control" required>
-        </div>
-        <div class="col-md-4 mb-3">
-          <label>Gender</label>
-          <select v-model="form.gender" class="form-control" required>
-            <option disabled value="">Choose...</option>
-            <option>Male</option>
-            <option>Female</option>
-            <option>Other</option>
-          </select>
-        </div>
-        <div class="col-md-4 mb-3">
-          <label>Tax Status</label>
-          <select v-model="form.tax_status" @change="updateSpouseRequirement" class="form-control" required>
-            <option disabled value="">Choose...</option>
-            <option>Single</option>
-            <option>Married Filing Jointly</option>
-            <option>Married Filing Separately</option>
-          </select>
-        </div>
-      </div>
-
-      <div v-if="showSpouseFields">
-        <h5>Spouse Information</h5>
-        <div class="row">
-          <div class="col-md-6 mb-3">
-            <label>Spouse First Name</label>
-            <input v-model="form.spouse_first_name" class="form-control" required>
+        <div class="card-body">
+          <div class="row">
+            
+            <div class="col-md-6 mb-3">
+              <label>First Name</label>
+              <input v-model="form.first_name" class="form-control" required minlength="5" maxlength="30">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label>Last Name</label>
+              <input v-model="form.last_name" class="form-control" required minlength="5" maxlength="30">
+            </div>
           </div>
-          <div class="col-md-6 mb-3">
-            <label>Spouse Last Name</label>
-            <input v-model="form.spouse_last_name" class="form-control" required>
+
+          <div class="mb-3">
+            <label>Email</label>
+            <input v-model="form.email" type="email" class="form-control" required>
           </div>
-        </div>
-        <div class="row">
-          <div class="col-md-6 mb-3">
-            <label>Spouse Birthdate</label>
-            <input v-model="form.spouse_birthdate" type="date" class="form-control" required>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label>Birthdate</label>
+              <input v-model="form.birthdate" type="date" class="form-control" required>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label>Gender</label>
+              <select v-model="form.gender" class="form-control" required>
+                <option disabled value="">Choose...</option>
+                <option>Male</option>
+                <option>Female</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label>Tax Status</label>
+              <select v-model="form.tax_status" @change="updateSpouseRequirement" class="form-control" required>
+                <option disabled value="">Choose...</option>
+                <option>Single</option>
+                <option>Married Filing Jointly</option>
+                <option>Married Filing Separately</option>
+              </select>
+            </div>
           </div>
-          <div class="col-md-6 mb-3">
-            <label>Spouse Gender</label>
-            <select v-model="form.spouse_gender" class="form-control" required>
-              <option disabled value="">Choose...</option>
-              <option>Male</option>
-              <option>Female</option>
-              <option>Other</option>
-            </select>
+
+          <div v-if="showSpouseFields">
+            <h5>Spouse Information</h5>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label>Spouse First Name</label>
+                <input v-model="form.spouse_first_name" class="form-control" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label>Spouse Last Name</label>
+                <input v-model="form.spouse_last_name" class="form-control" required>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label>Spouse Birthdate</label>
+                <input v-model="form.spouse_birthdate" type="date" class="form-control" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label>Spouse Gender</label>
+                <select v-model="form.spouse_gender" class="form-control" required>
+                  <option disabled value="">Choose...</option>
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label>Advisor Notes</label>
+            <textarea v-model="form.notes" class="form-control" rows="4"></textarea>
           </div>
         </div>
       </div>
-
-      <div class="mb-3">
-        <label>Advisor Notes</label>
-        <textarea v-model="form.notes" class="form-control" rows="4"></textarea>
-      </div>
-
       <button type="submit" class="btn btn-primary">Create Client</button>
     </form>
   </div>

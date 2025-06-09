@@ -16,4 +16,13 @@
 - **Implementation Steps**:
   1. Identify when the income source is a masset like a 401k during the income addition process.
   2. Calculate the spend down trajectory based on user-defined criteria.
-  3. Display a graph under the income entry showing the spend down and the projected amount left at death. 
+  3. Display a graph under the income entry showing the spend down and the projected amount left at death.
+
+## 3. Model Different Income Withdrawal Levels
+
+- **Objective**: Allow users to specify different income withdrawal levels over time for accounts like Roth IRA.
+- **Details**: This enhancement will enable users to model scenarios where they withdraw different amounts at different stages of retirement. For example, withdrawing $4,000 a month for the first 3 years, then $3,000 for the remainder of retirement.
+- **Implementation Steps**:
+  1. Update the income modeling interface to allow users to specify multiple withdrawal levels and durations.
+  2. Adjust the simulation engine to account for these varying withdrawal levels over the specified periods.
+  3. Ensure the results reflect the impact of these changes on the overall retirement plan and account balances. 
