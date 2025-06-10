@@ -9,9 +9,9 @@
   2. If a process is found, output a message to the user indicating the conflict and provide options to resolve it.
   3. Proceed with the build only if the port is free or after the user resolves the conflict.
 
-## 2. Show Graph for Masset Income
+## 2. Show Graph for Asset Income
 
-- **Objective**: When adding income, if it is a masset like a 401k, display a graph showing the spend down based on criteria and the amount left at death.
+- **Objective**: When adding income, if it is a Asset like a 401k, display a graph showing the spend down based on criteria and the amount left at death.
 - **Details**: This enhancement will provide a visual representation of how the masset is spent over time, helping users understand the financial trajectory and remaining balance at the end of life.
 - **Implementation Steps**:
   1. Identify when the income source is a masset like a 401k during the income addition process.
