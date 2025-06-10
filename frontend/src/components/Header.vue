@@ -3,7 +3,7 @@
     <div class="navbar-nav-wrap">
       <!-- Logo -->
       <a class="navbar-brand" href="#">
-        <img style="height:30px;margin-left:30px;" src="/assets/img/logo.png" alt="Logo">
+        <img style="height:30px;margin-left:20px;" src="/assets/img/logo-white.png" alt="Logo">
       </a>
       <!-- End Logo -->
 

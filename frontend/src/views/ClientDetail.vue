@@ -41,8 +41,7 @@
 
                 <div class="mb-3">
                 <router-link :to="`/clients/${client.id}/edit`" class="btn btn-secondary">Edit</router-link>
-                <button @click="deleteClient" class="btn btn-danger">Delete</button>
-                <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Add Scenario</router-link>
+                <button @click="deleteClient" class="btn btn-danger" style="margin-left:10px;margin-right:10px;">Delete</button>
                 </div>
             </div>
             <div v-else class="text-center mt-5">
@@ -54,8 +53,9 @@
         <div class="col-lg-8">
             <div class="card mb-4">
                 <div class="card-body">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="card-header-title">Scenarios</h4>
+                        <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Add Scenario</router-link>
                     </div>
 
                     <div class="card-body">
@@ -169,5 +169,10 @@ export default {
 <style scoped>
 .card-title {
   font-weight: bold;
+}
+
+.card-header {
+  padding-top: 0.5rem; /* Reduce padding to decrease whitespace */
+  padding-bottom: 0.5rem;
 }
 </style>

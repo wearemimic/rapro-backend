@@ -3,6 +3,9 @@
     <div class="container py-5 py-sm-7">
       <div class="mx-auto" style="max-width: 30rem;">
         <!-- Card -->
+        <div class="text-center mb-4">
+          <img src="/assets/img/logo.png" style="height:50px;margin-bottom:20px;" alt="Logo">
+        </div>
         <div class="card card-lg mb-5">
           <div class="card-body">
             <!-- Form -->
@@ -10,7 +13,7 @@
               <div class="text-center">
                 <div class="mb-5">
                   <h1 class="display-5">Sign in</h1>
-                  <p>Don’t have an account yet? <a href="/register">Sign up here</a></p>
+                  <p>Don't have an account yet? <a href="/register">Sign up here</a></p>
                 </div>
               </div>
 
