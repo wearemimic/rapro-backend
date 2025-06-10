@@ -126,6 +126,7 @@ class Scenario(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     part_b_inflation_rate = models.FloatField(default=6.0)
     part_d_inflation_rate = models.FloatField(default=6.0)
+    FRA_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

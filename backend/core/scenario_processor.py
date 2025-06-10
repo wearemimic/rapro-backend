@@ -57,7 +57,7 @@ class ScenarioProcessor:
         self.client = self.scenario.client
         self.spouse = getattr(self.client, "spouse", None)
         self.primary_birthdate = self.client.birthdate
-        self.spouse_birthdate = self.spouse_birthdate if self.spouse else None
+        self.spouse_birthdate = self.spouse.birthdate if self.spouse else None
         self.tax_status = self.client.tax_status
         self.assets = list(self.scenario.income_sources.values())
 

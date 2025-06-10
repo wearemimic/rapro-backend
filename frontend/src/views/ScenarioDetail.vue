@@ -5,14 +5,6 @@
       <!-- Page Header -->
       <div class="page-header">
         <div class="d-flex mb-3">
-          <!-- Avatar -->
-          <!-- <div class="flex-shrink-0">
-            <div class="avatar avatar-lg avatar-4x3">
-              <img class="avatar-img" src="./assets/svg/brands/guideline-icon.svg" alt="Image Description">
-            </div>
-          </div> -->
-          <!-- End Avatar -->
-
           <div class="flex-grow-1 ms-4">
             <div class="row">
               <div class="col-lg mb-3 mb-lg-0">
@@ -88,7 +80,7 @@
               <!-- Card -->
               <div class="card card-sm h-100">
                 <div class="card-body">
-                  <div class="row">
+                  <div class="row d-flex align-items-stretch">
                     <div class="col">
                       <!-- Media -->
                       <div class="d-flex">
@@ -98,7 +90,7 @@
 
                         <div class="flex-grow-1 ms-3">
                           <h4 class="mb-1">Federal Taxes</h4>
-                          <span class="d-block" style="font-size: 1.5rem;">$800,000</span>
+                          <span class="d-block" style="font-size: 1.5rem;">{{ formatCurrency(totalFederalTaxes) }}</span>
                         </div>
                       </div>
                       <!-- End Media -->
@@ -122,7 +114,7 @@
               <!-- Card -->
               <div class="card card-sm h-100">
                 <div class="card-body">
-                  <div class="row">
+                  <div class="row d-flex align-items-stretch">
                     <div class="col">
                       <!-- Media -->
                       <div class="d-flex">
@@ -132,7 +124,7 @@
 
                         <div class="flex-grow-1 ms-3">
                           <h4 class="mb-1">Medicare Costs</h4>
-                          <span class="d-block" style="font-size: 1.5rem;">$1,200,000</span>
+                          <span class="d-block" style="font-size: 1.5rem;">{{ formatCurrency(totalMedicareCosts) }}</span>
                         </div>
                       </div>
                       <!-- End Media -->
@@ -156,7 +148,7 @@
               <!-- Card -->
               <div class="card card-sm h-100">
                 <div class="card-body">
-                  <div class="row">
+                  <div class="row d-flex align-items-stretch">
                     <div class="col">
                       <!-- Media -->
                       <div class="d-flex">
@@ -189,7 +181,7 @@
               <!-- Card -->
               <div class="card card-sm h-100">
                 <div class="card-body">
-                  <div class="row">
+                  <div class="row d-flex align-items-stretch">
                     <div class="col">
                       <!-- Media -->
                       <div class="d-flex">
@@ -352,29 +344,6 @@
                   </div>
                 </div>
               </div>
-              <div class="card mb-3 mb-lg-5">
-                <!-- Header -->
-                <div class="card-header card-header-content-between">
-                  <h5 class="mb-4">401k Year-by-Year Details</h5>
-                  <div class="table-responsive">
-                    <table class="table table-hover">
-                      <thead class="thead-light">
-                        <tr>
-                          <th>Year</th>
-                          <th>401k Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="row in scenarioResults" :key="row.year">
-                          <td>{{ row.year }}</td>
-                          <td>${{ row["401k_balance"] }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              <!-- End Card -->
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
               <!-- Social Security Chart Card -->
@@ -465,7 +434,7 @@
                               "duration": 2000,
                               "isViewportInit": true,
                               "radius": 70,
-                              "width": 10,
+                              "width": 20,
                               "fgStrokeLinecap": "round",
                               "textFontSize": 14,
                               "additionalText": "%",
@@ -474,6 +443,10 @@
                             }'>
                           </div>
                       </div>
+                    </div>
+                    <div class="card-body">
+                      <h4>Base Premium: $5,000</h4>
+                      <h4>IRMAA Surcharges: $20,000</h4>
                     </div>
                   </div>
                 </div>
@@ -738,7 +711,7 @@ import axios from 'axios'
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-
+import { mapActions } from 'vuex';
 
 import {
   Chart,
@@ -833,6 +806,10 @@ export default {
     document.removeEventListener('click', this.handleClickOutside);
   },
   methods: {
+    ...mapActions(['fetchScenarioData']),
+    formatCurrency(value) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    },
     downloadTable(format) {
       const rows = this.scenarioResults;
       if (!rows.length) return;
@@ -1300,7 +1277,13 @@ export default {
       // List any field that seems to represent income but is not excluded
       return Object.keys(firstRow)
         .filter(key => key.includes('income') && !knownKeys.includes(key));
-    }
+    },
+    totalFederalTaxes() {
+      return this.scenarioResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0).toFixed(2);
+    },
+    totalMedicareCosts() {
+      return this.scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2);
+    },
   },
   watch: {
     activeTab(newVal) {
@@ -1337,5 +1320,21 @@ export default {
 .equal-height-row > .col {
   display: flex;
   flex-direction: column;
+}
+
+.circles-chart-content {
+  text-align: center;
+  line-height: 1;
+  font-size: 24px;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(0%, 0%);
 }
 </style>

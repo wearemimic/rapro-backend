@@ -1,23 +1,14 @@
 <template>
   <div class="container mt-12">
     <div class="row" style="margin-top:60px;">
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+      <div class="col-sm-6 col-lg-2 mb-3 mb-lg-5">
         <!-- Card -->
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="card-subtitle mb-2">Total Clients</h6>
-
+            <h5 class="card-subtitle mb-2 text-center">Total Clients</h5>
             <div class="row align-items-center gx-2">
-              <div class="col">
-                <span class="js-counter display-4 text-dark">24</span>
-                <span class="text-body fs-5 ms-1">from 22</span>
-              </div>
-              <!-- End Col -->
-
-              <div class="col-auto">
-                <span class="badge bg-soft-success text-success p-1">
-                  <i class="bi-graph-up"></i> 5.0%
-                </span>
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ totalClients }}</span>
               </div>
               <!-- End Col -->
             </div>
@@ -27,75 +18,14 @@
         <!-- End Card -->
       </div>
 
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+      <div class="col-sm-6 col-lg-2 mb-3 mb-lg-5">
         <!-- Card -->
-        <div class="card h-100">
-          <div class="card-body">
-            <h6 class="card-subtitle mb-2">Clients In Process</h6>
-
-            <div class="row align-items-center gx-2">
-              <div class="col">
-                <span class="js-counter display-4 text-dark">12</span>
-                <span class="text-body fs-5 ms-1">from 11</span>
-              </div>
-
-              <div class="col-auto">
-                <span class="badge bg-soft-success text-success p-1">
-                  <i class="bi-graph-up"></i> 1.2%
-                </span>
-              </div>
-            </div>
-            <!-- End Row -->
-          </div>
+        <div class="col-auto" style="margin-top:50px;">
+          <a class="btn btn-primary" href="/clients/create">
+            <i class="bi-person-plus-fill me-1"></i> Create Client
+          </a>
         </div>
-        <!-- End Card -->
-      </div>
-
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
-        <!-- Card -->
-        <div class="card h-100">
-          <div class="card-body">
-            <h6 class="card-subtitle mb-2">Clients in Draft</h6>
-
-            <div class="row align-items-center gx-2">
-              <div class="col">
-                <span class="js-counter display-4 text-dark">56</span>
-                <span class="display-4 text-dark">%</span>
-                <span class="text-body fs-5 ms-1">from 48.7</span>
-              </div>
-
-              <div class="col-auto">
-                <span class="badge bg-soft-danger text-danger p-1">
-                  <i class="bi-graph-down"></i> 2.8%
-                </span>
-              </div>
-            </div>
-            <!-- End Row -->
-          </div>
-        </div>
-        <!-- End Card -->
-      </div>
-
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
-        <!-- Card -->
-        <div class="card h-100">
-          <div class="card-body">
-            <h6 class="card-subtitle mb-2">Active members</h6>
-
-            <div class="row align-items-center gx-2">
-              <div class="col">
-                <span class="js-counter display-4 text-dark">28.6</span>
-                <span class="display-4 text-dark">%</span>
-                <span class="text-body fs-5 ms-1">from 28.6%</span>
-              </div>
-
-              <div class="col-auto">
-                <span class="badge bg-soft-secondary text-secondary p-1">0.0%</span>
-              </div>
-            </div>
-            <!-- End Row -->
-          </div>
-        </div>
+         
         <!-- End Card -->
       </div>
     </div>
@@ -109,45 +39,49 @@
               <div class="mb-3 d-flex justify-content-between">
                 <input type="text" v-model="searchQuery" placeholder="Search by name..." class="form-control w-50" />
                 <div>
-                  <button class="btn btn-sm btn-outline-secondary" @click="toggleSort('last_name')">Sort by Last Name</button>
-                  <button class="btn btn-sm btn-outline-secondary" @click="toggleSort('created_at')">Sort by Created</button>
+                  <label for="statusFilter" class="form-label me-2">Filter by Status:</label>
+                  <select v-model="statusFilter" class="form-select w-auto d-inline" id="statusFilter">
+                    <option value="">All</option>
+                    <option value="Draft">Draft</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Reviewed">Reviewed</option>
+                    <option value="Archived">Archived</option>
+                  </select>
                 </div>
               </div>
-
-              <div class="mb-3">
-                <label for="statusFilter" class="form-label me-2">Filter by Status:</label>
-                <select v-model="statusFilter" class="form-select w-auto d-inline" id="statusFilter">
-                  <option value="">All</option>
-                  <option value="Draft">Draft</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Reviewed">Reviewed</option>
-                  <option value="Archived">Archived</option>
-                </select>
-              </div>
-
-              <div class="mb-2 text-muted">Total clients retrieved: {{ clients.length }}</div>
+              <div class="mb-2 text-muted" style="margin-top:40px;">Total clients retrieved: {{ clients.length }}</div>
 
               <table v-if="clients.length && !isLoading" class="table table-hover">
                 <thead class="thead-light">
                   <tr>
+                    <th>Members</th>
                     <th>First Name</th>
                     <th>Last Name</th>
-                    <th>Email</th>
+                    <th># of Scenarios</th>
                     <th>Tax Status</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="client in paginatedClients" :key="client.id">
+                  <tr v-for="client in paginatedClients" :key="client.id" @click="viewClient(client.id)" style="cursor: pointer;">
+                    <td>
+                      <div v-if="client.tax_status === 'Single'" class="icon-container">
+                        <div class="single-icon">{{ client.first_name.charAt(0) }}</div>
+                      </div>
+                      <div v-else class="offset-icons">
+                        <div class="icon">{{ client.first_name.charAt(0) }}</div>
+                        <div class="icon">{{ client.spouse?.first_name?.charAt(0) || '' }}</div>
+                      </div>
+                    </td>
                     <td>{{ client.first_name }}</td>
                     <td>{{ client.last_name }}</td>
-                    <td>{{ client.email }}</td>
+                    <td>{{ client.scenarios?.length || 0 }}</td>
                     <td>{{ client.tax_status }}</td>
                     <td>{{ client.status }}</td>
                     <td>
-                      <button class="btn btn-sm btn-outline-primary" @click="viewClient(client.id)">View</button>
-                      <button class="btn btn-sm btn-outline-secondary" @click="editClient(client.id)">Edit</button>
+                      <button class="btn btn-sm btn-outline-primary me-2" @click.stop="viewClient(client.id)">View</button>
+                      <button class="btn btn-sm btn-outline-secondary" style="border-color: #6c757d;" @click.stop="editClient(client.id)">Edit</button>
                     </td>
                   </tr>
                 </tbody>
@@ -213,6 +147,9 @@ export default {
     },
     totalPages() {
       return Math.ceil(this.sortedClients.length / this.perPage)
+    },
+    totalClients() {
+      return this.clients.length;
     }
   },
   methods: {
@@ -220,7 +157,7 @@ export default {
         this.isLoading = true
         this.error = null
         try {
-            const response = await axios.get('http://localhost:8000/api/clients/') // ← simpler, no params yet
+            const response = await axios.get('http://localhost:8000/api/clients/', { headers })
             this.clients = response.data
             console.log('Fetched clients:', this.clients.length)  // Debug
         } catch (err) {
@@ -247,6 +184,9 @@ export default {
     },
     editClient(clientId) {
       this.$router.push({ name: 'ClientEdit', params: { id: clientId } }) // placeholder
+    },
+    createNewClient() {
+      this.$router.push('/clients/create');
     }
   },
   mounted() {
@@ -263,3 +203,47 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.icon-container {
+  display: flex;
+  align-items: center;
+}
+.single-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: #333;
+  border: 1px solid #ccc;
+}
+.offset-icons {
+  position: relative;
+  width: 55px;
+}
+.offset-icons .icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: #333;
+  position: absolute;
+  border: 1px solid #ccc;
+}
+.offset-icons .icon:first-child {
+  left: 0;
+  z-index: 2;
+}
+.offset-icons .icon:last-child {
+  left: 20px;
+  z-index: 1;
+}
+</style>

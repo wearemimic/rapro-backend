@@ -72,4 +72,12 @@ const logout = async () => {
 .navbar-brand-logo {
   height: 40px;
 }
+
+.dropdown-menu {
+  background-color: white;
+}
+
+.nav-link.dropdown-toggle {
+  color: white;
+}
 </style>

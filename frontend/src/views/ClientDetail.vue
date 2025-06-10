@@ -55,7 +55,9 @@
                 <div class="card-body">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="card-header-title">Scenarios</h4>
-                        <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Add Scenario</router-link>
+                        <div v-if="client && client.scenarios && client.scenarios.length">
+                            <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Add Scenario</router-link>
+                        </div>
                     </div>
 
                     <div class="card-body">
@@ -90,9 +92,9 @@
                         </table>
                       </div>
                       <div v-else>
-                        
-                        <div class="text-center" style="margin:50px;">
-                          <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Create Your First Scenario!</router-link>
+                        <div class="text-center d-flex flex-column align-items-center" style="margin:50px;">
+                          <img src="/assets/svg/illustrations/oc-project-development.svg" alt="No Scenarios" class="mb-3" style="max-width: 50%; height: auto;"/>
+                          <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary mt-3">Create Your First Scenario!</router-link>
                         </div>
                       </div>
                     </div>

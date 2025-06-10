@@ -2,9 +2,6 @@
 <template>
   <div class="row align-items-center">
     <div>
-      <!-- <div class="col">
-        <h1 class="page-header-title">Dashboard</h1>
-      </div> -->
       <!-- End Col -->
       <div class="col-auto" style="margin-top:50px;">
         <a class="btn btn-primary" href="/clients/create">
@@ -43,20 +40,29 @@
           <table v-if="clients.length && !isLoading" class="table table-hover">
             <thead class="thead-light">
               <tr>
+                <th>Members</th>
                 <th>Name</th>
-                <th>Email</th>
+                <th># of Scenarios</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="client in paginatedClients" :key="client.id">
+              <tr v-for="client in paginatedClients" :key="client.id" @click="viewClient(client.id)" style="cursor: pointer;">
+                <td>
+                  <div v-if="client.tax_status === 'Single'" class="icon-container">
+                    <div class="single-icon">{{ client.first_name.charAt(0) }}</div>
+                  </div>
+                  <div v-else class="offset-icons">
+                    <div class="icon">{{ client.first_name.charAt(0) }}</div>
+                    <div class="icon">{{ client.spouse?.first_name?.charAt(0) || '' }}</div>
+                  </div>
+                </td>
                 <td>{{ client.last_name }} , {{ client.first_name }}</td>
-                <td>{{ client.email }}</td>
+                <td>{{ client.scenarios?.length || 0 }}</td>
                 <td>{{ client.status }}</td>
                 <td>
-                  <button class="btn btn-sm btn-outline-primary" @click="viewClient(client.id)">View</button>
-                  <button class="btn btn-sm btn-outline-secondary" @click="editClient(client.id)">Edit</button>
+                  <button class="btn btn-sm btn-outline-primary" @click.stop="viewClient(client.id)">View</button>
                 </td>
               </tr>
             </tbody>
@@ -213,3 +219,37 @@ export default {
 
 
 </script>
+
+<style scoped>
+.icon-container {
+  display: flex;
+  align-items: center;
+}
+.single-icon, .offset-icons .icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: #333;
+  border: 1px solid #ccc;
+}
+.offset-icons {
+  position: relative;
+  width: 55px;
+}
+.offset-icons .icon {
+  position: absolute;
+}
+.offset-icons .icon:first-child {
+  left: 0;
+  z-index: 2;
+}
+.offset-icons .icon:last-child {
+  left: 20px;
+  z-index: 1;
+}
+</style>

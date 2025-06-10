@@ -34,4 +34,14 @@
 - **Implementation Steps**:
   1. Integrate Wealthbox API to access client data securely.
   2. Develop an AI model to analyze asset data and predict IRMAA impact.
-  3. Provide a report or dashboard highlighting clients at risk of IRMAA, with recommendations for mitigation. 
+  3. Provide a report or dashboard highlighting clients at risk of IRMAA, with recommendations for mitigation.
+
+## 5. Update Button Text and Default Scenario Name for First Scenario
+
+- **Objective**: Change the button text to "Run your First Stress Test" on the client detail page for the first scenario, and default the scenario name to "IRMAA Stress Test" on the scenario creation page for the first scenario.
+- **Details**: This enhancement aims to guide users through their first scenario setup by providing clear instructions and a default scenario name.
+- **Implementation Steps**:
+  1. Detect when the user is running their first scenario on the client detail page.
+  2. Update the button text to "Run your First Stress Test" for the first scenario.
+  3. On the scenario creation page, set the default scenario name to "IRMAA Stress Test" for the first scenario.
+  4. Ensure these changes only apply to the first scenario and revert to standard behavior for subsequent scenarios. 
