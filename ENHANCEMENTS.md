@@ -25,4 +25,13 @@
 - **Implementation Steps**:
   1. Update the income modeling interface to allow users to specify multiple withdrawal levels and durations.
   2. Adjust the simulation engine to account for these varying withdrawal levels over the specified periods.
-  3. Ensure the results reflect the impact of these changes on the overall retirement plan and account balances. 
+  3. Ensure the results reflect the impact of these changes on the overall retirement plan and account balances.
+
+## 4. Analyze Wealthbox Clients for IRMAA Impact
+
+- **Objective**: Use AI to analyze clients in Wealthbox and identify those who may be hitting IRMAA based on their assets.
+- **Details**: This enhancement will leverage AI to automatically review client data in Wealthbox, assessing asset levels and predicting potential IRMAA impacts. This proactive approach helps advisors manage client expectations and plan accordingly.
+- **Implementation Steps**:
+  1. Integrate Wealthbox API to access client data securely.
+  2. Develop an AI model to analyze asset data and predict IRMAA impact.
+  3. Provide a report or dashboard highlighting clients at risk of IRMAA, with recommendations for mitigation. 

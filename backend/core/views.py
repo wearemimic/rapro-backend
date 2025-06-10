@@ -1,3 +1,4 @@
+import requests
 from django.contrib.auth import authenticate
 from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -17,6 +18,9 @@ from rest_framework.exceptions import PermissionDenied
 from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer
 from .serializers import ScenarioCreateSerializer
 from .scenario_processor import ScenarioProcessor
+from django.http import HttpResponse, JsonResponse
+import logging
+
 
 User = get_user_model()
 
@@ -141,6 +145,25 @@ def create_scenario(request, client_id):
         return Response({'id': scenario.id}, status=201)
     else:
         return Response(serializer.errors, status=400)  
+
+@csrf_exempt
+def proxy_to_wealthbox(request):
+    api_key = '020dfe66ac3f4213beefb36641a96721'  # Replace with your actual API key
+    # Log the incoming request path
+    print(f"Received request path: {request.path}")
+    url = f"https://api.crmworkspace.com/{request.path.replace('/proxy', '')}"
+    print(f"Proxying request to URL: {url}")
+    headers = {'ACCESS_TOKEN': api_key}
+
+    try:
+        response = requests.get(url, headers=headers)
+        # Log the response status code
+        # self._log_debug(f"Response status code: {response.status_code}")
+        return JsonResponse(response.json(), status=response.status_code)
+    except requests.exceptions.RequestException as e:
+        logging.error(f"RequestException: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 class AdvisorClientListView(generics.ListAPIView):
     serializer_class = ClientSerializer

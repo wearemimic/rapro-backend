@@ -22,7 +22,10 @@
                 <div class="row align-items-center">
                   <div class="col-auto">
                     <span>Client:</span>
-                    <a href="/clients/{clientId}">{{ formatClientName(client) }}</a>
+                    <router-link v-if="client" :to="{ name: 'ClientDetail', params: { id: client.id } }">
+                      {{ formatClientName(client) }}
+                    </router-link>
+                    <span v-else>Loading...</span>
                   </div>
                   <!-- End Col -->
 
@@ -39,15 +42,26 @@
               </div>
               <!-- End Col -->
 
-              <div class="col-lg-auto">
-                <div class="mb-3">
-                  <label for="scenarioSelect" class="form-label">Switch Scenario</label>
+              <div class="col-lg-auto d-flex align-items-center">
+                <div class="d-flex align-items-center me-3">
+                  <label for="scenarioSelect" class="form-label mb-0 me-2" style="white-space: nowrap;">Switch Scenario</label>
                   <select id="scenarioSelect" class="form-select" v-model="selectedScenarioId" @change="onScenarioChange">
                     <option v-for="s in scenarios" :value="s.id" :key="s.id">{{ s.name }}</option>
                   </select>
                 </div>
+                <!-- New Scenario Dropdown -->
+                <div class="d-flex align-items-center">
+                  <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="newScenarioDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                      New Scenario
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="newScenarioDropdown">
+                      <li><a class="dropdown-item" href="#" @click="createScenario('scratch')">From Scratch</a></li>
+                      <li><a class="dropdown-item" href="#" @click="createScenario('duplicate')">Duplicate This Scenario</a></li>
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <!-- End Col -->
             </div>
             <!-- End Row -->
           </div>
@@ -70,151 +84,139 @@
           </span>
 
           <div class="row">
-        <div class="col-sm-6 col-xl-4 mb-3 mb-xl-6">
-          <!-- Card -->
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="row">
-                <div class="col">
-                  <!-- Media -->
-                  <div class="d-flex">
-                    <div class="flex-shrink-0">
-                      <i class="bi-receipt nav-icon"></i>
-                    </div>
+            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
+              <!-- Card -->
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col">
+                      <!-- Media -->
+                      <div class="d-flex">
+                        <div class="flex-shrink-0">
+                          <i class="bi-receipt nav-icon"></i>
+                        </div>
 
-                    <div class="flex-grow-1 ms-3">
-                      <h4 class="mb-1">Total Taxes</h4>
+                        <div class="flex-grow-1 ms-3">
+                          <h4 class="mb-1">Federal Taxes</h4>
+                          <span class="d-block" style="font-size: 1.5rem;">$800,000</span>
+                        </div>
+                      </div>
+                      <!-- End Media -->
                     </div>
-                  </div>
-                  <!-- End Media -->
-                </div>
-                <!-- End Col -->
+                    <!-- End Col -->
 
-                <div class="col-auto">
-                  <!-- Circle -->
-                  <div class="circles-chart">
-                    <div class="js-circle" id="circle-taxes" data-hs-circles-options='{
-                           "value": 54,
-                           "maxValue": 100,
-                           "duration": 500,
-                           "isViewportInit": true,
-                           "radius": 25,
-                           "width": 7,
-                           "fgStrokeLinecap": "round",
-                           "textFontSize": 14,
-                           "additionalText": "%",
-                           "textClass": "circles-chart-content",
-                           "textColor": "#377dff"
-                         }'></div>
+                    <div class="col-auto">
+                      <!-- Circle -->
+                      
+                      <!-- End Circle -->
+                    </div>
+                    <!-- End Col -->
                   </div>
-                  <!-- End Circle -->
+                  <!-- End Row -->
                 </div>
-                <!-- End Col -->
               </div>
-              <!-- End Row -->
+              <!-- End Card -->
+            </div>
+
+            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
+              <!-- Card -->
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col">
+                      <!-- Media -->
+                      <div class="d-flex">
+                        <div class="flex-shrink-0">
+                          <i class="bi-bar-chart nav-icon"></i>
+                        </div>
+
+                        <div class="flex-grow-1 ms-3">
+                          <h4 class="mb-1">Medicare Costs</h4>
+                          <span class="d-block" style="font-size: 1.5rem;">$1,200,000</span>
+                        </div>
+                      </div>
+                      <!-- End Media -->
+                    </div>
+                    <!-- End Col -->
+
+                    <div class="col-auto">
+                      <!-- Circle -->
+                    
+                      <!-- End Circle -->
+                    </div>
+                    <!-- End Col -->
+                  </div>
+                  <!-- End Row -->
+                </div>
+              </div>
+              <!-- End Card -->
+            </div>
+
+            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
+              <!-- Card -->
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col">
+                      <!-- Media -->
+                      <div class="d-flex">
+                        <div class="flex-shrink-0">
+                          <i class="bi-check2-circle nav-icon"></i>
+                        </div>
+
+                        <div class="flex-grow-1 ms-3">
+                          <h4 class="mb-1">Out Of Pocket</h4>
+                          <span class="d-block" style="font-size: 1.5rem;">$50,000</span>
+                          </div>
+                      </div>
+                      <!-- End Media -->
+                    </div>
+                    <!-- End Col -->
+
+                    <div class="col-auto">
+                      <!-- Circle -->
+                    
+                      <!-- End Circle -->
+                    </div>
+                    <!-- End Col -->
+                  </div>
+                  <!-- End Row -->
+                </div>
+              </div>
+              <!-- End Card -->
+            </div>
+            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
+              <!-- Card -->
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col">
+                      <!-- Media -->
+                      <div class="d-flex">
+                        <div class="flex-shrink-0">
+                          <i class="bi-check2-circle nav-icon"></i>
+                        </div>
+
+                        <div class="flex-grow-1 ms-3">
+                          <h4 class="mb-1">IRMAA Status</h4>
+                          <!-- Orange Rectangle -->
+                      <div style="width: 90%; height: 30px; background-color: orange;"></div>
+                      <!-- End Orange Rectangle -->
+                        </div>
+                      </div>
+                      <!-- End Media -->
+                    </div>
+                    <!-- End Col -->
+
+                    
+                  </div>
+                  <!-- End Row -->
+                </div>
+              </div>
+              <!-- End Card -->
             </div>
           </div>
-          <!-- End Card -->
-        </div>
-
-        <div class="col-sm-6 col-xl-4 mb-3 mb-xl-6">
-          <!-- Card -->
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="row">
-                <div class="col">
-                  <!-- Media -->
-                  <div class="d-flex">
-                    <div class="flex-shrink-0">
-                      <i class="bi-bar-chart nav-icon"></i>
-                    </div>
-
-                    <div class="flex-grow-1 ms-3">
-                      <h4 class="mb-1">Total Medicare Costs</h4>
-                    </div>
-                  </div>
-                  <!-- End Media -->
-                </div>
-                <!-- End Col -->
-
-                <div class="col-auto">
-                  <!-- Circle -->
-                  <div class="circles-chart">
-                    <div class="js-circle" id="circle-medicare" data-hs-circles-options='{
-                           "value": 80,
-                           "maxValue": 100,
-                           "duration": 2000,
-                           "isViewportInit": true,
-                           "radius": 25,
-                           "width": 3,
-                           "fgStrokeLinecap": "round",
-                           "textFontSize": 14,
-                           "additionalText": "%",
-                           "textClass": "circles-chart-content",
-                           "textColor": "#377dff"
-                         }'></div>
-                  </div>
-                  <!-- End Circle -->
-                </div>
-                <!-- End Col -->
-              </div>
-              <!-- End Row -->
-            </div>
-          </div>
-          <!-- End Card -->
-        </div>
-
-        <div class="col-sm-6 col-xl-4 mb-3 mb-xl-6">
-          <!-- Card -->
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="row">
-                <div class="col">
-                  <!-- Media -->
-                  <div class="d-flex">
-                    <div class="flex-shrink-0">
-                      <i class="bi-check2-circle nav-icon"></i>
-                    </div>
-
-                    <div class="flex-grow-1 ms-3">
-                      <h4 class="mb-1">Total Medicare Out Of Pocket</h4>
-                      <span class="d-block">79 <span class="badge bg-soft-dark text-dark rounded-pill ms-1">+4 today</span></span>
-                    </div>
-                  </div>
-                  <!-- End Media -->
-                </div>
-                <!-- End Col -->
-
-                <div class="col-auto">
-                  <!-- Circle -->
-                  <div class="circles-chart">
-                    <div class="js-circle" id="circle-outofpocket" data-hs-circles-options='{
-                           "value": 67,
-                           "maxValue": 100,
-                           "duration": 2000,
-                           "isViewportInit": true,
-                           "radius": 25,
-                           "width": 3,
-                           "fgStrokeLinecap": "round",
-                           "textFontSize": 14,
-                           "additionalText": "%",
-                           "textClass": "circles-chart-content",
-                           "textColor": "#377dff"
-                         }'></div>
-                  </div>
-                  <!-- End Circle -->
-                </div>
-                <!-- End Col -->
-              </div>
-              <!-- End Row -->
-            </div>
-          </div>
-          <!-- End Card -->
-        </div>
-
-        
-      </div>
-      <!-- End Row -->
+          <!-- End Row -->
 
           <ul class="nav nav-tabs page-header-tabs" id="projectsTab" role="tablist">
             <li class="nav-item">
@@ -267,7 +269,7 @@
             </li>
           </ul>
           <div class="tab-content mt-4">
-            <div v-if="activeTab === 'financial'" class="tab-pane active">
+            <div v-if="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
               <!-- Card -->
               <div class="card mb-3 mb-lg-5" >
                 <!-- Header -->
@@ -374,7 +376,7 @@
               </div>
               <!-- End Card -->
             </div>
-            <div v-show="activeTab === 'socialSecurity'" class="tab-pane active">
+            <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
               <!-- Social Security Chart Card -->
 
               <div class="card mb-3 mb-lg-5">
@@ -439,11 +441,41 @@
               </div>
               
             </div>
-            <div v-show="activeTab === 'medicare'" class="tab-pane active">
+            <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
               <!-- Medicare Chart Card -->
-              <div class="card mb-3 mb-lg-5">
-                <div class="card-body">
-                  <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
+              <div class="row">
+                <div class="col-sm-6 col-xl-8 mb-3 mb-xl-6">
+                  <div class="card mb-3 mb-lg-5">
+                    <div class="card-body">
+                      <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
+                    </div>
+                  </div>
+                </div>
+                <!-- Medicare Chart Card -->
+                <div class="col-sm-6 col-xl-4 mb-3 mb-xl-6">
+                  <div class="card mb-3 mb-lg-5">
+                    <div class="card-header">
+                      <h5 class="mb-4">Base Premium VS IRMAA</h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="circles-chart">
+                        <div class="js-circle" id="circle-medicare" data-hs-circles-options='{
+                              "value": 80,
+                              "maxValue": 100,
+                              "duration": 2000,
+                              "isViewportInit": true,
+                              "radius": 70,
+                              "width": 10,
+                              "fgStrokeLinecap": "round",
+                              "textFontSize": 14,
+                              "additionalText": "%",
+                              "textClass": "circles-chart-content",
+                              "textColor": "#377dff"
+                            }'>
+                          </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="card mb-3 mb-lg-5">
@@ -521,7 +553,7 @@
                 </div>
               </div>
             </div>
-            <div v-show="activeTab === 'income'" class="tab-pane active">
+            <div v-show="activeTab === 'income'" class="tab-pane active" style="margin-top:50px;">
               <div class="card mb-3 mb-lg-5">
                 <div class="card-body">
                   <h5 class="mb-4">Types of Income in Scenario</h5>
@@ -533,55 +565,100 @@
                 </div>
               </div>
             </div>
-            <div v-show="activeTab === 'rothConversion'" class="tab-pane active">
+            <div v-show="activeTab === 'rothConversion'" class="tab-pane active" style="margin-top:50px;">
               <div class="card mb-3 mb-lg-5">
                 <div class="card-body">
                   <p>This is the Roth Conversion section.</p>
                 </div>
               </div>
             </div>
-            <div v-show="activeTab === 'worksheets'" class="tab-pane active">
-              <div class="mb-3">
-                <label for="colaInput" class="form-label">Social Security COLA (%)</label>
-                <input type="number" class="form-control" id="colaInput" v-model.number="socialSecurityCola" @change="initializeChartJS" min="0" step="0.1">
-              </div>
-              <div class="card mb-3 mb-lg-5">
-                <div class="card-body">
-                  <canvas id="breakevenChart" style="width: 100%; height: 300px !important;"></canvas>
+            <div v-show="activeTab === 'worksheets'" class="tab-pane active" style="margin-top:50px;">
+              
+              <div class="row">
+                <div class="col-sm-6 col-xl-6 mb-3 mb-xl-6">
+                  
+                  <div class="card mb-3 mb-lg-5">
+                    
+                    <div class="card-body">
+                      
+                      <canvas id="breakevenChart" style="width: 100%; height: 300px !important;"></canvas>
+                    </div>
+                  </div>
+                  <div class="card mt-3 mb-lg-5">
+                    <div class="card-body">
+                      <h5 class="mb-4">Social Security Claim Comparison</h5>
+                      <div class="table-responsive">
+                        <table class="table table-bordered">
+                          <thead>
+                            <tr>
+                              <th>Age</th>
+                              <th>Monthly Amount</th>
+                              <th>Total Lifetime Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(benefit, age) in benefitByAge" :key="age">
+                              <td>{{ age }}</td>
+                              <td>${{ (benefit / 12).toFixed(2) }}</td>
+                              <td>
+                                ${{ 
+                                  (
+                                    Array.from({ length: client?.mortality_age - age + 1 }, (_, i) =>
+                                      (benefit * Math.pow(1 + socialSecurityCola / 100, i))
+                                    ).reduce((acc, val) => acc + val, 0)
+                                  ).toFixed(2) 
+                                }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <!-- Social Security Claim Comparison Table -->
-              <div class="card mt-3 mb-lg-5">
-                <div class="card-body">
-                  <h5 class="mb-4">Social Security Claim Comparison</h5>
-                  <div class="table-responsive">
-                    <table class="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Age</th>
-                          <th>Monthly Amount</th>
-                          <th>Total Lifetime Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(benefit, age) in benefitByAge" :key="age">
-                          <td>{{ age }}</td>
-                          <td>${{ (benefit / 12).toFixed(2) }}</td>
-                          <td>
-                            ${{ 
-                              (
-                                Array.from({ length: client?.mortality_age - age + 1 }, (_, i) =>
-                                  (benefit * Math.pow(1 + socialSecurityCola / 100, i))
-                                ).reduce((acc, val) => acc + val, 0)
-                              ).toFixed(2) 
-                            }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                <div class="col-sm-6 col-xl-6 mb-3 mb-xl-6">
+                  
+                  <div class="card mb-3 mb-lg-5">
+                    <div class="card-body">
+                    </div>
+                  </div>
+                  <div class="card mt-3 mb-lg-5">
+                    <div class="card-body">
+                      <h5 class="mb-4">Social Security Claim Comparison</h5>
+                      <div class="table-responsive">
+                        <table class="table table-bordered">
+                          <thead>
+                            <tr>
+                              <th>Age</th>
+                              <th>Monthly Amount</th>
+                              <th>Total Lifetime Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(benefit, age) in benefitByAge" :key="age">
+                              <td>{{ age }}</td>
+                              <td>${{ (benefit / 12).toFixed(2) }}</td>
+                              <td>
+                                ${{ 
+                                  (
+                                    Array.from({ length: client?.mortality_age - age + 1 }, (_, i) =>
+                                      (benefit * Math.pow(1 + socialSecurityCola / 100, i))
+                                    ).reduce((acc, val) => acc + val, 0)
+                                  ).toFixed(2) 
+                                }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+                <!-- Social Security Claim Comparison Table -->
+                
+                
+          
               <!-- End Social Security Claim Comparison Table -->
               <div class="dropdown">
                 <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('worksheets')" :aria-expanded="isDropdownOpen.worksheets">
@@ -808,7 +885,7 @@ export default {
 
           const datasets = this.activeTab === 'worksheets' ? [
             ...Object.entries(this.benefitByAge).map(([age, benefit], i) => {
-              const label = `Total Lifetime Value (Age ${age})`;
+              const label = `Age ${age}`;
               const data = [];
               console.log(`Processing Age: ${age}, Benefit: ${benefit}`);
               let cumulativeIncome = 0;
@@ -982,7 +1059,7 @@ export default {
                             const options = JSON.parse(el.getAttribute('data-hs-circles-options') || '{}');
                             console.log('Creating circle for element:', el.id, options);
                             const defaultOptions = {
-                                radius: 25,
+                                radius: 325,
                                 width: 7,
                                 fgStrokeLinecap: 'round',
                                 textFontSize: 14,
@@ -1244,8 +1321,21 @@ export default {
         const scenarioId = parseInt(newVal);
         this.scenario = this.scenarios.find(s => s.id === scenarioId);
         this.selectedScenarioId = scenarioId;
+        this.fetchScenarioData();
       }
     }
   }
 };
 </script>
+
+<style>
+.equal-height-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.equal-height-row > .col {
+  display: flex;
+  flex-direction: column;
+}
+</style>
