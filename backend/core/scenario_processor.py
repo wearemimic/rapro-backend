@@ -64,6 +64,7 @@ class ScenarioProcessor:
         # Log scenario ID and number of assets retrieved
         self._log_debug(f"Scenario ID: {scenario_id}, Number of assets retrieved: {len(self.assets)}")
 
+        # STEP 1: Scenario Initialization
         current_year = datetime.datetime.now().year
         retirement_age_primary = self.scenario.retirement_age or 65
         retirement_age_spouse = getattr(self.scenario, 'spouse_retirement_age', None) or 65
@@ -110,15 +111,29 @@ class ScenarioProcessor:
             primary_age = year - self.primary_birthdate.year
             spouse_age = year - self.spouse_birthdate.year if self.spouse_birthdate else None
 
+            # STEP 2: Income Mapping
             gross_income = self._calculate_gross_income(year)
+
+            # STEP 3: Taxable Income & MAGI Engine
             ss_income = self._calculate_social_security(year)
-            taxable_ss = calculate_taxable_social_security(ss_income, gross_income, 0, self.tax_status)  # Assuming no tax-exempt interest for simplicity
-            taxable_income = (gross_income - ss_income) + taxable_ss  # Corrected to add only the taxable portion
+            taxable_ss = calculate_taxable_social_security(ss_income, gross_income, 0, self.tax_status)
+            taxable_income = (gross_income - ss_income) + taxable_ss
+
+            # STEP 4: Federal Tax & AMT Engine
             federal_tax = self._calculate_federal_tax(taxable_income)
             cumulative_federal_tax += federal_tax
+
+            # STEP 5: Medicare & IRMAA Engine (2-year lookback)
             medicare_base, irmaa, total_medicare = self._calculate_medicare_costs(taxable_income, year)
-            # Convert total_medicare to Decimal for subtraction
             total_medicare = Decimal(total_medicare)
+
+            # STEP 6: Roth Conversion Module (Joint Household, Phase 1)
+            roth_conversion_amount = self._calculate_roth_conversion(year)
+            taxable_income += roth_conversion_amount
+
+            # STEP 7: Asset Spend-Down & Growth Engine
+            self._calculate_asset_spend_down(year)
+
             net_income = gross_income + ss_income - federal_tax - total_medicare
 
             summary = {
@@ -127,8 +142,9 @@ class ScenarioProcessor:
                 "spouse_age": spouse_age if self.tax_status != "Single" else None,
                 "gross_income": round(gross_income, 2),
                 "ss_income": round(ss_income, 2),
-                "taxable_ss": round(taxable_ss, 2),  # Store taxable Social Security
+                "taxable_ss": round(taxable_ss, 2),
                 "taxable_income": round(taxable_income, 2),
+                "roth_conversion": round(roth_conversion_amount, 2),
                 "federal_tax": round(federal_tax, 2),
                 "cumulative_federal_tax": round(cumulative_federal_tax, 2),
                 "medicare_base": round(medicare_base, 2),
@@ -136,6 +152,9 @@ class ScenarioProcessor:
                 "total_medicare": round(total_medicare, 2),
                 "net_income": round(net_income, 2)
             }
+
+            for asset in self.assets:
+                summary[f"{asset['income_type']}_balance"] = round(asset["current_asset_balance"], 2)
 
             self._log_debug(f"Year {year}: {summary}")
             results.append(summary)
@@ -302,9 +321,24 @@ class ScenarioProcessor:
         return gross_income + ss_income * Decimal("0.85")
 
     def _calculate_federal_tax(self, taxable_income):
+        # Calculate regular federal income tax
         if self.tax_status == "Single":
-            return taxable_income * Decimal("0.15")
-        return taxable_income * Decimal("0.12")
+            regular_tax = taxable_income * Decimal("0.15")
+        else:
+            regular_tax = taxable_income * Decimal("0.12")
+
+        # Calculate Alternative Minimum Tax (AMT)
+        if self.tax_status == "Single":
+            amt_exemption = max(Decimal("54700"), Decimal("54700") - (Decimal("0.25") * (taxable_income - Decimal("539900"))))
+        else:
+            amt_exemption = max(Decimal("84700"), Decimal("84700") - (Decimal("0.25") * (taxable_income - Decimal("1079800"))))
+
+        amt_income = max(Decimal("0"), taxable_income - amt_exemption)
+        amt_tax = amt_income * Decimal("0.26")
+
+        # Determine final federal tax liability
+        federal_tax = max(regular_tax, amt_tax)
+        return federal_tax
 
     def _calculate_medicare_costs(self, taxable_income, year):
         self._log_debug(f"Calculating Medicare costs based on taxable income: {taxable_income}")
@@ -372,6 +406,71 @@ class ScenarioProcessor:
         total_medicare = irmaa * 12
         self._log_debug(f"Adjusted Medicare Base: {base}, Adjusted IRMAA: {irmaa}, Total Medicare: {total_medicare}")
         return base, irmaa, total_medicare
+
+    def _calculate_roth_conversion(self, year):
+        """
+        Implement the Roth Conversion Module (STEP 6)
+        - Accept advisor-defined joint conversion schedule: start year, duration, annual conversion amount.
+        - Apply pro-rata asset depletion across eligible balances (IRA, 401k, etc.).
+        - Conversion amount treated as additional taxable income & MAGI.
+        - Update Roth balances accordingly with growth.
+        """
+        roth_conversion_start_year = self.scenario.roth_conversion_start_year
+        roth_conversion_duration = self.scenario.roth_conversion_duration
+        roth_conversion_annual_amount = self.scenario.roth_conversion_annual_amount
+
+        # Add error handling for None values
+        if roth_conversion_start_year is None or roth_conversion_duration is None:
+            self._log_debug(f"Roth conversion parameters are not set: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}")
+            return 0
+
+        if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
+            # Apply pro-rata asset depletion across eligible balances
+            eligible_balances = [asset for asset in self.assets if asset["income_type"] in ["ira", "401k"]]
+            total_eligible_balance = sum(asset["current_asset_balance"] for asset in eligible_balances)
+            for asset in eligible_balances:
+                depletion_ratio = asset["current_asset_balance"] / total_eligible_balance
+                asset_conversion_amount = roth_conversion_annual_amount * depletion_ratio
+                asset["current_asset_balance"] -= asset_conversion_amount
+                asset["roth_conversion_amount"] = asset_conversion_amount
+
+            # Add conversion amount to taxable income and MAGI
+            return roth_conversion_annual_amount
+        else:
+            return 0
+
+    def _calculate_asset_spend_down(self, year):
+        """
+        Implement the Asset Spend-Down & Growth Engine (STEP 7)
+        - Apply monthly contributions until retirement age.
+        - Apply growth rates annually.
+        - Apply withdrawals after retirement start year.
+        - Apply RMD override when applicable (IRS Uniform Lifetime Table).
+        - Apply Roth conversions as account depletion & Roth growth.
+        - Prevent negative balances.
+        - Survivor rules handle tax filing transitions.
+        """
+        for asset in self.assets:
+            self._update_asset_balance(asset, year)
+
+            # Apply RMD override if calculated RMD > requested withdrawals
+            rmd_amount = self._calculate_rmd(asset, year)
+            withdrawal_amount = asset.get("withdrawal_amount", 0)
+            if rmd_amount > withdrawal_amount:
+                asset["withdrawal_amount"] = rmd_amount
+
+            # Apply Roth conversion depletion and growth
+            roth_conversion_amount = self._calculate_roth_conversion(year)
+            if asset["income_type"] == "roth":
+                asset["current_asset_balance"] += roth_conversion_amount
+                asset["current_asset_balance"] *= (1 + asset.get("rate_of_return", 0) / 100)
+            else:
+                asset["current_asset_balance"] -= roth_conversion_amount
+
+        # Prevent negative balances
+        for asset in self.assets:
+            if asset["current_asset_balance"] < 0:
+                asset["current_asset_balance"] = 0
 
     def _log_debug(self, message):
         if self.debug:
