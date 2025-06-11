@@ -118,12 +118,28 @@ class ClientEditSerializer(serializers.ModelSerializer):
 
         # Handle spouse logic only if not single
         if instance.tax_status.lower() != 'single':
-            if spouse_data and any(spouse_data.values()):
-                spouse, _ = Spouse.objects.get_or_create(client=instance)
-                for attr, value in spouse_data.items():
-                    setattr(spouse, attr, value)
-                spouse.save()
+            required_spouse_fields = ['first_name', 'last_name', 'birthdate', 'gender']
+            print('DEBUG spouse_data:', spouse_data)
+            print('DEBUG required fields check:', [spouse_data.get(f) not in [None, ''] for f in required_spouse_fields] if spouse_data else None)
+            if spouse_data and all(spouse_data.get(f) not in [None, ''] for f in required_spouse_fields):
+                print('DEBUG: Creating or updating spouse')
+                try:
+                    spouse = Spouse.objects.get(client=instance)
+                    for attr, value in spouse_data.items():
+                        setattr(spouse, attr, value)
+                    spouse.save()
+                except Spouse.DoesNotExist:
+                    Spouse.objects.create(client=instance, **spouse_data)
+            else:
+                print('DEBUG: Spouse data incomplete, deleting spouse if exists')
+                # If spouse data is incomplete, delete spouse if exists
+                try:
+                    if instance.spouse:
+                        instance.spouse.delete()
+                except Spouse.DoesNotExist:
+                    pass
         else:
+            print('DEBUG: Tax status is single, deleting spouse if exists')
             # If single and spouse exists, delete it
             try:
                 if instance.spouse:
