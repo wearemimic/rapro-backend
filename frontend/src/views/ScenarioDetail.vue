@@ -87,7 +87,6 @@
                         <div class="flex-shrink-0">
                           <i class="bi-receipt nav-icon"></i>
                         </div>
-
                         <div class="flex-grow-1 ms-3">
                           <h4 class="mb-1">Federal Taxes</h4>
                           <span class="d-block" style="font-size: 1.5rem;">{{ formatCurrency(totalFederalTaxes) }}</span>
@@ -95,14 +94,6 @@
                       </div>
                       <!-- End Media -->
                     </div>
-                    <!-- End Col -->
-
-                    <div class="col-auto">
-                      <!-- Circle -->
-                      
-                      <!-- End Circle -->
-                    </div>
-                    <!-- End Col -->
                   </div>
                   <!-- End Row -->
                 </div>
@@ -412,41 +403,33 @@
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
               <!-- Medicare Chart Card -->
-              <div class="row">
-                <div class="col-sm-6 col-xl-8 mb-3 mb-xl-6">
-                  <div class="card mb-3 mb-lg-5">
-                    <div class="card-body">
-                      <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
-                    </div>
+              <div class="card mb-3 mb-lg-5">
+                <div class="card-body d-flex">
+                  <div class="col-sm-8 h-100">
+                    <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
                   </div>
-                </div>
-                <!-- Medicare Chart Card -->
-                <div class="col-sm-6 col-xl-4 mb-3 mb-xl-6">
-                  <div class="card mb-3 mb-lg-5">
-                    <div class="card-header">
-                      <h5 class="mb-4">Base Premium VS IRMAA</h5>
-                    </div>
-                    <div class="card-body">
-                      <div class="circles-chart">
+                  <div class="col-sm-4 h-100">
+                    
+                      <h5 class="mb-4" style="text-align:center;">IRMAA as percentage of Overall Cost </h5>
+                    
+                      <div class="circles-chart"style="padding-top:20px;">
                         <div class="js-circle" id="circle-medicare" data-hs-circles-options='{
-                              "value": 80,
-                              "maxValue": 100,
+                              "value": {{ totalIrmaaSurcharge }},
+                              "maxValue": {{ totalMedicareCost }},
                               "duration": 2000,
                               "isViewportInit": true,
-                              "radius": 70,
+                              "radius": 80,
                               "width": 20,
                               "fgStrokeLinecap": "round",
-                              "textFontSize": 14,
-                              "additionalText": "%",
-                              "textClass": "circles-chart-content",
+                              
                               "textColor": "#377dff"
                             }'>
                           </div>
                       </div>
-                    </div>
+                    
                     <div class="card-body">
-                      <h4>Base Premium: $5,000</h4>
-                      <h4>IRMAA Surcharges: $20,000</h4>
+                      <h4 style="text-align:center;margin-top:20px;">Base Premium: ${{ (totalMedicareCost - totalIrmaaSurcharge).toFixed(2) }}</h4>
+                      <h4 style="text-align:center;">IRMAA Surcharges: ${{ totalIrmaaSurcharge }}</h4>
                     </div>
                   </div>
                 </div>
@@ -480,10 +463,10 @@
                         <tr>
                           <th>Year</th>
                           <th>Age (mark)</th>
-                          <th>Total Income</th>
-                          <th>Income for Medicare</th>
-                          <th>Part B (mark)</th>
-                          <th>Part D (mark)</th>
+                          <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
+                          <th>Part B</th>
+                          <th>Part D</th>
+                          <th>IRMAA Surcharge</th>
                           <th>Total Cost</th>
                         </tr>
                       </thead>
@@ -491,13 +474,22 @@
                         <tr v-for="(row, index) in scenarioResults" :key="index">
                           <td>{{ row.year }}</td>
                           <td>{{ row.primary_age }}</td>
-                          <td>${{ parseFloat(row.gross_income || 0).toFixed(2) }}</td>
-                          <td>${{ parseFloat(row.medicare_income || 0).toFixed(2) }}</td>
+                          <td v-if="client?.tax_status?.toLowerCase() !== 'single'">{{ row.spouse_age }}</td>
                           <td>${{ parseFloat(row.part_b || 0).toFixed(2) }}</td>
                           <td>${{ parseFloat(row.part_d || 0).toFixed(2) }}</td>
+                          <td>${{ parseFloat(row.irmaa_surcharge || 0).toFixed(2) }}</td>
                           <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
                         </tr>
                       </tbody>
+                      <tfoot>
+                        <tr style="font-weight: bold;">
+                          <td colspan="2"><strong>Total</strong></td>
+                          <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.part_b || 0), 0).toFixed(2) }}</td>
+                          <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.part_d || 0), 0).toFixed(2) }}</td>
+                          <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.irmaa_surcharge || 0), 0).toFixed(2) }}</td>
+                          <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2) }}</td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
@@ -775,7 +767,7 @@ export default {
         socialSecurity: false,
         medicare: false,
         worksheets: false
-      }
+      },
     };
   },
   mounted() {
@@ -791,6 +783,7 @@ export default {
         this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
         this.selectedScenarioId = this.scenario?.id || null;
         this.initPlugins();
+        this.initializeCircles();
         this.fetchScenarioData();
         console.log('Client Tax Status:', this.client?.tax_status);
       })
@@ -857,24 +850,19 @@ export default {
             this.chartInstance.destroy();
           }
 
-          console.log('Scenario Results:', this.scenarioResults);
-          console.log('Remaining SSI Benefit Data:', this.scenarioResults.map(row => parseFloat(row.remaining_ssi || 0)));
-
           const datasets = this.activeTab === 'worksheets' ? [
             ...Object.entries(this.benefitByAge).map(([age, benefit], i) => {
               const label = `Age ${age}`;
               const data = [];
-              console.log(`Processing Age: ${age}, Benefit: ${benefit}`);
               let cumulativeIncome = 0;
-              const startYear = 62 + (age - 62); // Adjust the start year based on age
+              const startYear = 62 + (age - 62);
               for (let year = 62; year <= 90; year++) {
                 if (year >= startYear) {
                   cumulativeIncome += benefit;
                   data.push(cumulativeIncome);
                 } else {
-                  data.push(null); // Fill with null or zero until the start year
+                  data.push(null);
                 }
-                console.log(`Year: ${year}, Cumulative Income: ${cumulativeIncome}`);
               }
               return {
                 type: 'line',
@@ -905,7 +893,6 @@ export default {
                 const ssiBenefit = parseFloat(row.ss_income || 0);
                 const medicareExpense = parseFloat(row.total_medicare || 0);
                 const remainingSSI = ssiBenefit - medicareExpense;
-                console.log(`Year: ${row.year}, SSI Benefit: ${ssiBenefit}, Medicare Expense: ${medicareExpense}, Remaining SSI: ${remainingSSI}`);
                 return remainingSSI;
               }),
               borderColor: "#00c9db",
@@ -924,15 +911,29 @@ export default {
             }
           ] : this.activeTab === 'medicare' ? [
             {
-            type: 'line',
-            label: 'Total Income',
-            data: this.scenarioResults.map(row => parseFloat(row.gross_income || 0)),
-            borderColor: "#377dff",
-            backgroundColor: "rgba(55, 125, 255, 0.1)",
-            borderWidth: 2,
-            tension: 0.3,
-            yAxisID: 'y'
-          }
+              type: 'bar',
+              label: 'Part B',
+              data: this.scenarioResults.map(row => parseFloat(row.part_b || 0)),
+              backgroundColor: '#377dff',
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Part D',
+              data: this.scenarioResults.map(row => parseFloat(row.part_d || 0)),
+              backgroundColor: '#00c9db',
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'IRMAA Surcharge',
+              data: this.scenarioResults.map(row => parseFloat(row.irmaa_surcharge || 0)),
+              backgroundColor: '#ffc107',
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            }
           ] : [
             {
               type: 'line',
@@ -978,13 +979,10 @@ export default {
             }
           ];
 
-          console.log('Datasets:', datasets);
-          console.log('Chart Context:', ctx);
-
           this.chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: this.scenarioResults.map(row => row.year.toString()), // Use actual years from data
+              labels: this.scenarioResults.map(row => row.year.toString()),
               datasets: datasets
             },
             options: {
@@ -992,14 +990,14 @@ export default {
               maintainAspectRatio: false,
               scales: {
                 x: {
-                  stacked: false,
+                  stacked: this.activeTab === 'medicare',
                   title: {
                     display: true,
                     text: 'Year'
                   }
                 },
                 y: {
-                  stacked: false,
+                  stacked: this.activeTab === 'medicare',
                   title: {
                     display: true,
                     text: 'Amount ($)'
@@ -1024,41 +1022,62 @@ export default {
       });
     },
     initializeCircles() {
-        this.$nextTick(() => {
-            const maxRetries = 20;
-            let retryCount = 0;
+      this.$nextTick(() => {
+        console.log('Initializing Circles...');
+        console.log('Total IRMAA Surcharge:', this.totalIrmaaSurcharge);
+        console.log('Total Medicare Cost:', this.totalMedicareCost);
+        const maxRetries = 20;
+        let retryCount = 0;
+        const tryInit = () => {
+          const CirclesGlobal = window.Circles;
+          if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
+            console.log('Circles.js is ready.');
+            document.querySelectorAll('.js-circle').forEach((el) => {
+              console.log('Found circle element:', el);
+              if (!el.dataset.initialized) {
+                const irmaaPercentage = Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
+                let circleColor = '#377dff'; // Default color
 
-            const tryInit = () => {
-                const CirclesGlobal = window.Circles;
-                if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
-                    document.querySelectorAll('.js-circle').forEach((el) => {
-                        if (!el.dataset.initialized) {
-                            const options = JSON.parse(el.getAttribute('data-hs-circles-options') || '{}');
-                            console.log('Creating circle for element:', el.id, options);
-                            const defaultOptions = {
-                                radius: 325,
-                                width: 7,
-                                fgStrokeLinecap: 'round',
-                                textFontSize: 14,
-                                additionalText: '%',
-                                textClass: 'circles-chart-content',
-                                textColor: '#377dff'
-                            };
-                            CirclesGlobal.create({ id: el.id, ...defaultOptions, ...options });
-                            el.dataset.initialized = 'true';
-                        }
-                    });
-                } else if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.warn(`Circles.js not ready, retrying ${retryCount}/${maxRetries}...`);
-                    setTimeout(tryInit, 200);
+                // Determine color based on IRMAA percentage
+                if (irmaaPercentage > 50) {
+                  circleColor = '#ff0000'; // Red for percentages above 50
+                } else if (irmaaPercentage > 25) {
+                  circleColor = '#ffa500'; // Orange for percentages between 25 and 50
+                } else if (irmaaPercentage > 15) {
+                  circleColor = '#ffff00'; // Yellow for percentages between 15 and 25
                 } else {
-                    console.error('❌ Circles.js never loaded.');
+                  circleColor = '#00ff00'; // Green for percentages below 15
                 }
-            };
 
-            tryInit();
-        });
+                console.log('IRMAA Percentage:', irmaaPercentage, 'Circle Color:', circleColor);
+
+                CirclesGlobal.create({
+                  id: el.id,
+                  value: irmaaPercentage,
+                  maxValue: 100,
+                  width: 20,
+                  radius: 70,
+                  text: function(value) { return value + '%'; },
+                  colors: ['#f0f0f0', circleColor],
+                  duration: 400,
+                  wrpClass: 'circles-wrp',
+                  textClass: 'circles-text',
+                  styleWrapper: true,
+                  styleText: true
+                });
+                el.dataset.initialized = true;
+              }
+            });
+          } else if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(tryInit, 100);
+          } else {
+            console.error('Failed to initialize Circles.js after multiple attempts.');
+          }
+        };
+
+        tryInit();
+      });
     },
     fetchScenariosForClient() {
       // Use clientId from route params (not from scenario.client)
@@ -1261,7 +1280,6 @@ export default {
       }
       return `${firstName} ${lastName}`;
     },
-    
   },
   computed: {
     incomeFields() {
@@ -1284,14 +1302,28 @@ export default {
     totalMedicareCosts() {
       return this.scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2);
     },
+    totalIrmaaSurcharge() {
+      return this.scenarioResults.reduce((total, row) => total + parseFloat(row.irmaa_surcharge || 0), 0).toFixed(2);
+    },
+    totalMedicareCost() {
+      return this.scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2);
+    },
   },
   watch: {
+    scenarioResults: {
+      handler() {
+        this.$nextTick(() => {
+          this.initializeCircles();
+        });
+      },
+      deep: true
+    },
     activeTab(newVal) {
-      console.log("Active tab changed to:", newVal);
+      console.log('Active tab changed to:', newVal);
       if (['socialSecurity', 'medicare', 'worksheets'].includes(newVal)) {
-        console.log("🔍 Debug - scenarioResults:", this.scenarioResults);
+        console.log('🔍 Debug - scenarioResults:', this.scenarioResults);
         if (this.scenarioResults.length) {
-          console.log("🔍 Debug - First row year:", this.scenarioResults[0].year);
+          console.log('🔍 Debug - First row year:', this.scenarioResults[0].year);
           this.$nextTick(() => this.initializeChartJS());
         } else {
           console.warn(`⚠️ scenarioResults is empty when switching to ${newVal} tab`);
@@ -1306,7 +1338,7 @@ export default {
         this.selectedScenarioId = scenarioId;
         this.fetchScenarioData();
       }
-    }
+    },
   }
 };
 </script>
@@ -1325,7 +1357,7 @@ export default {
 .circles-chart-content {
   text-align: center;
   line-height: 1;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: bold;
   display: flex;
   justify-content: center;

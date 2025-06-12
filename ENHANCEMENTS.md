@@ -44,4 +44,44 @@
   1. Detect when the user is running their first scenario on the client detail page.
   2. Update the button text to "Run your First Stress Test" for the first scenario.
   3. On the scenario creation page, set the default scenario name to "IRMAA Stress Test" for the first scenario.
-  4. Ensure these changes only apply to the first scenario and revert to standard behavior for subsequent scenarios. 
+  4. Ensure these changes only apply to the first scenario and revert to standard behavior for subsequent scenarios.
+
+## 6. Add Age Sliders and Heat Map for Social Security Timing
+
+- **Objective**: Introduce sliders above the graphs to allow users to select ages for the client and spouse, showing the impact of taxes, IRMAA, etc., based on the chosen age for social security. Additionally, implement a heat map to indicate the optimal time for taking social security.
+- **Details**: This enhancement will provide an interactive way for users to visualize the financial impact of different social security claiming ages. The heat map will help users identify the best time to claim social security benefits.
+- **Implementation Steps**:
+  1. Add sliders above the graphs for selecting the ages of the client and spouse.
+  2. Update the graphs dynamically to reflect changes in taxes, IRMAA, and other financial metrics based on the selected ages.
+  3. Develop a heat map to display the optimal social security claiming age, considering various financial factors.
+  4. Ensure the user interface is intuitive and provides clear insights into the financial implications of different age selections.
+
+## 7. Include Social Security Rules for Spousal Claiming Strategies
+
+- **Objective**: Integrate social security rules to provide guidance on optimal spousal claiming strategies.
+- **Details**: This enhancement will help users understand the best strategies for a spouse to claim social security benefits, taking into account various rules and scenarios.
+- **Implementation Steps**:
+  1. Research and compile relevant social security rules and strategies for spousal benefits.
+  2. Implement logic to analyze user data and suggest optimal claiming strategies for spouses.
+  3. Display recommendations and potential outcomes in the user interface, providing clear guidance on spousal claiming options.
+  4. Ensure the recommendations are personalized based on the user's specific financial situation and goals.
+
+## 8. Add Table to Compare Benefits at Full Retirement Age (FRA) and Other Ages
+
+- **Objective**: Provide a table under the age slider to display the social security benefits at Full Retirement Age (FRA) and compare them with benefits at other selected ages.
+- **Details**: This enhancement will allow users to see the difference in social security benefits between the FRA and any other age they choose using the slider.
+- **Implementation Steps**:
+  1. Create a table component to display social security benefits at FRA and other selected ages.
+  2. Update the table dynamically as users adjust the age slider, showing the difference in benefits.
+  3. Ensure the table provides clear and concise information, helping users make informed decisions about when to claim benefits.
+  4. Integrate the table with the existing slider and graph components for a seamless user experience.
+
+## 9. Access to Social Security Forms and Wealthbox Reminders for IRMAA
+
+- **Objective**: Provide access to all forms related to social security and set reminders in Wealthbox for IRMAA preparation, including having the SSA-44 form ready.
+- **Details**: This enhancement will ensure users have easy access to necessary social security forms and are reminded to prepare for IRMAA two years prior to retirement.
+- **Implementation Steps**:
+  1. Compile a list of all relevant social security forms and make them accessible within the application.
+  2. Integrate with Wealthbox to set reminders for users two years before retirement to prepare for IRMAA.
+  3. Ensure the SSA-44 form is readily available for users to fill out and submit.
+  4. Provide clear instructions and guidance on how to use these forms and reminders effectively. 

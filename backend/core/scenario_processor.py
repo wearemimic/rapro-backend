@@ -124,7 +124,7 @@ class ScenarioProcessor:
             cumulative_federal_tax += federal_tax
 
             # STEP 5: Medicare & IRMAA Engine (2-year lookback)
-            medicare_base, irmaa, total_medicare = self._calculate_medicare_costs(taxable_income, year)
+            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa = self._calculate_medicare_costs(taxable_income, year)
             total_medicare = Decimal(total_medicare)
 
             # STEP 6: Roth Conversion Module (Joint Household, Phase 1)
@@ -135,6 +135,7 @@ class ScenarioProcessor:
             self._calculate_asset_spend_down(year)
 
             net_income = gross_income + ss_income - federal_tax - total_medicare
+            irmaa = irmaa + part_d_irmaa
 
             summary = {
                 "year": year,
@@ -148,7 +149,9 @@ class ScenarioProcessor:
                 "federal_tax": round(federal_tax, 2),
                 "cumulative_federal_tax": round(cumulative_federal_tax, 2),
                 "medicare_base": round(medicare_base, 2),
-                "irmaa": round(irmaa, 2),
+                "part_b": round(medicare_base, 2),
+                "part_d": round(base_part_d, 2),
+                "irmaa_surcharge": round(irmaa, 2),
                 "total_medicare": round(total_medicare, 2),
                 "net_income": round(net_income, 2)
             }
@@ -342,54 +345,70 @@ class ScenarioProcessor:
 
     def _calculate_medicare_costs(self, taxable_income, year):
         self._log_debug(f"Calculating Medicare costs based on taxable income: {taxable_income}")
-        base = 1700
+        base_part_b = 185  # Base monthly rate per person for Part B
+        base_part_d = 49  # Base monthly rate for Part D
         irmaa = 0
+        part_d_irmaa = 0
 
         # Determine IRMAA based on filing status and taxable income
         if self.tax_status == "Single":
             if taxable_income > 500000:
                 irmaa = 616
+                part_d_irmaa = 85.80
             elif taxable_income > 200000:
                 irmaa = 581
+                part_d_irmaa = 78.60
             elif taxable_income > 167000:
                 irmaa = 472.80
+                part_d_irmaa = 57.00
             elif taxable_income > 133000:
                 irmaa = 364.90
+                part_d_irmaa = 35.30
             elif taxable_income > 106000:
                 irmaa = 256.90
-            elif taxable_income < 106000:
+                part_d_irmaa = 13.70
+            elif taxable_income <= 106000:
                 irmaa = 185.00
+                part_d_irmaa = 0
         elif self.tax_status == "Married Filing Jointly":
             if taxable_income > 750000:
                 irmaa = 616
+                part_d_irmaa = 85.80
             elif taxable_income > 400000:
                 irmaa = 581
+                part_d_irmaa = 78.60
             elif taxable_income > 334000:
                 irmaa = 472.80
+                part_d_irmaa = 57.00
             elif taxable_income > 266000:
                 irmaa = 364.90
+                part_d_irmaa = 35.30
             elif taxable_income > 212000:
                 irmaa = 256.90
-            elif taxable_income < 212000:
+                part_d_irmaa = 13.70
+            elif taxable_income <= 212000:
                 irmaa = 185.00
+                part_d_irmaa = 0
+            base_part_b *= 2  # Double the base for married couples
+            base_part_d *= 2  # Double the base for married couples
         elif self.tax_status == "Married Filing Separately":
             if taxable_income > 394000:
                 irmaa = 443.90
+                part_d_irmaa = 85.80
             elif taxable_income > 106000:
                 irmaa = 406.90
-            elif taxable_income < 106000:
+                part_d_irmaa = 78.60
+            elif taxable_income <= 106000:
                 irmaa = 406.90
+                part_d_irmaa = 0
+
+        # Convert irmaa and part_d_irmaa to Decimal before applying the inflation rate
+        irmaa = Decimal(irmaa)
+        part_d_irmaa = Decimal(part_d_irmaa)
 
         # Retrieve inflation rates from the scenario
         part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
         part_d_inflation_rate = Decimal(self.scenario.part_d_inflation_rate) / 100
-
-        # Convert irmaa to Decimal before applying the inflation rate
-        irmaa = Decimal(irmaa)
-        irmaa *= (1 + part_d_inflation_rate)
-
-        # Adjust the base and IRMAA costs by the inflation rates
-        base *= (1 + part_b_inflation_rate)
 
         # Calculate the number of years until the current year
         current_year = datetime.datetime.now().year
@@ -397,15 +416,30 @@ class ScenarioProcessor:
 
         # Apply inflation for each year until the current year
         for _ in range(years_until_current):
-            base *= (1 + part_b_inflation_rate)
+            base_part_b *= (1 + part_b_inflation_rate)
+            base_part_d *= (1 + part_d_inflation_rate)
             irmaa *= (1 + part_d_inflation_rate)
+            part_d_irmaa *= (1 + part_d_inflation_rate)
+
+        # Calculate the IRMAA cost separately
+        irmaa_cost = irmaa - base_part_b
+
+        if irmaa_cost < 0:
+            irmaa_cost = 0
+
+        # Calculate total Medicare cost
+        total_medicare_monthly = base_part_b + irmaa_cost + base_part_d + part_d_irmaa
 
         # Log the adjusted values
-        self._log_debug(f"Year {year} - Inflated Medicare Base: {base}, Inflated IRMAA: {irmaa}")
+        self._log_debug(f"Year {year} - Inflated Medicare Base Part B: {base_part_b}, Inflated IRMAA: {irmaa}, Base Part D: {base_part_d}, Part D IRMAA: {part_d_irmaa}, Total Medicare Monthly: {total_medicare_monthly}")
 
-        total_medicare = irmaa * 12
-        self._log_debug(f"Adjusted Medicare Base: {base}, Adjusted IRMAA: {irmaa}, Total Medicare: {total_medicare}")
-        return base, irmaa, total_medicare
+        total_medicare_annual = total_medicare_monthly * 12  # Calculate total annual cost
+        self._log_debug(f"Adjusted Medicare Base Part B: {base_part_b}, Adjusted IRMAA: {irmaa}, Base Part D: {base_part_d}, Part D IRMAA: {part_d_irmaa}, Total Medicare Annual: {total_medicare_annual}")
+        base_part_b_annual = base_part_b * 12
+        base_part_d_annual = base_part_d * 12
+        irmaa_cost_annual = irmaa_cost * 12
+        
+        return base_part_b_annual, irmaa_cost_annual, total_medicare_annual, base_part_d_annual, part_d_irmaa
 
     def _calculate_roth_conversion(self, year):
         """
