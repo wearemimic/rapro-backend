@@ -233,6 +233,19 @@ export default {
         tryInit();
       });
     }
+  },
+  mounted() {
+    this.initializeCircles();
+  },
+  watch: {
+    scenarioResults: {
+      handler() {
+        this.$nextTick(() => {
+          this.initializeCircles();
+        });
+      },
+      deep: true
+    }
   }
 };
 </script> 
