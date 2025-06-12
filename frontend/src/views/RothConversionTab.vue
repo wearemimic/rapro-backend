@@ -1,0 +1,196 @@
+<template>
+  <div>
+    <!-- Section 1: Asset Selection Panel -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <h5 class="mb-4">Asset Selection Panel</h5>
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Owner</th>
+                <th>Value</th>
+                <th>Amount to Convert</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="asset in assetDetails" :key="asset.income_type || asset.id" v-if="asset && asset.income_type && ['401k', 'IRA', 'Traditional_401k'].includes(asset.income_type)">
+                <td>{{ asset.income_type || 'Unknown' }}</td>
+                <td>{{ asset.owned_by || 'Unknown' }}</td>
+                <td>${{ parseFloat(asset.current_asset_balance || 0).toFixed(2) }}</td>
+                <td><input type="number" v-model="asset.amount_to_convert" :max="asset.current_asset_balance || 0" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Conversion Schedule Parameters -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <h5 class="mb-4">Conversion Schedule Parameters</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <label for="preRetirementIncome">Projected Pre-Retirement Household Income</label>
+            <input type="number" id="preRetirementIncome" v-model="preRetirementIncome" class="form-control" />
+          </div>
+          <div class="col-md-6">
+            <label for="conversionStartYear">Conversion Start Year</label>
+            <select id="conversionStartYear" v-model="conversionStartYear" class="form-control">
+              <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+            </select>
+          </div>
+          <div class="col-md-6 mt-3">
+            <label for="yearsToConvert">Years to Convert</label>
+            <input type="range" id="yearsToConvert" v-model="yearsToConvert" min="0" max="10" class="form-range" />
+            <span>{{ yearsToConvert }} years</span>
+          </div>
+          <div class="col-md-6 mt-3">
+            <label for="rothGrowthRate">Roth Growth Rate (%)</label>
+            <input type="number" id="rothGrowthRate" v-model="rothGrowthRate" class="form-control" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Conversion Impact Table -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <h5 class="mb-4">Conversion Impact Table</h5>
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Client/Spouse Ages</th>
+                <th>Income Before Conversion</th>
+                <th>Conversion Amount</th>
+                <th>Total Taxable Income</th>
+                <th>Tax Bracket (%)</th>
+                <th>Federal Tax</th>
+                <th>Medicare Costs</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in scenarioResults" :key="row.year">
+                <td>{{ row.year }}</td>
+                <td>{{ row.primary_age }} / {{ row.spouse_age }}</td>
+                <td>${{ parseFloat(row.gross_income || 0).toFixed(2) }}</td>
+                <td>${{ parseFloat(row.roth_conversion || 0).toFixed(2) }}</td>
+                <td>${{ parseFloat(row.taxable_income || 0).toFixed(2) }}</td>
+                <td>12%</td>
+                <td>${{ parseFloat(row.federal_tax || 0).toFixed(2) }}</td>
+                <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Baseline vs Roth Conversion Comparison Table -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <h5 class="mb-4">Baseline vs Roth Conversion Comparison</h5>
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Baseline</th>
+                <th>Roth Conversion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Lifetime Federal Taxes</td>
+                <td>$0</td>
+                <td>$0</td>
+              </tr>
+              <tr>
+                <td>Lifetime Medicare Premiums</td>
+                <td>$0</td>
+                <td>$0</td>
+              </tr>
+              <tr>
+                <td>Lifetime IRMAA Surcharges</td>
+                <td>$0</td>
+                <td>$0</td>
+              </tr>
+              <tr>
+                <td>Net Lifetime Spendable Income</td>
+                <td>$0</td>
+                <td>$0</td>
+              </tr>
+              <tr>
+                <td>Final Roth IRA Balance</td>
+                <td>$0</td>
+                <td>$0</td>
+              </tr>
+              <tr>
+                <td>Total Net Assets at Mortality</td>
+                <td>$0</td>
+                <td>$0</td>
+              </tr>
+              <tr>
+                <td>Average IRMAA Tier Hit</td>
+                <td>Tier Level</td>
+                <td>Tier Level</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Action Buttons -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <button class="btn btn-primary me-2" @click="recalculateConversion">Recalculate Conversion</button>
+        <button class="btn btn-success me-2" @click="saveRothConversionScenario">Save Roth Conversion Scenario</button>
+        <button class="btn btn-secondary" @click="exportComparisonReport">Export Comparison Report (PDF)</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  props: {
+    scenario: {
+      type: Object,
+      required: true
+    },
+    assetDetails: {
+      type: Array,
+      required: true
+    },
+    scenarioResults: {
+      type: Array,
+      required: true
+    }
+  },
+  data() {
+    return {
+      preRetirementIncome: 0,
+      availableYears: [],
+      conversionStartYear: null,
+      yearsToConvert: 0,
+      rothGrowthRate: 0
+    };
+  },
+  methods: {
+    recalculateConversion() {
+      // Implement recalculation logic
+    },
+    saveRothConversionScenario() {
+      // Implement save logic
+    },
+    exportComparisonReport() {
+      // Implement PDF export logic
+    }
+  }
+};
+</script> 

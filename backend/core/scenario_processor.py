@@ -219,7 +219,7 @@ class ScenarioProcessor:
         start_age = asset.get("age_to_begin_withdrawal")
         end_age = asset.get("age_to_end_withdrawal")
         rate_of_return = Decimal(asset.get("rate_of_return", 0)) / 100
-        monthly_contribution = Decimal(asset.get("monthly_contribution", 0))
+        monthly_contribution = Decimal(asset.get("monthly_contribution") or 0)
 
         # Log asset details
         self._log_debug(f"Processing asset: {asset.get('income_name', 'Unnamed Asset')} (Type: {asset.get('income_type', 'Unknown')})")
@@ -280,7 +280,7 @@ class ScenarioProcessor:
 
             if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
                 years_since_start = current_age - start_age
-                monthly_amount = asset.get("monthly_amount", 0)
+                monthly_amount = Decimal(asset.get("monthly_amount") or 0)
                 inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                 annual_income = inflated_amount * 12  # Annualize monthly income
 
@@ -495,11 +495,8 @@ class ScenarioProcessor:
 
             # Apply Roth conversion depletion and growth
             roth_conversion_amount = self._calculate_roth_conversion(year)
-            if asset["income_type"] == "roth":
-                asset["current_asset_balance"] += roth_conversion_amount
-                asset["current_asset_balance"] *= (1 + asset.get("rate_of_return", 0) / 100)
-            else:
-                asset["current_asset_balance"] -= roth_conversion_amount
+            asset["current_asset_balance"] = asset.get("current_asset_balance") or 0
+            asset["current_asset_balance"] -= roth_conversion_amount
 
         # Prevent negative balances
         for asset in self.assets:

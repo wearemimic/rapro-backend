@@ -227,3 +227,27 @@ class ScenarioCreateView(APIView):
             return Response({'id': scenario.id, 'message': 'Scenario created successfully'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_scenario_assets(request, scenario_id):
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        assets = scenario.income_sources.all()
+        asset_details = [
+            {
+                'income_type': asset.income_type,
+                'income_name': asset.income_name,
+                'current_asset_balance': asset.current_asset_balance,
+                'monthly_contribution': asset.monthly_contribution,
+                'age_to_begin_withdrawal': asset.age_to_begin_withdrawal,
+                'age_to_end_withdrawal': asset.age_to_end_withdrawal,
+                'rate_of_return': asset.rate_of_return,
+                'cola': asset.cola,
+                'tax_rate': asset.tax_rate
+            }
+            for asset in assets
+        ]
+        return Response(asset_details)
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=404)
+    
