@@ -14,7 +14,7 @@
 - **Objective**: When adding income, if it is a Asset like a 401k, display a graph showing the spend down based on criteria and the amount left at death.
 - **Details**: This enhancement will provide a visual representation of how the masset is spent over time, helping users understand the financial trajectory and remaining balance at the end of life.
 - **Implementation Steps**:
-  1. Identify when the income source is a masset like a 401k during the income addition process.
+  1. Identify when the income source is a asset like a 401k during the income addition process.
   2. Calculate the spend down trajectory based on user-defined criteria.
   3. Display a graph under the income entry showing the spend down and the projected amount left at death.
 
@@ -84,4 +84,24 @@
   1. Compile a list of all relevant social security forms and make them accessible within the application.
   2. Integrate with Wealthbox to set reminders for users two years before retirement to prepare for IRMAA.
   3. Ensure the SSA-44 form is readily available for users to fill out and submit.
-  4. Provide clear instructions and guidance on how to use these forms and reminders effectively. 
+  4. Provide clear instructions and guidance on how to use these forms and reminders effectively.
+
+## 10. Allow Asset Labeling for Easy Identification
+
+- **Objective**: Enable users to assign labels to assets such as 401k, IRA, etc., to facilitate easy identification and usage in various parts of the application.
+- **Details**: This enhancement will allow users to add custom labels to their assets, making it easier to identify and reference them in different scenarios and reports.
+- **Implementation Steps**:
+  1. Update the asset management interface to include an option for users to add labels to their assets.
+  2. Ensure that these labels are stored and associated with the respective assets in the database.
+  3. Modify relevant parts of the application to display these labels alongside asset information.
+  4. Provide users with the ability to edit or remove labels as needed.
+
+## 11. AI-Adjusted Roth Withdrawals for Social Security Loss
+
+- **Objective**: Automatically adjust Roth IRA withdrawals to compensate for the loss of Social Security income and visualize the impact on Roth asset spend down.
+- **Details**: This enhancement will use AI to dynamically adjust Roth IRA withdrawals when Social Security benefits are reduced or lost, ensuring users maintain their desired income level. A graph will display the adjusted withdrawals and the resulting spend down of the Roth asset over time.
+- **Implementation Steps**:
+  1. Develop an AI model to analyze the user's financial situation and determine optimal Roth withdrawal adjustments when Social Security income changes.
+  2. Integrate the AI model with the existing income management system to automate withdrawal adjustments.
+  3. Create a graph component to visualize the adjusted Roth withdrawals and the spend down trajectory of the Roth asset.
+  4. Ensure the user interface provides clear insights into the financial impact of these adjustments, helping users make informed decisions. 

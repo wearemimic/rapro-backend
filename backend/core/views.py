@@ -235,15 +235,20 @@ def get_scenario_assets(request, scenario_id):
         assets = scenario.income_sources.all()
         asset_details = [
             {
+                'id': asset.id,
+                'owned_by': asset.owned_by,
                 'income_type': asset.income_type,
                 'income_name': asset.income_name,
                 'current_asset_balance': asset.current_asset_balance,
+                'monthly_amount': asset.monthly_amount,
                 'monthly_contribution': asset.monthly_contribution,
                 'age_to_begin_withdrawal': asset.age_to_begin_withdrawal,
                 'age_to_end_withdrawal': asset.age_to_end_withdrawal,
                 'rate_of_return': asset.rate_of_return,
                 'cola': asset.cola,
-                'tax_rate': asset.tax_rate
+                'exclusion_ratio': asset.exclusion_ratio,
+                'tax_rate': asset.tax_rate,
+                'scenario_id': asset.scenario_id
             }
             for asset in assets
         ]

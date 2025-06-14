@@ -46,7 +46,7 @@
               </div>
             </div>
             <div class="card-body">
-              <h4 style="text-align:center;margin-top:20px;">Base Premium: ${{ (totalMedicareCost - totalIrmaaSurcharge).toFixed(2) }}</h4>
+              <h4 style="text-align:center;margin-top:20px;">Total Medicare Expense: ${{ (totalMedicareCost).toFixed(2) }}</h4>
               <h4 style="text-align:center;">IRMAA Surcharges: ${{ totalIrmaaSurcharge }}</h4>
             </div>
           </div>

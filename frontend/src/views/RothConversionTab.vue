@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="filteredAssets.length > 0">
     <!-- Section 1: Asset Selection Panel -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
@@ -10,12 +10,12 @@
               <tr>
                 <th>Asset</th>
                 <th>Owner</th>
-                <th>Value</th>
+                <th>Current Value</th>
                 <th>Amount to Convert</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="asset in assetDetails" :key="asset.income_type || asset.id" v-if="asset && asset.income_type && ['401k', 'IRA', 'Traditional_401k'].includes(asset.income_type)">
+              <tr v-for="asset in filteredAssets" :key="asset.income_type || asset.id">
                 <td>{{ asset.income_type || 'Unknown' }}</td>
                 <td>{{ asset.owned_by || 'Unknown' }}</td>
                 <td>${{ parseFloat(asset.current_asset_balance || 0).toFixed(2) }}</td>
@@ -32,24 +32,27 @@
       <div class="card-body">
         <h5 class="mb-4">Conversion Schedule Parameters</h5>
         <div class="row">
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label for="preRetirementIncome">Projected Pre-Retirement Household Income</label>
             <input type="number" id="preRetirementIncome" v-model="preRetirementIncome" class="form-control" />
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label for="conversionStartYear">Conversion Start Year</label>
             <select id="conversionStartYear" v-model="conversionStartYear" class="form-control">
               <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
             </select>
           </div>
-          <div class="col-md-6 mt-3">
-            <label for="yearsToConvert">Years to Convert</label>
-            <input type="range" id="yearsToConvert" v-model="yearsToConvert" min="0" max="10" class="form-range" />
-            <span>{{ yearsToConvert }} years</span>
-          </div>
-          <div class="col-md-6 mt-3">
+          <div class="col-md-4">
             <label for="rothGrowthRate">Roth Growth Rate (%)</label>
             <input type="number" id="rothGrowthRate" v-model="rothGrowthRate" class="form-control" />
+          </div>
+          <div class="col-12 mt-3">
+            <label for="yearsToConvert" class="w-100 text-center" style="font-size: 1.2em; font-weight: bold;">Years to Convert</label>
+            <input type="range" id="yearsToConvert" v-model="yearsToConvert" min="1" max="10" class="form-range w-100" list="tickmarks" />
+            <datalist id="tickmarks">
+              <option v-for="year in 10" :key="year" :value="year">{{ year }}</option>
+            </datalist>
+            <span>{{ yearsToConvert }} years</span>
           </div>
         </div>
       </div>
@@ -175,13 +178,27 @@ export default {
   data() {
     return {
       preRetirementIncome: 0,
-      availableYears: [],
-      conversionStartYear: null,
+      availableYears: this.generateAvailableYears(),
+      conversionStartYear: new Date().getFullYear(),
       yearsToConvert: 0,
       rothGrowthRate: 0
     };
   },
+  computed: {
+    filteredAssets() {
+      return this.assetDetails.filter(asset => {
+        if (!asset || !asset.income_type) return false;
+        const normalizedType = asset.income_type.trim().toLowerCase();
+        console.log('Normalized Type:', normalizedType); // Log the normalized type
+        return normalizedType === 'traditional_401k';
+      });
+    }
+  },
   methods: {
+    generateAvailableYears() {
+      const currentYear = new Date().getFullYear();
+      return Array.from({ length: 41 }, (_, i) => currentYear + i);
+    },
     recalculateConversion() {
       // Implement recalculation logic
     },
@@ -191,6 +208,90 @@ export default {
     exportComparisonReport() {
       // Implement PDF export logic
     }
-  }
+  },
+  mounted() {
+    console.log('Asset Details medicare:', this.assetDetails);
+    if (Array.isArray(this.assetDetails) && this.assetDetails.length > 0) {
+      this.assetDetails.forEach(asset => {
+        console.log('Asset:', asset);
+        console.log('Asset Type:', asset.income_type);
+      });
+    } else {
+      console.log('Asset Details is empty or not an array.');
+    }
+  },
+  watch: {
+    assetDetails(newVal) {
+      console.log('Updated Asset Details:', newVal);
+      if (Array.isArray(newVal) && newVal.length > 0) {
+        newVal.forEach(asset => {
+          console.log('Asset:', asset);
+          console.log('Asset Type:', asset.income_type);
+        });
+      } else {
+        console.log('Asset Details is empty or not an array.');
+      }
+    }
+  },
 };
-</script> 
+</script>
+
+<style scoped>
+input[type="range"] {
+  width: 100%;
+  background: transparent;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #ddd;
+  border-radius: 5px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -4px; /* Center the thumb */
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  background: #ddd;
+  border-radius: 5px;
+}
+
+datalist {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 10px;
+}
+
+datalist option {
+  position: relative;
+  text-align: center;
+}
+
+datalist option::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 10px;
+  background: #ddd; /* Match the slider line color */
+}
+</style> 
