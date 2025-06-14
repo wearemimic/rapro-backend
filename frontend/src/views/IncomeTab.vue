@@ -1,29 +1,63 @@
 <template>
   <div>
-    <div class="card mb-3 mb-lg-5">
-      <div class="card-body">
-        <h5 class="mb-4">Types of Income in Scenario</h5>
-        <ul>
-          <li v-for="incomeType in incomeFields" :key="incomeType">
-            {{ incomeType }}
-            <Graph :data="getGraphData(incomeType)" />
-          </li>
-        </ul>
-      </div>
-    </div>
+    
     
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Assets in Scenario</h5>
         <ul>
-          <li v-for="asset in assetDetails" :key="asset.id" class="asset-details">
+          <li v-for="asset in assetDetails" :key="asset.id" class="asset-details" style="margin-bottom: 2rem;">
             <div>
-              <div v-for="(value, key) in asset" :key="key">
-                <strong>{{ key }}:</strong> {{ value }}
+              <h5 style="margin-bottom: 0.5rem; text-transform: capitalize;">{{ asset.income_type.replace(/_/g, ' ') }}</h5>
+              <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: center;">
+                <template v-if="asset.income_type === 'social_security'">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Amount at FRA:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>COLA %:</strong> {{ asset.cola }}</div>
+                </template>
+                <template v-else-if="['Traditional_401k', 'Roth_401k', 'Traditional_IRA', 'Roth_IRA'].includes(asset.income_type)">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Current Balance:</strong> ${{ parseFloat(asset.current_asset_balance || 0).toLocaleString() }}</div>
+                  <div><strong>Monthly Contribution:</strong> ${{ parseFloat(asset.monthly_contribution || 0).toLocaleString() }}</div>
+                  <div><strong>Growth Rate (%):</strong> {{ asset.rate_of_return }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>Monthly Withdrawal:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                </template>
+                <template v-else-if="asset.income_type === 'Pension'">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div><strong>COLA %:</strong> {{ asset.cola }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                </template>
+                <template v-else-if="asset.income_type === 'Annuity'">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div><strong>% Taxable:</strong> {{ asset.tax_rate }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
+                </template>
+                <template v-else-if="asset.income_type === 'Rental_Income'">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
+                </template>
+                <template v-else-if="['Wages', 'Reverse_Mortgage'].includes(asset.income_type)">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Amount per Month:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
+                </template>
+                <template v-else>
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Monthly Amount:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
+                </template>
               </div>
-              <pre style="background:#f8f9fa; border:1px solid #eee; padding:8px; margin-top:8px;">{{ asset }}</pre>
             </div>
-            <Graph :data="getGraphData(asset.income_type)" style="height: 50px;" />
+            <Graph :data="getGraphData(asset.income_type)" :height="200" />
           </li>
         </ul>
       </div>
@@ -86,6 +120,7 @@ export default {
         const lower = incomeType.toLowerCase();
         if (lower.includes('401k')) normalizedType = '401k';
         else if (lower.includes('ira')) normalizedType = 'ira';
+        else if (lower.includes('social_security')) normalizedType = 'social_security';
       }
       // Find the asset for this incomeType
       const asset = this.assetDetails.find(a => {
@@ -93,7 +128,8 @@ export default {
         const lower = a.income_type.toLowerCase();
         if (normalizedType === '401k') return lower.includes('401k');
         if (normalizedType === 'ira') return lower.includes('ira');
-        return false;
+        if (normalizedType === 'social_security') return lower.includes('social_security');
+        return lower === normalizedType;
       });
       if (!asset) return {};
       // Get scenario ages
@@ -109,57 +145,114 @@ export default {
       const withdrawalStartAge = parseInt(asset.age_to_begin_withdrawal || retirementAge);
       const withdrawalEndAge = parseInt(asset.age_to_end_withdrawal || endAge);
       const annualWithdrawal = parseFloat(asset.monthly_amount || 0) * 12;
-      // Simulate each year
-      let balance = startBalance;
-      const balances = [];
-      const withdrawals = [];
-      for (let age = currentAge; age <= endAge; age++) {
-        // Pre-retirement: accumulate
-        if (age < withdrawalStartAge) {
-          balance += annualContribution;
+      // Social Security: payout graph only
+      if (normalizedType === 'social_security') {
+        const cola = parseFloat(asset.cola || 0) / 100;
+        const payouts = [];
+        const labels = [];
+        let payout = annualWithdrawal;
+        for (let age = currentAge; age <= endAge; age++) {
+          labels.push(age);
+          if (age >= withdrawalStartAge && age <= withdrawalEndAge) {
+            payouts.push(parseFloat(payout.toFixed(2)));
+            payout *= (1 + cola);
+          } else {
+            payouts.push(0);
+          }
         }
-        // Growth
-        balance *= (1 + growthRate);
-        // Withdrawals (if in withdrawal phase)
-        let withdrawal = 0;
-        if (age >= withdrawalStartAge && age <= withdrawalEndAge) {
-          withdrawal = annualWithdrawal;
-          if (balance < withdrawal) withdrawal = balance;
-          balance -= withdrawal;
-        }
-        // RMDs (if age >= rmdStartAge)
-        if (age >= rmdStartAge && balance > 0) {
-          // IRS Uniform Lifetime Table divisor for RMDs (approximate)
-          const rmdDivisor = Math.max(27.4 - (age - 72), 1.9); // 27.4 at 73, 26.5 at 74, ...
-          const rmd = balance / rmdDivisor;
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'Annual Payout',
+              data: payouts,
+              borderColor: 'blue',
+              fill: false
+            }
+          ]
+        };
+      }
+      // 401k/IRA: keep current logic
+      if (normalizedType === '401k' || normalizedType === 'ira') {
+        let balance = startBalance;
+        const balances = [];
+        const withdrawals = [];
+        for (let age = currentAge; age <= endAge; age++) {
+          // Pre-retirement: accumulate
+          if (age < withdrawalStartAge) {
+            balance += annualContribution;
+            balance *= (1 + growthRate);
+            balances.push(Math.max(balance, 0));
+            withdrawals.push(0);
+            continue;
+          }
+          // Calculate RMD if applicable
+          let rmd = 0;
+          if (age >= rmdStartAge && balance > 0) {
+            const rmdDivisor = Math.max(27.4 - (age - 72), 1.9);
+            rmd = balance / rmdDivisor;
+          }
+          // Calculate withdrawal: greater of annualWithdrawal or RMD (if RMD applies)
+          let withdrawal = annualWithdrawal;
           if (rmd > withdrawal) {
-            const extraRmd = rmd - withdrawal;
-            if (balance < extraRmd) balance = 0;
-            else balance -= extraRmd;
             withdrawal = rmd;
           }
-        }
-        balances.push(Math.max(balance, 0));
-        withdrawals.push(withdrawal);
-      }
-      const labels = Array.from({length: endAge - currentAge + 1}, (_, i) => currentAge + i);
-      return {
-        labels,
-        datasets: [
-          {
-            label: 'Balance',
-            data: balances,
-            borderColor: 'green',
-            fill: false
-          },
-          {
-            label: 'Withdrawals',
-            data: withdrawals,
-            borderColor: 'red',
-            fill: false
+          // Don't withdraw more than the balance
+          if (withdrawal > balance) {
+            withdrawal = balance;
           }
-        ]
-      };
+          // Deduct withdrawal, then grow remaining balance
+          balance -= withdrawal;
+          balance = Math.max(balance, 0);
+          balance *= (1 + growthRate);
+          balances.push(Math.max(balance, 0));
+          withdrawals.push(withdrawal);
+        }
+        const labels = Array.from({length: endAge - currentAge + 1}, (_, i) => currentAge + i);
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'Balance',
+              data: balances,
+              borderColor: 'green',
+              fill: false
+            },
+            {
+              label: 'Withdrawals',
+              data: withdrawals,
+              borderColor: 'red',
+              fill: false
+            }
+          ]
+        };
+      }
+      // Other types: simple payout graph if monthly_amount is present
+      if (annualWithdrawal > 0) {
+        const payouts = [];
+        const labels = [];
+        for (let age = currentAge; age <= endAge; age++) {
+          labels.push(age);
+          if (age >= withdrawalStartAge && age <= withdrawalEndAge) {
+            payouts.push(annualWithdrawal);
+          } else {
+            payouts.push(0);
+          }
+        }
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'Annual Payout',
+              data: payouts,
+              borderColor: 'purple',
+              fill: false
+            }
+          ]
+        };
+      }
+      // Default: empty
+      return {};
     },
     recalculateConversion() {
       // Implement recalculation logic

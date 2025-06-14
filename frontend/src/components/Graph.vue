@@ -1,5 +1,7 @@
 <template>
-  <canvas ref="canvas" style="height: 300px;"></canvas>
+  <div :style="`height: ${height}px;`">
+    <canvas ref="canvas" :height="height" :style="`height: ${height}px;`"></canvas>
+  </div>
 </template>
 
 <script>
@@ -14,6 +16,10 @@ export default {
     options: {
       type: Object,
       default: () => ({})
+    },
+    height: {
+      type: Number,
+      default: 200
     }
   },
   data() {
@@ -43,10 +49,15 @@ export default {
       if (!this.data || !this.data.labels || !this.data.datasets || !this.data.datasets.length) {
         return;
       }
+      const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        ...this.options
+      };
       this.chartInstance = new Chart(this.$refs.canvas, {
         type: 'line',
         data: this.data,
-        options: this.options
+        options
       });
     }
   },
