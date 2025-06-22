@@ -50,13 +50,6 @@
               </div>
 
               <div class="mb-3">
-                <label>
-                  <input type="checkbox" v-model="form.apply_standard_deduction" checked>
-                  Apply Standard Deduction
-                </label>
-              </div>
-
-              <div class="mb-3">
                 <label>Advisor Notes</label>
                 <textarea v-model="form.notes" class="form-control" rows="4"></textarea>
               </div>

@@ -11,3 +11,5 @@
 5. **IRMAA Box Color Issue**: The IRMAA box at the top of the ScenarioDetail is not changing color to reflect the circle graph in the Medicare tab. 
 
 6. **Standard Deduction Not Applied**: Standard deductions do not appear to be applied in tax calculations, even when the toggle is enabled in the client/scenario setup. 
+
+7. **AGI Too High Without Standard Deduction**: When you select NOT to apply standard deductions for a scenario, the AGI is much higher than expected (possibly due to calculation logic). 

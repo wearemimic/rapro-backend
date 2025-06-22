@@ -72,7 +72,7 @@
                 <td>{{ formatCurrency(row.gross_income) }}</td>
                 <td>{{ formatCurrency(row.agi) }}</td>
                 <td>{{ formatCurrency(row.magi) }}</td>
-                <td>12%</td>
+                <td>{{ row.tax_bracket }}</td>
                 <td>{{ formatCurrency(row.federal_tax) }}</td>
                 <td>{{ formatCurrency(row.total_medicare) }}</td>
                 <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>

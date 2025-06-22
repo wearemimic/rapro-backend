@@ -223,7 +223,7 @@ class ScenarioProcessor:
             # Removed duplicate calculation
 
             # STEP 4: Federal Tax & AMT Engine
-            federal_tax = self._calculate_federal_tax(taxable_income)
+            federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
             cumulative_federal_tax += federal_tax
             
             print(f"\nTAX CALCULATION:")
@@ -284,7 +284,8 @@ class ScenarioProcessor:
                 "part_d": round(base_part_d, 2),
                 "irmaa_surcharge": round(irmaa, 2),
                 "total_medicare": round(total_medicare, 2),
-                "net_income": round(net_income, 2)
+                "net_income": round(net_income, 2),
+                "tax_bracket": tax_bracket
             }
 
             for asset in self.assets:
@@ -454,30 +455,85 @@ class ScenarioProcessor:
     def _calculate_taxable_income(self, gross_income, ss_income):
         return gross_income + ss_income * Decimal("0.85")
 
-    def _calculate_federal_tax(self, taxable_income):
-        # Calculate regular federal income tax
-        if self.tax_status == "Single":
-            regular_tax = taxable_income * Decimal("0.15")
+    def _calculate_federal_tax_and_bracket(self, taxable_income):
+        # 2025 IRS tax brackets (all rates as Decimal)
+        brackets = {
+            "single": [
+                (11925, Decimal('0.10')),
+                (48475, Decimal('0.12')),
+                (103350, Decimal('0.22')),
+                (197300, Decimal('0.24')),
+                (250525, Decimal('0.32')),
+                (626350, Decimal('0.35')),
+                (Decimal('Infinity'), Decimal('0.37'))
+            ],
+            "married filing jointly": [
+                (23850, Decimal('0.10')),
+                (96950, Decimal('0.12')),
+                (206700, Decimal('0.22')),
+                (394600, Decimal('0.24')),
+                (501050, Decimal('0.32')),
+                (751600, Decimal('0.35')),
+                (Decimal('Infinity'), Decimal('0.37'))
+            ],
+            "married filing separately": [
+                (11925, Decimal('0.10')),
+                (48475, Decimal('0.12')),
+                (103350, Decimal('0.22')),
+                (197300, Decimal('0.24')),
+                (250525, Decimal('0.32')),
+                (375800, Decimal('0.35')),
+                (Decimal('Infinity'), Decimal('0.37'))
+            ],
+            "head of household": [
+                (17000, Decimal('0.10')),
+                (64850, Decimal('0.12')),
+                (103350, Decimal('0.22')),
+                (197300, Decimal('0.24')),
+                (250500, Decimal('0.32')),
+                (626350, Decimal('0.35')),
+                (Decimal('Infinity'), Decimal('0.37'))
+            ],
+            "qualifying widow(er)": [
+                (23850, Decimal('0.10')),
+                (96950, Decimal('0.12')),
+                (206700, Decimal('0.22')),
+                (394600, Decimal('0.24')),
+                (501050, Decimal('0.32')),
+                (751600, Decimal('0.35')),
+                (Decimal('Infinity'), Decimal('0.37'))
+            ]
+        }
+        # Normalize tax status
+        status = (self.tax_status or '').strip().lower()
+        bracket_list = brackets.get(status, brackets["single"])
+        tax = Decimal('0')
+        last_cap = Decimal('0')
+        marginal_rate = Decimal('0.10')
+        taxable_income = Decimal(taxable_income)
+        for cap, rate in bracket_list:
+            cap = Decimal(cap)
+            if taxable_income > cap:
+                tax += (cap - last_cap) * marginal_rate
+                last_cap = cap
+                marginal_rate = rate
+            else:
+                tax += (taxable_income - last_cap) * marginal_rate
+                break
+        # Find the marginal bracket
+        for cap, rate in bracket_list:
+            cap = Decimal(cap)
+            if taxable_income <= cap:
+                bracket_str = f"{int(rate*100)}%"
+                break
         else:
-            regular_tax = taxable_income * Decimal("0.12")
-
-        # Calculate Alternative Minimum Tax (AMT)
-        if self.tax_status == "Single":
-            amt_exemption = max(Decimal("54700"), Decimal("54700") - (Decimal("0.25") * (taxable_income - Decimal("539900"))))
-        else:
-            amt_exemption = max(Decimal("84700"), Decimal("84700") - (Decimal("0.25") * (taxable_income - Decimal("1079800"))))
-
-        amt_income = max(Decimal("0"), taxable_income - amt_exemption)
-        amt_tax = amt_income * Decimal("0.26")
-
-        # Determine final federal tax liability
-        federal_tax = max(regular_tax, amt_tax)
-        return federal_tax
+            bracket_str = f"{int(bracket_list[-1][1]*100)}%"
+        return tax, bracket_str
 
     def _calculate_medicare_costs(self, magi, year):
         self._log_debug(f"Calculating Medicare costs based on MAGI: {magi}")
         base_part_b = 185  # Base monthly rate per person for Part B
-        base_part_d = 49  # Base monthly rate for Part D
+        base_part_d = 71  # Base monthly rate for Part D
         irmaa = 0
         part_d_irmaa = 0
 

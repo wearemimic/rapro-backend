@@ -64,13 +64,6 @@
                 </select>
               </div>
 
-              <div class="mb-3">
-                <label>
-                  <input type="checkbox" v-model="form.apply_standard_deduction">
-                  Apply Standard Deduction
-                </label>
-              </div>
-
               <button type="submit" class="btn btn-primary">Save Changes</button>
               <button type="button" class="btn btn-secondary ms-2" @click="cancelEdit">Cancel</button>
             </form>
