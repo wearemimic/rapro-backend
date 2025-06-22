@@ -144,6 +144,7 @@ class Scenario(models.Model):
     roth_conversion_start_year = models.PositiveIntegerField(null=True, blank=True)
     roth_conversion_duration = models.PositiveIntegerField(null=True, blank=True)
     roth_conversion_annual_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    apply_standard_deduction = models.BooleanField(default=True, help_text="Apply IRS standard deduction in tax calculations.")
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

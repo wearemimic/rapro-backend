@@ -50,6 +50,13 @@
               </div>
 
               <div class="mb-3">
+                <label>
+                  <input type="checkbox" v-model="form.apply_standard_deduction" checked>
+                  Apply Standard Deduction
+                </label>
+              </div>
+
+              <div class="mb-3">
                 <label>Advisor Notes</label>
                 <textarea v-model="form.notes" class="form-control" rows="4"></textarea>
               </div>
@@ -115,7 +122,8 @@ export default {
         spouse_last_name: "",
         spouse_birthdate: "",
         spouse_gender: "",
-        notes: ""
+        notes: "",
+        apply_standard_deduction: true
       },
       showSpouseFields: false
     };
@@ -134,6 +142,7 @@ export default {
           gender: this.form.gender,
           tax_status: this.form.tax_status,
           notes: this.form.notes,
+          apply_standard_deduction: this.form.apply_standard_deduction
         };
 
         if (this.showSpouseFields) {

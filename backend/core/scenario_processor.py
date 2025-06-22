@@ -107,45 +107,164 @@ class ScenarioProcessor:
     def calculate(self):
         results = []
         cumulative_federal_tax = 0
+        
+        print("\n==== STARTING RETIREMENT INCOME CALCULATION ====")
+        
         for year in range(self.start_year, self.end_year + 1):
             primary_age = year - self.primary_birthdate.year
             spouse_age = year - self.spouse_birthdate.year if self.spouse_birthdate else None
+            
+            print(f"\n--- Processing Year: {year} | Primary Age: {primary_age} | Spouse Age: {spouse_age} ---")
 
             # STEP 2: Income Mapping
             gross_income = self._calculate_gross_income(year)
             ss_income = self._calculate_social_security(year)
             agi_excl_ss = Decimal(gross_income) - Decimal(ss_income)
+            
+            print(f"INCOME BREAKDOWN:")
+            print(f"  Gross Income: ${gross_income:,.2f}")
+            print(f"  Social Security: ${ss_income:,.2f}")
+            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
 
             # Calculate provisional income for debug
             provisional_income = agi_excl_ss + Decimal('0.5') * Decimal(ss_income)
-            self._log_debug(f"Gross: {gross_income}, SS: {ss_income}, AGI excl SS: {agi_excl_ss}, Provisional: {provisional_income}")
+            print(f"\nPROVISIONAL INCOME CALCULATION:")
+            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
+            print(f"  + 50% of SS (${ss_income:,.2f} × 0.5): ${Decimal('0.5') * Decimal(ss_income):,.2f}")
+            print(f"  = Provisional Income: ${provisional_income:,.2f}")
+            
+            # Get IRS thresholds based on filing status
+            if self.tax_status == "Single":
+                base_threshold = Decimal('25000')
+                additional_threshold = Decimal('34000')
+            else:  # Married Filing Jointly
+                base_threshold = Decimal('32000')
+                additional_threshold = Decimal('44000')
+                
+            print(f"\nIRS THRESHOLDS ({self.tax_status}):")
+            print(f"  Base: ${base_threshold:,.2f}")
+            print(f"  Additional: ${additional_threshold:,.2f}")
 
             taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
-            self._log_debug(f"Taxable SS: {taxable_ss}")
+            
+            # Calculate how much would be taxable based on IRS rules
+            if provisional_income <= base_threshold:
+                taxable_portion = "0%"
+            elif provisional_income <= additional_threshold:
+                taxable_portion = f"50% of amount over ${base_threshold:,.2f}"
+            else:
+                taxable_portion = f"85% of amount over ${additional_threshold:,.2f} + 50% between thresholds"
+            
+            print(f"\nTAXABLE SOCIAL SECURITY CALCULATION:")
+            print(f"  SS Benefits: ${ss_income:,.2f}")
+            print(f"  Provisional Income: ${provisional_income:,.2f}")
+            print(f"  Taxable Portion: {taxable_portion}")
+            print(f"  Calculated Taxable SS: ${taxable_ss:,.2f}")
+            print(f"  % of SS Taxable: {(taxable_ss / ss_income * 100) if ss_income > 0 else 0:.1f}%")
 
             taxable_income = agi_excl_ss + taxable_ss
-            self._log_debug(f"Taxable Income: {taxable_income}")
+            
+            # Apply 2025 standard deduction if enabled
+            if getattr(self.scenario, 'apply_standard_deduction', True):
+                if self.tax_status in ["Single", "Married Filing Separately"]:
+                    standard_deduction = Decimal('15000')
+                elif self.tax_status == "Married Filing Jointly" or self.tax_status == "Qualifying Widow(er)":
+                    standard_deduction = Decimal('30000')
+                elif self.tax_status == "Head of Household":
+                    standard_deduction = Decimal('22500')
+                else:
+                    standard_deduction = Decimal('15000')
+                taxable_income = max(Decimal('0'), taxable_income - standard_deduction)
+                print(f"\nSTANDARD DEDUCTION APPLIED: {standard_deduction} for {self.tax_status}. Taxable Income after deduction: ${taxable_income:,.2f}")
+
+            print(f"\nTAXABLE INCOME CALCULATION:")
+            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
+            print(f"  + Taxable SS: ${taxable_ss:,.2f}")
+            print(f"  = Taxable Income: ${taxable_income:,.2f}")
+
+            # Calculate MAGI (Modified Adjusted Gross Income) for Medicare IRMAA determination
+            # MAGI = AGI + Tax-exempt interest + excluded foreign income + other specific add-backs
+            tax_exempt_interest = Decimal(getattr(self.scenario, 'tax_exempt_interest', 0) or 0)
+            foreign_income_exclusion = Decimal('0')  # For future implementation
+            
+            # For retirement planning, MAGI is AGI plus tax-exempt interest and certain other income
+            # AGI = income from all sources - specific deductions, but including taxable SS
+            agi = agi_excl_ss + taxable_ss
+            
+            # Additional income sources for MAGI (these would be 0 in most cases but could be added in future)
+            excluded_municipal_bond_interest = tax_exempt_interest  # Tax-exempt municipal bond interest
+            excluded_series_ee_bond_interest = Decimal('0')  # Used for education expenses
+            excluded_foreign_income = Decimal('0')
+            qualified_adoption_expenses = Decimal('0')
+            passive_income_loss = Decimal('0')
+            student_loan_interest = Decimal('0')
+            ira_contribution_deduction = Decimal('0')
+            
+            # The MAGI adjustment factors can be set based on tax situation
+            # Traditionally there are several adjustments for MAGI, but for Medicare IRMAA purposes
+            # the key additions are tax-exempt interest and excluded foreign income
+            magi_adjustments = excluded_municipal_bond_interest + excluded_series_ee_bond_interest + \
+                             excluded_foreign_income + ira_contribution_deduction
+            
+            magi = agi + magi_adjustments
+            
+            if magi == agi:
+                print(f"\nMAGI CALCULATION: (Note: MAGI equals AGI because no MAGI adjustments are present)")
+            else:
+                print(f"\nMAGI CALCULATION: (MAGI is different from AGI due to adjustments)")
+            
+            print(f"  AGI (taxable income): ${agi:,.2f}")
+            print(f"  + Tax-exempt interest: ${excluded_municipal_bond_interest:,.2f}")
+            print(f"  + Foreign income exclusion: ${excluded_foreign_income:,.2f}")
+            print(f"  + IRA contribution deduction: ${ira_contribution_deduction:,.2f}")
+            print(f"  = MAGI: ${magi:,.2f}")
 
             # STEP 3: Taxable Income & MAGI Engine
-            taxable_income = (gross_income - ss_income) + taxable_ss
+            # Removed duplicate calculation
 
             # STEP 4: Federal Tax & AMT Engine
             federal_tax = self._calculate_federal_tax(taxable_income)
             cumulative_federal_tax += federal_tax
+            
+            print(f"\nTAX CALCULATION:")
+            print(f"  Taxable Income: ${taxable_income:,.2f}")
+            print(f"  Federal Tax: ${federal_tax:,.2f}")
+            print(f"  Cumulative Federal Tax: ${cumulative_federal_tax:,.2f}")
 
             # STEP 5: Medicare & IRMAA Engine (2-year lookback)
-            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa = self._calculate_medicare_costs(taxable_income, year)
+            # Note: In real-world scenarios, IRMAA is based on MAGI from 2 years prior
+            # For projection purposes, we're using current year MAGI for simplicity
+            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa = self._calculate_medicare_costs(magi, year)
             total_medicare = Decimal(total_medicare)
+            
+            print(f"\nMEDICARE COSTS:")
+            print(f"  Medicare Base: ${medicare_base:,.2f}")
+            print(f"  IRMAA: ${irmaa:,.2f}")
+            print(f"  Part D: ${base_part_d:,.2f}")
+            print(f"  Part D IRMAA: ${part_d_irmaa:,.2f}")
+            print(f"  Total Medicare: ${total_medicare:,.2f}")
 
             # STEP 6: Roth Conversion Module (Joint Household, Phase 1)
             roth_conversion_amount = self._calculate_roth_conversion(year)
-            taxable_income += roth_conversion_amount
+            if roth_conversion_amount > 0:
+                print(f"\nROTH CONVERSION:")
+                print(f"  Conversion Amount: ${roth_conversion_amount:,.2f}")
+                taxable_income += roth_conversion_amount
+                print(f"  Updated Taxable Income: ${taxable_income:,.2f}")
 
             # STEP 7: Asset Spend-Down & Growth Engine
             self._calculate_asset_spend_down(year)
 
             net_income = gross_income + ss_income - federal_tax - total_medicare
             irmaa = irmaa + part_d_irmaa
+            
+            print(f"\nFINAL RESULTS FOR YEAR {year}:")
+            print(f"  Gross Income: ${gross_income:,.2f}")
+            print(f"  Taxable Income: ${taxable_income:,.2f}")
+            print(f"  Federal Tax: ${federal_tax:,.2f}")
+            print(f"  Total Medicare: ${total_medicare:,.2f}")
+            print(f"  Net Income: ${net_income:,.2f}")
+            print("--------------------------------------------")
 
             summary = {
                 "year": year,
@@ -154,6 +273,8 @@ class ScenarioProcessor:
                 "gross_income": round(gross_income, 2),
                 "ss_income": round(ss_income, 2),
                 "taxable_ss": round(taxable_ss, 2),
+                "agi": round(agi, 2),
+                "magi": round(magi, 2),
                 "taxable_income": round(taxable_income, 2),
                 "roth_conversion": round(roth_conversion_amount, 2),
                 "federal_tax": round(federal_tax, 2),
@@ -353,62 +474,62 @@ class ScenarioProcessor:
         federal_tax = max(regular_tax, amt_tax)
         return federal_tax
 
-    def _calculate_medicare_costs(self, taxable_income, year):
-        self._log_debug(f"Calculating Medicare costs based on taxable income: {taxable_income}")
+    def _calculate_medicare_costs(self, magi, year):
+        self._log_debug(f"Calculating Medicare costs based on MAGI: {magi}")
         base_part_b = 185  # Base monthly rate per person for Part B
         base_part_d = 49  # Base monthly rate for Part D
         irmaa = 0
         part_d_irmaa = 0
 
-        # Determine IRMAA based on filing status and taxable income
+        # Determine IRMAA based on filing status and MAGI
         if self.tax_status == "Single":
-            if taxable_income > 500000:
+            if magi > 500000:
                 irmaa = 616
                 part_d_irmaa = 85.80
-            elif taxable_income > 200000:
+            elif magi > 200000:
                 irmaa = 581
                 part_d_irmaa = 78.60
-            elif taxable_income > 167000:
+            elif magi > 167000:
                 irmaa = 472.80
                 part_d_irmaa = 57.00
-            elif taxable_income > 133000:
+            elif magi > 133000:
                 irmaa = 364.90
                 part_d_irmaa = 35.30
-            elif taxable_income > 106000:
+            elif magi > 106000:
                 irmaa = 256.90
                 part_d_irmaa = 13.70
-            elif taxable_income <= 106000:
+            elif magi <= 106000:
                 irmaa = 185.00
                 part_d_irmaa = 0
         elif self.tax_status == "Married Filing Jointly":
-            if taxable_income > 750000:
+            if magi > 750000:
                 irmaa = 616
                 part_d_irmaa = 85.80
-            elif taxable_income > 400000:
+            elif magi > 400000:
                 irmaa = 581
                 part_d_irmaa = 78.60
-            elif taxable_income > 334000:
+            elif magi > 334000:
                 irmaa = 472.80
                 part_d_irmaa = 57.00
-            elif taxable_income > 266000:
+            elif magi > 266000:
                 irmaa = 364.90
                 part_d_irmaa = 35.30
-            elif taxable_income > 212000:
+            elif magi > 212000:
                 irmaa = 256.90
                 part_d_irmaa = 13.70
-            elif taxable_income <= 212000:
+            elif magi <= 212000:
                 irmaa = 185.00
                 part_d_irmaa = 0
             base_part_b *= 2  # Double the base for married couples
             base_part_d *= 2  # Double the base for married couples
         elif self.tax_status == "Married Filing Separately":
-            if taxable_income > 394000:
+            if magi > 394000:
                 irmaa = 443.90
                 part_d_irmaa = 85.80
-            elif taxable_income > 106000:
+            elif magi > 106000:
                 irmaa = 406.90
                 part_d_irmaa = 78.60
-            elif taxable_income <= 106000:
+            elif magi <= 106000:
                 irmaa = 406.90
                 part_d_irmaa = 0
 
@@ -525,6 +646,14 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
 
     # Calculate provisional income
     provisional_income = agi + tax_exempt_interest + Decimal('0.5') * ss_benefits
+    
+    # Detailed calculation explanation
+    print(f"  DETAILED SS TAXATION CALCULATION:")
+    print(f"    SS Benefits: ${ss_benefits:,.2f}")
+    print(f"    AGI (excluding SS): ${agi:,.2f}")
+    print(f"    Tax-exempt interest: ${tax_exempt_interest:,.2f}")
+    print(f"    50% of SS: ${Decimal('0.5') * ss_benefits:,.2f}")
+    print(f"    Provisional Income: ${provisional_income:,.2f}")
 
     # Determine the base and additional thresholds based on filing status
     if filing_status == "Single":
@@ -535,17 +664,46 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
         additional_threshold = Decimal('44000')
     else:
         raise ValueError("Unsupported filing status")
+        
+    print(f"    Filing Status: {filing_status}")
+    print(f"    Base threshold: ${base_threshold:,.2f}")
+    print(f"    Additional threshold: ${additional_threshold:,.2f}")
 
     # Calculate the taxable portion of Social Security benefits
     if provisional_income <= base_threshold:
         taxable_ss = Decimal('0')
+        print(f"    Case: Provisional income <= base threshold")
+        print(f"    Taxable SS: $0.00 (0% of benefits)")
     elif provisional_income <= additional_threshold:
-        taxable_ss = Decimal('0.5') * (provisional_income - base_threshold)
+        taxable_ss = min(Decimal('0.5') * (provisional_income - base_threshold), Decimal('0.5') * ss_benefits)
+        print(f"    Case: Provisional income between thresholds")
+        print(f"    Amount over base: ${provisional_income - base_threshold:,.2f}")
+        print(f"    50% of amount over base: ${Decimal('0.5') * (provisional_income - base_threshold):,.2f}")
+        print(f"    Maximum allowed (50% of SS): ${Decimal('0.5') * ss_benefits:,.2f}")
+        print(f"    Taxable SS: ${taxable_ss:,.2f}")
     else:
-        taxable_ss = Decimal('0.85') * ss_benefits
-
-    # Ensure the taxable amount does not exceed 85% of the benefits
-    taxable_ss = min(taxable_ss, Decimal('0.85') * ss_benefits)
+        # For incomes above the additional threshold, the formula is more complex:
+        # 50% of the amount between thresholds + 85% of the amount above additional threshold
+        # But never more than 85% of total benefits
+        amount_between_thresholds = additional_threshold - base_threshold
+        amount_above_additional = provisional_income - additional_threshold
+        
+        taxable_portion_first_tier = Decimal('0.5') * amount_between_thresholds
+        taxable_portion_second_tier = Decimal('0.85') * amount_above_additional
+        
+        calculated_taxable_ss = taxable_portion_first_tier + taxable_portion_second_tier
+        max_taxable_ss = Decimal('0.85') * ss_benefits
+        
+        taxable_ss = min(calculated_taxable_ss, max_taxable_ss)
+        
+        print(f"    Case: Provisional income > additional threshold")
+        print(f"    Amount between thresholds: ${amount_between_thresholds:,.2f}")
+        print(f"    50% of amount between thresholds: ${taxable_portion_first_tier:,.2f}")
+        print(f"    Amount above additional threshold: ${amount_above_additional:,.2f}")
+        print(f"    85% of amount above additional: ${taxable_portion_second_tier:,.2f}")
+        print(f"    Calculated taxable amount: ${calculated_taxable_ss:,.2f}")
+        print(f"    Maximum allowed (85% of SS): ${max_taxable_ss:,.2f}")
+        print(f"    Final Taxable SS: ${taxable_ss:,.2f} ({(taxable_ss / ss_benefits * 100):,.1f}% of benefits)")
 
     return taxable_ss
 

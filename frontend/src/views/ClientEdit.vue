@@ -64,6 +64,13 @@
                 </select>
               </div>
 
+              <div class="mb-3">
+                <label>
+                  <input type="checkbox" v-model="form.apply_standard_deduction">
+                  Apply Standard Deduction
+                </label>
+              </div>
+
               <button type="submit" class="btn btn-primary">Save Changes</button>
               <button type="button" class="btn btn-secondary ms-2" @click="cancelEdit">Cancel</button>
             </form>
@@ -128,7 +135,8 @@ export default {
         spouse_birthdate: "",
         spouse_gender: "",
         notes: "",
-        status: "draft"
+        status: "draft",
+        apply_standard_deduction: true
       },
       showSpouseFields: false
     };
@@ -152,7 +160,8 @@ export default {
           spouse_first_name: response.data.spouse?.first_name || "",
           spouse_last_name: response.data.spouse?.last_name || "",
           spouse_birthdate: response.data.spouse?.birthdate || "",
-          spouse_gender: response.data.spouse?.gender || ""
+          spouse_gender: response.data.spouse?.gender || "",
+          apply_standard_deduction: response.data.apply_standard_deduction || true
         };
         this.updateSpouseRequirement();
       } catch (error) {
@@ -174,7 +183,8 @@ export default {
 
       const payload = {
         ...baseForm,
-        notes: String(this.form.notes || "")
+        notes: String(this.form.notes || ""),
+        apply_standard_deduction: this.form.apply_standard_deduction
       };
 
       if (this.showSpouseFields) {

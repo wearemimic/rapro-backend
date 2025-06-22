@@ -54,7 +54,8 @@
                 <th>Primary Age</th>
                 <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
                 <th>Gross Income</th>
-                <th>Taxable Income</th>
+                <th>AGI</th>
+                <th>MAGI</th>
                 <th>Tax Bracket</th>
                 <th>Federal Tax</th>
                 <th>Total Medicare</th>
@@ -68,12 +69,13 @@
                 <td v-else></td>
                 <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= 90">{{ row.spouse_age }}</td>
                 <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td>${{ row.gross_income }}</td>
-                <td>${{ row.taxable_income }}</td>
+                <td>{{ formatCurrency(row.gross_income) }}</td>
+                <td>{{ formatCurrency(row.agi) }}</td>
+                <td>{{ formatCurrency(row.magi) }}</td>
                 <td>12%</td>
-                <td>${{ row.federal_tax }}</td>
-                <td>${{ row.total_medicare }}</td>
-                <td>${{ (parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))).toFixed(2) }}</td>
+                <td>{{ formatCurrency(row.federal_tax) }}</td>
+                <td>{{ formatCurrency(row.total_medicare) }}</td>
+                <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>
               </tr>
             </tbody>
           </table>
