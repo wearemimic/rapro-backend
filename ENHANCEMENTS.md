@@ -104,4 +104,15 @@
   1. Develop an AI model to analyze the user's financial situation and determine optimal Roth withdrawal adjustments when Social Security income changes.
   2. Integrate the AI model with the existing income management system to automate withdrawal adjustments.
   3. Create a graph component to visualize the adjusted Roth withdrawals and the spend down trajectory of the Roth asset.
-  4. Ensure the user interface provides clear insights into the financial impact of these adjustments, helping users make informed decisions. 
+  4. Ensure the user interface provides clear insights into the financial impact of these adjustments, helping users make informed decisions.
+
+## 12. Allow Users to Select Modules to View During Scenario Setup
+
+- **Objective**: Enable users to customize their scenario experience by selecting which modules (e.g., Social Security, Medicare, Worksheets, etc.) they want to view or include during scenario setup.
+- **Details**: This enhancement will provide a more tailored and user-friendly experience by allowing users to focus only on the modules relevant to their needs. Users can check or uncheck modules such as Social Security, Medicare, Worksheets, and others during the scenario setup process. The application will then display only the selected modules in the scenario workflow and dashboard.
+- **Implementation Steps**:
+  1. Update the scenario setup interface to include a module selection step with checkboxes or toggles for each available module (Social Security, Medicare, Worksheets, etc.).
+  2. Store the user's module selections as part of the scenario configuration.
+  3. Adjust the scenario dashboard and navigation to show only the modules selected by the user.
+  4. Ensure that all calculations, graphs, and reports are dynamically updated based on the modules included in the scenario.
+  5. Provide an option for users to edit their module selections after initial setup if needed. 

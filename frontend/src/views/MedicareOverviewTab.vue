@@ -28,7 +28,7 @@
         </div>
         <div class="row" style="margin-top:20px;">
           <div class="col-sm-8 h-100">
-            <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
+            <Graph :data="medicareChartData" :options="medicareChartOptions" type="bar" :height="300" />
           </div>
           <div class="col-sm-4 h-100">
             <h5 class="mb-4" style="text-align:center;">IRMAA as percentage of Overall Cost </h5>
@@ -120,11 +120,13 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
 
 export default {
+  components: { Graph },
   props: {
     scenarioResults: {
       type: Array,
@@ -157,6 +159,56 @@ export default {
         medicare: false
       }
     };
+  },
+  computed: {
+    medicareChartData() {
+      const years = this.scenarioResults.map(row => row.year);
+      const partB = this.scenarioResults.map(row => parseFloat(row.part_b || 0));
+      const partD = this.scenarioResults.map(row => parseFloat(row.part_d || 0));
+      const irmaa = this.scenarioResults.map(row => parseFloat(row.irmaa_surcharge || 0));
+      return {
+        labels: years,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Part B',
+            backgroundColor: '#007bff',
+            data: partB,
+            stack: 'medicare',
+            order: 1
+          },
+          {
+            type: 'bar',
+            label: 'Part D',
+            backgroundColor: '#28a745',
+            data: partD,
+            stack: 'medicare',
+            order: 1
+          },
+          {
+            type: 'bar',
+            label: 'IRMAA Surcharge',
+            backgroundColor: '#ffc107',
+            data: irmaa,
+            stack: 'medicare',
+            order: 1
+          }
+        ]
+      };
+    },
+    medicareChartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true }
+        }
+      };
+    }
   },
   methods: {
     toggleDropdown(tab) {

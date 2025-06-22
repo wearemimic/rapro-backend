@@ -4,7 +4,7 @@
       <div class="col-sm-6 col-xl-6 mb-3 mb-xl-6">
         <div class="card mb-3 mb-lg-5">
           <div class="card-body">
-            <canvas id="breakevenChart" style="width: 100%; height: 300px !important;"></canvas>
+            <Graph :data="breakevenLineData" type="line" :height="300" />
           </div>
         </div>
         <div class="card mt-3 mb-lg-5">
@@ -107,11 +107,13 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
 
 export default {
+  components: { Graph },
   props: {
     scenarioResults: {
       type: Array,
@@ -136,6 +138,29 @@ export default {
         worksheets: false
       }
     };
+  },
+  computed: {
+    breakevenLineData() {
+      return {
+        labels: Object.keys(this.benefitByAge),
+        datasets: [
+          {
+            label: 'Monthly Amount',
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0,123,255,0.1)',
+            data: Object.values(this.benefitByAge).map(val => val / 12),
+            fill: false
+          },
+          {
+            label: 'Total Lifetime Value',
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40,167,69,0.1)',
+            data: Object.values(this.benefitByAge),
+            fill: false
+          }
+        ]
+      };
+    }
   },
   methods: {
     toggleDropdown(tab) {

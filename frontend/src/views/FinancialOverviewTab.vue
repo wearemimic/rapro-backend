@@ -37,9 +37,7 @@
 
       <!-- Body -->
       <div class="card-body">
-        <!-- Bar Chart -->
-        <canvas id="financial_overview_chart" style="width: 100%; height: 300px !important;"></canvas>
-        <!-- End Bar Chart -->
+        <Graph :data="financialChartData" :options="financialChartOptions" type="bar" :height="300" />
       </div>
       <!-- End Body -->
     </div>
@@ -87,11 +85,13 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
 
 export default {
+  components: { Graph },
   props: {
     scenarioResults: {
       type: Array,
@@ -108,6 +108,76 @@ export default {
         financial: false
       }
     };
+  },
+  computed: {
+    financialChartData() {
+      const years = this.scenarioResults.map(row => row.year);
+      const grossIncome = this.scenarioResults.map(row => parseFloat(row.gross_income || 0));
+      const federalTax = this.scenarioResults.map(row => parseFloat(row.federal_tax || 0));
+      const totalMedicare = this.scenarioResults.map(row => parseFloat(row.total_medicare || 0));
+      const remainingIncome = this.scenarioResults.map(row => {
+        const gross = parseFloat(row.gross_income || 0);
+        const fed = parseFloat(row.federal_tax || 0);
+        const med = parseFloat(row.total_medicare || 0);
+        return gross - (fed + med);
+      });
+      return {
+        labels: years,
+        datasets: [
+          // Stacked bars
+          {
+            type: 'bar',
+            label: 'Federal Tax',
+            backgroundColor: '#007bff',
+            data: federalTax,
+            stack: 'taxes',
+            order: 2
+          },
+          {
+            type: 'bar',
+            label: 'Total Medicare',
+            backgroundColor: '#28a745',
+            data: totalMedicare,
+            stack: 'taxes',
+            order: 2
+          },
+          // Lines
+          {
+            type: 'line',
+            label: 'Gross Income',
+            borderColor: '#ff9800',
+            backgroundColor: 'rgba(255,152,0,0.1)',
+            data: grossIncome,
+            fill: false,
+            yAxisID: 'y',
+            order: 1
+          },
+          {
+            type: 'line',
+            label: 'Remaining Income',
+            borderColor: '#6f42c1',
+            backgroundColor: 'rgba(111,66,193,0.1)',
+            data: remainingIncome,
+            fill: false,
+            yAxisID: 'y',
+            order: 1
+          }
+        ]
+      };
+    },
+    financialChartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true }
+        }
+      };
+    }
   },
   methods: {
     toggleDropdown(tab) {

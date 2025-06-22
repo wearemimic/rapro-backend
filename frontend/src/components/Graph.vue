@@ -20,6 +20,10 @@ export default {
     height: {
       type: Number,
       default: 200
+    },
+    type: {
+      type: String,
+      default: 'line'
     }
   },
   data() {
@@ -55,7 +59,7 @@ export default {
         ...this.options
       };
       this.chartInstance = new Chart(this.$refs.canvas, {
-        type: 'line',
+        type: this.type,
         data: this.data,
         options
       });

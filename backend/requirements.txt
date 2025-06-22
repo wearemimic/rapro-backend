@@ -4,6 +4,7 @@ django-cors-headers
 djangorestframework>=3.14.0
 djangorestframework-simplejwt==5.2.2
 gunicorn
+numpy
 psycopg2-binary
 pillow
 django-extensions>=4.1
