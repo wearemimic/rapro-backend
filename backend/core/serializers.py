@@ -4,8 +4,11 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import CustomUser, Client, Scenario, Spouse
 import logging
+from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -203,3 +206,30 @@ class ScenarioCreateSerializer(serializers.ModelSerializer):
         for income in income_data:
             IncomeSource.objects.create(scenario=scenario, **income)
         return scenario
+
+class AdvisorRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    licenses = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'email', 'password',
+            'first_name', 'last_name',
+            'phone_number', 'company_name',
+            'website_url', 'address', 'city',
+            'state', 'zip_code', 'licenses'
+        ]
+        extra_kwargs = {
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+            'phone_number': {'required': True},
+        }
+
+    def create(self, validated_data):
+        licenses = validated_data.pop('licenses', '')
+        user = User.objects.create_user(
+            **validated_data
+        )
+        # Store licenses in a custom field or separate model if needed
+        return user

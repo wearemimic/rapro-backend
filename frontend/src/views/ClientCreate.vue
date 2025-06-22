@@ -11,7 +11,7 @@
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label>First Name</label>
-                  <input v-model="form.first_name" class="form-control" required minlength="5" maxlength="30">
+                  <input v-model="form.first_name" class="form-control" required minlength="3" maxlength="30">
                 </div>
                 <div class="col-md-6 mb-3">
                   <label>Last Name</label>

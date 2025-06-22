@@ -113,10 +113,20 @@ class ScenarioProcessor:
 
             # STEP 2: Income Mapping
             gross_income = self._calculate_gross_income(year)
+            ss_income = self._calculate_social_security(year)
+            agi_excl_ss = Decimal(gross_income) - Decimal(ss_income)
+
+            # Calculate provisional income for debug
+            provisional_income = agi_excl_ss + Decimal('0.5') * Decimal(ss_income)
+            self._log_debug(f"Gross: {gross_income}, SS: {ss_income}, AGI excl SS: {agi_excl_ss}, Provisional: {provisional_income}")
+
+            taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
+            self._log_debug(f"Taxable SS: {taxable_ss}")
+
+            taxable_income = agi_excl_ss + taxable_ss
+            self._log_debug(f"Taxable Income: {taxable_income}")
 
             # STEP 3: Taxable Income & MAGI Engine
-            ss_income = self._calculate_social_security(year)
-            taxable_ss = calculate_taxable_social_security(ss_income, gross_income, 0, self.tax_status)
             taxable_income = (gross_income - ss_income) + taxable_ss
 
             # STEP 4: Federal Tax & AMT Engine

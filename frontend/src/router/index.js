@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import Dashboard from '@/views/Dashboard.vue'
 import UserProfile from '@/views/UserProfile.vue'
-import Signup from '@/views/Signup.vue'
+import Register from '@/views/Register.vue'
 import Login from '@/views/Login.vue'
 import ClientList from '@/views/ClientList.vue'
 import ClientsCreate from '@/views/ClientCreate.vue'
@@ -11,7 +11,7 @@ import ScenarioDetail from '@/views/ScenarioDetail.vue'
 
 
 const routes = [
-  { path: '/signup', name: 'Signup', component: Signup },
+  { path: '/register', name: 'Register', component: Register },
   { path: '/login', name: 'Login', component: Login },
   {
     path: '/',
