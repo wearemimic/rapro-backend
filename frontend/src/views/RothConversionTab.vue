@@ -7,7 +7,7 @@
     <!-- Section 1: Asset Selection Panel -->
     <div class="row align-items-stretch">
       <!-- Asset Selection Panel -->
-      <div class="col-md-6 mb-3 mb-lg-5">
+      <div class="col-md-7 mb-3 mb-lg-5">
         <div class="card h-100">
           <div class="card-body">
             <h5 class="mb-4">Asset Selection Panel</h5>
@@ -37,6 +37,13 @@
                       />
                     </td>
                   </tr>
+                  <!-- Total Row -->
+                  <tr style="font-weight: bold; background: #f8f9fa;">
+                    <td>Total to Convert</td>
+                    <td></td>
+                    <td></td>
+                    <td>{{ formatCurrency(selectedAssetList.reduce((sum, asset) => sum + (parseFloat(maxToConvert[asset.id || asset.income_type]) || 0), 0)) }}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -44,13 +51,21 @@
         </div>
       </div>
       <!-- Conversion Schedule Parameters -->
-      <div class="col-md-6 mb-3 mb-lg-5">
+      <div class="col-md-5 mb-3 mb-lg-5">
         <div class="card h-100">
           <div class="card-body">
             <h5 class="mb-4">Conversion Schedule Parameters</h5>
             <div class="row">
-              <div class="col-md-4">
-                <label for="preRetirementIncome">Projected Pre-Retirement Household Income</label>
+              <!-- Row 1: Pre-Retirement Income & Conversion Start Year -->
+             
+              <div class="col-md-6">
+                <label for="conversionStartYear">Conversion Start Year</label>
+                <select id="conversionStartYear" v-model="conversionStartYear" class="form-control">
+                  <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="preRetirementIncome">Pre-Retirement Income</label>
                 <input
                   type="text"
                   id="preRetirementIncome"
@@ -61,17 +76,12 @@
                   class="form-control"
                 />
               </div>
-              <div class="col-md-4">
-                <label for="conversionStartYear">Conversion Start Year</label>
-                <select id="conversionStartYear" v-model="conversionStartYear" class="form-control">
-                  <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
-                </select>
-              </div>
-              <div class="col-md-4">
+              <!-- Row 2: Roth Growth Rate & Max Annual Conversion Amount -->
+              <div class="col-md-6 mt-3">
                 <label for="rothGrowthRate">Roth Growth Rate (%)</label>
                 <input type="number" id="rothGrowthRate" v-model="rothGrowthRate" class="form-control" />
               </div>
-              <div class="col-md-4 mt-3">
+              <div class="col-md-6 mt-3">
                 <label for="maxAnnualAmount">Max Annual Conversion Amount</label>
                 <input
                   type="text"
@@ -84,7 +94,8 @@
                   min="0"
                 />
               </div>
-              <div class="col-md-4 mt-3">
+              <!-- Row 3: Roth Withdrawal Amount & Roth Withdrawal Start Year -->
+              <div class="col-md-6 mt-3">
                 <label for="rothWithdrawalAmount">Roth Withdrawal Amount</label>
                 <input
                   type="text"
@@ -97,12 +108,13 @@
                   min="0"
                 />
               </div>
-              <div class="col-md-4 mt-3">
+              <div class="col-md-6 mt-3">
                 <label for="rothWithdrawalStartYear">Roth Withdrawal Start Year</label>
                 <select id="rothWithdrawalStartYear" v-model="rothWithdrawalStartYear" class="form-control">
                   <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
                 </select>
               </div>
+              <!-- Years to Convert Slider (full width) -->
               <div class="col-12 mt-3">
                 <label for="yearsToConvert" class="w-100 text-center" style="font-size: 1.2em; font-weight: bold;">Years to Convert</label>
                 <input type="range" id="yearsToConvert" v-model="yearsToConvert" min="1" max="10" class="form-range w-100" list="tickmarks" />
