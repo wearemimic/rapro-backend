@@ -20,8 +20,6 @@ from .serializers import ScenarioCreateSerializer
 from .scenario_processor import ScenarioProcessor
 from django.http import HttpResponse, JsonResponse
 import logging
-from .optimizer import RothConversionOptimizer
-import copy
 
 
 User = get_user_model()
@@ -257,90 +255,4 @@ def get_scenario_assets(request, scenario_id):
         return Response(asset_details)
     except Scenario.DoesNotExist:
         return Response({'error': 'Scenario not found.'}, status=404)
-    
-class RothOptimizeAPIView(APIView):
-    def post(self, request):
-        scenario = request.data.get('scenario')
-        client = request.data.get('client')
-        spouse = request.data.get('spouse')
-        assets = request.data.get('assets')
-        optimizer_params = request.data.get('optimizer_params')
-        mode = optimizer_params.get('mode', 'auto')  # default to auto if not specified
-
-        if not scenario or not client or assets is None or not optimizer_params:
-            return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if mode == 'manual':
-            # Manual mode: straight calculation
-            years_to_convert = int(optimizer_params.get('years_to_convert', 1))
-            start_year = int(optimizer_params.get('conversion_start_year', scenario.get('current_year', 2025)))
-            
-            # Sum max_to_convert for selected assets
-            total_to_convert = sum(
-                float(asset.get('max_to_convert', 0))
-                for asset in assets
-                if asset.get('max_to_convert')
-            )
-            
-            # Calculate annual conversion amount
-            annual_conversion = total_to_convert / years_to_convert if years_to_convert > 0 else total_to_convert
-
-            # Prepare the scenario with conversion parameters
-            scenario_manual = {
-                **scenario,
-                'roth_conversion_start_year': start_year,
-                'roth_conversion_duration': years_to_convert,
-                'roth_conversion_annual_amount': annual_conversion
-            }
-
-            # Create ScenarioProcessor instance with debug enabled
-            processor = ScenarioProcessor.from_dicts(
-                scenario=scenario_manual,
-                client=client,
-                spouse=spouse,
-                assets=assets,
-                debug=True  # Enable debug logging
-            )
-
-            # Calculate year by year results
-            year_by_year = processor.calculate()
-
-            # Filter results to only include years from the start year
-            year_by_year = [row for row in year_by_year if row.get('year', 0) >= start_year]
-
-            # Extract metrics for the conversion period
-            metrics = RothConversionOptimizer._extract_metrics(self=None, results=year_by_year)
-
-            # Log the conversion schedule
-            print(f"Manual Roth Conversion Schedule:")
-            print(f"Start Year: {start_year}")
-            print(f"Duration: {years_to_convert} years")
-            print(f"Total to Convert: ${total_to_convert:,.2f}")
-            print(f"Annual Amount: ${annual_conversion:,.2f}")
-
-            return Response({
-                "optimal_schedule": {
-                    "start_year": start_year,
-                    "duration": years_to_convert,
-                    "annual_amount": annual_conversion,
-                    "total_amount": total_to_convert,
-                    "score_breakdown": metrics
-                },
-                "baseline": {},
-                "comparison": {},
-                "year_by_year": year_by_year
-            }, status=status.HTTP_200_OK)
-        else:
-            # Auto mode: run optimizer as before
-            optimizer = RothConversionOptimizer(scenario, client, spouse, assets, optimizer_params)
-            result = optimizer.run()
-            # Filter results to only years >= roth_conversion_start_year if set
-            filter_year = optimizer_params.get('conversion_start_year') or scenario.get('roth_conversion_start_year')
-            if filter_year and result.get('year_by_year'):
-                try:
-                    filter_year = int(filter_year)
-                    result['year_by_year'] = [row for row in result['year_by_year'] if row.get('year', 0) >= filter_year]
-                except Exception:
-                    pass
-            return Response(result, status=status.HTTP_200_OK)
     

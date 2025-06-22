@@ -1,7 +1,6 @@
 import datetime
 from decimal import Decimal
 from core.models import Scenario, Client, Spouse, IncomeSource
-from datetime import datetime as dt, date
 
 # RMD Table based on IRS Uniform Lifetime Table
 RMD_TABLE = {
@@ -52,47 +51,25 @@ RMD_TABLE = {
 }
 
 class ScenarioProcessor:
-    def get_scenario_field(self, key, default=None):
-        if isinstance(self.scenario, dict):
-            return self.scenario.get(key, default)
-        return getattr(self.scenario, key, default)
-
-    def __init__(self, scenario=None, client=None, spouse=None, assets=None, scenario_id=None, debug=False):
+    def __init__(self, scenario_id, debug=False):
         self.debug = debug
-        def parse_date(d):
-            if isinstance(d, date):
-                return d
-            if isinstance(d, str):
-                return dt.strptime(d, "%Y-%m-%d").date()
-            return None
-        if scenario_id is not None:
-            # Legacy/ORM mode
-            self.scenario = Scenario.objects.get(id=scenario_id)
-            self.client = self.scenario.client
-            self.spouse = getattr(self.client, "spouse", None)
-            self.primary_birthdate = self.client.birthdate
-            self.spouse_birthdate = self.spouse.birthdate if self.spouse else None
-            self.tax_status = self.client.tax_status
-            self.assets = list(self.scenario.income_sources.values())
-        else:
-            # In-memory/dict mode
-            self.scenario = scenario
-            self.client = client
-            self.spouse = spouse
-            self.primary_birthdate = parse_date(client['birthdate'])
-            self.spouse_birthdate = parse_date(spouse['birthdate']) if spouse else None
-            self.tax_status = client['tax_status']
-            self.assets = assets
+        self.scenario = Scenario.objects.get(id=scenario_id)
+        self.client = self.scenario.client
+        self.spouse = getattr(self.client, "spouse", None)
+        self.primary_birthdate = self.client.birthdate
+        self.spouse_birthdate = self.spouse.birthdate if self.spouse else None
+        self.tax_status = self.client.tax_status
+        self.assets = list(self.scenario.income_sources.values())
 
         # Log scenario ID and number of assets retrieved
-        self._log_debug(f"ScenarioProcessor initialized. Number of assets: {len(self.assets)}")
+        self._log_debug(f"Scenario ID: {scenario_id}, Number of assets retrieved: {len(self.assets)}")
 
         # STEP 1: Scenario Initialization
         current_year = datetime.datetime.now().year
-        retirement_age_primary = self.get_scenario_field('retirement_age', 65)
-        retirement_age_spouse = self.get_scenario_field('spouse_retirement_age', 65)
-        mortality_age_primary = self.get_scenario_field('mortality_age', 90)
-        mortality_age_spouse = self.get_scenario_field('spouse_mortality_age', mortality_age_primary)
+        retirement_age_primary = self.scenario.retirement_age or 65
+        retirement_age_spouse = getattr(self.scenario, 'spouse_retirement_age', None) or 65
+        mortality_age_primary = self.scenario.mortality_age or 90
+        mortality_age_spouse = getattr(self.scenario, 'spouse_mortality_age', None) or mortality_age_primary
 
         current_age_primary = current_year - self.primary_birthdate.year
         if self.spouse_birthdate:
@@ -127,42 +104,18 @@ class ScenarioProcessor:
 
         self.end_year = max_end_year
 
-        # If roth_conversion_start_year is set, always use it as the simulation start year
-        roth_start_year = None
-        if isinstance(self.scenario, dict):
-            roth_start_year = self.scenario.get('roth_conversion_start_year')
-        else:
-            roth_start_year = getattr(self.scenario, 'roth_conversion_start_year', None)
-        if roth_start_year is not None:
-            try:
-                roth_start_year = int(roth_start_year)
-                self.start_year = roth_start_year
-            except Exception:
-                pass
-
-        # Debug and assert for birthdate
-        print(f"[DEBUG] ScenarioProcessor: client birthdate = {self.primary_birthdate}, scenario start_year = {self.start_year}")
-        assert self.primary_birthdate is not None, "Client birthdate must be provided for accurate age calculation."
-
     def calculate(self):
         results = []
         cumulative_federal_tax = 0
-        roth_balance = Decimal('0')
-        roth_growth_rate = Decimal(str(self.get_scenario_field('roth_growth_rate', 0))) / 100
-        roth_withdrawal_amount = Decimal(str(self.get_scenario_field('roth_withdrawal_amount', 0)))
-        roth_withdrawal_start_year = self.get_scenario_field('roth_withdrawal_start_year', None)
-        if roth_withdrawal_start_year is not None:
-            roth_withdrawal_start_year = int(roth_withdrawal_start_year)
-
         for year in range(self.start_year, self.end_year + 1):
             primary_age = year - self.primary_birthdate.year
             spouse_age = year - self.spouse_birthdate.year if self.spouse_birthdate else None
 
             # STEP 2: Income Mapping
-            ss_income = self._calculate_social_security(year)
-            gross_income = self._calculate_gross_income(year) + ss_income
+            gross_income = self._calculate_gross_income(year)
 
             # STEP 3: Taxable Income & MAGI Engine
+            ss_income = self._calculate_social_security(year)
             taxable_ss = calculate_taxable_social_security(ss_income, gross_income, 0, self.tax_status)
             taxable_income = (gross_income - ss_income) + taxable_ss
 
@@ -176,22 +129,12 @@ class ScenarioProcessor:
 
             # STEP 6: Roth Conversion Module (Joint Household, Phase 1)
             roth_conversion_amount = self._calculate_roth_conversion(year)
-            taxable_income += Decimal(str(roth_conversion_amount))
-
-            # --- Roth Account Growth and Withdrawals ---
-            roth_balance += Decimal(str(roth_conversion_amount))
-            roth_balance *= (Decimal('1') + roth_growth_rate)
-            roth_withdrawal = Decimal('0')
-            if roth_withdrawal_start_year is not None and year >= roth_withdrawal_start_year:
-                roth_withdrawal = min(roth_withdrawal_amount, roth_balance)
-                roth_balance -= roth_withdrawal
-            if roth_balance < 0:
-                roth_balance = Decimal('0')
+            taxable_income += roth_conversion_amount
 
             # STEP 7: Asset Spend-Down & Growth Engine
-            self._calculate_asset_spend_down(year, roth_conversion_amount)
+            self._calculate_asset_spend_down(year)
 
-            net_income = gross_income - federal_tax - total_medicare
+            net_income = gross_income + ss_income - federal_tax - total_medicare
             irmaa = irmaa + part_d_irmaa
 
             summary = {
@@ -210,10 +153,7 @@ class ScenarioProcessor:
                 "part_d": round(base_part_d, 2),
                 "irmaa_surcharge": round(irmaa, 2),
                 "total_medicare": round(total_medicare, 2),
-                "net_income": round(net_income, 2),
-                "roth_balance": round(roth_balance, 2),
-                "roth_withdrawal": round(roth_withdrawal, 2),
-                "non_taxable_income": round(roth_withdrawal, 2)
+                "net_income": round(net_income, 2)
             }
 
             for asset in self.assets:
@@ -251,7 +191,7 @@ class ScenarioProcessor:
         # Convert life expectancy factor to Decimal for division
         life_expectancy_factor = Decimal(life_expectancy_factor)
 
-        rmd_amount = Decimal(str(previous_year_balance)) / life_expectancy_factor
+        rmd_amount = previous_year_balance / life_expectancy_factor
 
         # Calculate RMD percentage
         rmd_percentage = 100 / life_expectancy_factor
@@ -467,8 +407,8 @@ class ScenarioProcessor:
         part_d_irmaa = Decimal(part_d_irmaa)
 
         # Retrieve inflation rates from the scenario
-        part_b_inflation_rate = Decimal(self.get_scenario_field('part_b_inflation_rate', 0)) / 100
-        part_d_inflation_rate = Decimal(self.get_scenario_field('part_d_inflation_rate', 0)) / 100
+        part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
+        part_d_inflation_rate = Decimal(self.scenario.part_d_inflation_rate) / 100
 
         # Calculate the number of years until the current year
         current_year = datetime.datetime.now().year
@@ -503,46 +443,37 @@ class ScenarioProcessor:
 
     def _calculate_roth_conversion(self, year):
         """
-        Manual mode only: Evenly split the total amount to convert over the selected years, starting at the chosen year.
-        - Uses sum of max_to_convert for all eligible assets.
-        - Ignores asset-by-asset logic and balances for the conversion amount.
+        Implement the Roth Conversion Module (STEP 6)
+        - Accept advisor-defined joint conversion schedule: start year, duration, annual conversion amount.
+        - Apply pro-rata asset depletion across eligible balances (IRA, 401k, etc.).
+        - Conversion amount treated as additional taxable income & MAGI.
+        - Update Roth balances accordingly with growth.
         """
-        roth_conversion_start_year = self.get_scenario_field('roth_conversion_start_year')
-        roth_conversion_duration = self.get_scenario_field('roth_conversion_duration')
-        
-        # Sum max_to_convert for all eligible assets
-        total_to_convert = sum(
-            float(asset.get('max_to_convert', 0))
-            for asset in self.assets
-            if asset["income_type"].lower() in ["ira", "traditional_ira", "traditional_401k", "401k"]
-        )
-        
-        if roth_conversion_start_year is not None:
-            roth_conversion_start_year = int(roth_conversion_start_year)
-        if roth_conversion_duration is not None:
-            roth_conversion_duration = int(roth_conversion_duration)
-            
-        if not total_to_convert or not roth_conversion_start_year or not roth_conversion_duration:
-            return 0
-            
-        # Calculate the annual conversion amount
-        annual_amount = total_to_convert / roth_conversion_duration
-        
-        # Check if we're in the conversion period
-        if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
-            # Calculate which year of conversion this is (0-based)
-            conversion_year = year - roth_conversion_start_year
-            
-            # For the last year, handle any remaining amount due to rounding
-            if conversion_year == roth_conversion_duration - 1:
-                total_converted = annual_amount * (roth_conversion_duration - 1)
-                return total_to_convert - total_converted
-            else:
-                return annual_amount
-        
-        return 0
+        roth_conversion_start_year = self.scenario.roth_conversion_start_year
+        roth_conversion_duration = self.scenario.roth_conversion_duration
+        roth_conversion_annual_amount = self.scenario.roth_conversion_annual_amount
 
-    def _calculate_asset_spend_down(self, year, roth_conversion_amount):
+        # Add error handling for None values
+        if roth_conversion_start_year is None or roth_conversion_duration is None:
+            self._log_debug(f"Roth conversion parameters are not set: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}")
+            return 0
+
+        if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
+            # Apply pro-rata asset depletion across eligible balances
+            eligible_balances = [asset for asset in self.assets if asset["income_type"] in ["ira", "401k"]]
+            total_eligible_balance = sum(asset["current_asset_balance"] for asset in eligible_balances)
+            for asset in eligible_balances:
+                depletion_ratio = asset["current_asset_balance"] / total_eligible_balance
+                asset_conversion_amount = roth_conversion_annual_amount * depletion_ratio
+                asset["current_asset_balance"] -= asset_conversion_amount
+                asset["roth_conversion_amount"] = asset_conversion_amount
+
+            # Add conversion amount to taxable income and MAGI
+            return roth_conversion_annual_amount
+        else:
+            return 0
+
+    def _calculate_asset_spend_down(self, year):
         """
         Implement the Asset Spend-Down & Growth Engine (STEP 7)
         - Apply monthly contributions until retirement age.
@@ -552,15 +483,9 @@ class ScenarioProcessor:
         - Apply Roth conversions as account depletion & Roth growth.
         - Prevent negative balances.
         - Survivor rules handle tax filing transitions.
-        - For converting assets, subtract conversion before RMD/withdrawal.
         """
         for asset in self.assets:
             self._update_asset_balance(asset, year)
-
-            # Subtract Roth conversion from converting assets before withdrawal/RMD
-            if asset["income_type"].lower() in ["ira", "traditional_ira", "traditional_401k", "401k"]:
-                asset["current_asset_balance"] = asset.get("current_asset_balance") or 0
-                asset["current_asset_balance"] -= Decimal(str(roth_conversion_amount))
 
             # Apply RMD override if calculated RMD > requested withdrawals
             rmd_amount = self._calculate_rmd(asset, year)
@@ -571,7 +496,7 @@ class ScenarioProcessor:
             # Apply Roth conversion depletion and growth
             roth_conversion_amount = self._calculate_roth_conversion(year)
             asset["current_asset_balance"] = asset.get("current_asset_balance") or 0
-            asset["current_asset_balance"] -= Decimal(str(roth_conversion_amount))
+            asset["current_asset_balance"] -= roth_conversion_amount
 
         # Prevent negative balances
         for asset in self.assets:
@@ -579,13 +504,8 @@ class ScenarioProcessor:
                 asset["current_asset_balance"] = 0
 
     def _log_debug(self, message):
-        pass
-        # if self.debug:
-        #     print(f"🔍 Debug: {message}")
-
-    @classmethod
-    def from_dicts(cls, scenario, client, spouse, assets, debug=False):
-        return cls(scenario=scenario, client=client, spouse=spouse, assets=assets, debug=debug)
+        if self.debug:
+            print(f"🔍 Debug: {message}")
 
 def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, filing_status):
     # Convert inputs to Decimal for consistency

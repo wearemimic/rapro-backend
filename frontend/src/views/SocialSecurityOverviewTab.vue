@@ -3,7 +3,7 @@
     <!-- Card for Graph -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
-        <Graph :data="ssChartData" :options="ssChartOptions" type="bar" :height="300" />
+        <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
       </div>
     </div>
     <!-- End Card for Graph -->
@@ -42,13 +42,11 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
 
 export default {
-  components: { Graph },
   props: {
     scenarioResults: {
       type: Array,
@@ -65,65 +63,6 @@ export default {
         socialSecurity: false
       }
     };
-  },
-  computed: {
-    ssChartData() {
-      const years = this.scenarioResults.map(row => row.year);
-      const ssIncome = this.scenarioResults.map(row => parseFloat(row.ss_income || 0));
-      const totalMedicare = this.scenarioResults.map(row => parseFloat(row.total_medicare || 0));
-      const remainingSSI = this.scenarioResults.map(row => {
-        const ss = parseFloat(row.ss_income || 0);
-        const med = parseFloat(row.total_medicare || 0);
-        return ss - med;
-      });
-      return {
-        labels: years,
-        datasets: [
-          // Bar for Medicare
-          {
-            type: 'bar',
-            label: 'Total Medicare',
-            backgroundColor: '#28a745',
-            data: totalMedicare,
-            order: 2
-          },
-          // Lines
-          {
-            type: 'line',
-            label: 'Social Security Benefit',
-            borderColor: '#007bff',
-            backgroundColor: 'rgba(0,123,255,0.1)',
-            data: ssIncome,
-            fill: false,
-            yAxisID: 'y',
-            order: 1
-          },
-          {
-            type: 'line',
-            label: 'Remaining SSI',
-            borderColor: '#6f42c1',
-            backgroundColor: 'rgba(111,66,193,0.1)',
-            data: remainingSSI,
-            fill: false,
-            yAxisID: 'y',
-            order: 1
-          }
-        ]
-      };
-    },
-    ssChartOptions() {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: true }
-        },
-        scales: {
-          x: { stacked: false },
-          y: { stacked: false, beginAtZero: true }
-        }
-      };
-    }
   },
   methods: {
     toggleDropdown(tab) {

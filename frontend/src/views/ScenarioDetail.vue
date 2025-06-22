@@ -141,7 +141,7 @@
               <IncomeTab :scenario="scenario" :assetDetails="assetDetails" />
             </div>
             <div v-show="activeTab === 'rothConversion'" class="tab-pane active" style="margin-top:50px;">
-              <RothConversionTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" :client="client" />
+              <RothConversionTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" />
             </div>
             <div v-show="activeTab === 'worksheets'" class="tab-pane active" style="margin-top:50px;">
               <WorksheetsTab :scenarioResults="scenarioResults" :client="client" :benefitByAge="benefitByAge" :socialSecurityCola="socialSecurityCola" />
