@@ -78,6 +78,20 @@
                 <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>
               </tr>
             </tbody>
+            <tfoot>
+              <tr style="font-weight: bold;">
+                <td>Total</td>
+                <td></td>
+                <td v-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0)) }}</td>
+                <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0)) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
