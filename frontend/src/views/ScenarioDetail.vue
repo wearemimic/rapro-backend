@@ -129,7 +129,7 @@
           </ul>
           <div class="tab-content mt-4">
             <div v-if="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
-              <FinancialOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
+              <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
               <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
@@ -919,31 +919,30 @@ export default {
     },
   },
   computed: {
-    incomeFields() {
-      if (!this.scenarioResults.length) return [];
-
-      const firstRow = this.scenarioResults[0];
-      const knownKeys = [
-        'year', 'primary_age', 'spouse_age', 'gross_income', 'taxable_income', 
-        'federal_tax', 'total_medicare', 'remaining_ssi', 'social_security_benefit',
-        'part_b', 'part_d', 'medicare_income'
-      ];
-
-      // List any field that seems to represent income but is not excluded
-      return Object.keys(firstRow)
-        .filter(key => key.includes('income') && !knownKeys.includes(key));
+    filteredScenarioResults() {
+      const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+      const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+      const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+      const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+      return this.scenarioResults.filter(row => {
+        if (isSingle) {
+          return row.primary_age <= mortalityAge;
+        } else {
+          return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+        }
+      });
     },
     totalFederalTaxes() {
-      return this.scenarioResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0).toFixed(2);
+      return this.filteredScenarioResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0).toFixed(2);
     },
     totalMedicareCosts() {
-      return this.scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2);
+      return this.filteredScenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2);
     },
     totalIrmaaSurcharge() {
-      return parseFloat(this.scenarioResults.reduce((total, row) => total + (parseFloat(row.irmaa_surcharge || 0)), 0).toFixed(2));
+      return parseFloat(this.filteredScenarioResults.reduce((total, row) => total + (parseFloat(row.irmaa_surcharge || 0)), 0).toFixed(2));
     },
     totalMedicareCost() {
-      return parseFloat(this.scenarioResults.reduce((total, row) => total + (parseFloat(row.total_medicare || 0)), 0).toFixed(2));
+      return parseFloat(this.filteredScenarioResults.reduce((total, row) => total + (parseFloat(row.total_medicare || 0)), 0).toFixed(2));
     },
   },
   watch: {
