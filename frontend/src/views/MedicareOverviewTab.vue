@@ -172,9 +172,14 @@ export default {
     filteredResults() {
       const mortalityAge = Number(this.mortalityAge) || 90;
       const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
-      const maxAge = Math.max(mortalityAge, spouseMortalityAge);
+      const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+      const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
       return this.scenarioResults.filter(row => {
-        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+        if (isSingle) {
+          return row.primary_age <= mortalityAge;
+        } else {
+          return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+        }
       });
     }
   },
