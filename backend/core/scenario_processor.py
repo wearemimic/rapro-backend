@@ -109,16 +109,47 @@ class ScenarioProcessor:
         cumulative_federal_tax = 0
         
         print("\n==== STARTING RETIREMENT INCOME CALCULATION ====")
-        
-        for year in range(self.start_year, self.end_year + 1):
+
+        # Determine mortality years
+        primary_mortality_year = self.primary_birthdate.year + (self.scenario.mortality_age or 90)
+        spouse_mortality_year = self.spouse_birthdate.year + (self.scenario.spouse_mortality_age or (self.scenario.mortality_age or 90)) if self.spouse_birthdate else None
+        last_mortality_year = max(primary_mortality_year, spouse_mortality_year) if spouse_mortality_year else primary_mortality_year
+
+        # Track living status
+        primary_alive = True
+        spouse_alive = True if self.spouse_birthdate else False
+        tax_status = self.tax_status
+
+        for year in range(self.start_year, last_mortality_year + 1):
             primary_age = year - self.primary_birthdate.year
             spouse_age = year - self.spouse_birthdate.year if self.spouse_birthdate else None
-            
-            print(f"\n--- Processing Year: {year} | Primary Age: {primary_age} | Spouse Age: {spouse_age} ---")
 
-            # STEP 2: Income Mapping
-            gross_income = self._calculate_gross_income(year)
-            ss_income = self._calculate_social_security(year)
+            # Check mortality
+            if primary_alive and year > primary_mortality_year:
+                primary_alive = False
+                print(f"Primary deceased in year {year}")
+            if spouse_alive and spouse_mortality_year and year > spouse_mortality_year:
+                spouse_alive = False
+                print(f"Spouse deceased in year {year}")
+
+            # Switch tax status if one spouse dies
+            if tax_status == "Married Filing Jointly" and (not primary_alive or not spouse_alive):
+                tax_status = "Single"
+                print(f"Tax status switched to Single in year {year}")
+
+            # If both deceased, stop calculations
+            if not primary_alive and not spouse_alive:
+                print(f"Both deceased in year {year}, stopping calculations.")
+                break
+
+            print(f"\n--- Processing Year: {year} | Primary Age: {primary_age if primary_alive else 'deceased'} | Spouse Age: {spouse_age if spouse_alive else 'deceased'} ---")
+
+            # Only include income/assets for living persons
+            gross_income = 0
+            ss_income = 0
+            if primary_alive or spouse_alive:
+                gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
+                ss_income = self._calculate_social_security(year, primary_alive, spouse_alive)
             agi_excl_ss = Decimal(gross_income) - Decimal(ss_income)
             
             print(f"INCOME BREAKDOWN:")
@@ -268,8 +299,8 @@ class ScenarioProcessor:
 
             summary = {
                 "year": year,
-                "primary_age": primary_age,
-                "spouse_age": spouse_age if self.tax_status != "Single" else None,
+                "primary_age": primary_age if primary_alive else None,
+                "spouse_age": spouse_age if spouse_alive else None,
                 "gross_income": round(gross_income, 2),
                 "ss_income": round(ss_income, 2),
                 "taxable_ss": round(taxable_ss, 2),
@@ -451,62 +482,54 @@ class ScenarioProcessor:
         
         return current_balance
 
-    def _calculate_gross_income(self, year: int) -> float:
+    def _calculate_gross_income(self, year, primary_alive=True, spouse_alive=True):
         self._log_debug(f"Processing gross income for year {year}")
         income_total = 0
         for asset in self.assets:
-            self._update_asset_balance(asset, year)
             owner = asset.get("owned_by", "primary")
+            if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
+                continue
+            self._update_asset_balance(asset, year)
             birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
             if not birthdate:
                 continue
-
             current_age = year - birthdate.year
             start_age = asset.get("age_to_begin_withdrawal")
             end_age = asset.get("age_to_end_withdrawal")
-            cola = Decimal(asset.get("cola", 0)) / 100  # Cost of Living Adjustment as decimal, e.g., 0.02 for 2%
-
-            # self._log_debug(f"  Asset: {asset}, Current Age: {current_age}, Start Age: {start_age}, End Age: {end_age}, COLA: {cola}")
-
+            cola = Decimal(asset.get("cola", 0)) / 100
             if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
                 years_since_start = current_age - start_age
                 monthly_amount = Decimal(asset.get("monthly_amount") or 0)
                 inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
-                annual_income = inflated_amount * 12  # Annualize monthly income
-
-                # Check if the asset is subject to RMDs and adjust the income if necessary
+                annual_income = inflated_amount * 12
                 if asset.get("income_type") == "Traditional_401k":
                     rmd_amount = self._calculate_rmd(asset, year)
                     if rmd_amount > annual_income:
                         annual_income = rmd_amount
-
                 income_total += annual_income
-
         return income_total
 
-    def _calculate_social_security(self, year):
+    def _calculate_social_security(self, year, primary_alive=True, spouse_alive=True):
         self._log_debug(f"Processing social security income for year {year}")
         total_ss = 0
         for asset in self.assets:
             if asset.get("income_type") == "social_security":
                 owner = asset.get("owned_by", "primary")
+                if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
+                    continue
                 birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
                 if not birthdate:
                     continue
                 current_age = year - birthdate.year
                 start_age = asset.get("age_to_begin_withdrawal")
                 end_age = asset.get("age_to_end_withdrawal")
-                cola = Decimal('0.02')  # Set COLA to 2% for Social Security
-
-                self._log_debug(f"  SS Asset: {asset}, Current Age: {current_age}, Start Age: {start_age}, End Age: {end_age}, COLA: {cola}")
-
+                cola = Decimal('0.02')
                 if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
                     years_since_start = current_age - start_age
                     monthly_amount = asset.get("monthly_amount", 0)
                     inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                     annual_income = inflated_amount * 12
                     total_ss += annual_income
-                    self._log_debug(f"  Year {year} - Calculated Social Security Income: {annual_income}")
         self._log_debug(f"Total Social Security Income for year {year}: {total_ss}")
         return total_ss
 
