@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.contrib.auth.base_user import BaseUserManager
 from django.conf import settings
+from django.utils import timezone
 
 
 
@@ -31,8 +32,7 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class CustomUser(AbstractUser):
-    email = models.EmailField(unique=True)  # New unique identifier
-    # username = models.CharField(max_length=150, unique=True, blank=True, null=True)
+    email = models.EmailField(unique=True)
 
     phone_number = models.CharField(max_length=20, blank=True)
     company_name = models.CharField(max_length=255, blank=True)
@@ -46,6 +46,13 @@ class CustomUser(AbstractUser):
     primary_color = models.CharField(max_length=20, blank=True)
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
 
+    # Stripe related fields
+    stripe_customer_id = models.CharField(max_length=100, blank=True)
+    stripe_subscription_id = models.CharField(max_length=100, blank=True)
+    subscription_status = models.CharField(max_length=50, blank=True)
+    subscription_plan = models.CharField(max_length=20, blank=True)
+    subscription_end_date = models.DateTimeField(null=True, blank=True)
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
@@ -56,6 +63,13 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
+
+    @property
+    def is_subscription_active(self):
+        return self.subscription_status == 'active' and (
+            self.subscription_end_date is None or 
+            self.subscription_end_date > timezone.now()
+        )
     
 class Client(models.Model):
     # advisor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clients')
@@ -127,6 +141,10 @@ class Scenario(models.Model):
     part_b_inflation_rate = models.FloatField(default=6.0)
     part_d_inflation_rate = models.FloatField(default=6.0)
     FRA_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    roth_conversion_start_year = models.PositiveIntegerField(null=True, blank=True)
+    roth_conversion_duration = models.PositiveIntegerField(null=True, blank=True)
+    roth_conversion_annual_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    apply_standard_deduction = models.BooleanField(default=True, help_text="Apply IRS standard deduction in tax calculations.")
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

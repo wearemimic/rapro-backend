@@ -11,7 +11,7 @@
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label>First Name</label>
-                  <input v-model="form.first_name" class="form-control" required minlength="5" maxlength="30">
+                  <input v-model="form.first_name" class="form-control" required minlength="3" maxlength="30">
                 </div>
                 <div class="col-md-6 mb-3">
                   <label>Last Name</label>
@@ -115,7 +115,8 @@ export default {
         spouse_last_name: "",
         spouse_birthdate: "",
         spouse_gender: "",
-        notes: ""
+        notes: "",
+        apply_standard_deduction: true
       },
       showSpouseFields: false
     };
@@ -134,6 +135,7 @@ export default {
           gender: this.form.gender,
           tax_status: this.form.tax_status,
           notes: this.form.notes,
+          apply_standard_deduction: this.form.apply_standard_deduction
         };
 
         if (this.showSpouseFields) {

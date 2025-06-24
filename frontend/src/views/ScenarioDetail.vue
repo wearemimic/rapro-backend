@@ -75,140 +75,7 @@
             </a>
           </span>
 
-          <div class="row">
-            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-              <!-- Card -->
-              <div class="card card-sm h-100">
-                <div class="card-body">
-                  <div class="row d-flex align-items-stretch">
-                    <div class="col">
-                      <!-- Media -->
-                      <div class="d-flex">
-                        <div class="flex-shrink-0">
-                          <i class="bi-receipt nav-icon"></i>
-                        </div>
-
-                        <div class="flex-grow-1 ms-3">
-                          <h4 class="mb-1">Federal Taxes</h4>
-                          <span class="d-block" style="font-size: 1.5rem;">{{ formatCurrency(totalFederalTaxes) }}</span>
-                        </div>
-                      </div>
-                      <!-- End Media -->
-                    </div>
-                    <!-- End Col -->
-
-                    <div class="col-auto">
-                      <!-- Circle -->
-                      
-                      <!-- End Circle -->
-                    </div>
-                    <!-- End Col -->
-                  </div>
-                  <!-- End Row -->
-                </div>
-              </div>
-              <!-- End Card -->
-            </div>
-
-            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-              <!-- Card -->
-              <div class="card card-sm h-100">
-                <div class="card-body">
-                  <div class="row d-flex align-items-stretch">
-                    <div class="col">
-                      <!-- Media -->
-                      <div class="d-flex">
-                        <div class="flex-shrink-0">
-                          <i class="bi-bar-chart nav-icon"></i>
-                        </div>
-
-                        <div class="flex-grow-1 ms-3">
-                          <h4 class="mb-1">Medicare Costs</h4>
-                          <span class="d-block" style="font-size: 1.5rem;">{{ formatCurrency(totalMedicareCosts) }}</span>
-                        </div>
-                      </div>
-                      <!-- End Media -->
-                    </div>
-                    <!-- End Col -->
-
-                    <div class="col-auto">
-                      <!-- Circle -->
-                    
-                      <!-- End Circle -->
-                    </div>
-                    <!-- End Col -->
-                  </div>
-                  <!-- End Row -->
-                </div>
-              </div>
-              <!-- End Card -->
-            </div>
-
-            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-              <!-- Card -->
-              <div class="card card-sm h-100">
-                <div class="card-body">
-                  <div class="row d-flex align-items-stretch">
-                    <div class="col">
-                      <!-- Media -->
-                      <div class="d-flex">
-                        <div class="flex-shrink-0">
-                          <i class="bi-check2-circle nav-icon"></i>
-                        </div>
-
-                        <div class="flex-grow-1 ms-3">
-                          <h4 class="mb-1">Out Of Pocket</h4>
-                          <span class="d-block" style="font-size: 1.5rem;">$50,000</span>
-                          </div>
-                      </div>
-                      <!-- End Media -->
-                    </div>
-                    <!-- End Col -->
-
-                    <div class="col-auto">
-                      <!-- Circle -->
-                    
-                      <!-- End Circle -->
-                    </div>
-                    <!-- End Col -->
-                  </div>
-                  <!-- End Row -->
-                </div>
-              </div>
-              <!-- End Card -->
-            </div>
-            <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-              <!-- Card -->
-              <div class="card card-sm h-100">
-                <div class="card-body">
-                  <div class="row d-flex align-items-stretch">
-                    <div class="col">
-                      <!-- Media -->
-                      <div class="d-flex">
-                        <div class="flex-shrink-0">
-                          <i class="bi-check2-circle nav-icon"></i>
-                        </div>
-
-                        <div class="flex-grow-1 ms-3">
-                          <h4 class="mb-1">IRMAA Status</h4>
-                          <!-- Orange Rectangle -->
-                      <div style="width: 90%; height: 30px; background-color: orange;"></div>
-                      <!-- End Orange Rectangle -->
-                        </div>
-                      </div>
-                      <!-- End Media -->
-                    </div>
-                    <!-- End Col -->
-
-                    
-                  </div>
-                  <!-- End Row -->
-                </div>
-              </div>
-              <!-- End Card -->
-            </div>
-          </div>
-          <!-- End Row -->
+          <ScenarioMetrics :total-federal-taxes="totalFederalTaxes" :total-medicare-costs="totalMedicareCosts" />
 
           <ul class="nav nav-tabs page-header-tabs" id="projectsTab" role="tablist">
             <li class="nav-item">
@@ -262,400 +129,22 @@
           </ul>
           <div class="tab-content mt-4">
             <div v-if="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
-              <!-- Card -->
-              <div class="card mb-3 mb-lg-5" >
-                <!-- Header -->
-                <div class="card-header card-header-content-between">
-                  <!-- <h6 class="card-subtitle mb-0">Project budget: <span class="h3 ms-sm-2">$150,000.00 USD</span></h6> -->
-
-                  <!-- Dropdown -->
-                  <div class="dropdown">
-                    <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('financial')" :aria-expanded="isDropdownOpen.financial">
-                      <i class="bi-download me-2"></i> Export
-                    </button>
-
-                    <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.financial }" aria-labelledby="usersExportDropdown">
-                      <span class="dropdown-header">Export Options</span>
-                      <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-                        Export graph and table to Excel
-                      </a>
-                      <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                        Export graph and data to PDF
-                      </a>
-                      <a id="export-graph" class="dropdown-item" href="javascript:;">
-                        Export graph only
-                      </a>
-                      <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                        Export table only as CSV
-                      </a>
-                    </div>
-                  </div>
-                  <!-- End Dropdown -->
-                </div>
-                <!-- End Header -->
-
-                <!-- Body -->
-                <div class="card-body">
-                  <!-- Bar Chart -->
-                  <canvas id="financial_overview_chart" style="width: 100%; height: 300px !important;"></canvas>
-                  <!-- End Bar Chart -->
-                </div>
-                <!-- End Body -->
-              </div>
-              <!-- End Card -->
-              <div class="card mb-3 mb-lg-5">
-                <!-- Header -->
-                
-                <div class="card-header card-header-content-between">
-                  <div v-if="scenarioResults.length" class="table-responsive mt-4">
-                    <table class="table table-hover">
-                      <thead class="thead-light">
-                        <tr>
-                          <th>Year</th>
-                          <th>Primary Age</th>
-                          <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
-                          <th>Gross Income</th>
-                          <th>Taxable Income</th>
-                          <th>Tax Bracket</th>
-                          <th>Federal Tax</th>
-                          <th>Total Medicare</th>
-                          <th>Remaining Income</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="row in scenarioResults" :key="row.year">
-                          <td>{{ row.year }}</td>
-                          <td v-if="row.primary_age <= 90">{{ row.primary_age }}</td>
-                          <td v-else></td>
-                          <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= 90">{{ row.spouse_age }}</td>
-                          <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                          <td>${{ row.gross_income }}</td>
-                          <td>${{ row.taxable_income }}</td>
-                          <td>12%</td>
-                          <td>${{ row.federal_tax }}</td>
-                          <td>${{ row.total_medicare }}</td>
-                          <td>${{ (parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))).toFixed(2) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              <FinancialOverviewTab :scenario-results="scenarioResults" :client="client" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
-              <!-- Social Security Chart Card -->
-
-              <div class="card mb-3 mb-lg-5">
-                <div class="card-header card-header-content-between">
-                  <div class="dropdown">
-                    <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('socialSecurity')" :aria-expanded="isDropdownOpen.socialSecurity">
-                      <i class="bi-download me-2"></i> Export
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.socialSecurity }" aria-labelledby="usersExportDropdown">
-                      <span class="dropdown-header">Export Options</span>
-                      <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-                        Export graph and table to Excel
-                      </a>
-                      <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                        Export graph and data to PDF
-                      </a>
-                      <a id="export-graph" class="dropdown-item" href="javascript:;">
-                        Export graph only
-                      </a>
-                      <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-                        <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                        Export table only as CSV
-                      </a>
-                    </div>
-                  </div>
-                </div>
-                <div class="card-body">
-                  <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
-                </div>
-              </div>
-              <div class="card mb-3 mb-lg-5">
-                
-                <div class="card-body">
-                  <h5 class="mb-4">IMPACT ON SOCIAL SECURITY CHECK (PRIMARY)</h5>
-                  <div class="table-responsive">
-                    <table class="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Year</th>
-                          <th>Age</th>
-                          <th>SSI Benefit</th>
-                          <th>Total Medicare Expense</th>
-                          <th>SSI Benefit Taxed</th>
-                          <th>Remaining SSI Benefit</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(row, index) in scenarioResults" :key="index">
-                          <td>{{ row.year }}</td>
-                          <td>{{ row.primary_age }}</td>
-                          <td>${{ parseFloat(row.ss_income || 0).toFixed(2) }}</td>
-                          <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
-                          <td></td>
-                          <td class="bg-success text-white">${{ (parseFloat(row.ss_income || 0) - parseFloat(row.total_medicare || 0)).toFixed(2) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              
+              <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" />
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
-              <!-- Medicare Chart Card -->
-              <div class="row">
-                <div class="col-sm-6 col-xl-8 mb-3 mb-xl-6">
-                  <div class="card mb-3 mb-lg-5">
-                    <div class="card-body">
-                      <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
-                    </div>
-                  </div>
-                </div>
-                <!-- Medicare Chart Card -->
-                <div class="col-sm-6 col-xl-4 mb-3 mb-xl-6">
-                  <div class="card mb-3 mb-lg-5">
-                    <div class="card-header">
-                      <h5 class="mb-4">Base Premium VS IRMAA</h5>
-                    </div>
-                    <div class="card-body">
-                      <div class="circles-chart">
-                        <div class="js-circle" id="circle-medicare" data-hs-circles-options='{
-                              "value": 80,
-                              "maxValue": 100,
-                              "duration": 2000,
-                              "isViewportInit": true,
-                              "radius": 70,
-                              "width": 20,
-                              "fgStrokeLinecap": "round",
-                              "textFontSize": 14,
-                              "additionalText": "%",
-                              "textClass": "circles-chart-content",
-                              "textColor": "#377dff"
-                            }'>
-                          </div>
-                      </div>
-                    </div>
-                    <div class="card-body">
-                      <h4>Base Premium: $5,000</h4>
-                      <h4>IRMAA Surcharges: $20,000</h4>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="card mb-3 mb-lg-5">
-                <div class="card-body">
-                  <h5 class="mb-4">Medicare Costs</h5>
-                  <div class="row mb-3">
-                    <div class="col-md-4">
-                      <div class="border p-3 text-center">
-                        <strong>Mark age to opt in to Medicare</strong><br />
-                        <span>{{ client?.medicare_age || '65' }}</span>
-                      </div>
-                    </div>
-                    <div class="col-md-4">
-                      <div class="border p-3 text-center">
-                        <strong>Part B Inflation Rate:</strong><br />
-                        <span>{{ partBInflationRate }}%</span>
-                      </div>
-                    </div>
-                    <div class="col-md-4">
-                      <div class="border p-3 text-center">
-                        <strong>Part D Inflation Rate:</strong><br />
-                        <span>{{ partDInflationRate }}%</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="table-responsive">
-                    <table class="table table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Year</th>
-                          <th>Age (mark)</th>
-                          <th>Total Income</th>
-                          <th>Income for Medicare</th>
-                          <th>Part B (mark)</th>
-                          <th>Part D (mark)</th>
-                          <th>Total Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(row, index) in scenarioResults" :key="index">
-                          <td>{{ row.year }}</td>
-                          <td>{{ row.primary_age }}</td>
-                          <td>${{ parseFloat(row.gross_income || 0).toFixed(2) }}</td>
-                          <td>${{ parseFloat(row.medicare_income || 0).toFixed(2) }}</td>
-                          <td>${{ parseFloat(row.part_b || 0).toFixed(2) }}</td>
-                          <td>${{ parseFloat(row.part_d || 0).toFixed(2) }}</td>
-                          <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              <div class="dropdown">
-                <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('medicare')" :aria-expanded="isDropdownOpen.medicare">
-                  <i class="bi-download me-2"></i> Export
-                </button>
-                <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.medicare }" aria-labelledby="usersExportDropdown">
-                  <span class="dropdown-header">Export Options</span>
-                  <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-                    Export graph and table to Excel
-                  </a>
-                  <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                    Export graph and data to PDF
-                  </a>
-                  <a id="export-graph" class="dropdown-item" href="javascript:;">
-                    Export graph only
-                  </a>
-                  <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                    Export table only as CSV
-                  </a>
-                </div>
-              </div>
+              <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" />
             </div>
             <div v-show="activeTab === 'income'" class="tab-pane active" style="margin-top:50px;">
-              <div class="card mb-3 mb-lg-5">
-                <div class="card-body">
-                  <h5 class="mb-4">Types of Income in Scenario</h5>
-                  <ul>
-                    <li v-for="incomeType in incomeFields" :key="incomeType">
-                      {{ incomeType }}
-                    </li>
-                  </ul>
-                </div>
-              </div>
+              <IncomeTab :scenario="scenario" :assetDetails="assetDetails" />
             </div>
             <div v-show="activeTab === 'rothConversion'" class="tab-pane active" style="margin-top:50px;">
-              <div class="card mb-3 mb-lg-5">
-                <div class="card-body">
-                  <p>This is the Roth Conversion section.</p>
-                </div>
-              </div>
+              <RothConversionTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" />
             </div>
             <div v-show="activeTab === 'worksheets'" class="tab-pane active" style="margin-top:50px;">
-              
-              <div class="row">
-                <div class="col-sm-6 col-xl-6 mb-3 mb-xl-6">
-                  
-                  <div class="card mb-3 mb-lg-5">
-                    
-                    <div class="card-body">
-                      
-                      <canvas id="breakevenChart" style="width: 100%; height: 300px !important;"></canvas>
-                    </div>
-                  </div>
-                  <div class="card mt-3 mb-lg-5">
-                    <div class="card-body">
-                      <h5 class="mb-4">Social Security Claim Comparison</h5>
-                      <div class="table-responsive">
-                        <table class="table table-bordered">
-                          <thead>
-                            <tr>
-                              <th>Age</th>
-                              <th>Monthly Amount</th>
-                              <th>Total Lifetime Value</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="(benefit, age) in benefitByAge" :key="age">
-                              <td>{{ age }}</td>
-                              <td>${{ (benefit / 12).toFixed(2) }}</td>
-                              <td>
-                                ${{ 
-                                  (
-                                    Array.from({ length: client?.mortality_age - age + 1 }, (_, i) =>
-                                      (benefit * Math.pow(1 + socialSecurityCola / 100, i))
-                                    ).reduce((acc, val) => acc + val, 0)
-                                  ).toFixed(2) 
-                                }}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-sm-6 col-xl-6 mb-3 mb-xl-6">
-                  
-                  <div class="card mb-3 mb-lg-5">
-                    <div class="card-body">
-                    </div>
-                  </div>
-                  <div class="card mt-3 mb-lg-5">
-                    <div class="card-body">
-                      <h5 class="mb-4">Social Security Claim Comparison</h5>
-                      <div class="table-responsive">
-                        <table class="table table-bordered">
-                          <thead>
-                            <tr>
-                              <th>Age</th>
-                              <th>Monthly Amount</th>
-                              <th>Total Lifetime Value</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="(benefit, age) in benefitByAge" :key="age">
-                              <td>{{ age }}</td>
-                              <td>${{ (benefit / 12).toFixed(2) }}</td>
-                              <td>
-                                ${{ 
-                                  (
-                                    Array.from({ length: client?.mortality_age - age + 1 }, (_, i) =>
-                                      (benefit * Math.pow(1 + socialSecurityCola / 100, i))
-                                    ).reduce((acc, val) => acc + val, 0)
-                                  ).toFixed(2) 
-                                }}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-                <!-- Social Security Claim Comparison Table -->
-                
-                
-          
-              <!-- End Social Security Claim Comparison Table -->
-              <div class="dropdown">
-                <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('worksheets')" :aria-expanded="isDropdownOpen.worksheets">
-                  <i class="bi-download me-2"></i> Export
-                </button>
-                <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.worksheets }" aria-labelledby="usersExportDropdown">
-                  <span class="dropdown-header">Export Options</span>
-                  <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-                    Export graph and table to Excel
-                  </a>
-                  <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                    Export graph and data to PDF
-                  </a>
-                  <a id="export-graph" class="dropdown-item" href="javascript:;">
-                    Export graph only
-                  </a>
-                  <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-                    <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                    Export table only as CSV
-                  </a>
-                </div>
-              </div>
+              <WorksheetsTab :scenarioResults="scenarioResults" :client="client" :benefitByAge="benefitByAge" :socialSecurityCola="socialSecurityCola" :medicareCosts="scenarioResults" />
             </div>
           </div>
         </div>
@@ -727,6 +216,14 @@ import {
   CategoryScale
 } from 'chart.js';
 
+import FinancialOverviewTab from './FinancialOverviewTab.vue';
+import SocialSecurityOverviewTab from './SocialSecurityOverviewTab.vue';
+import MedicareOverviewTab from './MedicareOverviewTab.vue';
+import IncomeTab from './IncomeTab.vue';
+import RothConversionTab from './RothConversionTab.vue';
+import WorksheetsTab from './WorksheetsTab.vue';
+import ScenarioMetrics from './ScenarioMetrics.vue';
+
 Chart.register(
   LineController,
   LineElement,
@@ -747,6 +244,15 @@ const token = localStorage.getItem('token')
 const headers = { Authorization: `Bearer ${token}` }
 
 export default {
+  components: {
+    FinancialOverviewTab,
+    SocialSecurityOverviewTab,
+    MedicareOverviewTab,
+    IncomeTab,
+    RothConversionTab,
+    WorksheetsTab,
+    ScenarioMetrics
+  },
   data() {
     return {
       scenario: null,
@@ -775,7 +281,13 @@ export default {
         socialSecurity: false,
         medicare: false,
         worksheets: false
-      }
+      },
+      preRetirementIncome: 0,
+      availableYears: [],
+      conversionStartYear: null,
+      yearsToConvert: 0,
+      rothGrowthRate: 0,
+      assetDetails: [],
     };
   },
   mounted() {
@@ -791,8 +303,12 @@ export default {
         this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
         this.selectedScenarioId = this.scenario?.id || null;
         this.initPlugins();
+        this.initializeCircles();
         this.fetchScenarioData();
+        this.fetchAssetDetails();
         console.log('Client Tax Status:', this.client?.tax_status);
+        console.log('Scenarios:', this.scenarios);
+        console.log('Selected Scenario:', this.scenario);
       })
       .catch(error => {
         console.error('Error loading client and scenario:', error);
@@ -852,29 +368,25 @@ export default {
           this.activeTab === 'socialSecurity' ? 'socialSecurityChart' :
           'financial_overview_chart'
         );
+        console.log('Canvas Context:', ctx); // Log the canvas context
         if (ctx && this.scenarioResults.length) {
           if (this.chartInstance) {
             this.chartInstance.destroy();
           }
 
-          console.log('Scenario Results:', this.scenarioResults);
-          console.log('Remaining SSI Benefit Data:', this.scenarioResults.map(row => parseFloat(row.remaining_ssi || 0)));
-
           const datasets = this.activeTab === 'worksheets' ? [
             ...Object.entries(this.benefitByAge).map(([age, benefit], i) => {
               const label = `Age ${age}`;
               const data = [];
-              console.log(`Processing Age: ${age}, Benefit: ${benefit}`);
               let cumulativeIncome = 0;
-              const startYear = 62 + (age - 62); // Adjust the start year based on age
+              const startYear = 62 + (age - 62);
               for (let year = 62; year <= 90; year++) {
                 if (year >= startYear) {
                   cumulativeIncome += benefit;
                   data.push(cumulativeIncome);
                 } else {
-                  data.push(null); // Fill with null or zero until the start year
+                  data.push(null);
                 }
-                console.log(`Year: ${year}, Cumulative Income: ${cumulativeIncome}`);
               }
               return {
                 type: 'line',
@@ -905,7 +417,6 @@ export default {
                 const ssiBenefit = parseFloat(row.ss_income || 0);
                 const medicareExpense = parseFloat(row.total_medicare || 0);
                 const remainingSSI = ssiBenefit - medicareExpense;
-                console.log(`Year: ${row.year}, SSI Benefit: ${ssiBenefit}, Medicare Expense: ${medicareExpense}, Remaining SSI: ${remainingSSI}`);
                 return remainingSSI;
               }),
               borderColor: "#00c9db",
@@ -924,15 +435,29 @@ export default {
             }
           ] : this.activeTab === 'medicare' ? [
             {
-            type: 'line',
-            label: 'Total Income',
-            data: this.scenarioResults.map(row => parseFloat(row.gross_income || 0)),
-            borderColor: "#377dff",
-            backgroundColor: "rgba(55, 125, 255, 0.1)",
-            borderWidth: 2,
-            tension: 0.3,
-            yAxisID: 'y'
-          }
+              type: 'bar',
+              label: 'Part B',
+              data: this.scenarioResults.map(row => parseFloat(row.part_b || 0)),
+              backgroundColor: '#377dff',
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'Part D',
+              data: this.scenarioResults.map(row => parseFloat(row.part_d || 0)),
+              backgroundColor: '#00c9db',
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            },
+            {
+              type: 'bar',
+              label: 'IRMAA Surcharge',
+              data: this.scenarioResults.map(row => parseFloat(row.irmaa_surcharge || 0)),
+              backgroundColor: '#ffc107',
+              stack: 'Stack 0',
+              yAxisID: 'y'
+            }
           ] : [
             {
               type: 'line',
@@ -978,13 +503,10 @@ export default {
             }
           ];
 
-          console.log('Datasets:', datasets);
-          console.log('Chart Context:', ctx);
-
           this.chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: this.scenarioResults.map(row => row.year.toString()), // Use actual years from data
+              labels: this.scenarioResults.map(row => row.year.toString()),
               datasets: datasets
             },
             options: {
@@ -992,14 +514,14 @@ export default {
               maintainAspectRatio: false,
               scales: {
                 x: {
-                  stacked: false,
+                  stacked: this.activeTab === 'medicare',
                   title: {
                     display: true,
                     text: 'Year'
                   }
                 },
                 y: {
-                  stacked: false,
+                  stacked: this.activeTab === 'medicare',
                   title: {
                     display: true,
                     text: 'Amount ($)'
@@ -1020,45 +542,71 @@ export default {
               }
             }
           });
+        } else {
+          // If scenarioResults is empty, clear the chart
+          if (this.chartInstance) {
+            this.chartInstance.destroy();
+          }
         }
       });
     },
     initializeCircles() {
-        this.$nextTick(() => {
-            const maxRetries = 20;
-            let retryCount = 0;
+      this.$nextTick(() => {
+        console.log('Initializing Circles...');
+        console.log('Total IRMAA Surcharge:', this.totalIrmaaSurcharge);
+        console.log('Total Medicare Cost:', this.totalMedicareCost);
+        const maxRetries = 20;
+        let retryCount = 0;
+        const tryInit = () => {
+          const CirclesGlobal = window.Circles;
+          if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
+            console.log('Circles.js is ready.');
+            document.querySelectorAll('.js-circle').forEach((el) => {
+              console.log('Found circle element:', el);
+              if (!el.dataset.initialized) {
+                const irmaaPercentage = Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
+                let circleColor = '#377dff'; // Default color
 
-            const tryInit = () => {
-                const CirclesGlobal = window.Circles;
-                if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
-                    document.querySelectorAll('.js-circle').forEach((el) => {
-                        if (!el.dataset.initialized) {
-                            const options = JSON.parse(el.getAttribute('data-hs-circles-options') || '{}');
-                            console.log('Creating circle for element:', el.id, options);
-                            const defaultOptions = {
-                                radius: 325,
-                                width: 7,
-                                fgStrokeLinecap: 'round',
-                                textFontSize: 14,
-                                additionalText: '%',
-                                textClass: 'circles-chart-content',
-                                textColor: '#377dff'
-                            };
-                            CirclesGlobal.create({ id: el.id, ...defaultOptions, ...options });
-                            el.dataset.initialized = 'true';
-                        }
-                    });
-                } else if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.warn(`Circles.js not ready, retrying ${retryCount}/${maxRetries}...`);
-                    setTimeout(tryInit, 200);
+                // Determine color based on IRMAA percentage
+                if (irmaaPercentage > 50) {
+                  circleColor = '#ff0000'; // Red for percentages above 50
+                } else if (irmaaPercentage > 25) {
+                  circleColor = '#ffa500'; // Orange for percentages between 25 and 50
+                } else if (irmaaPercentage > 15) {
+                  circleColor = '#ffff00'; // Yellow for percentages between 15 and 25
                 } else {
-                    console.error('❌ Circles.js never loaded.');
+                  circleColor = '#00ff00'; // Green for percentages below 15
                 }
-            };
 
-            tryInit();
-        });
+                console.log('IRMAA Percentage:', irmaaPercentage, 'Circle Color:', circleColor);
+
+                CirclesGlobal.create({
+                  id: el.id,
+                  value: irmaaPercentage,
+                  maxValue: 100,
+                  width: 20,
+                  radius: 70,
+                  text: function(value) { return value + '%'; },
+                  colors: ['#f0f0f0', circleColor],
+                  duration: 400,
+                  wrpClass: 'circles-wrp',
+                  textClass: 'circles-text',
+                  styleWrapper: true,
+                  styleText: true
+                });
+                el.dataset.initialized = true;
+              }
+            });
+          } else if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(tryInit, 100);
+          } else {
+            console.error('Failed to initialize Circles.js after multiple attempts.');
+          }
+        };
+
+        tryInit();
+      });
     },
     fetchScenariosForClient() {
       // Use clientId from route params (not from scenario.client)
@@ -1085,10 +633,15 @@ export default {
       const scenarioId = this.$route.params.scenarioid;
       axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/calculate/`, { headers })
         .then(response => {
-          this.scenarioResults = response.data;
-          console.log('API Response:', response.data);
-          // Re-initialize chart with new data
-          this.initializeChartJS();
+          if (response.data && response.data.length) {
+            this.scenarioResults = response.data;
+            console.log('API Response:', response.data); // Log the API response
+            console.log('Scenario Results:', this.scenarioResults); // Log scenario results
+            // Re-initialize chart with new data
+            this.initializeChartJS();
+          } else {
+            console.warn('No data received for scenarioResults');
+          }
         })
         .catch(error => {
           console.error("Error loading scenario data:", error);
@@ -1261,7 +814,17 @@ export default {
       }
       return `${firstName} ${lastName}`;
     },
-    
+    fetchAssetDetails() {
+      const scenarioId = this.$route.params.scenarioid;
+      axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/assets/`, { headers })
+        .then(response => {
+          this.assetDetails = response.data;
+          console.log('Asset Details:', this.assetDetails);
+        })
+        .catch(error => {
+          console.error('Error fetching asset details:', error);
+        });
+    },
   },
   computed: {
     incomeFields() {
@@ -1284,17 +847,32 @@ export default {
     totalMedicareCosts() {
       return this.scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2);
     },
+    totalIrmaaSurcharge() {
+      return parseFloat(this.scenarioResults.reduce((total, row) => total + (parseFloat(row.irmaa_surcharge || 0)), 0).toFixed(2));
+    },
+    totalMedicareCost() {
+      return parseFloat(this.scenarioResults.reduce((total, row) => total + (parseFloat(row.total_medicare || 0)), 0).toFixed(2));
+    },
   },
   watch: {
+    scenarioResults: {
+      handler() {
+        this.$nextTick(() => {
+          this.initializeCircles();
+        });
+      },
+      deep: true
+    },
     activeTab(newVal) {
-      console.log("Active tab changed to:", newVal);
+      console.log('Active tab changed to:', newVal);
       if (['socialSecurity', 'medicare', 'worksheets'].includes(newVal)) {
-        console.log("🔍 Debug - scenarioResults:", this.scenarioResults);
+        console.log('🔍 Debug - scenarioResults:', this.scenarioResults);
         if (this.scenarioResults.length) {
-          console.log("🔍 Debug - First row year:", this.scenarioResults[0].year);
-          this.$nextTick(() => this.initializeChartJS());
+          console.log('🔍 Debug - First row year:', this.scenarioResults[0].year);
+          this.initializeChartJS();
         } else {
           console.warn(`⚠️ scenarioResults is empty when switching to ${newVal} tab`);
+          this.fetchScenarioData();
         }
       }
     },
@@ -1306,7 +884,7 @@ export default {
         this.selectedScenarioId = scenarioId;
         this.fetchScenarioData();
       }
-    }
+    },
   }
 };
 </script>
@@ -1325,7 +903,7 @@ export default {
 .circles-chart-content {
   text-align: center;
   line-height: 1;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: bold;
   display: flex;
   justify-content: center;

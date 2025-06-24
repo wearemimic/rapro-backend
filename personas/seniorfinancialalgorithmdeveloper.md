@@ -24,6 +24,8 @@ Works directly with UI/UX developers to bring financial projections to life. Wri
 	•	Communication & Documentation:
 Translates complex mathematical logic into plain English for cross-functional team members, advisors, and even end clients.
 Writes crystal-clear internal documentation for each algorithm with derivations, assumptions, and limitations noted.
+	•	One you have you just fix it in the code
+
 
 ⸻
 

@@ -11,7 +11,7 @@ rm -rf node_modules package-lock.json dist
 echo "✅ Removed node_modules, package-lock.json, and dist"
 
 echo "📦 Installing dependencies..."
-npm install
+# npm install
 
 # Ensure we're in the root dir
 cd "$(dirname "$0")"
