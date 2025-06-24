@@ -90,10 +90,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, index) in scenarioResults" :key="index">
+              <tr v-for="(row, index) in filteredResults" :key="index">
                 <td>{{ row.year }}</td>
-                <td>{{ row.primary_age }}</td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single'">{{ row.spouse_age }}</td>
+                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
+                <td v-else></td>
+                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
+                <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
                 <td>${{ parseFloat(row.part_b || 0).toFixed(2) }}</td>
                 <td>${{ parseFloat(row.part_d || 0).toFixed(2) }}</td>
                 <td>${{ parseFloat(row.irmaa_surcharge || 0).toFixed(2) }}</td>
@@ -103,10 +105,10 @@
             <tfoot>
               <tr style="font-weight: bold;">
                 <td colspan="2"><strong>Total</strong></td>
-                <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.part_b || 0), 0).toFixed(2) }}</td>
-                <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.part_d || 0), 0).toFixed(2) }}</td>
-                <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.irmaa_surcharge || 0), 0).toFixed(2) }}</td>
-                <td>${{ scenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2) }}</td>
+                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.part_b || 0), 0).toFixed(2) }}</td>
+                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.part_d || 0), 0).toFixed(2) }}</td>
+                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.irmaa_surcharge || 0), 0).toFixed(2) }}</td>
+                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2) }}</td>
               </tr>
             </tfoot>
           </table>
@@ -149,6 +151,14 @@ export default {
     totalMedicareCost: {
       type: Number,
       required: true
+    },
+    mortalityAge: {
+      type: [Number, String],
+      required: false
+    },
+    spouseMortalityAge: {
+      type: [Number, String],
+      required: false
     }
   },
   data() {
@@ -157,6 +167,21 @@ export default {
         medicare: false
       }
     };
+  },
+  computed: {
+    filteredResults() {
+      const mortalityAge = Number(this.mortalityAge) || 90;
+      const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
+      const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+      const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+      return this.scenarioResults.filter(row => {
+        if (isSingle) {
+          return row.primary_age <= mortalityAge;
+        } else {
+          return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+        }
+      });
+    }
   },
   methods: {
     toggleDropdown(tab) {

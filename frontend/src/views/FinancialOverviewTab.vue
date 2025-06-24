@@ -46,7 +46,7 @@
     <!-- End Card -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-header card-header-content-between">
-        <div v-if="scenarioResults.length" class="table-responsive mt-4">
+        <div v-if="filteredResults.length" class="table-responsive mt-4">
           <table class="table table-hover">
             <thead class="thead-light">
               <tr>
@@ -63,11 +63,11 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in scenarioResults" :key="row.year">
+              <tr v-for="row in filteredResults" :key="row.year">
                 <td>{{ row.year }}</td>
-                <td v-if="row.primary_age <= 90">{{ row.primary_age }}</td>
+                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
                 <td v-else></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= 90">{{ row.spouse_age }}</td>
+                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
                 <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
                 <td>{{ formatCurrency(row.gross_income) }}</td>
                 <td>{{ formatCurrency(row.agi) }}</td>
@@ -102,6 +102,14 @@ export default {
     client: {
       type: Object,
       required: true
+    },
+    mortalityAge: {
+      type: [Number, String],
+      required: false
+    },
+    spouseMortalityAge: {
+      type: [Number, String],
+      required: false
     }
   },
   data() {
@@ -110,6 +118,21 @@ export default {
         financial: false
       }
     };
+  },
+  computed: {
+    filteredResults() {
+      const mortalityAge = Number(this.mortalityAge) || 90;
+      const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
+      const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+      const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+      return this.scenarioResults.filter(row => {
+        if (isSingle) {
+          return row.primary_age <= mortalityAge;
+        } else {
+          return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+        }
+      });
+    }
   },
   methods: {
     toggleDropdown(tab) {
