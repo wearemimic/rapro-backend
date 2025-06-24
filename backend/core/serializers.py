@@ -156,7 +156,12 @@ class ClientEditSerializer(serializers.ModelSerializer):
 class ScenarioSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Scenario
-        fields = ['id', 'name', 'updated_at', 'apply_standard_deduction']
+        fields = [
+            'id', 'name', 'updated_at', 'apply_standard_deduction',
+            'retirement_age', 'medicare_age', 'spouse_retirement_age', 'spouse_medicare_age',
+            'mortality_age', 'spouse_mortality_age', 'retirement_year', 'share_with_client',
+            'part_b_inflation_rate', 'part_d_inflation_rate'
+        ]
 
 class ClientDetailSerializer(serializers.ModelSerializer):
     spouse = SpouseSerializer(read_only=True)

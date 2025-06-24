@@ -129,13 +129,13 @@
           </ul>
           <div class="tab-content mt-4">
             <div v-if="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
-              <FinancialOverviewTab :scenario-results="scenarioResults" :client="client" />
+              <FinancialOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
-              <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" />
+              <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
-              <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" />
+              <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'income'" class="tab-pane active" style="margin-top:50px;">
               <IncomeTab :scenario="scenario" :assetDetails="assetDetails" />
@@ -301,6 +301,7 @@ export default {
         this.scenarios = response.data.scenarios || [];
         const scenarioId = this.$route.params.scenarioid;
         this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
+        console.log('DEBUG: scenario.id:', this.scenario?.id, 'scenario.mortality_age:', this.scenario?.mortality_age, typeof this.scenario?.mortality_age);
         this.selectedScenarioId = this.scenario?.id || null;
         this.initPlugins();
         this.initializeCircles();

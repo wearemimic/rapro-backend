@@ -22,9 +22,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in scenarioResults" :key="row.year">
+            <tr v-for="row in filteredResults" :key="row.year">
               <td>{{ row.year }}</td>
-              <td>{{ row.primary_age }}</td>
+              <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
+              <td v-else></td>
               <td>${{ parseFloat(row.ss_income || 0).toFixed(2) }}</td>
               <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
               <td>${{ parseFloat(row.ssi_taxed || 0).toFixed(2) }}</td>
@@ -55,6 +56,14 @@ export default {
     client: {
       type: Object,
       required: true
+    },
+    mortalityAge: {
+      type: [Number, String],
+      required: false
+    },
+    spouseMortalityAge: {
+      type: [Number, String],
+      required: false
     }
   },
   data() {
@@ -63,6 +72,16 @@ export default {
         socialSecurity: false
       }
     };
+  },
+  computed: {
+    filteredResults() {
+      const mortalityAge = Number(this.mortalityAge) || 90;
+      const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
+      const maxAge = Math.max(mortalityAge, spouseMortalityAge);
+      return this.scenarioResults.filter(row => {
+        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+      });
+    }
   },
   methods: {
     toggleDropdown(tab) {
