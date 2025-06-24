@@ -12,4 +12,6 @@
 
 6. **Standard Deduction Not Applied**: Standard deductions do not appear to be applied in tax calculations, even when the toggle is enabled in the client/scenario setup. 
 
-7. **AGI Too High Without Standard Deduction**: When you select NOT to apply standard deductions for a scenario, the AGI is much higher than expected (possibly due to calculation logic). 
+7. **AGI Too High Without Standard Deduction**: When you select NOT to apply standard deductions for a scenario, the AGI is much higher than expected (possibly due to calculation logic).
+
+8. **Export Button Not Working**: The export button isn't working anywhere in the application. 

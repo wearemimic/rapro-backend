@@ -401,113 +401,204 @@ export default {
               };
             })
           ] : this.activeTab === 'socialSecurity' ? [
-            {
-              type: 'line',
-              label: 'SSI Benefit',
-              data: this.scenarioResults.map(row => parseFloat(row.ss_income || 0)),
-              borderColor: "#377dff",
-              backgroundColor: "rgba(55, 125, 255, 0.1)",
-              borderWidth: 2,
-              tension: 0.3,
-              yAxisID: 'y'
-            },
-            {
-              type: 'line',
-              label: 'Remaining SSI Benefit',
-              data: this.scenarioResults.map(row => {
-                const ssiBenefit = parseFloat(row.ss_income || 0);
-                const medicareExpense = parseFloat(row.total_medicare || 0);
-                const remainingSSI = ssiBenefit - medicareExpense;
-                return remainingSSI;
-              }),
-              borderColor: "#00c9db",
-              backgroundColor: "rgba(0, 201, 219, 0.1)",
-              borderWidth: 2,
-              tension: 0.3,
-              yAxisID: 'y'
-            },
-            {
-              type: 'bar',
-              label: 'Medicare Expense',
-              data: this.scenarioResults.map(row => parseFloat(row.total_medicare || 0)),
-              backgroundColor: "#ffc107",
-              stack: 'Stack 0',
-              yAxisID: 'y'
-            }
+            // Use filtered results for social security overview chart
+            ...(() => {
+              const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+              const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+              const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+              const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+              const filtered = this.scenarioResults.filter(row => {
+                if (isSingle) {
+                  return row.primary_age <= mortalityAge;
+                } else {
+                  return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+                }
+              });
+              return [
+                {
+                  type: 'line',
+                  label: 'SSI Benefit',
+                  data: filtered.map(row => parseFloat(row.ss_income || 0)),
+                  borderColor: "#377dff",
+                  backgroundColor: "rgba(55, 125, 255, 0.1)",
+                  borderWidth: 2,
+                  tension: 0.3,
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'line',
+                  label: 'Remaining SSI Benefit',
+                  data: filtered.map(row => {
+                    const ssiBenefit = parseFloat(row.ss_income || 0);
+                    const medicareExpense = parseFloat(row.total_medicare || 0);
+                    const remainingSSI = ssiBenefit - medicareExpense;
+                    return remainingSSI;
+                  }),
+                  borderColor: "#00c9db",
+                  backgroundColor: "rgba(0, 201, 219, 0.1)",
+                  borderWidth: 2,
+                  tension: 0.3,
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'bar',
+                  label: 'Medicare Expense',
+                  data: filtered.map(row => parseFloat(row.total_medicare || 0)),
+                  backgroundColor: "#ffc107",
+                  stack: 'Stack 0',
+                  yAxisID: 'y'
+                }
+              ];
+            })()
           ] : this.activeTab === 'medicare' ? [
-            {
-              type: 'bar',
-              label: 'Part B',
-              data: this.scenarioResults.map(row => parseFloat(row.part_b || 0)),
-              backgroundColor: '#377dff',
-              stack: 'Stack 0',
-              yAxisID: 'y'
-            },
-            {
-              type: 'bar',
-              label: 'Part D',
-              data: this.scenarioResults.map(row => parseFloat(row.part_d || 0)),
-              backgroundColor: '#00c9db',
-              stack: 'Stack 0',
-              yAxisID: 'y'
-            },
-            {
-              type: 'bar',
-              label: 'IRMAA Surcharge',
-              data: this.scenarioResults.map(row => parseFloat(row.irmaa_surcharge || 0)),
-              backgroundColor: '#ffc107',
-              stack: 'Stack 0',
-              yAxisID: 'y'
-            }
+            // Use filtered results for medicare overview chart
+            ...(() => {
+              const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+              const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+              const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+              const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+              const filtered = this.scenarioResults.filter(row => {
+                if (isSingle) {
+                  return row.primary_age <= mortalityAge;
+                } else {
+                  return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+                }
+              });
+              return [
+                {
+                  type: 'bar',
+                  label: 'Part B',
+                  data: filtered.map(row => parseFloat(row.part_b || 0)),
+                  backgroundColor: '#377dff',
+                  stack: 'Stack 0',
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'bar',
+                  label: 'Part D',
+                  data: filtered.map(row => parseFloat(row.part_d || 0)),
+                  backgroundColor: '#00c9db',
+                  stack: 'Stack 0',
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'bar',
+                  label: 'IRMAA Surcharge',
+                  data: filtered.map(row => parseFloat(row.irmaa_surcharge || 0)),
+                  backgroundColor: '#ffc107',
+                  stack: 'Stack 0',
+                  yAxisID: 'y'
+                }
+              ];
+            })()
           ] : [
-            {
-              type: 'line',
-              label: 'Total Income',
-              data: this.scenarioResults.map(row => parseFloat(row.gross_income)),
-              borderColor: "#377dff",
-              backgroundColor: "rgba(55, 125, 255, 0.1)",
-              borderWidth: 2,
-              tension: 0.3,
-              yAxisID: 'y'
-            },
-            {
-              type: 'line',
-              label: 'Remaining Income',
-              data: this.scenarioResults.map(row => {
-                const gross = parseFloat(row.gross_income);
-                const tax = parseFloat(row.federal_tax);
-                const medicare = parseFloat(row.total_medicare);
-                const remaining = gross - (tax + medicare);
-                return parseFloat(remaining.toFixed(2));
-              }),
-              borderColor: "#00c9db",
-              backgroundColor: "rgba(0, 201, 219, 0.1)",
-              borderWidth: 2,
-              tension: 0.3,
-              yAxisID: 'y'
-            },
-            {
-              type: 'bar',
-              label: 'Federal Tax',
-              data: this.scenarioResults.map(row => parseFloat(row.federal_tax)),
-              backgroundColor: "#ff6b6b",
-              stack: 'Stack 0',
-              yAxisID: 'y'
-            },
-            {
-              type: 'bar',
-              label: 'Total Medicare',
-              data: this.scenarioResults.map(row => parseFloat(row.total_medicare)),
-              backgroundColor: "#ffc107",
-              stack: 'Stack 0',
-              yAxisID: 'y'
-            }
+            // Use filtered results for financial overview chart
+            ...(() => {
+              // Filtering logic matching FinancialOverviewTab.vue
+              const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+              const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+              const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+              const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+              const filtered = this.scenarioResults.filter(row => {
+                if (isSingle) {
+                  return row.primary_age <= mortalityAge;
+                } else {
+                  return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+                }
+              });
+              return [
+                {
+                  type: 'line',
+                  label: 'Total Income',
+                  data: filtered.map(row => parseFloat(row.gross_income)),
+                  borderColor: "#377dff",
+                  backgroundColor: "rgba(55, 125, 255, 0.1)",
+                  borderWidth: 2,
+                  tension: 0.3,
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'line',
+                  label: 'Remaining Income',
+                  data: filtered.map(row => {
+                    const gross = parseFloat(row.gross_income);
+                    const tax = parseFloat(row.federal_tax);
+                    const medicare = parseFloat(row.total_medicare);
+                    const remaining = gross - (tax + medicare);
+                    return parseFloat(remaining.toFixed(2));
+                  }),
+                  borderColor: "#00c9db",
+                  backgroundColor: "rgba(0, 201, 219, 0.1)",
+                  borderWidth: 2,
+                  tension: 0.3,
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'bar',
+                  label: 'Federal Tax',
+                  data: filtered.map(row => parseFloat(row.federal_tax)),
+                  backgroundColor: "#ff6b6b",
+                  stack: 'Stack 0',
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'bar',
+                  label: 'Total Medicare',
+                  data: filtered.map(row => parseFloat(row.total_medicare)),
+                  backgroundColor: "#ffc107",
+                  stack: 'Stack 0',
+                  yAxisID: 'y'
+                }
+              ];
+            })()
           ];
 
           this.chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: this.scenarioResults.map(row => row.year.toString()),
+              labels: this.activeTab === 'socialSecurity'
+                ? (() => {
+                    const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+                    const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+                    const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+                    const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+                    return this.scenarioResults.filter(row => {
+                      if (isSingle) {
+                        return row.primary_age <= mortalityAge;
+                      } else {
+                        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+                      }
+                    }).map(row => row.year.toString());
+                  })()
+                : this.activeTab === 'financial'
+                ? (() => {
+                    const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+                    const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+                    const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+                    const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+                    return this.scenarioResults.filter(row => {
+                      if (isSingle) {
+                        return row.primary_age <= mortalityAge;
+                      } else {
+                        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+                      }
+                    }).map(row => row.year.toString());
+                  })()
+                : this.activeTab === 'medicare'
+                ? (() => {
+                    const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+                    const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+                    const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
+                    const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
+                    return this.scenarioResults.filter(row => {
+                      if (isSingle) {
+                        return row.primary_age <= mortalityAge;
+                      } else {
+                        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
+                      }
+                    }).map(row => row.year.toString());
+                  })()
+                : this.scenarioResults.map(row => row.year.toString()),
               datasets: datasets
             },
             options: {
