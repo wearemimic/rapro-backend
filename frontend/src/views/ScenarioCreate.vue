@@ -703,6 +703,8 @@ async function submitScenario() {
       spouse_retirement_age: scenario.value.spouse_retirement_age,
       spouse_medicare_age: scenario.value.spouse_medicare_age,
       spouse_lifespan: scenario.value.spouse_lifespan,
+      mortality_age: scenario.value.primary_lifespan,
+      spouse_mortality_age: scenario.value.spouse_lifespan,
       income_sources: cleanedIncomeSources,
       model_tax_change: scenario.value.model_tax_change,
       reduction_2030_ss: scenario.value.reduction_2030_ss,
