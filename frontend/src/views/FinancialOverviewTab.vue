@@ -113,6 +113,10 @@ export default {
       type: Array,
       required: true
     },
+    filteredResults: {
+      type: Array,
+      required: true
+    },
     client: {
       type: Object,
       required: true
@@ -132,21 +136,6 @@ export default {
         financial: false
       }
     };
-  },
-  computed: {
-    filteredResults() {
-      const mortalityAge = Number(this.mortalityAge) || 90;
-      const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
-      const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-      const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-      return this.scenarioResults.filter(row => {
-        if (isSingle) {
-          return row.primary_age <= mortalityAge;
-        } else {
-          return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-        }
-      });
-    }
   },
   methods: {
     toggleDropdown(tab) {
