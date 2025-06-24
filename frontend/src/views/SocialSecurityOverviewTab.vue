@@ -15,6 +15,7 @@
             <tr>
               <th>Year</th>
               <th>Primary Age</th>
+              <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
               <th>Social Security Benefit</th>
               <th>Total Medicare</th>
               <th>SSI Taxed</th>
@@ -26,7 +27,18 @@
               <td>{{ row.year }}</td>
               <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
               <td v-else></td>
-              <td>${{ parseFloat(row.ss_income || 0).toFixed(2) }}</td>
+              <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
+              <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
+              <td>
+                <span v-if="client?.tax_status?.toLowerCase() !== 'single'">
+                  ${{ parseFloat(row.ss_income || 0).toFixed(2) }} /
+                  <span v-if="row.ss_income_spouse !== undefined">${{ parseFloat(row.ss_income_spouse || 0).toFixed(2) }}</span>
+                  <span v-else>N/A</span>
+                </span>
+                <span v-else>
+                  ${{ parseFloat(row.ss_income || 0).toFixed(2) }}
+                </span>
+              </td>
               <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
               <td>${{ parseFloat(row.ssi_taxed || 0).toFixed(2) }}</td>
               <td class="bg-success text-white">${{ (parseFloat(row.ss_income || 0) - parseFloat(row.total_medicare || 0)).toFixed(2) }}</td>
