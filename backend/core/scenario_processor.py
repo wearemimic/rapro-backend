@@ -367,31 +367,89 @@ class ScenarioProcessor:
         annual_contribution = 0
         if current_age < start_age:
             annual_contribution = monthly_contribution * 12
+            self._log_debug(f"Year {year} - Current age {current_age} < withdrawal start age {start_age}, applying annual contribution: ${annual_contribution}")
+        else:
+            self._log_debug(f"Year {year} - Current age {current_age} >= withdrawal start age {start_age}, no contributions")
 
-        # Fetch the account balance at the start of the year
-        current_balance = asset.get("current_asset_balance", 0)
-
-        self._log_debug(f"Year {year} - Initial 401k Balance: {current_balance}")
-        self._log_debug(f"Year {year} - Annual Contribution: {annual_contribution}")
-
-        # Calculate the number of years until retirement
-        retirement_age = asset.get("age_to_begin_withdrawal", 65)
-        years_until_retirement = max(0, retirement_age - current_age)
-
-        # Iterate over each year until retirement
-        for _ in range(years_until_retirement):
-            # Apply contributions
-            current_balance += annual_contribution
+        # Get current year and check if this is the first time we're processing this asset
+        current_year = datetime.datetime.now().year
+        
+        # If this is the first time we're processing this asset for this scenario run,
+        # we need to calculate its value for the current processing year
+        if "last_processed_year" not in asset:
+            # Initialize the asset's tracking data
+            asset["initial_asset_balance"] = asset.get("current_asset_balance", 0)
+            asset["last_processed_year"] = current_year - 1  # Start from last year
+            asset["previous_year_balance"] = asset.get("current_asset_balance", 0)
             
-            # Apply growth
-            current_balance *= (1 + rate_of_return)
-
-        # Log the balance after applying contributions and growth over multiple years
-        self._log_debug(f"Year {year} - 401k/IRA Balance after Contributions and Growth over {years_until_retirement} years: {current_balance}")
-
-        # Update the asset balance for the next year
+            # Calculate growth from initial entry year to current processing year
+            years_to_grow = year - current_year
+            
+            self._log_debug(f"Year {year} - First time processing asset. Initial balance: {asset['initial_asset_balance']}")
+            self._log_debug(f"Year {year} - Growing asset from current year {current_year} to processing year {year} ({years_to_grow} years)")
+            
+            # Grow the balance from current year to processing year
+            if years_to_grow > 0:
+                current_balance = asset["previous_year_balance"]
+                for yr in range(years_to_grow):
+                    # Check if we should apply contributions for this year
+                    projection_year = current_year + yr
+                    projection_age = projection_year - birthdate.year
+                    
+                    # Apply contributions only if before withdrawal age
+                    if projection_age < start_age:
+                        current_balance += annual_contribution
+                        self._log_debug(f"Projection Year {projection_year} - Age {projection_age} < {start_age}, added contribution: ${annual_contribution}")
+                    
+                    # Apply growth
+                    current_balance *= (1 + rate_of_return)
+                    
+                asset["previous_year_balance"] = current_balance
+            
+        # If we've already processed this asset but need to update for a new year
+        elif asset["last_processed_year"] < year - 1:
+            # Calculate how many years we need to catch up
+            years_to_catch_up = year - asset["last_processed_year"] - 1
+            current_balance = asset["previous_year_balance"]
+            
+            self._log_debug(f"Year {year} - Catching up asset growth for {years_to_catch_up} years from {asset['last_processed_year']} to {year-1}")
+            
+            # Process each missing year
+            for i in range(years_to_catch_up):
+                catch_up_year = asset["last_processed_year"] + i + 1
+                catch_up_age = catch_up_year - birthdate.year
+                
+                # Apply contributions only if before withdrawal age
+                if catch_up_age < start_age:
+                    current_balance += annual_contribution
+                    self._log_debug(f"Catch-up Year {catch_up_year} - Age {catch_up_age} < {start_age}, added contribution: ${annual_contribution}")
+                
+                # Apply growth
+                current_balance *= (1 + rate_of_return)
+            
+            asset["previous_year_balance"] = current_balance
+        
+        # Now process the current year
+        current_balance = asset["previous_year_balance"]
+        
+        # Apply contributions for current year if in contribution phase (before withdrawal age)
+        if current_age < start_age:
+            current_balance += annual_contribution
+            self._log_debug(f"Year {year} - Added contribution: ${annual_contribution}")
+        
+        # Apply growth for current year
+        current_balance *= (1 + rate_of_return)
+        self._log_debug(f"Year {year} - Applied growth rate: {rate_of_return:.2%}")
+        
+        # Log the final balance for this year
+        self._log_debug(f"Year {year} - Final balance: ${current_balance:,.2f}")
+        
+        # Update tracking information
+        asset["last_processed_year"] = year
         asset["previous_year_balance"] = current_balance
         asset["current_asset_balance"] = current_balance
+        
+        return current_balance
 
     def _calculate_gross_income(self, year: int) -> float:
         self._log_debug(f"Processing gross income for year {year}")
@@ -764,18 +822,50 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
     return taxable_ss
 
 def calculate_asset_value_at_retirement(current_balance, monthly_contribution, annual_growth_rate, years_until_retirement, years_in_retirement):
-    # Convert annual growth rate to monthly
-    monthly_growth_rate = Decimal(annual_growth_rate) / Decimal('12') / Decimal('100')
-
-    # Calculate the number of months until retirement
-    months_until_retirement = years_until_retirement * 12
-
+    """
+    Calculate the future value of an asset both at retirement and at the end of retirement.
+    
+    Parameters:
+    - current_balance: Current value of the asset
+    - monthly_contribution: Monthly contribution to the asset until retirement
+    - annual_growth_rate: Annual rate of return (as a percentage, e.g., 7 for 7%)
+    - years_until_retirement: Number of years until retirement begins
+    - years_in_retirement: Number of years in retirement
+    
+    Returns:
+    - future_value_at_end_of_retirement: The projected value at the end of retirement
+    """
+    # Convert to Decimal for precision
+    current_balance = Decimal(str(current_balance))
+    monthly_contribution = Decimal(str(monthly_contribution))
+    annual_growth_rate = Decimal(str(annual_growth_rate))
+    
+    # Convert annual growth rate to decimal form (e.g., 7% -> 0.07)
+    annual_rate_decimal = annual_growth_rate / Decimal('100')
+    
+    # Calculate the annual compounding factor
+    annual_factor = Decimal('1') + annual_rate_decimal
+    
     # Accumulation phase: calculate future value with contributions
-    future_value_at_retirement = current_balance * (1 + monthly_growth_rate) ** months_until_retirement
-    future_value_at_retirement += monthly_contribution * (((1 + monthly_growth_rate) ** months_until_retirement - 1) / monthly_growth_rate)
-
-    # Decumulation phase: calculate future value without contributions
-    months_in_retirement = years_in_retirement * 12
-    future_value_at_end_of_retirement = future_value_at_retirement * (1 + monthly_growth_rate) ** months_in_retirement
-
+    future_value = current_balance
+    
+    # Process each year until retirement - add contributions during this phase
+    for _ in range(years_until_retirement):
+        # Add annual contributions (12 months)
+        annual_contribution = monthly_contribution * 12
+        future_value += annual_contribution
+        
+        # Apply annual growth
+        future_value *= annual_factor
+    
+    # Store the value at retirement - no more contributions after this point
+    future_value_at_retirement = future_value
+    
+    # Decumulation phase: calculate future value without additional contributions
+    # Just apply growth during retirement years
+    for _ in range(years_in_retirement):
+        future_value *= annual_factor
+    
+    future_value_at_end_of_retirement = future_value
+    
     return future_value_at_end_of_retirement
