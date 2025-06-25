@@ -9,7 +9,17 @@
             <div class="row">
               <div class="col-lg mb-3 mb-lg-0">
                 
-                <h1 class="page-header-title">{{ scenario ? scenario.name : 'Scenario Detail' }}</h1>
+                <h1 class="page-header-title">
+                  {{ scenario ? scenario.name : 'Scenario Detail' }} - 
+                  <span v-if="activeTab === 'overview'">Scenario Overview</span>
+                  <span v-if="activeTab === 'financial'">Financial Overview</span>
+                  <span v-if="activeTab === 'socialSecurity'">Social Security Overview</span>
+                  <span v-if="activeTab === 'medicare'">Medicare Overview</span>
+                  <span v-if="activeTab === 'income'">Income</span>
+                  <span v-if="activeTab === 'rothConversion'">Roth Conversion</span>
+                  <span v-if="activeTab === 'worksheets'">Social Security Worksheets</span>
+                  <span v-if="activeTab === 'nextSteps'">Next Steps</span>
+                </h1>
 
                 <div class="row align-items-center">
                   <div class="col-auto">
@@ -75,69 +85,49 @@
             </a>
           </span>
 
-          <ScenarioMetrics :total-federal-taxes="totalFederalTaxes" :total-medicare-costs="totalMedicareCosts" :total-irmaa-surcharge="totalIrmaaSurcharge" :total-medicare-cost="totalMedicareCost" />
-
-          <ul class="nav nav-tabs page-header-tabs" id="projectsTab" role="tablist">
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'financial' }"
-                href="#"
-                @click.prevent="activeTab = 'financial'; $nextTick(() => initializeChartJS())"
-              >Financial Overview</a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'socialSecurity' }"
-                href="#"
-                @click.prevent="activeTab = 'socialSecurity'"
-              >Social Security Overview</a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'medicare' }"
-                href="#"
-                @click.prevent="activeTab = 'medicare'"
-              >Medicare Overview</a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'income' }"
-                href="#"
-                @click.prevent="activeTab = 'income'"
-              >Income</a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'rothConversion' }"
-                href="#"
-                @click.prevent="activeTab = 'rothConversion'"
-              >Roth Conversion</a>
-            </li>
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                :class="{ active: activeTab === 'worksheets' }"
-                href="#"
-                @click.prevent="activeTab = 'worksheets'"
-              >Social Security Worksheets</a>
-            </li>
-            <li class="nav-item d-flex align-items-center" style="margin-left: 0.5rem;">
-              <button
-                type="button"
-                class="btn btn-primary d-flex align-items-center justify-content-center"
-                :class="{ active: activeTab === 'nextSteps' }"
-                @click="activeTab = 'nextSteps'"
-                style="height: 40px; padding: 0 24px; font-size: 1rem; border-radius: 0.375rem;"
-              >Next Steps</button>
-            </li>
-          </ul>
+          <!-- Removed ScenarioMetrics from main layout - moved to overview tab -->
+          <!-- Removed tab navigation - functionality moved to sidebar -->
           <div class="tab-content mt-4">
-            <div v-if="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
+            <div v-show="activeTab === 'overview'" class="tab-pane active" style="margin-top:50px;">
+              <div class="row">
+                <div class="col-lg-12 mb-3 mb-lg-5">
+                  <div class="card h-100">
+                                      <div class="card-header">
+                    <h4 class="card-header-title">Overview Summary</h4>
+                  </div>
+                  <div class="card-body">
+                    <!-- Metrics Cards -->
+                    <ScenarioMetrics :total-federal-taxes="totalFederalTaxes" :total-medicare-costs="totalMedicareCosts" :total-irmaa-surcharge="totalIrmaaSurcharge" :total-medicare-cost="totalMedicareCost" />
+                    
+                    <div class="row mt-4">
+                      <div class="col-sm-6 mb-4">
+                        <h5>Client Information</h5>
+                        <p><strong>Name:</strong> {{ formatClientName(client) }}</p>
+                        <p><strong>Tax Status:</strong> {{ client?.tax_status || 'Not specified' }}</p>
+                        <p><strong>Current Age:</strong> {{ client?.age || 'Not specified' }}</p>
+                        <p v-if="client?.tax_status?.toLowerCase() !== 'single'"><strong>Spouse Age:</strong> {{ client?.spouse_age || 'Not specified' }}</p>
+                      </div>
+                      <div class="col-sm-6 mb-4">
+                        <h5>Scenario Details</h5>
+                        <p><strong>Name:</strong> {{ scenario?.name || 'Not specified' }}</p>
+                        <p><strong>Retirement Year:</strong> {{ scenario?.retirement_year || 'Not specified' }}</p>
+                        <p><strong>Mortality Age:</strong> {{ scenario?.mortality_age || 'Not specified' }}</p>
+                        <p v-if="client?.tax_status?.toLowerCase() !== 'single'"><strong>Spouse Mortality Age:</strong> {{ scenario?.spouse_mortality_age || 'Not specified' }}</p>
+                      </div>
+                    </div>
+                      <div class="row mt-3">
+                        <div class="col-12">
+                          <div class="alert alert-soft-primary">
+                            <p class="mb-0">Use the sidebar navigation under "Current Client" to explore detailed views of this scenario.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-show="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
               <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
@@ -274,7 +264,7 @@ export default {
       selectedScenarioId: null,
       client: null,
       scenarioResults: [],
-      activeTab: 'financial',
+      activeTab: this.$route.query.tab || 'overview', // Use route query param or default to overview
       partBInflationRate: 7.42,
       partDInflationRate: 6.73,
       breakevenChartInstance: null,
@@ -305,8 +295,10 @@ export default {
     };
   },
   mounted() {
-    // Ensure activeTab is set to 'financial' on mount
-    this.activeTab = 'financial';
+    // Check if we should set a specific tab from route query params
+    if (this.$route.query.tab) {
+      this.activeTab = this.$route.query.tab;
+    }
     // Fetch the client and scenarios, select scenario by id
     const clientId = this.$route.params.id;
     axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers })
@@ -317,6 +309,13 @@ export default {
         this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
         console.log('DEBUG: scenario.id:', this.scenario?.id, 'scenario.mortality_age:', this.scenario?.mortality_age, typeof this.scenario?.mortality_age);
         this.selectedScenarioId = this.scenario?.id || null;
+        
+        // Set client and scenario IDs in local storage for sidebar access
+        if (this.scenario?.id && clientId) {
+          localStorage.setItem('currentClientId', clientId);
+          localStorage.setItem('currentScenarioId', this.scenario.id);
+        }
+        
         this.initPlugins();
         this.initializeCircles();
         this.fetchScenarioData();
@@ -970,7 +969,7 @@ export default {
     },
     activeTab(newVal) {
       console.log('Active tab changed to:', newVal);
-      if (['socialSecurity', 'medicare', 'worksheets'].includes(newVal)) {
+      if (['socialSecurity', 'medicare', 'worksheets', 'financial'].includes(newVal)) {
         console.log('🔍 Debug - scenarioResults:', this.scenarioResults);
         if (this.scenarioResults.length) {
           console.log('🔍 Debug - First row year:', this.scenarioResults[0].year);
@@ -980,6 +979,15 @@ export default {
           this.fetchScenarioData();
         }
       }
+    },
+    // Watch for route query parameter changes
+    '$route.query.tab': {
+      handler(newTab) {
+        if (newTab) {
+          this.activeTab = newTab;
+        }
+      },
+      immediate: true
     },
     '$route.params.scenarioid': {
       immediate: true,
