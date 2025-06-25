@@ -128,11 +128,18 @@ def profile_view(request):
         serializer = UserSerializer(user)
         return Response(serializer.data)
     elif request.method == 'PUT':
-        serializer = UserSerializer(user, data=request.data, partial=True)
+        # Handle empty string for website_url to prevent validation errors
+        data = request.data.copy()
+        if 'website_url' in data and data['website_url'] == '':
+            data['website_url'] = None
+            
+        serializer = UserSerializer(user, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # Return detailed error messages
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
