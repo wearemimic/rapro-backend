@@ -5,7 +5,7 @@ import axios from 'axios';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: null,
+    user: JSON.parse(localStorage.getItem('user')) || null,
     token: localStorage.getItem('token') || null,
     loading: false,
     error: null,
@@ -96,7 +96,33 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    
+    setUser(user) {
+      this.user = user;
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('user');
+      }
+    },
+
+    async fetchProfile() {
+      if (!this.token) return;
+      try {
+        console.log('Fetching profile with token:', this.token);
+        const response = await axios.get('http://localhost:8000/api/profile/', {
+          headers: { Authorization: `Bearer ${this.token}` }
+        });
+        console.log('Profile response:', response.data);
+        if (response.data && response.data.logo) {
+          console.log('Logo from backend:', response.data.logo);
+        }
+        this.setUser(response.data);
+        console.log('User after update:', this.user);
+        console.log('LocalStorage after update:', JSON.parse(localStorage.getItem('user')));
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+      }
+    },
 
     logout() {
       this.token = null;

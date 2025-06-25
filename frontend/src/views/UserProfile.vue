@@ -132,13 +132,12 @@
                     <small class="text-muted">Enter a hex color code (e.g., #123456)</small>
                   </div>
                   <div class="col-sm-6 mb-4">
-                    <label for="logo" class="form-label">Logo</label>
-                    <div v-if="form.logo" class="mb-2">
-                      <img :src="form.logo" alt="Company Logo" style="max-width: 150px; max-height: 80px;" />
-                    </div>
-                    <div class="alert alert-info">
-                      Logo upload is not available in this version. Please contact support to update your logo.
-                    </div>
+                    <label for="logo" class="form-label">Company Logo</label>
+                    <ImageDropzone 
+                      v-model:value="logoFile" 
+                      :existingImageUrl="form.logo"
+                      @fileChanged="onLogoFileChanged"
+                    />
                   </div>
                 </div>
                 <div class="mt-3">
@@ -163,11 +162,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useToast } from 'vue-toastification'
+import ImageDropzone from '../components/ImageDropzone.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const toast = useToast()
+const authStore = useAuthStore()
 
 // State variables
 const form = ref({
@@ -189,6 +191,7 @@ const form = ref({
   logo: ''
 })
 
+const logoFile = ref(null)
 const loading = ref(true)
 const saving = ref(false)
 const successMessage = ref('')
@@ -198,14 +201,58 @@ const errorMessage = ref('')
 const apiBaseUrl = 'http://localhost:8000/api'
 
 // Helper to get token
-const getAuthHeaders = () => {
+const getAuthHeaders = (isMultipart = false) => {
   const token = localStorage.getItem('token')
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+  const headers = {
+    Authorization: `Bearer ${token}`
+  }
+  
+  if (isMultipart) {
+    // Don't set Content-Type for multipart/form-data as it will be set automatically with boundary
+    return { headers }
+  }
+  
+  headers['Content-Type'] = 'application/json'
+  return { headers }
+}
+
+// Handle logo file change from the dropzone component
+const onLogoFileChanged = async (file) => {
+  logoFile.value = file
+  if (file === null) {
+    await deleteLogo();
   }
 }
+
+const deleteLogo = async () => {
+  saving.value = true;
+  errorMessage.value = '';
+  try {
+    const formData = new FormData();
+    // Set logo to empty to trigger removal in backend
+    formData.append('logo', '');
+    const response = await axios.put(
+      `${apiBaseUrl}/profile/`,
+      formData,
+      getAuthHeaders(true)
+    );
+    // Update form with response data
+    Object.keys(form.value).forEach(key => {
+      if (response.data[key] !== undefined) {
+        form.value[key] = response.data[key];
+      }
+    });
+    logoFile.value = null;
+    successMessage.value = 'Logo deleted successfully!';
+    toast.success('Logo deleted successfully!');
+    await authStore.fetchProfile();
+  } catch (error) {
+    errorMessage.value = 'Failed to delete logo.';
+    toast.error('Failed to delete logo.');
+  } finally {
+    saving.value = false;
+  }
+};
 
 // Fetch user profile data
 const fetchUserProfile = async () => {
@@ -245,17 +292,44 @@ const updateProfile = async () => {
   }
   
   try {
-    const response = await axios.put(`${apiBaseUrl}/profile/`, form.value, getAuthHeaders())
+    // Use FormData for file uploads
+    const formData = new FormData()
     
-    // Update form with the response data in case the server modified anything
+    // Add all form fields to FormData
+    Object.keys(form.value).forEach(key => {
+      // Skip logo since we'll handle it separately
+      if (key !== 'logo') {
+        formData.append(key, form.value[key] || '')
+      }
+    })
+    
+    // Add logo file if a new one was selected
+    if (logoFile.value) {
+      formData.append('logo', logoFile.value)
+    }
+    
+    // Send multipart/form-data request
+    const response = await axios.put(
+      `${apiBaseUrl}/profile/`, 
+      formData, 
+      getAuthHeaders(true)
+    )
+    
+    // Update form with the response data
     Object.keys(form.value).forEach(key => {
       if (response.data[key] !== undefined) {
         form.value[key] = response.data[key]
       }
     })
     
+    // Clear the selected file since it's now uploaded
+    logoFile.value = null
+    
     successMessage.value = 'Profile updated successfully!'
     toast.success('Profile updated successfully')
+
+    // Refresh the user profile in the store so the header updates
+    await authStore.fetchProfile()
   } catch (error) {
     console.error('Error updating profile:', error)
     if (error.response?.data) {

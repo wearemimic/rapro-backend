@@ -6,6 +6,7 @@ from .views import ScenarioCreateView, create_scenario, run_scenario_calculation
 from . import views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .webhooks import stripe_webhook
+from django.http import HttpResponse
 
 
 urlpatterns = [

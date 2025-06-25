@@ -128,13 +128,22 @@ def profile_view(request):
         serializer = UserSerializer(user)
         return Response(serializer.data)
     elif request.method == 'PUT':
-        # Handle empty string for website_url to prevent validation errors
+        # Handle file uploads
         data = request.data.copy()
+        
+        # Handle empty string for website_url to prevent validation errors
         if 'website_url' in data and data['website_url'] == '':
             data['website_url'] = None
-            
+        
+        # Create a serializer with the data and possible file
         serializer = UserSerializer(user, data=data, partial=True)
         if serializer.is_valid():
+            # Handle logo file upload separately if present
+            if 'logo' in request.FILES:
+                user.logo = request.FILES['logo']
+                user.save(update_fields=['logo'])
+            
+            # Save the rest of the data
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         
