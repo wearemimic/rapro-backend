@@ -106,9 +106,10 @@
 
                 <div class="flex-grow-1 ms-3">
                   <h4 class="mb-1">IRMAA Status</h4>
-                  <!-- Orange Rectangle -->
-                  <div style="width: 90%; height: 30px; background-color: orange;"></div>
-                  <!-- End Orange Rectangle -->
+                  <!-- Dynamic Rectangle -->
+                  <div :style="{width: '90%', height: '30px', backgroundColor: irmaaColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'}">
+                  </div>
+                  <!-- End Dynamic Rectangle -->
                 </div>
               </div>
               <!-- End Media -->
@@ -134,6 +135,32 @@ export default {
     totalMedicareCosts: {
       type: Number,
       required: true
+    },
+    totalIrmaaSurcharge: {
+      type: Number,
+      required: true
+    },
+    totalMedicareCost: {
+      type: Number,
+      required: true
+    }
+  },
+  computed: {
+    irmaaPercentage() {
+      if (!this.totalMedicareCost) return 0;
+      return Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
+    },
+    irmaaColor() {
+      const pct = this.irmaaPercentage;
+      if (pct > 50) {
+        return '#ff0000'; // Red
+      } else if (pct > 25) {
+        return '#ffa500'; // Orange
+      } else if (pct > 15) {
+        return '#ffff00'; // Yellow
+      } else {
+        return '#00ff00'; // Green
+      }
     }
   },
   methods: {

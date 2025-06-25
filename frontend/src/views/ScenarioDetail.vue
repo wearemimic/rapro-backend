@@ -75,7 +75,7 @@
             </a>
           </span>
 
-          <ScenarioMetrics :total-federal-taxes="totalFederalTaxes" :total-medicare-costs="totalMedicareCosts" />
+          <ScenarioMetrics :total-federal-taxes="totalFederalTaxes" :total-medicare-costs="totalMedicareCosts" :total-irmaa-surcharge="totalIrmaaSurcharge" :total-medicare-cost="totalMedicareCost" />
 
           <ul class="nav nav-tabs page-header-tabs" id="projectsTab" role="tablist">
             <li class="nav-item">
