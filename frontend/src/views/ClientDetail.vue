@@ -29,19 +29,90 @@
                         <div v-html="client.notes"></div>
                     </div>
                 </div>
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">CRM Integration</h5>
-                        <p><i class="bi bi-check-circle text-success"></i> Connected to Wealthbox</p>
-                        <!-- or -->
-                        <p><i class="bi bi-x-circle text-muted"></i> Client not in CRM</p>
-                    </div>
-                </div>
+               
                 
 
                 <div class="mb-3">
                 <router-link :to="`/clients/${client.id}/edit`" class="btn btn-secondary">Edit</router-link>
                 <button @click="deleteClient" class="btn btn-danger" style="margin-left:10px;margin-right:10px;">Delete</button>
+                </div>
+
+                <!-- Real Estate Card -->
+                <div class="card mb-4">
+                  <div class="card-body">
+                    <h5 class="card-title">Real Estate</h5>
+                    <div v-if="realEstateList.length === 0" class="mb-2">
+                      <p>Add Real Estate</p>
+                    </div>
+                    <div v-else>
+                      <div v-for="(estate, idx) in realEstateList" :key="estate.id" class="mb-3 p-2 border rounded">
+                        <div class="d-flex align-items-center">
+                          <img v-if="estate.image_url || estate.image" :src="estate.image_url || estate.image" alt="Home" style="width:80px;height:80px;object-fit:cover;margin-right:15px;cursor:pointer;" @click="openImageModal(estate.image_url || estate.image)"/>
+                          <div>
+                            <div><strong>Address:</strong> {{ estate.address }}, {{ estate.city }}, {{ estate.state }} {{ estate.zip }}</div>
+                            <div><strong>Value:</strong> ${{ estate.value }}</div>
+                          </div>
+                          <button class="btn btn-sm btn-primary ms-3" @click="editRealEstate(estate, idx)">Edit</button>
+                          <button class="btn btn-sm btn-danger ms-2" @click="deleteRealEstate(estate, idx)">Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                    <button class="btn btn-primary mt-2" @click="showRealEstateModal = true">Add</button>
+                  </div>
+                </div>
+
+                <!-- Real Estate Modal -->
+                <div v-if="showRealEstateModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.5);">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Add Real Estate</h5>
+                        <button type="button" class="btn-close" @click="closeRealEstateModal"></button>
+                      </div>
+                      <div class="modal-body">
+                        <form @submit.prevent="addRealEstate">
+                          <div class="mb-3">
+                            <label for="addressInput" class="form-label">Street Address</label>
+                            <input v-model="realEstateAddress" type="text" class="form-control" id="addressInput" required />
+                          </div>
+                          <div class="mb-3">
+                            <label for="cityInput" class="form-label">City</label>
+                            <input v-model="realEstateCity" type="text" class="form-control" id="cityInput" required />
+                          </div>
+                          <div class="mb-3">
+                            <label for="stateInput" class="form-label">State</label>
+                            <input v-model="realEstateState" type="text" class="form-control" id="stateInput" required />
+                          </div>
+                          <div class="mb-3">
+                            <label for="zipInput" class="form-label">Zip Code</label>
+                            <input v-model="realEstateZip" type="text" class="form-control" id="zipInput" required />
+                          </div>
+                          <div class="mb-3">
+                            <label for="valueInput" class="form-label">Estimated Value</label>
+                            <input v-model="realEstateValue" type="number" class="form-control" id="valueInput" required min="0" />
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @click="closeRealEstateModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">{{ editingRealEstateId !== null ? 'Save' : 'Add' }}</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Image Modal for Large View -->
+                <div v-if="showImageModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.7);">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content" style="background:transparent; border:none; box-shadow:none;">
+                      <div class="modal-body text-center p-0">
+                        <img :src="selectedImage" alt="Large Home" style="max-width:90vw; max-height:80vh; border-radius:8px;" />
+                      </div>
+                      <div class="modal-footer justify-content-center" style="background:transparent; border:none;">
+                        <button type="button" class="btn btn-light" @click="closeImageModal">Close</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
             </div>
             <div v-else class="text-center mt-5">
@@ -116,6 +187,18 @@ export default {
   data() {
     return {
       client: null,
+      // Real estate state
+      realEstateList: [],
+      showRealEstateModal: false,
+      realEstateAddress: '',
+      realEstateCity: '',
+      realEstateState: '',
+      realEstateZip: '',
+      realEstateValue: '',
+      showImageModal: false,
+      selectedImage: '',
+      editingRealEstateIdx: null,
+      editingRealEstateId: null,
     };
   },
   async created() {
@@ -125,6 +208,9 @@ export default {
       const id = this.$route.params.id;
       const response = await axios.get(`http://localhost:8000/api/clients/${id}/`, { headers });
       this.client = response.data;
+      // Fetch real estate list for this client
+      const realEstateRes = await axios.get(`http://localhost:8000/api/clients/${id}/realestate/`, { headers });
+      this.realEstateList = realEstateRes.data;
     } catch (error) {
       console.error('Error loading client:', error);
       this.$router.push('/clients');
@@ -163,7 +249,94 @@ export default {
         } catch (error) {
             console.error('Failed to archive client:', error.response?.data || error.message);
         }
-    }
+    },
+    closeRealEstateModal() {
+      this.showRealEstateModal = false;
+      this.realEstateAddress = '';
+      this.realEstateCity = '';
+      this.realEstateState = '';
+      this.realEstateZip = '';
+      this.realEstateValue = '';
+      this.editingRealEstateIdx = null;
+      this.editingRealEstateId = null;
+    },
+    editRealEstate(estate, idx) {
+      this.realEstateAddress = estate.address;
+      this.realEstateCity = estate.city;
+      this.realEstateState = estate.state;
+      this.realEstateZip = estate.zip;
+      this.realEstateValue = estate.value;
+      this.editingRealEstateIdx = idx;
+      this.editingRealEstateId = estate.id;
+      this.showRealEstateModal = true;
+    },
+    async addRealEstate() {
+      const address = this.realEstateAddress;
+      const city = this.realEstateCity;
+      const state = this.realEstateState;
+      const zip = this.realEstateZip;
+      const value = this.realEstateValue;
+      // Insert your Google Street View API key below
+      const GOOGLE_API_KEY = 'AIzaSyCsvoEjQW68CWwwMlCcbUfZIHTSPKW54Bc';
+      // Generate Street View image URL
+      const fullAddress = `${address}, ${city}, ${state} ${zip}`;
+      const image = `https://maps.googleapis.com/maps/api/streetview?size=400x400&location=${encodeURIComponent(fullAddress)}&key=${GOOGLE_API_KEY}`;
+      if (this.editingRealEstateId !== null) {
+        // Edit mode: update backend and local list
+        try {
+          const token = localStorage.getItem('token');
+          const headers = { Authorization: `Bearer ${token}` };
+          const payload = { address, city, state, zip, value: value.toString(), image_url: image };
+          // Defensive: remove client field if present
+          if ('client' in payload) delete payload.client;
+          const res = await axios.put(`http://localhost:8000/api/realestate/${this.editingRealEstateId}/`, payload, { headers });
+          this.$set(this.realEstateList, this.editingRealEstateIdx, res.data);
+        } catch (err) {
+          console.error('Failed to update real estate:', err.response?.data || err.message, err.response);
+        }
+      } else {
+        // Add mode: save to backend
+        try {
+          const token = localStorage.getItem('token');
+          const headers = { Authorization: `Bearer ${token}` };
+          const clientId = this.client.id;
+          const payload = { address, city, state, zip, value: value.toString(), image_url: image };
+          // Defensive: remove client field if present
+          if ('client' in payload) delete payload.client;
+          const res = await axios.post(`http://localhost:8000/api/clients/${clientId}/realestate/`, payload, { headers });
+          this.realEstateList.push(res.data);
+        } catch (err) {
+          console.error('Failed to save real estate:', err.response?.data || err.message, err.response);
+        }
+      }
+      this.showRealEstateModal = false;
+      this.realEstateAddress = '';
+      this.realEstateCity = '';
+      this.realEstateState = '';
+      this.realEstateZip = '';
+      this.realEstateValue = '';
+      this.editingRealEstateIdx = null;
+      this.editingRealEstateId = null;
+    },
+    openImageModal(imageUrl) {
+      this.selectedImage = imageUrl;
+      this.showImageModal = true;
+    },
+    closeImageModal() {
+      this.showImageModal = false;
+      this.selectedImage = '';
+    },
+    async deleteRealEstate(estate, idx) {
+      if (!confirm('Are you sure you want to delete this real estate entry?')) return;
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        await axios.delete(`http://localhost:8000/api/realestate/${estate.id}/`, { headers });
+        this.realEstateList.splice(idx, 1);
+      } catch (err) {
+        console.error('Failed to delete real estate:', err.response?.data || err.message);
+      }
+    },
   }
 };
 </script>
