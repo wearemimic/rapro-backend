@@ -81,33 +81,78 @@
                   <a class="nav-link" href="/integrations/crm">CRM</a>
                 </div>
               </div>
+              
+              <!-- Placeholder when not in client context -->
+              <div class="nav-item" v-if="!isClientRoute">
+                <a class="nav-link" href="/clients">
+                  <i class="bi-person-plus nav-icon"></i>
+                  <span class="nav-link-title">Select a Client</span>
+                </a>
+              </div>
               <!-- End Collapse -->
 
               <!-- Collapse -->
-              <div class="nav-item">
-                <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuCurrentClient" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuCurrentClient" aria-expanded="false" aria-controls="navbarVerticalMenuCurrentClient">
-                  <i class="bi-plug nav-icon"></i>
+              <!-- Client navigation section - only shown when in client context -->
+              <div class="nav-item" v-if="isClientRoute">
+                <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuCurrentClient" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuCurrentClient" aria-expanded="true" aria-controls="navbarVerticalMenuCurrentClient">
+                  <i class="bi-person nav-icon"></i>
                   <span class="nav-link-title">Current Client</span>
+                  <span class="badge bg-primary rounded-pill ms-1">Active</span>
                 </a>
 
-                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">Financial Overview</a>
-                </div>
-                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">Social Security Overview</a>
-                </div>
-                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">Medicare Overview</a>
-                </div>
-                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">Income Overview</a>
-                </div>
-                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">Roth Conversion</a>
-                </div>
-                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">Social Security Tools</a>
-                </div>
+                                  <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" :class="{ show: isClientRoute }" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                    <router-link class="nav-link" :to="{ name: 'ClientDetail', params: { id: currentClientId }}">
+                      <i class="bi-person-badge nav-icon me-2"></i>Client Detail
+                    </router-link>
+                    
+                    <!-- For each scenario, create a collapsible section -->
+                    <div v-for="scenario in clientScenarios" :key="scenario.id" class="nav-item">
+                                          <!-- Non-clickable scenario name header -->
+                    <a class="nav-link nav-link-title ps-3 dropdown-toggle" :href="'#scenario-' + scenario.id" role="button" 
+                      data-bs-toggle="collapse" :data-bs-target="'#scenario-' + scenario.id" 
+                      :aria-expanded="isCurrentScenario(scenario.id)" :aria-controls="'scenario-' + scenario.id">
+                      <i class="bi-file-earmark nav-icon me-2"></i>
+                      <strong>{{ scenario.name }}</strong>
+                      <span v-if="isCurrentScenario(scenario.id)" class="badge bg-info rounded-pill ms-1">Current</span>
+                    </a>
+                    
+                    <!-- Collapsible content for each scenario - only expanded for current scenario -->
+                    <div :id="'scenario-' + scenario.id" class="nav-collapse collapse" :class="{ show: isCurrentScenario(scenario.id) }">
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'overview' }}">
+                          <i class="bi-file-earmark-text nav-icon me-2"></i>Scenario Overview
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'financial' }}">
+                          Financial Overview
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'socialSecurity' }}">
+                          Social Security Overview
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'medicare' }}">
+                          Medicare Overview
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'income' }}">
+                          Income
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'rothConversion' }}">
+                          Roth Conversion
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'worksheets' }}">
+                          Social Security Worksheets
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'nextSteps' }}">
+                          Next Steps
+                        </router-link>
+                                            </div>
+                    </div>
+                  </div>
               </div>
               <!-- End Collapse -->
             </div>
@@ -127,7 +172,154 @@
 
 <script>
 export default {
-  name: 'Sidebar'
+  name: 'Sidebar',
+  data() {
+    return {
+      currentClientId: null,
+      currentScenarioId: null,
+      clientScenarios: [],
+      isClientRoute: false
+    };
+  },
+  created() {
+    // Check the initial route
+    this.checkIfClientRoute(this.$route);
+    
+    // Listen for route changes to update state
+    this.$router.beforeEach((to, from, next) => {
+      // Check if this is a client-related route
+      this.checkIfClientRoute(to);
+      
+      // If we have client and scenario IDs in the route
+      if (to.params.id && to.params.scenarioid) {
+        this.currentClientId = to.params.id;
+        this.currentScenarioId = to.params.scenarioid;
+        
+        // Store current values in localStorage for persistence
+        localStorage.setItem('currentClientId', this.currentClientId);
+        localStorage.setItem('currentScenarioId', this.currentScenarioId);
+        
+        // Fetch scenarios for this client
+        this.fetchClientScenarios();
+      }
+      next();
+    });
+    
+    // Initialize client info from route or localStorage
+    if (this.$route.params.id) {
+      this.currentClientId = this.$route.params.id;
+      
+      if (this.$route.params.scenarioid) {
+        this.currentScenarioId = this.$route.params.scenarioid;
+      }
+      
+      // Fetch client scenarios
+      this.fetchClientScenarios();
+    } 
+    // Try from localStorage if not in route
+    else if (!this.isClientRoute) {
+      const storedClientId = localStorage.getItem('currentClientId');
+      const storedScenarioId = localStorage.getItem('currentScenarioId');
+      
+      // Only use stored values if we're not on a client page
+      // This prevents showing the client nav on non-client pages
+      if (storedClientId && !this.isClientRoute) {
+        this.currentClientId = storedClientId;
+        this.currentScenarioId = storedScenarioId;
+        this.fetchClientScenarios();
+      }
+    }
+  },
+  
+  methods: {
+    // Check if a scenario is the currently selected one
+    isCurrentScenario(scenarioId) {
+      // First check if we have a current scenario ID and we're viewing a scenario
+      if (!this.currentScenarioId || !this.$route.params.scenarioid) {
+        return false;
+      }
+      
+      // Compare as integers to ensure accurate comparison
+      return parseInt(scenarioId) === parseInt(this.currentScenarioId);
+    },
+    
+    // Check if current route is client-related
+    checkIfClientRoute(route) {
+      // Reset client status if it's a different client
+      if (route.params && route.params.id && this.currentClientId && route.params.id !== this.currentClientId) {
+        console.log('Different client detected, resetting state');
+        this.currentScenarioId = null;
+      }
+      
+      // Consider these routes as client context routes
+      const clientRoutes = ['ClientDetail', 'ScenarioDetail'];
+      
+      // Check if route name matches client routes
+      if (route.name && clientRoutes.includes(route.name)) {
+        this.isClientRoute = true;
+        
+        // If we're on a client detail page but not scenario, reset scenario context
+        if (route.name === 'ClientDetail' && !route.params.scenarioid) {
+          this.currentScenarioId = null;
+        }
+        
+        return;
+      }
+      
+      // Also check if the path includes client or scenario identifiers
+      if (route.params && (route.params.id || route.params.clientId)) {
+        this.isClientRoute = true;
+        
+        // No scenario context if we're just on a client page
+        if (!route.params.scenarioid) {
+          this.currentScenarioId = null;
+        }
+        
+        return;
+      }
+      
+      // Also check path structure
+      const path = route.path || '';
+      if (path.includes('/clients/') && path.split('/').length > 3) {
+        this.isClientRoute = true;
+        
+        // Reset scenario context if not in URL
+        if (!path.includes('/scenario/')) {
+          this.currentScenarioId = null;
+        }
+        
+        return;
+      }
+      
+      // Not a client route
+      this.isClientRoute = false;
+      
+      // When leaving client routes, reset scenario context
+      this.currentScenarioId = null;
+    },
+    
+    fetchClientScenarios() {
+      if (!this.currentClientId) return;
+      
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // Fetch client data which includes scenarios
+      fetch(`http://localhost:8000/api/clients/${this.currentClientId}/`, { headers })
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.scenarios) {
+            this.clientScenarios = data.scenarios;
+            console.log('Loaded scenarios for client:', this.clientScenarios);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading client scenarios:', error);
+        });
+    }
+  }
 };
 </script>
 
