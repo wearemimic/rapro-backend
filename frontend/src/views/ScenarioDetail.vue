@@ -126,6 +126,15 @@
                 @click.prevent="activeTab = 'worksheets'"
               >Social Security Worksheets</a>
             </li>
+            <li class="nav-item d-flex align-items-center" style="margin-left: 0.5rem;">
+              <button
+                type="button"
+                class="btn btn-primary d-flex align-items-center justify-content-center"
+                :class="{ active: activeTab === 'nextSteps' }"
+                @click="activeTab = 'nextSteps'"
+                style="height: 40px; padding: 0 24px; font-size: 1rem; border-radius: 0.375rem;"
+              >Next Steps</button>
+            </li>
           </ul>
           <div class="tab-content mt-4">
             <div v-if="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
@@ -145,6 +154,9 @@
             </div>
             <div v-show="activeTab === 'worksheets'" class="tab-pane active" style="margin-top:50px;">
               <WorksheetsTab :scenarioResults="scenarioResults" :client="client" :benefitByAge="benefitByAge" :socialSecurityCola="socialSecurityCola" :medicareCosts="scenarioResults" />
+            </div>
+            <div v-show="activeTab === 'nextSteps'" class="tab-pane active" style="margin-top:50px;">
+              <NextStepsTab />
             </div>
           </div>
         </div>
@@ -223,6 +235,7 @@ import IncomeTab from './IncomeTab.vue';
 import RothConversionTab from './RothConversionTab.vue';
 import WorksheetsTab from './WorksheetsTab.vue';
 import ScenarioMetrics from './ScenarioMetrics.vue';
+import NextStepsTab from './NextStepsTab.vue';
 
 Chart.register(
   LineController,
@@ -251,7 +264,8 @@ export default {
     IncomeTab,
     RothConversionTab,
     WorksheetsTab,
-    ScenarioMetrics
+    ScenarioMetrics,
+    NextStepsTab
   },
   data() {
     return {

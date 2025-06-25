@@ -1,5 +1,5 @@
 <template>
-  <aside id="sidebar" class="sidebar" style="width:200px;">
+  <aside id="sidebar" class="sidebar" style="width:250px;">
     <div class="navbar-vertical-container">
       <div class="navbar-vertical-footer-offset">
         <!-- Logo -->
@@ -79,6 +79,34 @@
 
                 <div id="navbarVerticalMenuIntegrationsMenu" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
                   <a class="nav-link" href="/integrations/crm">CRM</a>
+                </div>
+              </div>
+              <!-- End Collapse -->
+
+              <!-- Collapse -->
+              <div class="nav-item">
+                <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuCurrentClient" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuCurrentClient" aria-expanded="false" aria-controls="navbarVerticalMenuCurrentClient">
+                  <i class="bi-plug nav-icon"></i>
+                  <span class="nav-link-title">Current Client</span>
+                </a>
+
+                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">Financial Overview</a>
+                </div>
+                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">Social Security Overview</a>
+                </div>
+                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">Medicare Overview</a>
+                </div>
+                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">Income Overview</a>
+                </div>
+                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">Roth Conversion</a>
+                </div>
+                <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/integrations/crm">Social Security Tools</a>
                 </div>
               </div>
               <!-- End Collapse -->

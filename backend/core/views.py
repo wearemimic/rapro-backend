@@ -13,9 +13,9 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Scenario, Client
+from .models import Scenario, Client, RealEstate
 from rest_framework.exceptions import PermissionDenied
-from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer
+from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer, RealEstateSerializer
 from .serializers import ScenarioCreateSerializer
 from .scenario_processor import ScenarioProcessor
 from django.http import HttpResponse, JsonResponse
@@ -490,4 +490,25 @@ def complete_registration(request):
             'status': 'error',
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Real Estate API Views
+class ListCreateRealEstateView(generics.ListCreateAPIView):
+    serializer_class = RealEstateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_queryset(self):
+        client_id = self.kwargs['client_id']
+        return RealEstate.objects.filter(client_id=client_id)
+
+    def perform_create(self, serializer):
+        client_id = self.kwargs['client_id']
+        client = get_object_or_404(Client, id=client_id, advisor=self.request.user)
+        serializer.save(client=client)
+
+class RealEstateDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = RealEstate.objects.all()
+    serializer_class = RealEstateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 

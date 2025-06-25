@@ -2,7 +2,7 @@ from .models import IncomeSource
 # core/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import CustomUser, Client, Scenario, Spouse
+from .models import CustomUser, Client, Scenario, Spouse, RealEstate
 import logging
 from django.contrib.auth import get_user_model
 
@@ -236,3 +236,18 @@ class AdvisorRegistrationSerializer(serializers.ModelSerializer):
         )
         # Store licenses in a custom field or separate model if needed
         return user
+
+class RealEstateSerializer(serializers.ModelSerializer):
+    def to_internal_value(self, data):
+        logger = logging.getLogger(__name__)
+        logger.warning(f"RealEstateSerializer input data: {data}")
+        data = data.copy()
+        data.pop('client', None)
+        return super().to_internal_value(data)
+
+    class Meta:
+        model = RealEstate
+        fields = [
+            'id', 'client', 'address', 'city', 'state', 'zip', 'value', 'image_url', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'client', 'created_at', 'updated_at']
