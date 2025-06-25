@@ -127,9 +127,17 @@
                 </div>
                 <div class="row">
                   <div class="col-sm-6 mb-4">
-                    <label for="primaryColor" class="form-label">Primary Color</label>
-                    <input type="text" id="primaryColor" class="form-control" v-model="form.primary_color" placeholder="#123456">
-                    <small class="text-muted">Enter a hex color code (e.g., #123456)</small>
+                    <label for="primaryColor" class="form-label">Header Color</label>
+                    <div class="input-group">
+                      <input type="color" id="primaryColorPicker" class="form-control form-control-color" 
+                             v-model="form.primary_color" title="Choose header color">
+                      <input type="text" id="primaryColor" class="form-control" v-model="form.primary_color" 
+                             placeholder="#123456" style="flex: 1;">
+                      <span class="input-group-text" style="width: 40px; background-color: white;">
+                        <div :style="{ backgroundColor: form.primary_color || '#377dff', width: '20px', height: '20px', borderRadius: '3px' }"></div>
+                      </span>
+                    </div>
+                    <small class="text-muted">Choose a color for the header background</small>
                   </div>
                   <div class="col-sm-6 mb-4">
                     <label for="logo" class="form-label">Company Logo</label>

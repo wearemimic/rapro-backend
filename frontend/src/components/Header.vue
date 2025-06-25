@@ -1,5 +1,5 @@
 <template>
-  <header id="header" class="navbar navbar-expand-lg navbar-fixed navbar-height navbar-container navbar-bordered" style="background-color:#377dff;">
+  <header id="header" class="navbar navbar-expand-lg navbar-fixed navbar-height navbar-container navbar-bordered" :style="{ backgroundColor: headerColor }">
     <div class="navbar-nav-wrap">
       <!-- Logo -->
       <a class="navbar-brand" href="#">
@@ -116,6 +116,14 @@ watch(
   }
 );
 
+// Watch for changes to the primary color
+watch(
+  () => authStore.user && authStore.user.primary_color,
+  (newVal) => {
+    console.log('Header color changed:', newVal);
+  }
+);
+
 function onLogoError(event) {
   // fallback to default logo if image fails to load
   if (event && event.target) {
@@ -165,6 +173,12 @@ onMounted(() => {
   console.log('localStorage user:', JSON.parse(localStorage.getItem('user')));
   
   authStore.fetchProfile();
+});
+
+// Add this computed property after other computed properties
+const headerColor = computed(() => {
+  const user = authStore.user;
+  return user && user.primary_color ? user.primary_color : '#377dff';
 });
 </script>
 <style scoped>
