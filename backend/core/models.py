@@ -4,6 +4,9 @@ from django.db import models
 from django.contrib.auth.base_user import BaseUserManager
 from django.conf import settings
 from django.utils import timezone
+import uuid
+from django.core.validators import MinValueValidator
+from django.urls import reverse
 
 
 
@@ -203,3 +206,36 @@ class RealEstate(models.Model):
 
     def __str__(self):
         return f"{self.address}, {self.city}, {self.state} {self.zip} for {self.client}"
+
+def template_directory_path(instance, filename):
+    # File will be uploaded to MEDIA_ROOT/templates/client_<id>/<uuid>_<filename>
+    return f'templates/client_{instance.client.id}/{uuid.uuid4()}_{filename}'
+
+def slide_thumbnail_path(instance, filename):
+    # File will be uploaded to MEDIA_ROOT/templates/client_<id>/template_<id>/slides/<uuid>_<filename>
+    return f'templates/client_{instance.template.client.id}/template_{instance.template.id}/slides/{uuid.uuid4()}_{filename}'
+
+class ReportTemplate(models.Model):
+    """Model for storing PowerPoint report templates"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='report_templates')
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to=template_directory_path)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.client.full_name}"
+
+class TemplateSlide(models.Model):
+    """Model for storing individual slides from a PowerPoint template"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template = models.ForeignKey(ReportTemplate, on_delete=models.CASCADE, related_name='slides')
+    thumbnail = models.ImageField(upload_to=slide_thumbnail_path)
+    order = models.PositiveIntegerField()
+    
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Slide {self.order} - {self.template.name}"

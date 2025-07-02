@@ -2,9 +2,10 @@ from .models import IncomeSource
 # core/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import CustomUser, Client, Scenario, Spouse, RealEstate
+from .models import CustomUser, Client, Scenario, Spouse, RealEstate, ReportTemplate, TemplateSlide
 import logging
 from django.contrib.auth import get_user_model
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -251,3 +252,43 @@ class RealEstateSerializer(serializers.ModelSerializer):
             'id', 'client', 'address', 'city', 'state', 'zip', 'value', 'image_url', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'client', 'created_at', 'updated_at']
+
+class TemplateSlideSerializer(serializers.ModelSerializer):
+    thumbnail_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TemplateSlide
+        fields = ['id', 'order', 'thumbnail_url']
+    
+    def get_thumbnail_url(self, obj):
+        request = self.context.get('request')
+        if obj.thumbnail and hasattr(obj.thumbnail, 'url'):
+            if request:
+                return request.build_absolute_uri(obj.thumbnail.url)
+            return obj.thumbnail.url
+        return None
+
+class ReportTemplateSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    slides_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ReportTemplate
+        fields = ['id', 'name', 'file_url', 'created_at', 'updated_at', 'slides_count']
+    
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and hasattr(obj.file, 'url'):
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+    
+    def get_slides_count(self, obj):
+        return obj.slides.count()
+
+class ReportTemplateDetailSerializer(ReportTemplateSerializer):
+    slides = TemplateSlideSerializer(many=True, read_only=True)
+    
+    class Meta(ReportTemplateSerializer.Meta):
+        fields = ReportTemplateSerializer.Meta.fields + ['slides']

@@ -1,7 +1,11 @@
 import requests
+import os
+import sys
+import tempfile
+import shutil
 from django.contrib.auth import authenticate
 from rest_framework import status, generics, permissions
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes, action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,17 +17,31 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Scenario, Client, RealEstate
+from .models import Scenario, Client, RealEstate, ReportTemplate, TemplateSlide
 from rest_framework.exceptions import PermissionDenied
 from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer, RealEstateSerializer
 from .serializers import ScenarioCreateSerializer
+from .serializers import ReportTemplateSerializer, ReportTemplateDetailSerializer, TemplateSlideSerializer
 from .scenario_processor import ScenarioProcessor
 from django.http import HttpResponse, JsonResponse
 import logging
 from .serializers import AdvisorRegistrationSerializer
 import stripe
 from django.conf import settings
+from rest_framework import viewsets
+import json
+from PIL import Image, ImageDraw
+from io import BytesIO
+import uuid
+from .pptx_utils import create_enhanced_thumbnails
+from pptx_to_png import convert_pptx_to_png
 
+# Add the python-pptx library for handling PowerPoint files
+try:
+    from pptx import Presentation
+except ImportError:
+    # We'll handle this in the view with a proper error response
+    pass
 
 User = get_user_model()
 
@@ -511,4 +529,409 @@ class RealEstateDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RealEstateSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+
+class ReportTemplateViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+    
+    def list(self, request, client_pk=None):
+        """List all templates for a specific client"""
+        client = get_object_or_404(Client, pk=client_pk, advisor=request.user)
+        templates = ReportTemplate.objects.filter(client=client)
+        serializer = ReportTemplateSerializer(templates, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    def create(self, request, client_pk=None):
+        """Upload a new PowerPoint template and process its slides"""
+        try:
+            # Check if python-pptx is installed
+            from pptx import Presentation
+        except ImportError:
+            return Response(
+                {"error": "The python-pptx library is not installed on the server."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        client = get_object_or_404(Client, pk=client_pk, advisor=request.user)
+        
+        # Validate request data
+        if 'name' not in request.data:
+            return Response({"error": "Template name is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if 'file' not in request.FILES:
+            return Response({"error": "PowerPoint file is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        pptx_file = request.FILES['file']
+        
+        # Check file extension
+        if not pptx_file.name.endswith('.pptx'):
+            return Response(
+                {"error": "Only PowerPoint files (.pptx) are supported"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create the template record
+        template = ReportTemplate.objects.create(
+            client=client,
+            name=request.data['name'],
+            file=pptx_file
+        )
+        
+        # Process the PowerPoint file to extract slide thumbnails
+        try:
+            self._process_slides(template, pptx_file)
+        except Exception as e:
+            # If slide processing fails, delete the template and return error
+            template.delete()
+            return Response(
+                {"error": f"Failed to process PowerPoint file: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        serializer = ReportTemplateSerializer(template, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def retrieve(self, request, pk=None):
+        """Get details of a specific template including all slides"""
+        template = get_object_or_404(ReportTemplate, pk=pk)
+        
+        # Check if the user has access to this template
+        if template.client.advisor != request.user:
+            return Response(
+                {"error": "You don't have permission to access this template"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = ReportTemplateDetailSerializer(template, context={'request': request})
+        return Response(serializer.data)
+    
+    def destroy(self, request, pk=None):
+        """Delete a template and all its slides"""
+        template = get_object_or_404(ReportTemplate, pk=pk)
+        
+        # Check if the user has access to this template
+        if template.client.advisor != request.user:
+            return Response(
+                {"error": "You don't have permission to delete this template"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        template.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=True, methods=['get'])
+    def slides(self, request, pk=None):
+        """Get all slides for a specific template"""
+        template = get_object_or_404(ReportTemplate, pk=pk)
+        
+        # Check if the user has access to this template
+        if template.client.advisor != request.user:
+            return Response(
+                {"error": "You don't have permission to access this template"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        slides = template.slides.all().order_by('order')
+        serializer = TemplateSlideSerializer(slides, many=True, context={'request': request})
+        
+        return Response({"slides": serializer.data})
+    
+    @action(detail=True, methods=['post'])
+    def update_slides(self, request, pk=None):
+        """Update slide order and remove slides"""
+        template = get_object_or_404(ReportTemplate, pk=pk)
+        
+        # Check if the user has access to this template
+        if template.client.advisor != request.user:
+            return Response(
+                {"error": "You don't have permission to modify this template"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if 'slides' not in request.data:
+            return Response(
+                {"error": "Slides data is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get all current slides
+        current_slides = {str(slide.id): slide for slide in template.slides.all()}
+        
+        # Process the update
+        for idx, slide_data in enumerate(request.data['slides']):
+            slide_id = slide_data.get('id')
+            
+            if not slide_id or slide_id not in current_slides:
+                continue
+                
+            # Update the order
+            slide = current_slides[slide_id]
+            slide.order = idx
+            slide.save()
+            
+            # Remove from the current_slides dict to track which ones to delete
+            current_slides.pop(slide_id)
+        
+        # Delete any slides not included in the request
+        for slide in current_slides.values():
+            slide.delete()
+        
+        # Return the updated slides
+        slides = template.slides.all().order_by('order')
+        serializer = TemplateSlideSerializer(slides, many=True, context={'request': request})
+        
+        return Response({"slides": serializer.data})
+    
+    def _process_slides(self, template, pptx_file):
+        """Process a PowerPoint file and extract slide thumbnails"""
+        try:
+            # Create a temporary file to save the uploaded file
+            with tempfile.NamedTemporaryFile(suffix='.pptx', delete=False) as temp_file:
+                for chunk in pptx_file.chunks():
+                    temp_file.write(chunk)
+                temp_file_path = temp_file.name
+            
+            # Create output directory for thumbnails
+            thumbnails_dir = os.path.join(settings.MEDIA_ROOT, 'thumbnails')
+            os.makedirs(thumbnails_dir, exist_ok=True)
+            
+            # Initialize png_paths to empty list
+            png_paths = []
+            
+            try:
+                # Convert PowerPoint to PNG using our new converter
+                png_paths = convert_pptx_to_png(temp_file_path, thumbnails_dir, dpi=300)
+                
+                # Save each thumbnail as a slide
+                for i, png_path in enumerate(png_paths):
+                    # Open the PNG file
+                    with open(png_path, 'rb') as f:
+                        image_data = f.read()
+                    
+                    # Create the slide record
+                    slide_filename = f"slide_{i+1}.png"
+                    template_slide = TemplateSlide(
+                        template=template,
+                        order=i
+                    )
+                    template_slide.thumbnail.save(slide_filename, BytesIO(image_data), save=True)
+            finally:
+                # Clean up temporary files
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
+                
+                for png_path in png_paths:
+                    try:
+                        os.unlink(png_path)
+                    except:
+                        pass
+        
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error processing PowerPoint file: {str(e)}")
+            raise e
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def client_report_templates(request, client_id):
+    """
+    GET: List all report templates for a client
+    POST: Create a new report template for a client
+    """
+    client = get_object_or_404(Client, pk=client_id, advisor=request.user)
+    
+    if request.method == 'GET':
+        templates = ReportTemplate.objects.filter(client=client)
+        serializer = ReportTemplateSerializer(templates, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        try:
+            # Check if python-pptx is installed
+            from pptx import Presentation
+        except ImportError:
+            return Response(
+                {"error": "The python-pptx library is not installed on the server."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        # Validate request data
+        if 'name' not in request.data:
+            return Response({"error": "Template name is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if 'file' not in request.FILES:
+            return Response({"error": "PowerPoint file is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        pptx_file = request.FILES['file']
+        
+        # Check file extension
+        if not pptx_file.name.endswith('.pptx'):
+            return Response(
+                {"error": "Only PowerPoint files (.pptx) are supported"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create the template record
+        template = ReportTemplate.objects.create(
+            client=client,
+            name=request.data['name'],
+            file=pptx_file
+        )
+        
+        # Process the PowerPoint file to extract slide thumbnails
+        try:
+            process_pptx_slides(template, pptx_file)
+        except Exception as e:
+            # If slide processing fails, delete the template and return error
+            template.delete()
+            return Response(
+                {"error": f"Failed to process PowerPoint file: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        serializer = ReportTemplateSerializer(template, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+def process_pptx_slides(template, pptx_file):
+    """Process a PowerPoint file and extract slide thumbnails"""
+    try:
+        # Create a temporary file to save the uploaded file
+        with tempfile.NamedTemporaryFile(suffix='.pptx', delete=False) as temp_file:
+            for chunk in pptx_file.chunks():
+                temp_file.write(chunk)
+            temp_file_path = temp_file.name
+        
+        # Create output directory for thumbnails
+        thumbnails_dir = os.path.join(settings.MEDIA_ROOT, 'thumbnails')
+        os.makedirs(thumbnails_dir, exist_ok=True)
+        
+        # Initialize png_paths to empty list
+        png_paths = []
+        
+        try:
+            # Convert PowerPoint to PNG using our new converter
+            png_paths = convert_pptx_to_png(temp_file_path, thumbnails_dir, dpi=300)
+            
+            # Save each thumbnail as a slide
+            for i, png_path in enumerate(png_paths):
+                # Open the PNG file
+                with open(png_path, 'rb') as f:
+                    image_data = f.read()
+                
+                # Create the slide record
+                slide_filename = f"slide_{i+1}.png"
+                template_slide = TemplateSlide(
+                    template=template,
+                    order=i
+                )
+                template_slide.thumbnail.save(slide_filename, BytesIO(image_data), save=True)
+        finally:
+            # Clean up temporary files
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
+            
+            for png_path in png_paths:
+                try:
+                    os.unlink(png_path)
+                except:
+                    pass
+    
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error processing PowerPoint file: {str(e)}")
+        raise e
+
+@api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def report_template_detail(request, template_id):
+    """
+    GET: Retrieve details of a specific template
+    DELETE: Delete a template
+    """
+    template = get_object_or_404(ReportTemplate, pk=template_id)
+    
+    # Check if the user has access to this template
+    if template.client.advisor != request.user:
+        return Response(
+            {"error": "You don't have permission to access this template"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if request.method == 'GET':
+        serializer = ReportTemplateDetailSerializer(template, context={'request': request})
+        return Response(serializer.data)
+    
+    elif request.method == 'DELETE':
+        template.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def template_slides(request, template_id):
+    """Get all slides for a specific template"""
+    template = get_object_or_404(ReportTemplate, pk=template_id)
+    
+    # Check if the user has access to this template
+    if template.client.advisor != request.user:
+        return Response(
+            {"error": "You don't have permission to access this template"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    slides = template.slides.all().order_by('order')
+    serializer = TemplateSlideSerializer(slides, many=True, context={'request': request})
+    
+    return Response({"slides": serializer.data})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_template_slides(request, template_id):
+    """Update slide order and remove slides"""
+    template = get_object_or_404(ReportTemplate, pk=template_id)
+    
+    # Check if the user has access to this template
+    if template.client.advisor != request.user:
+        return Response(
+            {"error": "You don't have permission to modify this template"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if 'slides' not in request.data:
+        return Response(
+            {"error": "Slides data is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Get all current slides
+    current_slides = {str(slide.id): slide for slide in template.slides.all()}
+    
+    # Process the update
+    for idx, slide_data in enumerate(request.data['slides']):
+        slide_id = slide_data.get('id')
+        
+        if not slide_id or slide_id not in current_slides:
+            continue
+            
+        # Update the order
+        slide = current_slides[slide_id]
+        slide.order = idx
+        slide.save()
+        
+        # Remove from the current_slides dict to track which ones to delete
+        current_slides.pop(slide_id)
+    
+    # Delete any slides not included in the request
+    for slide in current_slides.values():
+        slide.delete()
+    
+    # Return the updated slides
+    slides = template.slides.all().order_by('order')
+    serializer = TemplateSlideSerializer(slides, many=True, context={'request': request})
+    
+    return Response({"slides": serializer.data})
 

@@ -11,3 +11,5 @@ pytest
 pytest-django
 requests>=2.32.3
 stripe
+python-pptx
+pdf2image

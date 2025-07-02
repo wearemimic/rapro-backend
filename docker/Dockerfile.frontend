@@ -9,6 +9,8 @@ COPY frontend/package*.json ./
 
 # Reinstall everything fresh
 RUN npm install
+# Install sortablejs package
+RUN npm install --save sortablejs
 
 COPY frontend/ .
 
