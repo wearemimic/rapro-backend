@@ -5,6 +5,8 @@
         <div class="card mb-3 mb-lg-5">
           <div class="card-body">
             <h5 class="mb-4">Social Security Breakeven</h5>
+            <P>This information looks at the Social Security Net Benefit at different ages.  The breakeven age is the age at 
+              which the Social Security Net Benefit cumulative amount is equal at all ages.</P>
             <div style="height: 300px">
               <Graph 
                 :data="breakevenChartData" 
@@ -50,6 +52,9 @@
         <div class="card mb-3 mb-lg-5">
           <div class="card-body">
             <h5 class="mb-4">Medicare-Adjusted Social Security Breakeven</h5>
+            <p>This infomration looks at the Social Security Net Benefit at different ages, adjusted for Medicare costs. 
+              The breakeven age is the age at 
+              which the Social Security Net Benefit cumulative amount is equal at all ages.</p>
             <div style="height: 300px">
               <Graph 
                 :data="medicareAdjustedBreakevenChartData" 
