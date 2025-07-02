@@ -15,3 +15,5 @@
 7. **AGI Too High Without Standard Deduction**: When you select NOT to apply standard deductions for a scenario, the AGI is much higher than expected (possibly due to calculation logic).
 
 8. **Export Button Not Working**: The export button isn't working anywhere in the application. 
+
+9. **Profile Links in Subdirectories**: When navigating to subdirectories (e.g., within client/scenario pages), the profile links in the top right corner of the application do not work correctly.

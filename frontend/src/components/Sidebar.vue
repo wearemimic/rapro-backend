@@ -1,5 +1,5 @@
 <template>
-  <aside id="sidebar" class="sidebar" style="width:250px;">
+  <aside id="sidebar" class="sidebar" style="width:270px;">
     <div class="navbar-vertical-container">
       <div class="navbar-vertical-footer-offset">
         <!-- Logo -->
@@ -120,7 +120,7 @@
                     <div :id="'scenario-' + scenario.id" class="nav-collapse collapse" :class="{ show: isCurrentScenario(scenario.id) }">
                         <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'overview' }}">
-                          <i class="bi-file-earmark-text nav-icon me-2"></i>Scenario Overview
+                          Scenario Overview
                         </router-link>
                         <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'financial' }}">
