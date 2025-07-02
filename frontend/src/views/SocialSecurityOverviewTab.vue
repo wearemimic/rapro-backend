@@ -1,12 +1,29 @@
 <template>
   <div>
-    <!-- Card for Graph -->
-    <div class="card mb-3 mb-lg-5">
-      <div class="card-body">
-        <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
+    <!-- Row for Graph and Insights -->
+    <div class="row mb-3 mb-lg-5">
+      <!-- Graph Card (2/3 width) -->
+      <div class="col-lg-8">
+        <div class="card h-100">
+          <div class="card-body">
+            <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
+          </div>
+        </div>
+      </div>
+      <!-- Insights Card (1/3 width) -->
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h5 class="card-title">Insights</h5>
+            <div>
+              <!-- Placeholder for insights content -->
+              <p>Add insights here...</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    <!-- End Card for Graph -->
+    <!-- End Row for Graph and Insights -->
     <!-- Card for Table -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
