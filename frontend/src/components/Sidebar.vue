@@ -82,16 +82,6 @@
                 </div>
               </div>
               
-              <!-- Placeholder when not in client context -->
-              <div class="nav-item" v-if="!isClientRoute">
-                <a class="nav-link" href="/clients">
-                  <i class="bi-person-plus nav-icon"></i>
-                  <span class="nav-link-title">Select a Client</span>
-                </a>
-              </div>
-              <!-- End Collapse -->
-
-              <!-- Collapse -->
               <!-- Client navigation section - only shown when in client context -->
               <div class="nav-item" v-if="isClientRoute">
                 <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuCurrentClient" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuCurrentClient" aria-expanded="true" aria-controls="navbarVerticalMenuCurrentClient">
@@ -111,8 +101,8 @@
                     <a class="nav-link nav-link-title ps-3 dropdown-toggle" :href="'#scenario-' + scenario.id" role="button" 
                       data-bs-toggle="collapse" :data-bs-target="'#scenario-' + scenario.id" 
                       :aria-expanded="isCurrentScenario(scenario.id)" :aria-controls="'scenario-' + scenario.id">
-                      <i class="bi-file-earmark nav-icon me-2"></i>
-                      <strong>{{ scenario.name }}</strong>
+                      <i class="bi-graph-up nav-icon me-2"></i>
+                      <strong>{{ scenario.name.length > 12 ? scenario.name.slice(0, 12) + '' : scenario.name }}</strong>
                       <span v-if="isCurrentScenario(scenario.id)" class="badge bg-info rounded-pill ms-1">Current</span>
                     </a>
                     
