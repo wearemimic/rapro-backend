@@ -89,7 +89,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'login': '5/min',  # specific to login
-        'user': '15/min',      # authenticated users: 10 requests per minute
+        'user': '100/min',      # authenticated users: 10 requests per minute
         'anon': '5/min',       # anonymous users: 5 requests per minute
     }
 }

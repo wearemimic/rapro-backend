@@ -20,6 +20,10 @@ export default {
     height: {
       type: Number,
       default: 200
+    },
+    type: {
+      type: String,
+      default: 'line'
     }
   },
   data() {
@@ -32,6 +36,12 @@ export default {
   },
   watch: {
     data: {
+      handler() {
+        this.renderChart();
+      },
+      deep: true
+    },
+    options: {
       handler() {
         this.renderChart();
       },
@@ -54,8 +64,31 @@ export default {
         maintainAspectRatio: false,
         ...this.options
       };
+      
+      // Determine chart type based on data structure
+      let chartType = this.type || 'line';
+      
+      // If data has multiple datasets with single values per dataset, it's likely a bar chart
+      if (this.data.datasets.length > 1 && 
+          this.data.datasets[0].data && 
+          this.data.datasets[0].data.length > 1 && 
+          this.options && 
+          this.options.indexAxis) {
+        chartType = 'bar';
+      }
+      
+      // Register custom plugins if they exist
+      if (options.plugins && options.plugins.totalColumnHighlight) {
+        Chart.register({
+          id: 'totalColumnHighlight',
+          beforeDraw: options.plugins.totalColumnHighlight.beforeDraw
+        });
+        // Remove from options to avoid duplicate registration
+        delete options.plugins.totalColumnHighlight;
+      }
+      
       this.chartInstance = new Chart(this.$refs.canvas, {
-        type: 'line',
+        type: chartType,
         data: this.data,
         options
       });

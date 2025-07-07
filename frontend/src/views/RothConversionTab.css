@@ -69,4 +69,9 @@ datalist option::before {
 .card-header,
 .card-header h5 {
   color: #fff !important;
+}
+
+/* Custom styles for expense summary chart */
+.expense-summary-legend {
+  margin-top: 15px;
 } 
