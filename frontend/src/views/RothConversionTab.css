@@ -64,4 +64,9 @@ datalist option::before {
   width: 2px;
   height: 10px;
   background: #ddd; /* Match the slider line color */
+}
+
+.card-header,
+.card-header h5 {
+  color: #fff !important;
 } 

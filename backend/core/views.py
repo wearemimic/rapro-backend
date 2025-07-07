@@ -35,6 +35,7 @@ from io import BytesIO
 import uuid
 from .pptx_utils import create_enhanced_thumbnails
 from pptx_to_png import convert_pptx_to_png
+from decimal import Decimal, InvalidOperation
 
 # Add the python-pptx library for handling PowerPoint files
 try:
@@ -297,90 +298,157 @@ def get_scenario_assets(request, scenario_id):
         return Response({'error': 'Scenario not found.'}, status=404)
 
 class RothOptimizeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    
     def post(self, request):
-        scenario = request.data.get('scenario')
-        client = request.data.get('client')
-        spouse = request.data.get('spouse')
-        assets = request.data.get('assets')
-        optimizer_params = request.data.get('optimizer_params')
-        mode = optimizer_params.get('mode', 'auto')  # default to auto if not specified
-
-        if not scenario or not client or assets is None or not optimizer_params:
-            return Response({'error': 'Missing required fields.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if mode == 'manual':
-            # Manual mode: straight calculation
-            years_to_convert = int(optimizer_params.get('years_to_convert', 1))
-            start_year = int(optimizer_params.get('conversion_start_year', scenario.get('current_year', 2025)))
+        try:
+            scenario = request.data.get('scenario')
+            client = request.data.get('client')
+            spouse = request.data.get('spouse')
+            assets = request.data.get('assets')
+            optimizer_params = request.data.get('optimizer_params')
             
-            # Sum max_to_convert for selected assets
-            total_to_convert = sum(
-                float(asset.get('max_to_convert', 0))
-                for asset in assets
-                if asset.get('max_to_convert')
-            )
+            print("Received data:")
+            print(f"Scenario: {scenario}")
+            print(f"Client: {client}")
+            print(f"Spouse: {spouse}")
+            print(f"Assets count: {len(assets) if assets else 0}")
+            print(f"Optimizer params: {optimizer_params}")
             
-            # Calculate annual conversion amount
-            annual_conversion = total_to_convert / years_to_convert if years_to_convert > 0 else total_to_convert
+            if not optimizer_params:
+                print("ERROR: Missing optimizer_params")
+                return Response({'error': 'Missing optimizer_params'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            mode = optimizer_params.get('mode', 'auto')  # default to auto if not specified
 
-            # Prepare the scenario with conversion parameters
-            scenario_manual = {
-                **scenario,
-                'roth_conversion_start_year': start_year,
-                'roth_conversion_duration': years_to_convert,
-                'roth_conversion_annual_amount': annual_conversion
-            }
+            if not scenario or not client or assets is None or not optimizer_params:
+                missing = []
+                if not scenario: missing.append('scenario')
+                if not client: missing.append('client')
+                if assets is None: missing.append('assets')
+                if not optimizer_params: missing.append('optimizer_params')
+                error_msg = f"Missing required fields: {', '.join(missing)}"
+                print(f"ERROR: {error_msg}")
+                return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Create ScenarioProcessor instance with debug enabled
-            processor = ScenarioProcessor.from_dicts(
-                scenario=scenario_manual,
-                client=client,
-                spouse=spouse,
-                assets=assets,
-                debug=True  # Enable debug logging
-            )
-
-            # Calculate year by year results
-            year_by_year = processor.calculate()
-
-            # Filter results to only include years from the start year
-            year_by_year = [row for row in year_by_year if row.get('year', 0) >= start_year]
-
-            # Extract metrics for the conversion period
-            metrics = RothConversionOptimizer._extract_metrics(self=None, results=year_by_year)
-
-            # Log the conversion schedule
-            print(f"Manual Roth Conversion Schedule:")
-            print(f"Start Year: {start_year}")
-            print(f"Duration: {years_to_convert} years")
-            print(f"Total to Convert: ${total_to_convert:,.2f}")
-            print(f"Annual Amount: ${annual_conversion:,.2f}")
-
-            return Response({
-                "optimal_schedule": {
-                    "start_year": start_year,
-                    "duration": years_to_convert,
-                    "annual_amount": annual_conversion,
-                    "total_amount": total_to_convert,
-                    "score_breakdown": metrics
-                },
-                "baseline": {},
-                "comparison": {},
-                "year_by_year": year_by_year
-            }, status=status.HTTP_200_OK)
-        else:
-            # Auto mode: run optimizer as before
-            optimizer = RothConversionOptimizer(scenario, client, spouse, assets, optimizer_params)
-            result = optimizer.run()
-            # Filter results to only years >= roth_conversion_start_year if set
-            filter_year = optimizer_params.get('conversion_start_year') or scenario.get('roth_conversion_start_year')
-            if filter_year and result.get('year_by_year'):
+            if mode == 'manual':
+                # Manual mode: straight calculation
                 try:
-                    filter_year = int(filter_year)
-                    result['year_by_year'] = [row for row in result['year_by_year'] if row.get('year', 0) >= filter_year]
-                except Exception:
-                    pass
-            return Response(result, status=status.HTTP_200_OK)
+                    years_to_convert = int(optimizer_params.get('years_to_convert', 1))
+                    start_year = int(optimizer_params.get('conversion_start_year', scenario.get('current_year', 2025)))
+                    
+                    # Sum max_to_convert for selected assets
+                    total_to_convert = Decimal('0')
+                    for asset in assets:
+                        if asset.get('max_to_convert'):
+                            try:
+                                max_to_convert = Decimal(str(asset.get('max_to_convert', '0')))
+                                total_to_convert += max_to_convert
+                            except (ValueError, TypeError, InvalidOperation):
+                                print(f"Warning: Invalid max_to_convert value: {asset.get('max_to_convert')}")
+                    
+                    # Calculate annual conversion amount
+                    annual_conversion = Decimal('0')
+                    if years_to_convert > 0:
+                        annual_conversion = total_to_convert / Decimal(str(years_to_convert))
+
+                    # Prepare the scenario with conversion parameters
+                    scenario_manual = {
+                        **scenario,
+                        'roth_conversion_start_year': start_year,
+                        'roth_conversion_duration': years_to_convert,
+                        'roth_conversion_annual_amount': annual_conversion
+                    }
+                    
+                    # Ensure required fields are present
+                    if 'part_b_inflation_rate' not in scenario_manual:
+                        scenario_manual['part_b_inflation_rate'] = 3.0
+                    if 'part_d_inflation_rate' not in scenario_manual:
+                        scenario_manual['part_d_inflation_rate'] = 3.0
+                    if 'retirement_age' not in scenario_manual:
+                        scenario_manual['retirement_age'] = 65
+                    if 'mortality_age' not in scenario_manual:
+                        scenario_manual['mortality_age'] = 90
+
+                    # Create ScenarioProcessor instance with debug enabled
+                    try:
+                        processor = ScenarioProcessor.from_dicts(
+                            scenario=scenario_manual,
+                            client=client,
+                            spouse=spouse,
+                            assets=assets,
+                            debug=True  # Enable debug logging
+                        )
+                    except Exception as e:
+                        print(f"ERROR creating ScenarioProcessor: {e}")
+                        return Response({'error': f'Error initializing scenario processor: {str(e)}'}, 
+                                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                    # Calculate year by year results
+                    try:
+                        year_by_year = processor.calculate()
+                    except Exception as e:
+                        print(f"ERROR calculating scenario: {e}")
+                        return Response({'error': f'Error calculating scenario: {str(e)}'}, 
+                                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                    # Filter results to only include years from the start year
+                    year_by_year = [row for row in year_by_year if row.get('year', 0) >= start_year]
+
+                    # Extract metrics for the conversion period
+                    try:
+                        metrics = RothConversionOptimizer._extract_metrics(self=None, results=year_by_year)
+                    except Exception as e:
+                        print(f"ERROR extracting metrics: {e}")
+                        metrics = {
+                            'lifetime_tax': 0,
+                            'lifetime_medicare': 0,
+                            'total_irmaa': 0,
+                            'final_roth': 0,
+                            'cumulative_net_income': 0,
+                            'income_stability': 0
+                        }
+
+                    # Log the conversion schedule
+                    print(f"Manual Roth Conversion Schedule:")
+                    print(f"Start Year: {start_year}")
+                    print(f"Duration: {years_to_convert} years")
+                    print(f"Total to Convert: ${total_to_convert:,.2f}")
+                    print(f"Annual Amount: ${annual_conversion:,.2f}")
+
+                    return Response({
+                        "optimal_schedule": {
+                            "start_year": start_year,
+                            "duration": years_to_convert,
+                            "annual_amount": annual_conversion,
+                            "total_amount": total_to_convert,
+                            "score_breakdown": metrics
+                        },
+                        "baseline": {},
+                        "comparison": {},
+                        "year_by_year": year_by_year
+                    }, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print(f"ERROR in manual mode: {e}")
+                    return Response({'error': f'Error in manual mode: {str(e)}'}, 
+                                   status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                # Auto mode: run optimizer as before
+                optimizer = RothConversionOptimizer(scenario, client, spouse, assets, optimizer_params)
+                result = optimizer.run()
+                # Filter results to only years >= roth_conversion_start_year if set
+                filter_year = optimizer_params.get('conversion_start_year') or scenario.get('roth_conversion_start_year')
+                if filter_year and result.get('year_by_year'):
+                    try:
+                        filter_year = int(filter_year)
+                        result['year_by_year'] = [row for row in result['year_by_year'] if row.get('year', 0) >= filter_year]
+                    except Exception:
+                        pass
+                return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"ERROR: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

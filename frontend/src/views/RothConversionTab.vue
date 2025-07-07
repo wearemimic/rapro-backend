@@ -9,8 +9,10 @@
       <!-- Asset Selection Panel -->
       <div class="col-md-7 mb-3 mb-lg-5">
         <div class="card h-100">
+          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+            <h5 class="mb-0">Asset Selection Panel</h5>
+          </div>
           <div class="card-body">
-            <h5 class="mb-4">Asset Selection Panel</h5>
             <div class="table-responsive">
               <table class="table table-bordered table-hover align-middle">
                 <thead class="thead-light">
@@ -53,8 +55,10 @@
       <!-- Conversion Schedule Parameters -->
       <div class="col-md-5 mb-3 mb-lg-5">
         <div class="card h-100">
+          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+            <h5 class="mb-0">Conversion Schedule Parameters</h5>
+          </div>
           <div class="card-body">
-            <h5 class="mb-4">Conversion Schedule Parameters</h5>
             <div class="row">
               <!-- Row 1: Pre-Retirement Income & Conversion Start Year -->
              
@@ -136,11 +140,12 @@
       </div>
     </div>
     <!-- Row of three cards: 1/4, 1/4, 1/2 width -->
+    <h3>Expense Summary</h3>
     <div class="row mb-3">
       <div class="col-md-3">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3">Taxes Before and After Conversion</h6>
+            <h6 class="mb-3">RMDs</h6>
             <Graph :data="taxesBarData" :options="barOptions" type="bar" :height="150" />
           </div>
         </div>
@@ -148,12 +153,31 @@
       <div class="col-md-3">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3">IRMAA Before and After</h6>
+            <h6 class="mb-3">State and Federal Taxes</h6>
             <Graph :data="irmaaBarData" :options="barOptions" type="bar" :height="150" />
           </div>
         </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="mb-3">Medicare and IRMAA Costs</h6>
+            <Graph :data="irmaaBarData" :options="barOptions" type="bar" :height="150" />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="mb-3">Inheretance Tax</h6>
+            <Graph :data="irmaaBarData" :options="barOptions" type="bar" :height="150" />
+          </div>
+        </div>
+      </div>
+    </div>  
+    <h3>Asset Summary</h3>
+    <div class="row mb-3">
+      <div class="col-md-12">
         <div class="card h-100">
           <div class="card-body">
             <h6 class="mb-3">Asset Balance Time Line</h6>
@@ -163,6 +187,7 @@
       </div>
     </div>
     <!-- Section 3: Conversion Impact Table -->
+    <h3>Detailed Yealry Summary</h3>
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Conversion Impact Table</h5>
@@ -276,6 +301,8 @@
 
 <script>
 import Graph from '../components/Graph.vue';
+import { useAuthStore } from '@/stores/auth';
+import { computed } from 'vue';
 
 export default {
   components: { Graph },
@@ -305,7 +332,7 @@ export default {
       preRetirementIncomeRaw: '',
       availableYears: this.generateAvailableYears(),
       conversionStartYear: new Date().getFullYear(),
-      yearsToConvert: 0,
+      yearsToConvert: 1,
       rothGrowthRate: 0,
       scenarioResults: [],
       baselineMetrics: {},
@@ -416,6 +443,19 @@ export default {
       const birthYear = new Date(this.client.birthdate).getFullYear();
       const retirementAge = this.scenario.retirement_age || 65;
       return birthYear + retirementAge;
+    },
+    headerColor() {
+      const authStore = useAuthStore();
+      const user = authStore.user;
+      return user && user.primary_color ? user.primary_color : '#377dff';
+    },
+    headingTextColor() {
+      const authStore = useAuthStore();
+      const user = authStore.user;
+      if (user && user.primary_color && user.primary_color !== '#377dff') {
+        return '#fff';
+      }
+      return '#fff'; // Always white for colored backgrounds
     }
   },
   methods: {
@@ -513,6 +553,13 @@ export default {
       this[`${field}Raw`] = this.formatCurrency(this[field]);
     },
     async recalculateConversion() {
+      // Check if client exists
+      if (!this.client) {
+        console.error('Client data is missing');
+        alert('Client data is missing. Cannot calculate conversion.');
+        return;
+      }
+
       // Always include all income-producing assets
       const allAssets = (this.assetDetails || []).map(asset => ({
         ...asset,
@@ -534,30 +581,60 @@ export default {
       
       // Calculate annual conversion amount by dividing total by years
       const annualConversion = totalToConvert / yearsToConvert;
+      
+      // Ensure all required fields have valid values
+      const currentYear = new Date().getFullYear();
+      const conversionStartYear = parseInt(this.conversionStartYear) || currentYear;
+      const rothWithdrawalStartYear = parseInt(this.rothWithdrawalStartYear) || currentYear;
+      const rothWithdrawalAmount = parseFloat(this.rothWithdrawalAmount) || 0;
+      const rothGrowthRate = parseFloat(this.rothGrowthRate) || 0;
+      const maxAnnualAmount = parseFloat(this.maxAnnualAmount) || 0;
+
+      // Ensure the client and scenario have all required fields
+      const scenarioData = {
+        ...this.scenario,
+        roth_conversion_start_year: conversionStartYear,
+        roth_conversion_duration: yearsToConvert,
+        roth_withdrawal_amount: rothWithdrawalAmount,
+        roth_withdrawal_start_year: rothWithdrawalStartYear,
+        pre_retirement_income: this.preRetirementIncome || 0,
+        max_annual_amount: maxAnnualAmount,
+        // Add these fields to ensure they exist
+        retirement_age: this.scenario.retirement_age || 65,
+        mortality_age: this.scenario.mortality_age || 90,
+        part_b_inflation_rate: this.scenario.part_b_inflation_rate || 3.0,
+        part_d_inflation_rate: this.scenario.part_d_inflation_rate || 3.0,
+      };
+      
+      // Ensure client has required fields
+      const clientData = {
+        ...this.client,
+        // Safely access tax_status with fallback
+        tax_status: this.client?.tax_status || 'Single',
+        // Add other potentially missing fields
+        birthdate: this.client?.birthdate || new Date().toISOString().split('T')[0],
+        name: this.client?.name || 'Client',
+        gender: this.client?.gender || 'M',
+        state: this.client?.state || 'CA'
+      };
+
+      console.log('Client data being sent:', clientData);
 
       const payload = {
-        scenario: {
-          ...this.scenario,
-          roth_conversion_start_year: this.conversionStartYear,
-          roth_conversion_duration: yearsToConvert,
-          roth_withdrawal_amount: this.rothWithdrawalAmount,
-          roth_withdrawal_start_year: this.rothWithdrawalStartYear,
-          pre_retirement_income: this.preRetirementIncome,
-          max_annual_amount: this.maxAnnualAmount,
-        },
-        client: this.client,
+        scenario: scenarioData,
+        client: clientData,
         spouse: this.scenario.spouse || (this.scenario.spouse_birthdate ? { birthdate: this.scenario.spouse_birthdate } : null),
         assets: allAssets,
         optimizer_params: {
           mode: modeToSend,
-          conversion_start_year: this.conversionStartYear,
+          conversion_start_year: conversionStartYear,
           years_to_convert: yearsToConvert,
           annual_conversion_amount: annualConversion,
-          roth_growth_rate: this.rothGrowthRate,
-          max_annual_amount: this.maxAnnualAmount,
+          roth_growth_rate: rothGrowthRate,
+          max_annual_amount: maxAnnualAmount,
           max_total_amount: totalToConvert,
-          roth_withdrawal_amount: this.rothWithdrawalAmount,
-          roth_withdrawal_start_year: this.rothWithdrawalStartYear
+          roth_withdrawal_amount: rothWithdrawalAmount,
+          roth_withdrawal_start_year: rothWithdrawalStartYear
         }
       };
 
@@ -569,12 +646,34 @@ export default {
       console.log('Annual conversion amount:', annualConversion);
 
       try {
+        const authStore = useAuthStore();
+        const token = authStore.accessToken;
+        
+        if (!token) {
+          console.error('No authentication token available');
+          return;
+        }
+        
+        console.log('Sending request with token:', token);
         const response = await fetch('http://localhost:8000/api/roth-optimize/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify(payload)
         });
+        
         const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('API error:', data);
+          alert(`Error: ${data.error || 'Unknown error occurred'}`);
+          return;
+        }
+        
+        console.log('API response:', data);
+        
         this.scenarioResults = data.year_by_year || [];
         this.comparisonMetrics = data.comparison || {};
         this.optimalSchedule = data.optimal_schedule || {};
