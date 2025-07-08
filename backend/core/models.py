@@ -172,6 +172,7 @@ class IncomeSource(models.Model):
     cola = models.FloatField(default=0)
     exclusion_ratio = models.FloatField(default=0)
     tax_rate = models.FloatField(default=0)
+    max_to_convert = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Maximum amount to convert to Roth")
 
     def __str__(self):
         return f"{self.income_type} for {self.scenario.name}"

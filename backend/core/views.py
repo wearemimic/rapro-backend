@@ -17,10 +17,10 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import Scenario, Client, RealEstate, ReportTemplate, TemplateSlide
+from .models import Scenario, Client, RealEstate, ReportTemplate, TemplateSlide, IncomeSource
 from rest_framework.exceptions import PermissionDenied
 from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCreateSerializer, RealEstateSerializer
-from .serializers import ScenarioCreateSerializer
+from .serializers import ScenarioCreateSerializer, ScenarioUpdateSerializer, IncomeSourceUpdateSerializer
 from .serializers import ReportTemplateSerializer, ReportTemplateDetailSerializer, TemplateSlideSerializer
 from .scenario_processor import ScenarioProcessor
 from django.http import HttpResponse, JsonResponse
@@ -296,6 +296,83 @@ def get_scenario_assets(request, scenario_id):
         return Response(asset_details)
     except Scenario.DoesNotExist:
         return Response({'error': 'Scenario not found.'}, status=404)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_scenario(request, scenario_id):
+    """
+    Update a scenario with Roth conversion parameters
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        
+        # Check if the user has access to this scenario
+        if scenario.client.advisor != request.user:
+            return Response(
+                {"error": "You don't have permission to modify this scenario"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = ScenarioUpdateSerializer(scenario, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_scenario_assets(request, scenario_id):
+    """
+    Update assets associated with a scenario, particularly for Roth conversion
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        
+        # Check if the user has access to this scenario
+        if scenario.client.advisor != request.user:
+            return Response(
+                {"error": "You don't have permission to modify this scenario's assets"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if 'assets' not in request.data:
+            return Response(
+                {"error": "Assets data is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        assets_data = request.data['assets']
+        updated_assets = []
+        
+        for asset_data in assets_data:
+            asset_id = asset_data.get('id')
+            if not asset_id:
+                continue
+                
+            try:
+                asset = IncomeSource.objects.get(id=asset_id, scenario=scenario)
+                
+                # Only update max_to_convert field
+                if 'max_to_convert' in asset_data:
+                    asset.max_to_convert = asset_data['max_to_convert']
+                    asset.save()
+                    updated_assets.append({
+                        'id': asset.id,
+                        'income_type': asset.income_type,
+                        'max_to_convert': asset.max_to_convert
+                    })
+            except IncomeSource.DoesNotExist:
+                # Skip assets that don't exist or don't belong to this scenario
+                continue
+        
+        return Response({
+            'message': f'Updated {len(updated_assets)} assets',
+            'assets': updated_assets
+        })
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 class RothOptimizeAPIView(APIView):
     permission_classes = [IsAuthenticated]

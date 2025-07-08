@@ -38,7 +38,13 @@
       <!-- Body -->
       <div class="card-body">
         <!-- Bar Chart -->
-        <canvas id="financial_overview_chart" style="width: 100%; height: 300px !important;"></canvas>
+        <Graph 
+          :data="financialChartData" 
+          :options="financialChartOptions" 
+          :height="300" 
+          type="bar"
+          graphId="financial-overview-chart"
+        />
         <!-- End Bar Chart -->
       </div>
       <!-- End Body -->
@@ -111,6 +117,7 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -151,6 +158,9 @@ const IRMAA_LABELS = {
 };
 
 export default {
+  components: {
+    Graph
+  },
   props: {
     scenarioResults: {
       type: Array,
@@ -178,7 +188,31 @@ export default {
       isDropdownOpen: {
         financial: false
       },
-      openIrmaaTooltipIdx: null
+      openIrmaaTooltipIdx: null,
+      financialChartData: {
+        labels: [],
+        datasets: []
+      },
+      financialChartOptions: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        }
+      }
     };
   },
   computed: {
@@ -197,7 +231,54 @@ export default {
       return IRMAA_LABELS['single'];
     }
   },
+  watch: {
+    filteredResults: {
+      handler(newResults) {
+        this.updateFinancialChart(newResults);
+      },
+      deep: true,
+      immediate: true
+    }
+  },
   methods: {
+    updateFinancialChart(results) {
+      if (!results || results.length === 0) return;
+      
+      // Extract years for labels
+      const years = results.map(row => row.year);
+      
+      // Create datasets for income, taxes, and medicare
+      this.financialChartData = {
+        labels: years,
+        datasets: [
+          {
+            label: 'Gross Income',
+            backgroundColor: '#4285f4',
+            data: results.map(row => parseFloat(row.gross_income) || 0)
+          },
+          {
+            label: 'Federal Tax',
+            backgroundColor: '#ea4335',
+            data: results.map(row => parseFloat(row.federal_tax) || 0)
+          },
+          {
+            label: 'Medicare',
+            backgroundColor: '#fbbc05',
+            data: results.map(row => parseFloat(row.total_medicare) || 0)
+          },
+          {
+            label: 'Net Income',
+            backgroundColor: '#34a853',
+            data: results.map(row => {
+              const gross = parseFloat(row.gross_income) || 0;
+              const tax = parseFloat(row.federal_tax) || 0;
+              const medicare = parseFloat(row.total_medicare) || 0;
+              return gross - tax - medicare;
+            })
+          }
+        ]
+      };
+    },
     toggleDropdown(tab) {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
@@ -254,6 +335,11 @@ export default {
   },
   mounted() {
     document.addEventListener('click', this.handleClickOutside);
+    
+    // Initialize financial chart with current data
+    if (this.filteredResults && this.filteredResults.length) {
+      this.updateFinancialChart(this.filteredResults);
+    }
   },
   beforeUnmount() {
     document.removeEventListener('click', this.handleClickOutside);

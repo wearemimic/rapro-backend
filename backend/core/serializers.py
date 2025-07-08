@@ -211,6 +211,28 @@ class ScenarioCreateSerializer(serializers.ModelSerializer):
             IncomeSource.objects.create(scenario=scenario, **income)
         return scenario
 
+class ScenarioUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Scenario
+        fields = [
+            'id', 'name', 'description', 'retirement_age', 'medicare_age',
+            'spouse_retirement_age', 'spouse_medicare_age', 'mortality_age',
+            'spouse_mortality_age', 'retirement_year', 'share_with_client',
+            'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction',
+            'roth_conversion_start_year', 'roth_conversion_duration', 'roth_conversion_annual_amount'
+        ]
+
+class IncomeSourceUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncomeSource
+        fields = [
+            'id', 'owned_by', 'income_type', 'income_name', 'current_asset_balance',
+            'monthly_amount', 'monthly_contribution', 'age_to_begin_withdrawal',
+            'age_to_end_withdrawal', 'rate_of_return', 'cola', 'exclusion_ratio',
+            'tax_rate', 'scenario_id', 'max_to_convert'
+        ]
+        read_only_fields = ['scenario_id']
+
 class AdvisorRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     licenses = serializers.CharField(required=False, allow_blank=True)
