@@ -36,6 +36,7 @@ import uuid
 from .pptx_utils import create_enhanced_thumbnails
 from pptx_to_png import convert_pptx_to_png
 from decimal import Decimal, InvalidOperation
+import copy
 
 # Add the python-pptx library for handling PowerPoint files
 try:
@@ -410,10 +411,11 @@ class RothOptimizeAPIView(APIView):
                 return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
             if mode == 'manual':
-                # Manual mode: straight calculation
+                                    # Manual mode: straight calculation
                 try:
                     years_to_convert = int(optimizer_params.get('years_to_convert', 1))
                     start_year = int(optimizer_params.get('conversion_start_year', scenario.get('current_year', 2025)))
+                    print(f"DEBUG: Received conversion_start_year={start_year} in API view")
                     
                     # Sum max_to_convert for selected assets
                     total_to_convert = Decimal('0')
@@ -448,64 +450,83 @@ class RothOptimizeAPIView(APIView):
                     if 'mortality_age' not in scenario_manual:
                         scenario_manual['mortality_age'] = 90
 
-                    # Create ScenarioProcessor instance with debug enabled
+                    # Create baseline scenario (without conversions)
+                    baseline_scenario = {**scenario_manual}
+                    baseline_scenario['roth_conversion_start_year'] = None
+                    baseline_scenario['roth_conversion_duration'] = None
+                    baseline_scenario['roth_conversion_annual_amount'] = None
+
                     try:
-                        processor = ScenarioProcessor.from_dicts(
+                        # Run baseline scenario
+                        baseline_processor = ScenarioProcessor.from_dicts(
+                            scenario=baseline_scenario,
+                            client=client,
+                            spouse=spouse,
+                            assets=copy.deepcopy(assets),  # Deep copy to avoid modifying original assets
+                            debug=True
+                        )
+                        baseline_results = baseline_processor.calculate()
+                        
+                        # Filter baseline results to only include years from the start year
+                        baseline_results = [row for row in baseline_results if row.get('year', 0) >= start_year]
+                        
+                        # Extract baseline metrics
+                        from .optimizer import RothConversionOptimizer
+                        optimizer = RothConversionOptimizer(scenario, client, spouse, copy.deepcopy(assets), optimizer_params)
+                        baseline_metrics = optimizer._extract_metrics(baseline_results)
+                        
+                        # Run conversion scenario
+                        conversion_processor = ScenarioProcessor.from_dicts(
                             scenario=scenario_manual,
                             client=client,
                             spouse=spouse,
                             assets=assets,
-                            debug=True  # Enable debug logging
+                            debug=True
                         )
+                        conversion_results = conversion_processor.calculate()
+                        
+                        # Filter conversion results to only include years from the start year
+                        conversion_results = [row for row in conversion_results if row.get('year', 0) >= start_year]
+                        
+                        # Extract conversion metrics
+                        conversion_metrics = optimizer._extract_metrics(conversion_results)
+                        
+                        # Calculate comparison metrics
+                        comparison = optimizer._compare_metrics(baseline_metrics, conversion_metrics)
+                        
+                        # Extract asset balances for charting
+                        asset_balances = self._extract_asset_balances(baseline_results, conversion_results)
+                        
+                        # Log the conversion schedule
+                        print(f"Manual Roth Conversion Schedule:")
+                        print(f"Start Year: {start_year}")
+                        print(f"Duration: {years_to_convert} years")
+                        print(f"Total to Convert: ${total_to_convert:,.2f}")
+                        print(f"Annual Amount: ${annual_conversion:,.2f}")
+                        
+                        return Response({
+                            "optimal_schedule": {
+                                "start_year": start_year,
+                                "duration": years_to_convert,
+                                "annual_amount": annual_conversion,
+                                "total_amount": total_to_convert,
+                                "score_breakdown": conversion_metrics
+                            },
+                            "baseline": {
+                                "metrics": baseline_metrics,
+                                "year_by_year": baseline_results
+                            },
+                            "conversion": {
+                                "metrics": conversion_metrics,
+                                "year_by_year": conversion_results
+                            },
+                            "comparison": comparison,
+                            "asset_balances": asset_balances
+                        }, status=status.HTTP_200_OK)
                     except Exception as e:
-                        print(f"ERROR creating ScenarioProcessor: {e}")
-                        return Response({'error': f'Error initializing scenario processor: {str(e)}'}, 
+                        print(f"ERROR calculating scenarios: {e}")
+                        return Response({'error': f'Error calculating scenarios: {str(e)}'}, 
                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-                    # Calculate year by year results
-                    try:
-                        year_by_year = processor.calculate()
-                    except Exception as e:
-                        print(f"ERROR calculating scenario: {e}")
-                        return Response({'error': f'Error calculating scenario: {str(e)}'}, 
-                                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-                    # Filter results to only include years from the start year
-                    year_by_year = [row for row in year_by_year if row.get('year', 0) >= start_year]
-
-                    # Extract metrics for the conversion period
-                    try:
-                        metrics = RothConversionOptimizer._extract_metrics(self=None, results=year_by_year)
-                    except Exception as e:
-                        print(f"ERROR extracting metrics: {e}")
-                        metrics = {
-                            'lifetime_tax': 0,
-                            'lifetime_medicare': 0,
-                            'total_irmaa': 0,
-                            'final_roth': 0,
-                            'cumulative_net_income': 0,
-                            'income_stability': 0
-                        }
-
-                    # Log the conversion schedule
-                    print(f"Manual Roth Conversion Schedule:")
-                    print(f"Start Year: {start_year}")
-                    print(f"Duration: {years_to_convert} years")
-                    print(f"Total to Convert: ${total_to_convert:,.2f}")
-                    print(f"Annual Amount: ${annual_conversion:,.2f}")
-
-                    return Response({
-                        "optimal_schedule": {
-                            "start_year": start_year,
-                            "duration": years_to_convert,
-                            "annual_amount": annual_conversion,
-                            "total_amount": total_to_convert,
-                            "score_breakdown": metrics
-                        },
-                        "baseline": {},
-                        "comparison": {},
-                        "year_by_year": year_by_year
-                    }, status=status.HTTP_200_OK)
                 except Exception as e:
                     print(f"ERROR in manual mode: {e}")
                     return Response({'error': f'Error in manual mode: {str(e)}'}, 
@@ -526,6 +547,36 @@ class RothOptimizeAPIView(APIView):
         except Exception as e:
             print(f"ERROR: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    def _extract_asset_balances(self, baseline_results, conversion_results):
+        """
+        Extract asset balances for charting.
+        """
+        if not baseline_results or not conversion_results:
+            return {'years': [], 'assets': {}}
+            
+        years = [row.get('year', 0) for row in baseline_results]
+        
+        # Find all asset balance fields
+        balance_fields = set()
+        for row in baseline_results + conversion_results:
+            for key in row:
+                if key.endswith('_balance'):
+                    balance_fields.add(key)
+        
+        # Create datasets for each asset type
+        asset_datasets = {}
+        for field in balance_fields:
+            asset_type = field.replace('_balance', '')
+            asset_datasets[asset_type] = {
+                'baseline': [row.get(field, 0) for row in baseline_results],
+                'conversion': [row.get(field, 0) for row in conversion_results]
+            }
+        
+        return {
+            'years': years,
+            'assets': asset_datasets
+        }
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
