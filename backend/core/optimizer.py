@@ -22,6 +22,36 @@ class RothConversionOptimizer:
             print(f"[RothOptimizer] Progress: {int(100*idx/total)}% ({idx}/{total})")
         return res
 
+    def _extract_asset_balances(self, baseline_results, conversion_results):
+        """
+        Extract asset balances for charting.
+        """
+        if not baseline_results or not conversion_results:
+            return {'years': [], 'assets': {}}
+            
+        years = [row.get('year', 0) for row in baseline_results]
+        
+        # Find all asset balance fields
+        balance_fields = set()
+        for row in baseline_results + conversion_results:
+            for key in row:
+                if key.endswith('_balance'):
+                    balance_fields.add(key)
+        
+        # Create datasets for each asset type
+        asset_datasets = {}
+        for field in balance_fields:
+            asset_type = field.replace('_balance', '')
+            asset_datasets[asset_type] = {
+                'baseline': [row.get(field, 0) for row in baseline_results],
+                'conversion': [row.get(field, 0) for row in conversion_results]
+            }
+        
+        return {
+            'years': years,
+            'assets': asset_datasets
+        }
+        
     def run(self):
         # 1. Run baseline scenario (no conversions)
         baseline_scenario = copy.deepcopy(self.scenario)
@@ -70,12 +100,41 @@ class RothConversionOptimizer:
         else:
             best_result = min(results, key=lambda x: x['score'])
 
-        # 5. Prepare API contract output
+        # 5. Filter results to start at the earlier of retirement year or conversion start year
+        retirement_year = None
+        if isinstance(self.client, dict) and 'birthdate' in self.client and isinstance(self.scenario, dict) and 'retirement_age' in self.scenario:
+            try:
+                from datetime import datetime
+                if isinstance(self.client['birthdate'], str):
+                    birth_year = datetime.strptime(self.client['birthdate'], '%Y-%m-%d').year
+                else:
+                    birth_year = self.client['birthdate'].year
+                retirement_year = birth_year + int(self.scenario['retirement_age'])
+            except Exception:
+                pass
+        
+        conversion_start_year = best_result['schedule']['start_year']
+        filter_year = conversion_start_year
+        if retirement_year:
+            filter_year = min(retirement_year, conversion_start_year)
+        
+        # Filter baseline and conversion results to start from the filter year
+        filtered_baseline = [row for row in baseline_results if row.get('year', 0) >= filter_year]
+        filtered_conversion = [row for row in best_result['year_by_year'] if row.get('year', 0) >= filter_year]
+        
+        # 6. Prepare enhanced API contract output
         return {
             "optimal_schedule": best_result['schedule'],
-            "baseline": baseline_metrics,
+            "baseline": {
+                "metrics": baseline_metrics,
+                "year_by_year": filtered_baseline
+            },
+            "conversion": {
+                "metrics": best_result['metrics'],
+                "year_by_year": filtered_conversion
+            },
             "comparison": self._compare_metrics(baseline_metrics, best_result['metrics']),
-            "year_by_year": best_result['year_by_year']
+            "asset_balances": self._extract_asset_balances(filtered_baseline, filtered_conversion)
         }
 
     def _run_single_scenario(self, scenario):
@@ -185,28 +244,171 @@ class RothConversionOptimizer:
                 'total_irmaa': 0,
                 'final_roth': 0,
                 'cumulative_net_income': 0,
-                'income_stability': 0
+                'income_stability': 0,
+                'total_rmds': 0,           # Add RMD tracking
+                'inheritance_tax': 0       # Add inheritance tax estimation
             }
-        lifetime_tax = sum(row.get('federal_tax', 0) for row in results)
-        lifetime_medicare = sum(row.get('total_medicare', 0) for row in results)
-        total_irmaa = sum(row.get('irmaa_surcharge', 0) for row in results)
-        cumulative_net_income = sum(row.get('net_income', 0) for row in results)
-        net_incomes = [row.get('net_income', 0) for row in results]
+        
+        # Helper function to safely convert values to float
+        def safe_float(value):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+        
+        lifetime_tax = sum(safe_float(row.get('federal_tax', 0)) for row in results)
+        lifetime_medicare = sum(safe_float(row.get('total_medicare', 0)) for row in results)
+        total_irmaa = sum(safe_float(row.get('irmaa_surcharge', 0)) for row in results)
+        cumulative_net_income = sum(safe_float(row.get('net_income', 0)) for row in results)
+        
+        # Track RMDs across all assets
+        total_rmds = 0
+        for row in results:
+            # Look for any field that might contain RMD information
+            rmd_amount = row.get('rmd_amount', 0)
+            if isinstance(rmd_amount, (int, float, str)):
+                try:
+                    total_rmds += float(rmd_amount)
+                except (ValueError, TypeError):
+                    pass
+                    
+            # Also check for asset-specific RMD fields
+            for key, value in row.items():
+                if '_rmd' in key.lower() and isinstance(value, (int, float, str)):
+                    try:
+                        total_rmds += float(value)
+                    except (ValueError, TypeError):
+                        pass
+        
+        # Calculate inheritance tax based on final balances
+        inheritance_tax = 0
+        if results:
+            final_year_data = results[-1]
+            # Calculate inheritance tax directly here instead of relying on external methods
+            tax_status = self.client.get('tax_status', 'Single').lower() if self.client else 'single'
+            
+            # Extract traditional (taxable) and Roth (non-taxable) balances
+            traditional_balances = 0
+            roth_balances = 0
+            
+            # Look for any asset balance in the final year data
+            for key, value in final_year_data.items():
+                if key.endswith('_balance'):
+                    try:
+                        balance = float(value)
+                        if 'roth' in key.lower():
+                            roth_balances += balance
+                        else:
+                            traditional_balances += balance
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Apply simplified inheritance tax model
+            # Traditional assets are subject to income tax for beneficiaries
+            # Roth assets pass tax-free
+            if tax_status in ['married filing jointly', 'qualifying widow(er)']:
+                # Higher exemption for married couples
+                tax_rate = 0.24  # Simplified average tax rate for beneficiaries
+            else:
+                tax_rate = 0.22  # Simplified average tax rate for beneficiaries
+            
+            inheritance_tax = traditional_balances * tax_rate
+        
+        # Calculate income stability
+        net_incomes = [safe_float(row.get('net_income', 0)) for row in results]
         income_stability = statistics.stdev(net_incomes) if len(net_incomes) > 1 else 0
-        # Try to get final Roth IRA balance (last year, prefer Roth_IRA_balance, fallback to 0)
+        
+        # Get final Roth IRA balance
         final_roth = 0
         for key in ['Roth_IRA_balance', 'Roth_401k_balance', 'Roth_balance']:
-            if key in results[-1]:
-                final_roth = results[-1][key]
+            if results and key in results[-1]:
+                final_roth = safe_float(results[-1][key])
                 break
+        
         return {
             'lifetime_tax': lifetime_tax,
             'lifetime_medicare': lifetime_medicare,
             'total_irmaa': total_irmaa,
             'final_roth': final_roth,
             'cumulative_net_income': cumulative_net_income,
-            'income_stability': income_stability
+            'income_stability': income_stability,
+            'total_rmds': total_rmds,
+            'inheritance_tax': inheritance_tax
         }
+    
+    def _calculate_inheritance_tax(self, final_year_data):
+        """
+        Calculate estimated inheritance tax based on remaining balances.
+        This is a simplified model that can be enhanced with more specific tax rules.
+        """
+        # Get tax status for inheritance tax calculation
+        tax_status = self.client.get('tax_status', 'Single').lower()
+        
+        # Extract traditional (taxable) and Roth (non-taxable) balances
+        traditional_balances = 0
+        roth_balances = 0
+        
+        # Look for any asset balance in the final year data
+        for key, value in final_year_data.items():
+            if key.endswith('_balance'):
+                try:
+                    balance = float(value)
+                    if 'roth' in key.lower():
+                        roth_balances += balance
+                    else:
+                        traditional_balances += balance
+                except (ValueError, TypeError):
+                    pass
+        
+        # Apply simplified inheritance tax model
+        # Traditional assets are subject to income tax for beneficiaries
+        # Roth assets pass tax-free
+        if tax_status in ['married filing jointly', 'qualifying widow(er)']:
+            # Higher exemption for married couples
+            tax_rate = 0.24  # Simplified average tax rate for beneficiaries
+        else:
+            tax_rate = 0.22  # Simplified average tax rate for beneficiaries
+        
+        inheritance_tax = traditional_balances * tax_rate
+        
+        return inheritance_tax
+
+    def _calculate_inheritance_tax_fallback(self, final_year_data):
+        """
+        Fallback method for calculating inheritance tax if the ScenarioProcessor method is unavailable.
+        This is a simplified model that can be enhanced with more specific tax rules.
+        """
+        # Get tax status for inheritance tax calculation
+        tax_status = self.client.get('tax_status', 'Single').lower()
+        
+        # Extract traditional (taxable) and Roth (non-taxable) balances
+        traditional_balances = 0
+        roth_balances = 0
+        
+        # Look for any asset balance in the final year data
+        for key, value in final_year_data.items():
+            if key.endswith('_balance'):
+                try:
+                    balance = float(value)
+                    if 'roth' in key.lower():
+                        roth_balances += balance
+                    else:
+                        traditional_balances += balance
+                except (ValueError, TypeError):
+                    pass
+        
+        # Apply simplified inheritance tax model
+        # Traditional assets are subject to income tax for beneficiaries
+        # Roth assets pass tax-free
+        if tax_status in ['married filing jointly', 'qualifying widow(er)']:
+            # Higher exemption for married couples
+            tax_rate = 0.24  # Simplified average tax rate for beneficiaries
+        else:
+            tax_rate = 0.22  # Simplified average tax rate for beneficiaries
+        
+        inheritance_tax = traditional_balances * tax_rate
+        
+        return inheritance_tax
 
     def _score_candidate(self, metrics):
         # Use advisor goals to set weights
@@ -245,12 +447,68 @@ class RothConversionOptimizer:
         )
 
     def _compare_metrics(self, baseline, candidate):
-        # TODO: Implement full comparison logic
+        """
+        Calculate comprehensive comparison metrics between baseline and conversion scenarios.
+        """
+        # Ensure all values are converted to float to avoid Decimal + float errors
+        def safe_float(value):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+        
+        # Get baseline values as floats
+        baseline_tax = safe_float(baseline['lifetime_tax'])
+        baseline_medicare = safe_float(baseline['lifetime_medicare'])
+        baseline_irmaa = safe_float(baseline['total_irmaa'])
+        baseline_rmds = safe_float(baseline['total_rmds'])
+        baseline_inheritance = safe_float(baseline['inheritance_tax'])
+        baseline_roth = safe_float(baseline['final_roth'])
+        baseline_net_income = safe_float(baseline['cumulative_net_income'])
+        baseline_stability = safe_float(baseline['income_stability'])
+        
+        # Get candidate values as floats
+        candidate_tax = safe_float(candidate['lifetime_tax'])
+        candidate_medicare = safe_float(candidate['lifetime_medicare'])
+        candidate_irmaa = safe_float(candidate['total_irmaa'])
+        candidate_rmds = safe_float(candidate['total_rmds'])
+        candidate_inheritance = safe_float(candidate['inheritance_tax'])
+        candidate_roth = safe_float(candidate['final_roth'])
+        candidate_net_income = safe_float(candidate['cumulative_net_income'])
+        candidate_stability = safe_float(candidate['income_stability'])
+        
+        # Calculate absolute differences
+        tax_savings = baseline_tax - candidate_tax
+        medicare_savings = baseline_medicare - candidate_medicare
+        irmaa_savings = baseline_irmaa - candidate_irmaa
+        rmd_reduction = baseline_rmds - candidate_rmds
+        inheritance_tax_savings = baseline_inheritance - candidate_inheritance
+        roth_increase = candidate_roth - baseline_roth
+        net_income_increase = candidate_net_income - baseline_net_income
+        
+        # Calculate percentage improvements
+        tax_savings_pct = (tax_savings / baseline_tax) * 100 if baseline_tax > 0 else 0
+        medicare_savings_pct = (medicare_savings / baseline_medicare) * 100 if baseline_medicare > 0 else 0
+        irmaa_savings_pct = (irmaa_savings / baseline_irmaa) * 100 if baseline_irmaa > 0 else 0
+        rmd_reduction_pct = (rmd_reduction / baseline_rmds) * 100 if baseline_rmds > 0 else 0
+        inheritance_tax_savings_pct = (inheritance_tax_savings / baseline_inheritance) * 100 if baseline_inheritance > 0 else 0
+        
+        # Calculate total lifetime savings
+        total_savings = tax_savings + medicare_savings + irmaa_savings + inheritance_tax_savings
+        
         return {
-            'tax_savings': baseline['lifetime_tax'] - candidate['lifetime_tax'],
-            'medicare_savings': baseline['lifetime_medicare'] - candidate['lifetime_medicare'],
-            'irmaa_savings': baseline['total_irmaa'] - candidate['total_irmaa'],
-            'roth_increase': candidate['final_roth'] - baseline['final_roth'],
-            'net_income_increase': candidate['cumulative_net_income'] - baseline['cumulative_net_income'],
-            'income_stability_improvement': baseline['income_stability'] - candidate['income_stability']
+            'tax_savings': tax_savings,
+            'tax_savings_pct': tax_savings_pct,
+            'medicare_savings': medicare_savings,
+            'medicare_savings_pct': medicare_savings_pct,
+            'irmaa_savings': irmaa_savings,
+            'irmaa_savings_pct': irmaa_savings_pct,
+            'rmd_reduction': rmd_reduction,
+            'rmd_reduction_pct': rmd_reduction_pct,
+            'inheritance_tax_savings': inheritance_tax_savings,
+            'inheritance_tax_savings_pct': inheritance_tax_savings_pct,
+            'roth_increase': roth_increase,
+            'net_income_increase': net_income_increase,
+            'total_savings': total_savings,
+            'income_stability_improvement': baseline_stability - candidate_stability
         } 

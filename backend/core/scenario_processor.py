@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from core.models import Scenario, Client, Spouse, IncomeSource
 
 # RMD Table based on IRS Uniform Lifetime Table
@@ -307,6 +307,18 @@ class ScenarioProcessor:
         spouse_alive = True if self.spouse_birthdate else False
         tax_status = self.tax_status
 
+        # --- NEW LOGIC: Determine table start year ---
+        retirement_year = self.primary_birthdate.year + (self.scenario.retirement_age or 65)
+        conversion_start_year = getattr(self.scenario, 'roth_conversion_start_year', None)
+        if conversion_start_year is None:
+            table_start_year = retirement_year
+        else:
+            table_start_year = min(retirement_year, int(conversion_start_year))
+            
+        print(f"DEBUG: retirement_year={retirement_year}, conversion_start_year={conversion_start_year}, table_start_year={table_start_year}")
+
+        pre_retirement_income = getattr(self.scenario, 'pre_retirement_income', 0)
+
         for year in range(self.start_year, last_mortality_year + 1):
             primary_age = year - self.primary_birthdate.year
             spouse_age = year - self.spouse_birthdate.year if self.spouse_birthdate else None
@@ -337,12 +349,15 @@ class ScenarioProcessor:
             if primary_alive or spouse_alive:
                 gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
                 ss_income = self._calculate_social_security(year, primary_alive, spouse_alive)
+                
+                # Add pre-retirement income if we're before retirement year
+                if year < retirement_year and pre_retirement_income:
+                    pre_retirement_income_decimal = Decimal(str(pre_retirement_income))
+                    gross_income += pre_retirement_income_decimal
+                    print(f"  Adding pre-retirement income: ${pre_retirement_income_decimal:,.2f}")
+                    
             agi_excl_ss = Decimal(gross_income) - Decimal(ss_income)
-            
-            print(f"INCOME BREAKDOWN:")
-            print(f"  Gross Income: ${gross_income:,.2f}")
-            print(f"  Social Security: ${ss_income:,.2f}")
-            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
+            taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
 
             # Calculate provisional income for debug
             provisional_income = agi_excl_ss + Decimal('0.5') * Decimal(ss_income)
@@ -363,8 +378,6 @@ class ScenarioProcessor:
             print(f"  Base: ${base_threshold:,.2f}")
             print(f"  Additional: ${additional_threshold:,.2f}")
 
-            taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
-            
             # Calculate how much would be taxable based on IRS rules
             if provisional_income <= base_threshold:
                 taxable_portion = "0%"
@@ -506,8 +519,14 @@ class ScenarioProcessor:
                 "tax_bracket": tax_bracket
             }
 
+            # Add asset balances to summary with safe rounding
+            def safe_round(val, ndigits=2):
+                try:
+                    return round(Decimal(val), ndigits)
+                except (InvalidOperation, TypeError, ValueError):
+                    return Decimal('0.00')
             for asset in self.assets:
-                summary[f"{asset['income_type']}_balance"] = round(asset["current_asset_balance"], 2)
+                summary[f"{asset['income_type']}_balance"] = safe_round(asset.get("current_asset_balance", 0))
 
             self._log_debug(f"Year {year}: {summary}")
             results.append(summary)
@@ -975,6 +994,46 @@ class ScenarioProcessor:
     def _log_debug(self, message):
         if self.debug:
             print(f"🔍 Debug: {message}")
+
+    def _calculate_inheritance_tax(self, final_year_data):
+        """
+        Calculate estimated inheritance tax based on remaining balances.
+        This is a simplified model that can be enhanced with more specific tax rules.
+        """
+        # Get tax status for inheritance tax calculation
+        tax_status = getattr(self.client, 'tax_status', 'Single').lower()
+        
+        # Extract traditional (taxable) and Roth (non-taxable) balances
+        traditional_balances = Decimal('0')
+        roth_balances = Decimal('0')
+        
+        # Look for any asset balance in the final year data
+        for key, value in final_year_data.items():
+            if key.endswith('_balance'):
+                try:
+                    balance = Decimal(str(value))
+                    if 'roth' in key.lower():
+                        roth_balances += balance
+                    else:
+                        traditional_balances += balance
+                except (ValueError, TypeError):
+                    pass
+        
+        # Apply simplified inheritance tax model
+        # Traditional assets are subject to income tax for beneficiaries
+        # Roth assets pass tax-free
+        if tax_status in ['married filing jointly', 'qualifying widow(er)']:
+            # Higher exemption for married couples
+            tax_rate = Decimal('0.24')  # Simplified average tax rate for beneficiaries
+        else:
+            tax_rate = Decimal('0.22')  # Simplified average tax rate for beneficiaries
+        
+        inheritance_tax = traditional_balances * tax_rate
+        
+        self._log_debug(f"Inheritance tax calculation: Traditional balances: {traditional_balances}, Roth balances: {roth_balances}, Tax rate: {tax_rate}, Inheritance tax: {inheritance_tax}")
+        
+        return inheritance_tax
+
 
 def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, filing_status):
     # Convert inputs to Decimal for consistency

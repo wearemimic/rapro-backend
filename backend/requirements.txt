@@ -13,3 +13,4 @@ requests>=2.32.3
 stripe
 python-pptx
 pdf2image
+numpy>=2.0.0

@@ -8,49 +8,14 @@
     <div class="row align-items-stretch">
       <!-- Asset Selection Panel -->
       <div class="col-md-7 mb-3 mb-lg-5">
-        <div class="card h-100">
-          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
-            <h5 class="mb-0">Asset Selection Panel</h5>
-          </div>
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-bordered table-hover align-middle">
-                <thead class="thead-light">
-                  <tr>
-                    <th>Asset</th>
-                    <th>Owner</th>
-                    <th>Current Value</th>
-                    <th>Max to Convert</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="asset in (eligibleAssets && eligibleAssets.length ? eligibleAssets : [])" :key="asset.id || asset.income_type">
-                    <td>{{ asset.income_type || 'Unknown' }}</td>
-                    <td>{{ asset.owned_by || 'Unknown' }}</td>
-                    <td>{{ formatCurrency(asset.current_asset_balance) }}</td>
-                    <td>
-                      <input
-                        type="text"
-                        :value="maxToConvertRaw[asset.id || asset.income_type] || ''"
-                        @focus="onMaxToConvertFocus(asset)"
-                        @input="onMaxToConvertInput($event, asset)"
-                        @blur="onMaxToConvertBlur(asset)"
-                        class="form-control form-control-sm"
-                      />
-                    </td>
-                  </tr>
-                  <!-- Total Row -->
-                  <tr style="font-weight: bold; background: #f8f9fa;">
-                    <td>Total to Convert</td>
-                    <td></td>
-                    <td></td>
-                    <td>{{ formatCurrency(selectedAssetList.reduce((sum, asset) => sum + (parseFloat(maxToConvert[asset.id || asset.income_type]) || 0), 0)) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <AssetSelectionPanel
+          :eligibleAssets="eligibleAssets"
+          :maxToConvert="maxToConvert"
+          :maxToConvertRaw="maxToConvertRaw"
+          :headerColor="headerColor"
+          @update:maxToConvert="val => maxToConvert = val"
+          @update:maxToConvertRaw="val => maxToConvertRaw = val"
+        />
       </div>
       <!-- Conversion Schedule Parameters -->
       <div class="col-md-5 mb-3 mb-lg-5">
@@ -283,7 +248,7 @@
       </div>
     </div>
     <!-- Section 3: Conversion Impact Table -->
-    <h3>Detailed Yealry Summary</h3>
+    <h3>Detailed Yearly Summary</h3>
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Conversion Impact Table</h5>
@@ -302,13 +267,17 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in scenarioResults" :key="row.year">
+              <tr v-for="(row, index) in filteredScenarioResults" :key="row.year">
                 <td>{{ row.year }}</td>
                 <td>{{ row.primary_age }} / {{ row.spouse_age }}</td>
                 <td>
                   ${{ 
-                    (parseFloat(row.gross_income || 0) + 
-                    (row.year < retirementYear ? parseFloat(preRetirementIncome || 0) : 0)).toFixed(2) 
+                    // If we have baseline data, use it for the income before conversion
+                    baselineMetrics && baselineMetrics.year_by_year && getBaselineIndex(index) !== -1 
+                      ? (parseFloat(baselineMetrics.year_by_year[getBaselineIndex(index)].gross_income || 0) + 
+                        (row.year < retirementYear ? parseFloat(preRetirementIncome || 0) : 0)).toFixed(2)
+                      : (parseFloat(row.gross_income || 0) + 
+                        (row.year < retirementYear ? parseFloat(preRetirementIncome || 0) : 0)).toFixed(2) 
                   }}
                 </td>
                 <td>${{ parseFloat(row.roth_conversion || 0).toFixed(2) }}</td>
@@ -319,7 +288,7 @@
                     parseFloat(row.roth_conversion || 0)
                   ).toFixed(2) }}
                 </td>
-                <td>12%</td>
+                <td>{{ row.tax_bracket || '12%' }}</td>
                 <td>${{ parseFloat(row.federal_tax || 0).toFixed(2) }}</td>
                 <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
               </tr>
@@ -340,43 +309,66 @@
                 <th>Metric</th>
                 <th>Baseline</th>
                 <th>Roth Conversion</th>
+                <th>Savings</th>
+                <th>% Improvement</th>
               </tr>
             </thead>
             <tbody>
               <tr>
+                <td>Lifetime RMDs</td>
+                <td>${{ baselineMetrics.total_rmds !== undefined ? baselineMetrics.total_rmds.toLocaleString() : 0 }}</td>
+                <td>${{ optimalSchedule.score_breakdown?.total_rmds !== undefined ? optimalSchedule.score_breakdown.total_rmds.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.rmd_reduction !== undefined ? comparisonMetrics.rmd_reduction.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.rmd_reduction_pct !== undefined ? comparisonMetrics.rmd_reduction_pct.toFixed(1) : 0 }}%</td>
+              </tr>
+              <tr>
                 <td>Lifetime Federal Taxes</td>
                 <td>${{ baselineMetrics.lifetime_tax !== undefined ? baselineMetrics.lifetime_tax.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.lifetime_tax !== undefined ? optimalSchedule.score_breakdown.lifetime_tax.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.tax_savings !== undefined ? comparisonMetrics.tax_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.tax_savings_pct !== undefined ? comparisonMetrics.tax_savings_pct.toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Lifetime Medicare Premiums</td>
                 <td>${{ baselineMetrics.lifetime_medicare !== undefined ? baselineMetrics.lifetime_medicare.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.lifetime_medicare !== undefined ? optimalSchedule.score_breakdown.lifetime_medicare.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.medicare_savings !== undefined ? comparisonMetrics.medicare_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.medicare_savings_pct !== undefined ? comparisonMetrics.medicare_savings_pct.toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Lifetime IRMAA Surcharges</td>
                 <td>${{ baselineMetrics.total_irmaa !== undefined ? baselineMetrics.total_irmaa.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.total_irmaa !== undefined ? optimalSchedule.score_breakdown.total_irmaa.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.irmaa_savings !== undefined ? comparisonMetrics.irmaa_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.irmaa_savings_pct !== undefined ? comparisonMetrics.irmaa_savings_pct.toFixed(1) : 0 }}%</td>
+              </tr>
+              <tr>
+                <td>Inheritance Tax</td>
+                <td>${{ baselineMetrics.inheritance_tax !== undefined ? baselineMetrics.inheritance_tax.toLocaleString() : 0 }}</td>
+                <td>${{ optimalSchedule.score_breakdown?.inheritance_tax !== undefined ? optimalSchedule.score_breakdown.inheritance_tax.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.inheritance_tax_savings !== undefined ? comparisonMetrics.inheritance_tax_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.inheritance_tax_savings_pct !== undefined ? comparisonMetrics.inheritance_tax_savings_pct.toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Net Lifetime Spendable Income</td>
                 <td>${{ baselineMetrics.cumulative_net_income !== undefined ? baselineMetrics.cumulative_net_income.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.cumulative_net_income !== undefined ? optimalSchedule.score_breakdown.cumulative_net_income.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.net_income_increase !== undefined ? comparisonMetrics.net_income_increase.toLocaleString() : 0 }}</td>
+                <td>{{ baselineMetrics.cumulative_net_income && comparisonMetrics.net_income_increase ? ((comparisonMetrics.net_income_increase / baselineMetrics.cumulative_net_income) * 100).toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Final Roth IRA Balance</td>
                 <td>${{ baselineMetrics.final_roth !== undefined ? baselineMetrics.final_roth.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.final_roth !== undefined ? optimalSchedule.score_breakdown.final_roth.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.roth_increase !== undefined ? comparisonMetrics.roth_increase.toLocaleString() : 0 }}</td>
+                <td>{{ baselineMetrics.final_roth && baselineMetrics.final_roth > 0 && comparisonMetrics.roth_increase ? ((comparisonMetrics.roth_increase / baselineMetrics.final_roth) * 100).toFixed(1) : 'N/A' }}</td>
               </tr>
-              <tr>
-                <td>Total Net Assets at Mortality</td>
-                <td>${{ baselineMetrics.final_roth !== undefined ? baselineMetrics.final_roth.toLocaleString() : 0 }}</td>
-                <td>${{ optimalSchedule.score_breakdown?.final_roth !== undefined ? optimalSchedule.score_breakdown.final_roth.toLocaleString() : 0 }}</td>
-              </tr>
-              <tr>
-                <td>Average IRMAA Tier Hit</td>
-                <td>{{ baselineMetrics.income_stability !== undefined ? baselineMetrics.income_stability : 'Tier Level' }}</td>
-                <td>{{ optimalSchedule.score_breakdown?.income_stability !== undefined ? optimalSchedule.score_breakdown.income_stability : 'Tier Level' }}</td>
+              <tr class="table-success">
+                <td><strong>Total Lifetime Savings</strong></td>
+                <td></td>
+                <td></td>
+                <td><strong>${{ comparisonMetrics.total_savings !== undefined ? comparisonMetrics.total_savings.toLocaleString() : totalSavings.toLocaleString() }}</strong></td>
+                <td><strong>{{ savingsPercentage }}%</strong></td>
               </tr>
             </tbody>
           </table>
@@ -396,12 +388,13 @@
 
 <script>
 import Graph from '../components/Graph.vue';
+import AssetSelectionPanel from '../components/RothConversion/AssetSelectionPanel.vue';
 import { useAuthStore } from '@/stores/auth';
 import { computed } from 'vue';
 import './RothConversionTab.css';
 
 export default {
-  components: { Graph },
+  components: { Graph, AssetSelectionPanel },
   mounted() {
     // Initialize our component's chart data without affecting other components
     const assetLineData = this.generateAssetLineData();
@@ -441,6 +434,8 @@ export default {
     return {
       // Flag to track if we're in the middle of a recalculation
       _isRecalculating: false,
+      // Flag to track if a scenario has been run
+      hasScenarioBeenRun: false,
       preRetirementIncome: 0,
       preRetirementIncomeRaw: '',
       availableYears: this.generateAvailableYears(),
@@ -469,6 +464,8 @@ export default {
       rothWithdrawalAmount: 0,
       rothWithdrawalAmountRaw: '',
       rothWithdrawalStartYear: currentYear,
+      // Asset data from API
+      assetBalanceData: null,
       // Initialize assetLineData as null, will be set in mounted
       assetLineData: null,
       // Initialize expenseSummaryData as null, will be set in mounted
@@ -565,6 +562,18 @@ export default {
     };
   },
   computed: {
+    filteredScenarioResults() {
+      // Filter scenario results to start at either conversion start year (if before retirement) or retirement year
+      if (!this.scenarioResults || this.scenarioResults.length === 0) {
+        return [];
+      }
+      
+      const conversionStartYr = parseInt(this.conversionStartYear) || new Date().getFullYear();
+      const retirementYr = this.retirementYear;
+      // If conversion start year is before retirement year, use conversion start year, else use retirement year
+      const tableStartYear = (conversionStartYr < retirementYr) ? conversionStartYr : retirementYr;
+      return this.scenarioResults.filter(row => parseInt(row.year) >= tableStartYear);
+    },
     eligibleAssets() {
       // Show all eligible accounts for conversion (401k, IRA, Roth IRA, etc.)
       const assets = this.assetDetails || [];
@@ -584,11 +593,14 @@ export default {
         return val && parseFloat(val) > 0;
       });
     },
+    // Calculate the retirement year based on client's birthdate and retirement age
     retirementYear() {
-      // Compute the retirement year from client birthdate and scenario retirement age
+      if (!this.client || !this.client.birthdate || !this.scenario || !this.scenario.retirement_age) {
+        return new Date().getFullYear() + 5; // Default to 5 years from now
+      }
+      
       const birthYear = new Date(this.client.birthdate).getFullYear();
-      const retirementAge = this.scenario.retirement_age || 65;
-      return birthYear + retirementAge;
+      return birthYear + parseInt(this.scenario.retirement_age);
     },
     headerColor() {
       const authStore = useAuthStore();
@@ -603,6 +615,7 @@ export default {
       }
       return '#fff'; // Always white for colored backgrounds
     },
+    // Calculate the total conversion amount
     totalConversionAmount() {
       return this.selectedAssetList.reduce((sum, asset) => {
         return sum + (parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0);
@@ -633,6 +646,17 @@ export default {
     }
   },
   methods: {
+    getBaselineIndex(filteredIndex) {
+      // Maps the index in filteredScenarioResults to the corresponding index in baselineMetrics.year_by_year
+      if (!this.baselineMetrics || !this.baselineMetrics.year_by_year || !this.filteredScenarioResults) {
+        return -1;
+      }
+      
+      const year = this.filteredScenarioResults[filteredIndex]?.year;
+      if (!year) return -1;
+      
+      return this.baselineMetrics.year_by_year.findIndex(row => row.year === year);
+    },
     generateAvailableYears() {
       const currentYear = new Date().getFullYear();
       return Array.from({ length: 41 }, (_, i) => currentYear + i);
@@ -1007,7 +1031,7 @@ export default {
       // Ensure the client and scenario have all required fields
       const scenarioData = {
         ...this.scenario,
-        roth_conversion_start_year: conversionStartYear,
+        roth_conversion_start_year: parseInt(conversionStartYear),
         roth_conversion_duration: yearsToConvert,
         roth_withdrawal_amount: rothWithdrawalAmount,
         roth_withdrawal_start_year: rothWithdrawalStartYear,
@@ -1041,7 +1065,7 @@ export default {
         assets: allAssets,
         optimizer_params: {
           mode: modeToSend,
-          conversion_start_year: conversionStartYear,
+          conversion_start_year: parseInt(conversionStartYear),
           years_to_convert: yearsToConvert,
           annual_conversion_amount: annualConversion,
           roth_growth_rate: rothGrowthRate,
@@ -1058,6 +1082,8 @@ export default {
       console.log('Years to convert:', yearsToConvert);
       console.log('Total to convert:', totalToConvert);
       console.log('Annual conversion amount:', annualConversion);
+      console.log('Conversion start year (parsed):', parseInt(conversionStartYear));
+      console.log('Retirement year:', this.retirementYear);
 
       try {
         const authStore = useAuthStore();
@@ -1094,25 +1120,50 @@ export default {
         console.log('API response:', data);
         
         // Only update our specific data if we have valid response data
-        if (data && data.year_by_year && data.year_by_year.length > 0) {
+        if (data) {
           // Store the API response data in component properties
-          this.scenarioResults = data.year_by_year || [];
-          this.comparisonMetrics = data.comparison || {};
-          this.optimalSchedule = data.optimal_schedule || {};
-          this.baselineMetrics = data.baseline || {};
-          
-          // Generate new chart data
-          const newAssetLineData = this.generateAssetLineData();
-          const newExpenseSummaryData = this.generateExpenseSummaryData();
-          
-          // Only update our component's chart data with deep clones to avoid reference issues
-          if (newAssetLineData) {
-            this.assetLineData = JSON.parse(JSON.stringify(newAssetLineData));
+          // Handle the new response structure with baseline and conversion data
+          if (data.conversion && data.conversion.year_by_year) {
+            this.scenarioResults = data.conversion.year_by_year || [];
+          } else if (data.year_by_year) {
+            // Fallback to old API structure
+            this.scenarioResults = data.year_by_year || [];
+          } else {
+            this.scenarioResults = [];
           }
           
+          this.comparisonMetrics = data.comparison || {};
+          this.optimalSchedule = data.optimal_schedule || {};
+          
+          // Handle the new baseline metrics structure
+          if (data.baseline && data.baseline.metrics) {
+            this.baselineMetrics = data.baseline.metrics || {};
+          } else {
+            // Fallback to old API structure
+            this.baselineMetrics = data.baseline || {};
+          }
+          
+          // Use asset balances from API if available
+          if (data.asset_balances) {
+            this.assetBalanceData = data.asset_balances;
+            // Generate asset line data using the API-provided asset balances
+            this.assetLineData = this.generateAssetLineDataFromAPI(data.asset_balances);
+          } else {
+            // Fallback to generating asset line data locally
+            const newAssetLineData = this.generateAssetLineData();
+            if (newAssetLineData) {
+              this.assetLineData = JSON.parse(JSON.stringify(newAssetLineData));
+            }
+          }
+          
+          // Generate expense summary data
+          const newExpenseSummaryData = this.generateExpenseSummaryData();
           if (newExpenseSummaryData) {
             this.expenseSummaryData = JSON.parse(JSON.stringify(newExpenseSummaryData));
           }
+          
+          // Set flag that we have run a scenario
+          this.hasScenarioBeenRun = true;
         } else {
           console.error('Invalid response data structure');
         }
@@ -1563,6 +1614,99 @@ export default {
         };
       }
     },
+    generateAssetLineDataFromAPI(assetBalances) {
+      try {
+        if (!assetBalances || !assetBalances.years || !assetBalances.assets) {
+          console.error('Invalid asset balance data from API');
+          return this.generateAssetLineData(); // Fallback to local generation
+        }
+        
+        const years = assetBalances.years;
+        const assets = assetBalances.assets;
+        const datasets = [];
+        
+        // Create a color map for consistent colors across asset types
+        const colorMap = {
+          'ira': '#007bff',
+          'traditional_ira': '#007bff',
+          '401k': '#28a745',
+          'traditional_401k': '#28a745',
+          'roth_ira': '#6f42c1',
+          'roth_401k': '#17a2b8',
+          'brokerage': '#fd7e14',
+          'savings': '#ffc107',
+          'pension': '#dc3545',
+          'social_security': '#20c997'
+        };
+        
+        // Process each asset type
+        for (const [assetType, balances] of Object.entries(assets)) {
+          // Skip any asset types that don't have both baseline and conversion data
+          if (!balances.baseline || !balances.conversion) continue;
+          
+          // Add baseline dataset
+          datasets.push({
+            label: `${this.formatAssetTypeName(assetType)} (Baseline)`,
+            borderColor: colorMap[assetType.toLowerCase()] || this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.05)',
+            data: balances.baseline,
+            fill: false,
+            borderDash: [5, 5] // Dashed line for baseline
+          });
+          
+          // Add conversion dataset
+          datasets.push({
+            label: `${this.formatAssetTypeName(assetType)} (After Conversion)`,
+            borderColor: colorMap[assetType.toLowerCase()] || this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            data: balances.conversion,
+            fill: false
+          });
+        }
+        
+        // Make sure we have at least one dataset
+        if (datasets.length === 0) {
+          datasets.push({
+            label: 'Default Asset',
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0,123,255,0.1)',
+            data: Array(years.length).fill(0),
+            fill: false
+          });
+        }
+        
+        return {
+          labels: years.map(year => year.toString()),
+          datasets: datasets
+        };
+      } catch (error) {
+        console.error('Error generating asset line data from API:', error);
+        return this.generateAssetLineData(); // Fallback to local generation
+      }
+    },
+    
+    formatAssetTypeName(assetType) {
+      // Convert snake_case to Title Case with proper acronyms
+      if (!assetType) return 'Unknown';
+      
+      // Handle common acronyms
+      const acronyms = {
+        'ira': 'IRA',
+        '401k': '401(k)'
+      };
+      
+      return assetType
+        .split('_')
+        .map(word => {
+          // Check if word is an acronym
+          if (acronyms[word.toLowerCase()]) {
+            return acronyms[word.toLowerCase()];
+          }
+          // Otherwise capitalize first letter
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' ');
+    },
     generateExpenseSummaryData() {
       try {
         // Check if we have real data or need to use defaults
@@ -1606,30 +1750,36 @@ export default {
         // Get values from baseline and optimal schedule
         const baseline = this.baselineMetrics || {};
         const optimal = this.optimalSchedule?.score_breakdown || {};
+        const comparison = this.comparisonMetrics || {};
         
-        // Extract RMD data (use total RMDs or a reasonable estimate)
-        const baselineRMDs = baseline.total_rmds || 250000;
-        const optimalRMDs = optimal.total_rmds || 180000;
+        // Extract RMD data (use total RMDs from the enhanced API response)
+        const baselineRMDs = baseline.total_rmds || 0;
+        const optimalRMDs = optimal.total_rmds || 0;
+        const rmdReduction = comparison.rmd_reduction || (baselineRMDs - optimalRMDs);
         
         // Extract tax data
-        const baselineTaxes = baseline.lifetime_tax || 180000;
-        const optimalTaxes = optimal.lifetime_tax || 140000;
+        const baselineTaxes = baseline.lifetime_tax || 0;
+        const optimalTaxes = optimal.lifetime_tax || 0;
+        const taxSavings = comparison.tax_savings || (baselineTaxes - optimalTaxes);
         
         // Extract Medicare and IRMAA data
         const baselineMedicare = (baseline.lifetime_medicare || 0) + (baseline.total_irmaa || 0);
         const optimalMedicare = (optimal.lifetime_medicare || 0) + (optimal.total_irmaa || 0);
+        const medicareSavings = comparison.medicare_savings || comparison.irmaa_savings || (baselineMedicare - optimalMedicare);
         
-        // Extract inheritance tax (estimate based on final balances)
-        const baselineInheritance = baseline.inheritance_tax || 75000;
-        const optimalInheritance = optimal.inheritance_tax || 45000;
+        // Extract inheritance tax
+        const baselineInheritance = baseline.inheritance_tax || 0;
+        const optimalInheritance = optimal.inheritance_tax || 0;
+        const inheritanceTaxSavings = comparison.inheritance_tax_savings || (baselineInheritance - optimalInheritance);
         
         // Calculate totals
         const baselineTotal = baselineRMDs + baselineTaxes + baselineMedicare + baselineInheritance;
         const optimalTotal = optimalRMDs + optimalTaxes + optimalMedicare + optimalInheritance;
         
         // Calculate savings
-        const savings = baselineTotal - optimalTotal;
-        const savingsPercentage = ((savings / baselineTotal) * 100).toFixed(1);
+        const savings = comparison.total_savings || (baselineTotal - optimalTotal);
+        const savingsPercentage = comparison.total_savings_pct || 
+          ((baselineTotal > 0) ? ((savings / baselineTotal) * 100).toFixed(1) : "0.0");
         
         // Update savings display
         this.totalSavings = savings;
@@ -1653,7 +1803,7 @@ export default {
         };
       } catch (error) {
         console.error('Error generating expense summary data:', error);
-        // Return fallback data
+        // Provide fallback data to ensure the graph doesn't break
         return {
           labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
           datasets: [
