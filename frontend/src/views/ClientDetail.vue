@@ -264,7 +264,8 @@
                             <tr>
                               <th scope="col">#</th>
                               <th scope="col">Name</th>
-                              <th scope="col">Last Updated</th>
+                              <th scope="col">Financial Overview</th>
+                              <th scope="col">Medicare Overview</th>
                               <th scope="col">Actions</th>
                             </tr>
                           </thead>
@@ -272,7 +273,12 @@
                             <tr v-for="(scenario, index) in client.scenarios" :key="scenario.id">
                               <th scope="row">{{ index + 1 }}</th>
                               <td>{{ scenario.name }}</td>
-                              <td>{{ scenario.updated_at }}</td>
+                              <td>
+                                <CircleGraph :value="40" :maxValue="100" colorMode="fixed" fixedColor="#4285f4" />
+                              </td>
+                              <td>
+                                <CircleGraph :value="20" :maxValue="100" colorMode="medicare" />
+                              </td>
                               <td>
                                 <router-link :to="{ 
                                   name: 'ScenarioDetail',
@@ -282,7 +288,7 @@
                                   class="btn btn-sm btn-outline-primary">
                                   View
                                 </router-link>
-                                <!-- <router-link :to="`/clients/${client.id}/scenarios/detail/${scenario.id}`" class="btn btn-sm btn-outline-primary">View</router-link>-->
+                                <button @click="deleteScenario(scenario.id)" class="btn btn-sm btn-outline-danger ms-2">Delete</button>
                               </td>
                             </tr>
                           </tbody>
@@ -352,9 +358,11 @@
 <script>
 import axios from 'axios';
 import Sortable from 'sortablejs';
+import CircleGraph from '../components/CircleGraph.vue';
 
 export default {
   name: 'ClientDetail',
+  components: { CircleGraph },
   data() {
     return {
       client: null,
@@ -1043,6 +1051,19 @@ export default {
         return (size / (1024 * 1024)).toFixed(2) + ' MB';
       } else {
         return (size / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+      }
+    },
+    async deleteScenario(scenarioId) {
+      if (!confirm('Are you sure you want to delete this scenario?')) return;
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        await axios.delete(`http://localhost:8000/api/scenarios/${scenarioId}/`, { headers });
+        // Remove from local array
+        this.client.scenarios = this.client.scenarios.filter(s => s.id !== scenarioId);
+      } catch (error) {
+        console.error('Error deleting scenario:', error);
+        alert('Failed to delete scenario. Please try again.');
       }
     },
   }
