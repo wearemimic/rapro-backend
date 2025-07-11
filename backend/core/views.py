@@ -23,6 +23,7 @@ from .serializers import ClientDetailSerializer, ClientEditSerializer, ClientCre
 from .serializers import ScenarioCreateSerializer, ScenarioUpdateSerializer, IncomeSourceUpdateSerializer
 from .serializers import ReportTemplateSerializer, ReportTemplateDetailSerializer, TemplateSlideSerializer
 from .scenario_processor import ScenarioProcessor
+from .roth_conversion_processor import RothConversionProcessor
 from django.http import HttpResponse, JsonResponse
 import logging
 from .serializers import AdvisorRegistrationSerializer
@@ -375,208 +376,155 @@ def update_scenario_assets(request, scenario_id):
     except Scenario.DoesNotExist:
         return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-class RothOptimizeAPIView(APIView):
+class RothConversionAPIView(APIView):
+    """
+    API endpoint for processing Roth conversion scenarios.
+    
+    This endpoint accepts scenario data, client data, and Roth conversion parameters,
+    and returns a detailed analysis of the Roth conversion impact, including:
+    - Baseline scenario (without Roth conversion)
+    - Conversion scenario (with Roth conversion)
+    - Comparison of key metrics (taxes, Medicare costs, RMDs, inheritance tax)
+    - Asset balance projections for visualization
+    """
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     
+    def _format_comparison_metrics(self, comparison):
+        """
+        Format comparison metrics to match the expected frontend structure.
+        
+        The frontend expects metrics like:
+        {
+            'rmd_reduction': 100000.0,
+            'rmd_reduction_pct': 10.0,
+            'tax_savings': 50000.0,
+            'tax_savings_pct': 5.0,
+            ...
+        }
+        """
+        formatted = {}
+        
+        # Format RMD reduction
+        if 'total_rmds' in comparison:
+            rmd_diff = comparison['total_rmds']['difference']
+            formatted['rmd_reduction'] = -rmd_diff  # Negate to get reduction
+            formatted['rmd_reduction_pct'] = -comparison['total_rmds']['percent_change']
+        
+        # Format tax savings
+        if 'lifetime_tax' in comparison:
+            tax_diff = comparison['lifetime_tax']['difference']
+            formatted['tax_savings'] = -tax_diff  # Negate to get savings
+            formatted['tax_savings_pct'] = -comparison['lifetime_tax']['percent_change']
+        
+        # Format Medicare savings
+        if 'lifetime_medicare' in comparison:
+            medicare_diff = comparison['lifetime_medicare']['difference']
+            formatted['medicare_savings'] = -medicare_diff
+            formatted['medicare_savings_pct'] = -comparison['lifetime_medicare']['percent_change']
+        
+        # Format IRMAA savings
+        if 'total_irmaa' in comparison:
+            irmaa_diff = comparison['total_irmaa']['difference']
+            formatted['irmaa_savings'] = -irmaa_diff
+            formatted['irmaa_savings_pct'] = -comparison['total_irmaa']['percent_change']
+        
+        # Format inheritance tax savings
+        if 'inheritance_tax' in comparison:
+            inheritance_diff = comparison['inheritance_tax']['difference']
+            formatted['inheritance_tax_savings'] = -inheritance_diff
+            formatted['inheritance_tax_savings_pct'] = -comparison['inheritance_tax']['percent_change']
+        
+        # Format net income increase
+        if 'cumulative_net_income' in comparison:
+            income_diff = comparison['cumulative_net_income']['difference']
+            formatted['net_income_increase'] = income_diff
+            formatted['net_income_increase_pct'] = comparison['cumulative_net_income']['percent_change']
+        
+        # Format Roth increase
+        if 'final_roth' in comparison:
+            roth_diff = comparison['final_roth']['difference']
+            formatted['roth_increase'] = roth_diff
+            formatted['roth_increase_pct'] = comparison['final_roth']['percent_change']
+        
+        # Format total savings
+        if 'total_expenses' in comparison:
+            total_diff = comparison['total_expenses']['difference']
+            formatted['total_savings'] = -total_diff
+            formatted['total_savings_pct'] = -comparison['total_expenses']['percent_change']
+        
+        return formatted
+    
     def post(self, request):
         try:
+            # Extract data from request
             scenario = request.data.get('scenario')
             client = request.data.get('client')
             spouse = request.data.get('spouse')
             assets = request.data.get('assets')
-            optimizer_params = request.data.get('optimizer_params')
+            conversion_params = request.data.get('optimizer_params')
             
-            print("Received data:")
+            # Log received data
+            print("Received data for Roth conversion:")
             print(f"Scenario: {scenario}")
             print(f"Client: {client}")
             print(f"Spouse: {spouse}")
             print(f"Assets count: {len(assets) if assets else 0}")
-            print(f"Optimizer params: {optimizer_params}")
+            print(f"Conversion params: {conversion_params}")
             
-            if not optimizer_params:
-                print("ERROR: Missing optimizer_params")
-                return Response({'error': 'Missing optimizer_params'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            mode = optimizer_params.get('mode', 'auto')  # default to auto if not specified
-
-            if not scenario or not client or assets is None or not optimizer_params:
+            # Validate required fields
+            if not scenario or not client or assets is None or not conversion_params:
                 missing = []
                 if not scenario: missing.append('scenario')
                 if not client: missing.append('client')
                 if assets is None: missing.append('assets')
-                if not optimizer_params: missing.append('optimizer_params')
+                if not conversion_params: missing.append('optimizer_params')
                 error_msg = f"Missing required fields: {', '.join(missing)}"
                 print(f"ERROR: {error_msg}")
                 return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
-
-            if mode == 'manual':
-                                    # Manual mode: straight calculation
-                try:
-                    years_to_convert = int(optimizer_params.get('years_to_convert', 1))
-                    start_year = int(optimizer_params.get('conversion_start_year', scenario.get('current_year', 2025)))
-                    print(f"DEBUG: Received conversion_start_year={start_year} in API view")
-                    
-                    # Sum max_to_convert for selected assets
-                    total_to_convert = Decimal('0')
-                    for asset in assets:
-                        if asset.get('max_to_convert'):
-                            try:
-                                max_to_convert = Decimal(str(asset.get('max_to_convert', '0')))
-                                total_to_convert += max_to_convert
-                            except (ValueError, TypeError, InvalidOperation):
-                                print(f"Warning: Invalid max_to_convert value: {asset.get('max_to_convert')}")
-                    
-                    # Calculate annual conversion amount
-                    annual_conversion = Decimal('0')
-                    if years_to_convert > 0:
-                        annual_conversion = total_to_convert / Decimal(str(years_to_convert))
-
-                    # Prepare the scenario with conversion parameters
-                    scenario_manual = {
-                        **scenario,
-                        'roth_conversion_start_year': start_year,
-                        'roth_conversion_duration': years_to_convert,
-                        'roth_conversion_annual_amount': annual_conversion
-                    }
-                    
-                    # Ensure required fields are present
-                    if 'part_b_inflation_rate' not in scenario_manual:
-                        scenario_manual['part_b_inflation_rate'] = 3.0
-                    if 'part_d_inflation_rate' not in scenario_manual:
-                        scenario_manual['part_d_inflation_rate'] = 3.0
-                    if 'retirement_age' not in scenario_manual:
-                        scenario_manual['retirement_age'] = 65
-                    if 'mortality_age' not in scenario_manual:
-                        scenario_manual['mortality_age'] = 90
-
-                    # Create baseline scenario (without conversions)
-                    baseline_scenario = {**scenario_manual}
-                    baseline_scenario['roth_conversion_start_year'] = None
-                    baseline_scenario['roth_conversion_duration'] = None
-                    baseline_scenario['roth_conversion_annual_amount'] = None
-
-                    try:
-                        # Run baseline scenario
-                        baseline_processor = ScenarioProcessor.from_dicts(
-                            scenario=baseline_scenario,
-                            client=client,
-                            spouse=spouse,
-                            assets=copy.deepcopy(assets),  # Deep copy to avoid modifying original assets
-                            debug=True
-                        )
-                        baseline_results = baseline_processor.calculate()
-                        
-                        # Filter baseline results to only include years from the start year
-                        baseline_results = [row for row in baseline_results if row.get('year', 0) >= start_year]
-                        
-                        # Extract baseline metrics
-                        from .optimizer import RothConversionOptimizer
-                        optimizer = RothConversionOptimizer(scenario, client, spouse, copy.deepcopy(assets), optimizer_params)
-                        baseline_metrics = optimizer._extract_metrics(baseline_results)
-                        
-                        # Run conversion scenario
-                        conversion_processor = ScenarioProcessor.from_dicts(
-                            scenario=scenario_manual,
-                            client=client,
-                            spouse=spouse,
-                            assets=assets,
-                            debug=True
-                        )
-                        conversion_results = conversion_processor.calculate()
-                        
-                        # Filter conversion results to only include years from the start year
-                        conversion_results = [row for row in conversion_results if row.get('year', 0) >= start_year]
-                        
-                        # Extract conversion metrics
-                        conversion_metrics = optimizer._extract_metrics(conversion_results)
-                        
-                        # Calculate comparison metrics
-                        comparison = optimizer._compare_metrics(baseline_metrics, conversion_metrics)
-                        
-                        # Extract asset balances for charting
-                        asset_balances = self._extract_asset_balances(baseline_results, conversion_results)
-                        
-                        # Log the conversion schedule
-                        print(f"Manual Roth Conversion Schedule:")
-                        print(f"Start Year: {start_year}")
-                        print(f"Duration: {years_to_convert} years")
-                        print(f"Total to Convert: ${total_to_convert:,.2f}")
-                        print(f"Annual Amount: ${annual_conversion:,.2f}")
-                        
-                        return Response({
-                            "optimal_schedule": {
-                                "start_year": start_year,
-                                "duration": years_to_convert,
-                                "annual_amount": annual_conversion,
-                                "total_amount": total_to_convert,
-                                "score_breakdown": conversion_metrics
-                            },
-                            "baseline": {
-                                "metrics": baseline_metrics,
-                                "year_by_year": baseline_results
-                            },
-                            "conversion": {
-                                "metrics": conversion_metrics,
-                                "year_by_year": conversion_results
-                            },
-                            "comparison": comparison,
-                            "asset_balances": asset_balances
-                        }, status=status.HTTP_200_OK)
-                    except Exception as e:
-                        print(f"ERROR calculating scenarios: {e}")
-                        return Response({'error': f'Error calculating scenarios: {str(e)}'}, 
-                                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                except Exception as e:
-                    print(f"ERROR in manual mode: {e}")
-                    return Response({'error': f'Error in manual mode: {str(e)}'}, 
-                                   status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                # Auto mode: run optimizer as before
-                optimizer = RothConversionOptimizer(scenario, client, spouse, assets, optimizer_params)
-                result = optimizer.run()
-                # Filter results to only years >= roth_conversion_start_year if set
-                filter_year = optimizer_params.get('conversion_start_year') or scenario.get('roth_conversion_start_year')
-                if filter_year and result.get('year_by_year'):
-                    try:
-                        filter_year = int(filter_year)
-                        result['year_by_year'] = [row for row in result['year_by_year'] if row.get('year', 0) >= filter_year]
-                    except Exception:
-                        pass
-                return Response(result, status=status.HTTP_200_OK)
-        except Exception as e:
-            print(f"ERROR: {str(e)}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-    def _extract_asset_balances(self, baseline_results, conversion_results):
-        """
-        Extract asset balances for charting.
-        """
-        if not baseline_results or not conversion_results:
-            return {'years': [], 'assets': {}}
+            # Create and process the Roth conversion
+            processor = RothConversionProcessor(
+                scenario=scenario,
+                client=client,
+                spouse=spouse,
+                assets=assets,
+                conversion_params=conversion_params
+            )
             
-        years = [row.get('year', 0) for row in baseline_results]
-        
-        # Find all asset balance fields
-        balance_fields = set()
-        for row in baseline_results + conversion_results:
-            for key in row:
-                if key.endswith('_balance'):
-                    balance_fields.add(key)
-        
-        # Create datasets for each asset type
-        asset_datasets = {}
-        for field in balance_fields:
-            asset_type = field.replace('_balance', '')
-            asset_datasets[asset_type] = {
-                'baseline': [row.get(field, 0) for row in baseline_results],
-                'conversion': [row.get(field, 0) for row in conversion_results]
+            # Process the conversion and get results
+            result = processor.process()
+            
+            # Transform the result to match the expected frontend structure
+            transformed_result = {
+                'baseline': {
+                    'metrics': result['metrics']['baseline'],
+                    'year_by_year': result['baseline_results']
+                },
+                'conversion': {
+                    'metrics': result['metrics']['conversion'],
+                    'year_by_year': result['conversion_results']
+                },
+                'comparison': self._format_comparison_metrics(result['metrics']['comparison']),
+                'optimal_schedule': {
+                    'start_year': result['conversion_params']['conversion_start_year'],
+                    'duration': result['conversion_params']['years_to_convert'],
+                    'annual_amount': result['conversion_params']['annual_conversion'],
+                    'total_amount': result['conversion_params']['total_conversion'],
+                    'score_breakdown': result['metrics']['conversion']
+                },
+                'asset_balances': result['asset_balances'],
+                'scenarioResults': result['conversion_results']  # Add scenarioResults for frontend
             }
-        
-        return {
-            'years': years,
-            'assets': asset_datasets
-        }
+            
+            # Return the transformed results
+            return Response(transformed_result, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"ERROR in Roth conversion processing: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

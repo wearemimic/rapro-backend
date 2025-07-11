@@ -113,14 +113,18 @@ class RothConversionOptimizer:
             except Exception:
                 pass
         
-        conversion_start_year = best_result['schedule']['start_year']
-        filter_year = conversion_start_year
-        if retirement_year:
-            filter_year = min(retirement_year, conversion_start_year)
+        # conversion_start_year = best_result['schedule']['start_year']
+        # filter_year = conversion_start_year
+        # if retirement_year:
+        #     filter_year = min(retirement_year, conversion_start_year)
         
         # Filter baseline and conversion results to start from the filter year
-        filtered_baseline = [row for row in baseline_results if row.get('year', 0) >= filter_year]
-        filtered_conversion = [row for row in best_result['year_by_year'] if row.get('year', 0) >= filter_year]
+        # filtered_baseline = [row for row in baseline_results if row.get('year', 0) >= filter_year]
+        # filtered_conversion = [row for row in best_result['year_by_year'] if row.get('year', 0) >= filter_year]
+
+        # Instead, return all years (no filtering)
+        filtered_baseline = baseline_results
+        filtered_conversion = best_result['year_by_year']
         
         # 6. Prepare enhanced API contract output
         return {

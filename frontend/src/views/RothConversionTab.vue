@@ -392,6 +392,7 @@ import AssetSelectionPanel from '../components/RothConversion/AssetSelectionPane
 import { useAuthStore } from '@/stores/auth';
 import { computed } from 'vue';
 import './RothConversionTab.css';
+import { apiService } from '@/services/api';
 
 export default {
   components: { Graph, AssetSelectionPanel },
@@ -563,16 +564,25 @@ export default {
   },
   computed: {
     filteredScenarioResults() {
-      // Filter scenario results to start at either conversion start year (if before retirement) or retirement year
+      // Filter scenario results to start at the conversion start year
       if (!this.scenarioResults || this.scenarioResults.length === 0) {
         return [];
       }
       
-      const conversionStartYr = parseInt(this.conversionStartYear) || new Date().getFullYear();
-      const retirementYr = this.retirementYear;
-      // If conversion start year is before retirement year, use conversion start year, else use retirement year
-      const tableStartYear = (conversionStartYr < retirementYr) ? conversionStartYr : retirementYr;
-      return this.scenarioResults.filter(row => parseInt(row.year) >= tableStartYear);
+      // Get conversion start year from optimal schedule or UI
+      const conversionStartYr = this.optimalSchedule && this.optimalSchedule.start_year 
+        ? parseInt(this.optimalSchedule.start_year) 
+        : parseInt(this.conversionStartYear) || new Date().getFullYear();
+      
+      // Always start from the conversion start year, ignoring retirement year
+      const tableStartYear = conversionStartYr;
+      
+      // Log for debugging
+      console.log(`Filtering scenario results to start from year ${tableStartYear}`);
+      
+      // Filter scenario results
+      const filtered = this.scenarioResults.filter(row => parseInt(row.year) >= tableStartYear);
+      return filtered;
     },
     eligibleAssets() {
       // Show all eligible accounts for conversion (401k, IRA, Roth IRA, etc.)
@@ -1099,7 +1109,7 @@ export default {
         console.log('Calculating Roth conversion...');
         
         console.log('Sending request with token:', token);
-        const response = await fetch('http://localhost:8000/api/roth-optimize/', {
+        const response = await fetch(apiService.getUrl('/api/roth-optimize/'), {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -1134,6 +1144,12 @@ export default {
           
           this.comparisonMetrics = data.comparison || {};
           this.optimalSchedule = data.optimal_schedule || {};
+          
+          // Update the UI's conversion start year to match the optimal schedule
+          if (this.optimalSchedule && this.optimalSchedule.start_year) {
+            this.conversionStartYear = parseInt(this.optimalSchedule.start_year);
+            console.log('Updated UI conversion start year to match optimal schedule:', this.conversionStartYear);
+          }
           
           // Handle the new baseline metrics structure
           if (data.baseline && data.baseline.metrics) {
@@ -1241,7 +1257,7 @@ export default {
         
         // Update the scenario with Roth conversion parameters
         try {
-          const response = await fetch(`http://localhost:8000/api/scenarios/${this.scenario.id}/update/`, {
+          const response = await fetch(apiService.getUrl(`/api/scenarios/${this.scenario.id}/update/`), {
             method: 'PUT',
             headers: { 
               'Content-Type': 'application/json',
@@ -1279,7 +1295,7 @@ export default {
         // Save asset updates if there are any
         if (assetUpdates.length > 0) {
           try {
-            const assetResponse = await fetch(`http://localhost:8000/api/scenarios/${this.scenario.id}/update-assets/`, {
+            const assetResponse = await fetch(apiService.getUrl(`/api/scenarios/${this.scenario.id}/update-assets/`), {
               method: 'PUT',
               headers: { 
                 'Content-Type': 'application/json',

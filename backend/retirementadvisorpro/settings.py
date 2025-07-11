@@ -31,7 +31,7 @@ DEBUG = True
 AUTH_USER_MODEL = 'core.CustomUser'
 
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.83', '*']
 
 
 # Application definition
@@ -72,6 +72,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite default development server
     "http://localhost:8080",
     "http://localhost:3000",  # <-- added for frontend dev server
+    "http://192.168.1.83:5173",  # Local IP with Vite
+    "http://192.168.1.83:8080",
+    "http://192.168.1.83:3000",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
