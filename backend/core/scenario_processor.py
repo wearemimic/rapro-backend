@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from core.models import Scenario, Client, Spouse, IncomeSource
 
 # RMD Table based on IRS Uniform Lifetime Table
@@ -103,6 +103,193 @@ class ScenarioProcessor:
                     max_end_year = asset_end_year
 
         self.end_year = max_end_year
+        
+    @classmethod
+    def from_dicts(cls, scenario, client, spouse, assets, debug=False):
+        """
+        Create a ScenarioProcessor instance from dictionaries instead of database objects.
+        
+        Parameters:
+        - scenario: Dictionary containing scenario data
+        - client: Dictionary containing client data
+        - spouse: Dictionary containing spouse data (or None)
+        - assets: List of dictionaries containing asset data
+        - debug: Boolean to enable debug logging
+        
+        Returns:
+        - ScenarioProcessor instance initialized with the provided data
+        """
+        instance = cls.__new__(cls)
+        instance.debug = debug
+        
+        # Log input data for debugging
+        if debug:
+            print(f"ScenarioProcessor.from_dicts() called with:")
+            print(f"Scenario: {scenario}")
+            print(f"Client: {client}")
+            print(f"Spouse: {spouse}")
+            print(f"Assets count: {len(assets) if assets else 0}")
+        
+        # Validate client data
+        if not client:
+            raise ValueError("Client data is required")
+            
+        # Ensure required client fields exist
+        required_client_fields = {
+            'tax_status': 'Single',
+            'gender': 'M',
+            'birthdate': None,  # Will be handled separately
+            'first_name': 'Client',
+            'last_name': '',
+            'email': '',
+            'state': 'CA'
+        }
+        
+        for field, default_value in required_client_fields.items():
+            if field not in client or client[field] is None:
+                if field == 'birthdate':  # Skip birthdate as it's handled separately
+                    continue
+                print(f"WARNING: Client missing required field '{field}', using default: {default_value}")
+                client[field] = default_value
+        
+        # Set scenario attributes directly from the dictionary
+        instance.scenario = type('obj', (object,), scenario)
+        
+        # Set client attributes
+        instance.client = type('obj', (object,), client)
+        
+        # Set spouse attributes if provided
+        if spouse:
+            instance.spouse = type('obj', (object,), spouse)
+        else:
+            instance.spouse = None
+        
+        # Set birthdate attributes with proper error handling
+        try:
+            if isinstance(client.get('birthdate'), str):
+                instance.primary_birthdate = datetime.datetime.strptime(client['birthdate'], '%Y-%m-%d').date()
+            else:
+                instance.primary_birthdate = client.get('birthdate')
+            
+            if not instance.primary_birthdate:
+                # If birthdate is missing, use a default (current year - 65)
+                current_year = datetime.datetime.now().year
+                instance.primary_birthdate = datetime.date(current_year - 65, 1, 1)
+                print(f"WARNING: Client birthdate missing, using default: {instance.primary_birthdate}")
+                # Update the client dictionary with the default birthdate
+                client['birthdate'] = instance.primary_birthdate.strftime('%Y-%m-%d')
+        except Exception as e:
+            print(f"ERROR parsing client birthdate: {e}")
+            # Default to 65 years ago
+            current_year = datetime.datetime.now().year
+            instance.primary_birthdate = datetime.date(current_year - 65, 1, 1)
+            # Update the client dictionary with the default birthdate
+            client['birthdate'] = instance.primary_birthdate.strftime('%Y-%m-%d')
+        
+        # Handle spouse birthdate
+        instance.spouse_birthdate = None
+        if spouse and 'birthdate' in spouse and spouse['birthdate']:
+            try:
+                if isinstance(spouse['birthdate'], str):
+                    instance.spouse_birthdate = datetime.datetime.strptime(spouse['birthdate'], '%Y-%m-%d').date()
+                else:
+                    instance.spouse_birthdate = spouse['birthdate']
+            except Exception as e:
+                print(f"ERROR parsing spouse birthdate: {e}")
+        
+        # Set tax status with default
+        instance.tax_status = client.get('tax_status', 'Single')
+        
+        # Set assets with validation
+        if not assets:
+            print("WARNING: No assets provided, using empty list")
+            instance.assets = []
+        else:
+            # Validate each asset has required fields
+            validated_assets = []
+            for asset in assets:
+                # Ensure each asset has the minimum required fields
+                if 'income_type' not in asset:
+                    print(f"WARNING: Asset missing income_type, skipping: {asset}")
+                    continue
+                
+                # Ensure numeric fields are properly set
+                for field in ['current_asset_balance', 'monthly_amount', 'monthly_contribution', 'rate_of_return']:
+                    if field not in asset or asset[field] is None:
+                        asset[field] = 0
+                
+                # Ensure age fields are set
+                if 'age_to_begin_withdrawal' not in asset or asset['age_to_begin_withdrawal'] is None:
+                    asset['age_to_begin_withdrawal'] = 65
+                if 'age_to_end_withdrawal' not in asset or asset['age_to_end_withdrawal'] is None:
+                    asset['age_to_end_withdrawal'] = 90
+                
+                validated_assets.append(asset)
+            
+            instance.assets = validated_assets
+        
+        # Log initialization
+        instance._log_debug(f"Initialized from dictionaries with {len(instance.assets)} assets")
+        
+        # STEP 1: Scenario Initialization
+        current_year = datetime.datetime.now().year
+        
+        # Get scenario parameters with defaults
+        retirement_age_primary = getattr(instance.scenario, 'retirement_age', 65)
+        retirement_age_spouse = getattr(instance.scenario, 'spouse_retirement_age', 65)
+        mortality_age_primary = getattr(instance.scenario, 'mortality_age', 90)
+        mortality_age_spouse = getattr(instance.scenario, 'spouse_mortality_age', mortality_age_primary)
+        
+        # Add required inflation rates if missing
+        if not hasattr(instance.scenario, 'part_b_inflation_rate'):
+            setattr(instance.scenario, 'part_b_inflation_rate', 3.0)
+        if not hasattr(instance.scenario, 'part_d_inflation_rate'):
+            setattr(instance.scenario, 'part_d_inflation_rate', 3.0)
+        
+        # Calculate current ages
+        current_age_primary = current_year - instance.primary_birthdate.year
+        if instance.spouse_birthdate:
+            current_age_spouse = current_year - instance.spouse_birthdate.year
+        else:
+            current_age_spouse = None
+            
+        # Calculate start year based on retirement
+        if instance.tax_status == "Single" or not instance.spouse_birthdate:
+            years_until_retirement = retirement_age_primary - current_age_primary
+            instance.start_year = current_year + max(years_until_retirement, 0)
+        else:
+            years_until_retirement_primary = retirement_age_primary - current_age_primary
+            years_until_retirement_spouse = retirement_age_spouse - current_age_spouse
+            start_year_primary = current_year + max(years_until_retirement_primary, 0)
+            start_year_spouse = current_year + max(years_until_retirement_spouse, 0)
+            instance.start_year = min(start_year_primary, start_year_spouse)
+            
+        # Calculate end years based on mortality
+        end_year_primary = instance.primary_birthdate.year + mortality_age_primary
+        end_year_spouse = instance.spouse_birthdate.year + mortality_age_spouse if instance.spouse_birthdate else end_year_primary
+        
+        max_end_year = max(end_year_primary, end_year_spouse)
+        
+        # Check asset end years
+        for asset in instance.assets:
+            start_age = asset.get("age_to_begin_withdrawal")
+            end_age = asset.get("age_to_end_withdrawal")
+            owner = asset.get("owned_by", "primary")
+            birthdate = instance.primary_birthdate if owner == "primary" else instance.spouse_birthdate
+            if birthdate and end_age is not None:
+                asset_end_year = birthdate.year + end_age
+                if asset_end_year > max_end_year:
+                    max_end_year = asset_end_year
+                    
+        instance.end_year = max_end_year
+        
+        # Set Roth conversion parameters
+        if hasattr(instance.scenario, 'roth_conversion_start_year') and hasattr(instance.scenario, 'roth_conversion_duration'):
+            instance._log_debug(f"Roth conversion parameters: start_year={instance.scenario.roth_conversion_start_year}, duration={instance.scenario.roth_conversion_duration}")
+        else:
+            instance._log_debug("No Roth conversion parameters set")
+        
+        return instance
 
     def calculate(self):
         results = []
@@ -119,6 +306,18 @@ class ScenarioProcessor:
         primary_alive = True
         spouse_alive = True if self.spouse_birthdate else False
         tax_status = self.tax_status
+
+        # --- NEW LOGIC: Determine table start year ---
+        retirement_year = self.primary_birthdate.year + (self.scenario.retirement_age or 65)
+        conversion_start_year = getattr(self.scenario, 'roth_conversion_start_year', None)
+        if conversion_start_year is None:
+            table_start_year = retirement_year
+        else:
+            table_start_year = min(retirement_year, int(conversion_start_year))
+            
+        print(f"DEBUG: retirement_year={retirement_year}, conversion_start_year={conversion_start_year}, table_start_year={table_start_year}")
+
+        pre_retirement_income = getattr(self.scenario, 'pre_retirement_income', 0)
 
         for year in range(self.start_year, last_mortality_year + 1):
             primary_age = year - self.primary_birthdate.year
@@ -150,12 +349,15 @@ class ScenarioProcessor:
             if primary_alive or spouse_alive:
                 gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
                 ss_income = self._calculate_social_security(year, primary_alive, spouse_alive)
+                
+                # Add pre-retirement income if we're before retirement year
+                if year < retirement_year and pre_retirement_income:
+                    pre_retirement_income_decimal = Decimal(str(pre_retirement_income))
+                    gross_income += pre_retirement_income_decimal
+                    print(f"  Adding pre-retirement income: ${pre_retirement_income_decimal:,.2f}")
+                    
             agi_excl_ss = Decimal(gross_income) - Decimal(ss_income)
-            
-            print(f"INCOME BREAKDOWN:")
-            print(f"  Gross Income: ${gross_income:,.2f}")
-            print(f"  Social Security: ${ss_income:,.2f}")
-            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
+            taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
 
             # Calculate provisional income for debug
             provisional_income = agi_excl_ss + Decimal('0.5') * Decimal(ss_income)
@@ -176,8 +378,6 @@ class ScenarioProcessor:
             print(f"  Base: ${base_threshold:,.2f}")
             print(f"  Additional: ${additional_threshold:,.2f}")
 
-            taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
-            
             # Calculate how much would be taxable based on IRS rules
             if provisional_income <= base_threshold:
                 taxable_portion = "0%"
@@ -319,8 +519,14 @@ class ScenarioProcessor:
                 "tax_bracket": tax_bracket
             }
 
+            # Add asset balances to summary with safe rounding
+            def safe_round(val, ndigits=2):
+                try:
+                    return round(Decimal(val), ndigits)
+                except (InvalidOperation, TypeError, ValueError):
+                    return Decimal('0.00')
             for asset in self.assets:
-                summary[f"{asset['income_type']}_balance"] = round(asset["current_asset_balance"], 2)
+                summary[f"{asset['income_type']}_balance"] = safe_round(asset.get("current_asset_balance", 0))
 
             self._log_debug(f"Year {year}: {summary}")
             results.append(summary)
@@ -719,12 +925,19 @@ class ScenarioProcessor:
         """
         roth_conversion_start_year = self.scenario.roth_conversion_start_year
         roth_conversion_duration = self.scenario.roth_conversion_duration
-        roth_conversion_annual_amount = self.scenario.roth_conversion_annual_amount
+        roth_conversion_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
+        
+        # Convert to Decimal if it's not already
+        if not isinstance(roth_conversion_annual_amount, Decimal):
+            try:
+                roth_conversion_annual_amount = Decimal(str(roth_conversion_annual_amount))
+            except:
+                roth_conversion_annual_amount = Decimal('0')
 
         # Add error handling for None values
         if roth_conversion_start_year is None or roth_conversion_duration is None:
             self._log_debug(f"Roth conversion parameters are not set: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}")
-            return 0
+            return Decimal('0')
 
         if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
             # Apply pro-rata asset depletion across eligible balances
@@ -739,7 +952,7 @@ class ScenarioProcessor:
             # Add conversion amount to taxable income and MAGI
             return roth_conversion_annual_amount
         else:
-            return 0
+            return Decimal('0')
 
     def _calculate_asset_spend_down(self, year):
         """
@@ -757,23 +970,70 @@ class ScenarioProcessor:
 
             # Apply RMD override if calculated RMD > requested withdrawals
             rmd_amount = self._calculate_rmd(asset, year)
-            withdrawal_amount = asset.get("withdrawal_amount", 0)
+            withdrawal_amount = Decimal(str(asset.get("withdrawal_amount", 0)))
             if rmd_amount > withdrawal_amount:
                 asset["withdrawal_amount"] = rmd_amount
 
             # Apply Roth conversion depletion and growth
             roth_conversion_amount = self._calculate_roth_conversion(year)
-            asset["current_asset_balance"] = asset.get("current_asset_balance") or 0
+            
+            # Ensure current_asset_balance is a Decimal
+            if "current_asset_balance" not in asset or asset["current_asset_balance"] is None:
+                asset["current_asset_balance"] = Decimal('0')
+            elif not isinstance(asset["current_asset_balance"], Decimal):
+                asset["current_asset_balance"] = Decimal(str(asset["current_asset_balance"]))
+                
+            # Subtract the Roth conversion amount (which is already a Decimal)
             asset["current_asset_balance"] -= roth_conversion_amount
 
         # Prevent negative balances
         for asset in self.assets:
             if asset["current_asset_balance"] < 0:
-                asset["current_asset_balance"] = 0
+                asset["current_asset_balance"] = Decimal('0')
 
     def _log_debug(self, message):
         if self.debug:
             print(f"🔍 Debug: {message}")
+
+    def _calculate_inheritance_tax(self, final_year_data):
+        """
+        Calculate estimated inheritance tax based on remaining balances.
+        This is a simplified model that can be enhanced with more specific tax rules.
+        """
+        # Get tax status for inheritance tax calculation
+        tax_status = getattr(self.client, 'tax_status', 'Single').lower()
+        
+        # Extract traditional (taxable) and Roth (non-taxable) balances
+        traditional_balances = Decimal('0')
+        roth_balances = Decimal('0')
+        
+        # Look for any asset balance in the final year data
+        for key, value in final_year_data.items():
+            if key.endswith('_balance'):
+                try:
+                    balance = Decimal(str(value))
+                    if 'roth' in key.lower():
+                        roth_balances += balance
+                    else:
+                        traditional_balances += balance
+                except (ValueError, TypeError):
+                    pass
+        
+        # Apply simplified inheritance tax model
+        # Traditional assets are subject to income tax for beneficiaries
+        # Roth assets pass tax-free
+        if tax_status in ['married filing jointly', 'qualifying widow(er)']:
+            # Higher exemption for married couples
+            tax_rate = Decimal('0.24')  # Simplified average tax rate for beneficiaries
+        else:
+            tax_rate = Decimal('0.22')  # Simplified average tax rate for beneficiaries
+        
+        inheritance_tax = traditional_balances * tax_rate
+        
+        self._log_debug(f"Inheritance tax calculation: Traditional balances: {traditional_balances}, Roth balances: {roth_balances}, Tax rate: {tax_rate}, Inheritance tax: {inheritance_tax}")
+        
+        return inheritance_tax
+
 
 def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, filing_status):
     # Convert inputs to Decimal for consistency

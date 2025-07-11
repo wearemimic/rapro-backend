@@ -64,4 +64,160 @@ datalist option::before {
   width: 2px;
   height: 10px;
   background: #ddd; /* Match the slider line color */
+}
+
+.card-header,
+.card-header h5 {
+  color: #fff !important;
+}
+
+/* Custom styles for expense summary chart */
+.expense-summary-legend {
+  margin-top: 15px;
+}
+
+/* Asset Summary Section Styles */
+.asset-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.asset-summary-table th,
+.asset-summary-table td {
+  padding: 10px;
+  border: 1px solid #dee2e6;
+}
+
+.asset-summary-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.asset-summary-table tr.affected-asset {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.asset-summary-table tr.roth-asset {
+  background-color: rgba(111, 66, 193, 0.05);
+}
+
+.asset-summary-table tr.roth-asset td:first-child {
+  font-weight: 600;
+  color: #6f42c1;
+}
+
+.asset-summary-legend {
+  display: flex;
+  justify-content: center;
+  margin-top: 15px;
+  margin-bottom: 20px;
+}
+
+.asset-summary-legend-item {
+  display: flex;
+  align-items: center;
+  margin: 0 10px;
+}
+
+.asset-summary-legend-color {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+
+.asset-balance-timeline {
+  position: relative;
+  margin-top: 20px;
+}
+
+.withdrawal-year-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px dashed rgba(220, 53, 69, 0.5);
+  z-index: 1;
+}
+
+.withdrawal-year-label {
+  position: absolute;
+  top: -25px;
+  transform: translateX(-50%);
+  background-color: rgba(220, 53, 69, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Hover effects for asset rows */
+.asset-summary-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Responsive styles for asset summary */
+@media (max-width: 768px) {
+  .asset-summary-table {
+    font-size: 14px;
+  }
+  
+  .asset-summary-table th,
+  .asset-summary-table td {
+    padding: 6px;
+  }
+  
+  .asset-summary-legend {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .asset-summary-legend-item {
+    margin: 5px 0;
+  }
+} 
+
+/* Scenario Results Section */
+.scenario-results {
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Empty state message */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  margin: 20px 0;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  color: #6c757d;
+  margin-bottom: 20px;
+}
+
+.empty-state-message {
+  font-size: 18px;
+  color: #495057;
+  margin-bottom: 10px;
+}
+
+.empty-state-description {
+  font-size: 14px;
+  color: #6c757d;
+  max-width: 500px;
+  margin: 0 auto;
 } 

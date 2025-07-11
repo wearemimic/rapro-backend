@@ -37,9 +37,9 @@
 
       <!-- Body -->
       <div class="card-body">
-        <!-- Bar Chart -->
-        <canvas id="financial_overview_chart" style="width: 100%; height: 300px !important;"></canvas>
-        <!-- End Bar Chart -->
+        <!-- Mixed Line/Bar Chart -->
+        <canvas id="financialOverviewChart" style="width: 100%; height: 300px !important;"></canvas>
+        <!-- End Mixed Chart -->
       </div>
       <!-- End Body -->
     </div>
@@ -111,6 +111,7 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { Chart } from 'chart.js';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -151,6 +152,7 @@ const IRMAA_LABELS = {
 };
 
 export default {
+  // No Graph component needed
   props: {
     scenarioResults: {
       type: Array,
@@ -178,7 +180,8 @@ export default {
       isDropdownOpen: {
         financial: false
       },
-      openIrmaaTooltipIdx: null
+      openIrmaaTooltipIdx: null,
+      chartInstance: null
     };
   },
   computed: {
@@ -197,7 +200,123 @@ export default {
       return IRMAA_LABELS['single'];
     }
   },
+  watch: {
+    filteredResults: {
+      handler(newResults) {
+        this.renderFinancialChart(newResults);
+      },
+      deep: true,
+      immediate: true
+    }
+  },
   methods: {
+    renderFinancialChart(results) {
+      if (!results || results.length === 0) return;
+      // Destroy previous chart instance if exists
+      if (this.chartInstance) {
+        this.chartInstance.destroy();
+        this.chartInstance = null;
+      }
+      // Extract years for labels
+      const years = results.map(row => row.year);
+      // Build datasets: lines for income, stacked bars for tax/medicare
+      const datasets = [
+        {
+          type: 'line',
+          label: 'Gross Income',
+          data: results.map(row => parseFloat(row.gross_income) || 0),
+          borderColor: '#4285f4',
+          backgroundColor: 'rgba(66,133,244,0.1)',
+          borderWidth: 2,
+          tension: 0.3,
+          yAxisID: 'y',
+          pointRadius: 2,
+          order: 1
+        },
+        {
+          type: 'line',
+          label: 'Net Income',
+          data: results.map(row => {
+            const gross = parseFloat(row.gross_income) || 0;
+            const tax = parseFloat(row.federal_tax) || 0;
+            const medicare = parseFloat(row.total_medicare) || 0;
+            return gross - tax - medicare;
+          }),
+          borderColor: '#34a853',
+          backgroundColor: 'rgba(52,168,83,0.1)',
+          borderWidth: 2,
+          tension: 0.3,
+          yAxisID: 'y',
+          pointRadius: 2,
+          order: 1
+        },
+        {
+          type: 'bar',
+          label: 'Federal Tax',
+          data: results.map(row => parseFloat(row.federal_tax) || 0),
+          backgroundColor: '#ea4335',
+          stack: 'Stack 0',
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          type: 'bar',
+          label: 'Medicare',
+          data: results.map(row => parseFloat(row.total_medicare) || 0),
+          backgroundColor: '#fbbc05',
+          stack: 'Stack 0',
+          yAxisID: 'y',
+          order: 2
+        }
+      ];
+      const ctx = document.getElementById('financialOverviewChart');
+      this.chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: years,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Year'
+              }
+            },
+            y: {
+              stacked: true,
+              title: {
+                display: true,
+                text: 'Amount ($)'
+              },
+              ticks: {
+                beginAtZero: true,
+                callback: function(value) {
+                  return '$' + value.toLocaleString();
+                }
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top'
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            }
+          },
+          interaction: {
+            mode: 'index',
+            intersect: false
+          }
+        }
+      });
+    },
     toggleDropdown(tab) {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
@@ -254,9 +373,16 @@ export default {
   },
   mounted() {
     document.addEventListener('click', this.handleClickOutside);
+    if (this.filteredResults && this.filteredResults.length) {
+      this.renderFinancialChart(this.filteredResults);
+    }
   },
   beforeUnmount() {
     document.removeEventListener('click', this.handleClickOutside);
+    if (this.chartInstance) {
+      this.chartInstance.destroy();
+      this.chartInstance = null;
+    }
   },
 };
 </script>
