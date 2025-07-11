@@ -101,15 +101,9 @@ export default {
           }
         };
         
-        // Determine chart type based on data structure
+        // Support mixed chart types: if any dataset has a 'type', use 'bar' as root type
         let chartType = this.type || 'line';
-        
-        // If data has multiple datasets with single values per dataset, it's likely a bar chart
-        if (safeData.datasets.length > 1 && 
-            safeData.datasets[0].data && 
-            safeData.datasets[0].data.length > 1 && 
-            safeOptions && 
-            safeOptions.indexAxis) {
+        if (safeData.datasets.some(ds => ds.type)) {
           chartType = 'bar';
         }
         
