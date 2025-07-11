@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         email = "mannese@wearemimic.com"
-        password = "password"
+        password = "$Arizona123"
 
         if not User.objects.filter(email=email).exists():
             advisor = User.objects.create_user(email=email, password=password)

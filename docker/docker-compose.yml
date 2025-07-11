@@ -1,4 +1,3 @@
-
 version: "3.9"
 services:
   frontend:
@@ -11,8 +10,9 @@ services:
       # - ../frontend:/app
       - ../frontend/src:/app/src
       - ../frontend/public:/app/public
+      - ../frontend/package.json:/app/package.json
     working_dir: /app
-    command: ["npm", "run", "dev"]
+    command: ["sh", "-c", "npm install sortablejs && npm run dev"]
   
   backend:
     build:

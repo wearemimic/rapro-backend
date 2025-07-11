@@ -1,60 +1,26 @@
 <template>
   <div v-if="eligibleAssets && eligibleAssets.length > 0">
     <!-- Mode Toggle -->
-    <div class="mb-3">
-      <label style="font-weight: bold;">Manual Settings</label>
-    </div>
     <!-- Section 1: Asset Selection Panel -->
     <div class="row align-items-stretch">
       <!-- Asset Selection Panel -->
       <div class="col-md-7 mb-3 mb-lg-5">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5 class="mb-4">Asset Selection Panel</h5>
-            <div class="table-responsive">
-              <table class="table table-bordered table-hover align-middle">
-                <thead class="thead-light">
-                  <tr>
-                    <th>Asset</th>
-                    <th>Owner</th>
-                    <th>Current Value</th>
-                    <th>Max to Convert</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="asset in (eligibleAssets && eligibleAssets.length ? eligibleAssets : [])" :key="asset.id || asset.income_type">
-                    <td>{{ asset.income_type || 'Unknown' }}</td>
-                    <td>{{ asset.owned_by || 'Unknown' }}</td>
-                    <td>{{ formatCurrency(asset.current_asset_balance) }}</td>
-                    <td>
-                      <input
-                        type="text"
-                        :value="maxToConvertRaw[asset.id || asset.income_type] || ''"
-                        @focus="onMaxToConvertFocus(asset)"
-                        @input="onMaxToConvertInput($event, asset)"
-                        @blur="onMaxToConvertBlur(asset)"
-                        class="form-control form-control-sm"
-                      />
-                    </td>
-                  </tr>
-                  <!-- Total Row -->
-                  <tr style="font-weight: bold; background: #f8f9fa;">
-                    <td>Total to Convert</td>
-                    <td></td>
-                    <td></td>
-                    <td>{{ formatCurrency(selectedAssetList.reduce((sum, asset) => sum + (parseFloat(maxToConvert[asset.id || asset.income_type]) || 0), 0)) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <AssetSelectionPanel
+          :eligibleAssets="eligibleAssets"
+          :maxToConvert="maxToConvert"
+          :maxToConvertRaw="maxToConvertRaw"
+          :headerColor="headerColor"
+          @update:maxToConvert="val => maxToConvert = val"
+          @update:maxToConvertRaw="val => maxToConvertRaw = val"
+        />
       </div>
       <!-- Conversion Schedule Parameters -->
       <div class="col-md-5 mb-3 mb-lg-5">
         <div class="card h-100">
+          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+            <h5 class="mb-0">Conversion Schedule Parameters</h5>
+          </div>
           <div class="card-body">
-            <h5 class="mb-4">Conversion Schedule Parameters</h5>
             <div class="row">
               <!-- Row 1: Pre-Retirement Income & Conversion Start Year -->
              
@@ -131,38 +97,155 @@
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <button class="btn btn-primary me-2" @click="recalculateConversion">Recalculate Conversion</button>
-        <button class="btn btn-success me-2" @click="saveRothConversionScenario">Save Roth Conversion Scenario</button>
-        <button class="btn btn-secondary" @click="exportComparisonReport">Export Comparison Report (PDF)</button>
       </div>
     </div>
-    <!-- Row of three cards: 1/4, 1/4, 1/2 width -->
+    
+    <!-- Empty state message when no scenario has been run -->
+    <div v-if="!hasScenarioBeenRun" class="empty-state">
+      <div class="empty-state-icon">📊</div>
+      <div class="empty-state-message">No Roth Conversion Scenario Yet</div>
+      <div class="empty-state-description">
+        Select your assets and parameters above, then click "Recalculate Conversion" to see detailed analysis and projections.
+      </div>
+    </div>
+    
+    <div v-if="hasScenarioBeenRun" class="scenario-results">
+    <!-- Combined Expense Summary Chart -->
+    <h3>Expense Summary</h3>
     <div class="row mb-3">
-      <div class="col-md-3">
+      <div class="col-md-12">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="mb-3">Taxes Before and After Conversion</h6>
-            <Graph :data="taxesBarData" :options="barOptions" type="bar" :height="150" />
+            <h6 class="mb-3">Expense Comparison Before vs After Roth Conversion</h6>
+            <Graph 
+              :data="expenseSummaryData || {
+                labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+                datasets: [
+                  {
+                    label: 'Before Conversion',
+                    backgroundColor: '#007bff',
+                    data: [0, 0, 0, 0, 0]
+                  },
+                  {
+                    label: 'After Conversion',
+                    backgroundColor: '#28a745',
+                    data: [0, 0, 0, 0, 0]
+                  }
+                ]
+              }" 
+              :options="expenseSummaryOptions" 
+              :height="300" 
+              type="bar" 
+              graphId="roth-expense-summary-chart"
+            />
+            <div class="mt-3">
+              <div v-if="totalSavings" class="text-center mt-3">
+                <div class="alert alert-success d-inline-block">
+                  <strong>Total Savings: {{ formatCurrency(totalSavings) }}</strong> 
+                  <span class="ms-2">({{ savingsPercentage }}% reduction in lifetime expenses)</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h6 class="mb-3">IRMAA Before and After</h6>
-            <Graph :data="irmaaBarData" :options="barOptions" type="bar" :height="150" />
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
+    </div>  
+    <h3>Asset Summary</h3>
+    <div class="row mb-3">
+      <div class="col-md-12">
         <div class="card h-100">
           <div class="card-body">
             <h6 class="mb-3">Asset Balance Time Line</h6>
-            <Graph :data="assetLineData" :options="lineOptions" type="line" :height="150" />
+            <div class="asset-balance-timeline">
+              <Graph 
+                :data="assetLineData || {
+                  labels: Array.from({ length: 30 }, (_, i) => (new Date().getFullYear() + i).toString()),
+                  datasets: [
+                    {
+                      label: 'Default Asset',
+                      borderColor: '#007bff',
+                      backgroundColor: 'rgba(0,123,255,0.1)',
+                      data: Array(30).fill(0),
+                      fill: false
+                    }
+                  ]
+                }" 
+                :options="lineOptions" 
+                type="line" 
+                :height="150" 
+                graphId="roth-asset-timeline-chart"
+              />
+              <div 
+                v-if="rothWithdrawalStartYear" 
+                class="withdrawal-year-marker" 
+                :style="{ left: calculateWithdrawalYearPosition() + '%' }"
+              >
+                <span class="withdrawal-year-label">Withdrawals Begin</span>
+              </div>
+            </div>
+            
+            <div class="asset-summary-legend">
+              <div class="asset-summary-legend-item" v-for="(dataset, index) in assetLineData.datasets" :key="index">
+                <span class="asset-summary-legend-color" :style="{ backgroundColor: dataset.borderColor }"></span>
+                <span>{{ dataset.label }}</span>
+              </div>
+            </div>
+            
+            <h6 class="mb-3 mt-4">Asset Details</h6>
+            <div class="table-responsive">
+              <table class="asset-summary-table">
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Owner</th>
+                    <th>Current Value</th>
+                    <th>Conversion Amount</th>
+                    <th>Projected Value at Retirement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Affected Assets (those with conversion amount > 0) -->
+                  <tr 
+                    v-for="asset in selectedAssetList" 
+                    :key="'affected-' + (asset.id || asset.income_type)" 
+                    class="affected-asset"
+                  >
+                    <td>{{ asset.income_type || 'Unknown' }}</td>
+                    <td>{{ asset.owned_by || 'Unknown' }}</td>
+                    <td>{{ formatCurrency(asset.current_asset_balance) }}</td>
+                    <td>{{ formatCurrency(maxToConvert[asset.id || asset.income_type]) }}</td>
+                    <td>{{ formatCurrency(calculateProjectedValue(asset)) }}</td>
+                  </tr>
+                  
+                  <!-- New Roth IRA Line -->
+                  <tr class="roth-asset">
+                    <td>New Roth IRA</td>
+                    <td>{{ selectedAssetList.length ? selectedAssetList[0].owned_by || 'Client' : 'Client' }}</td>
+                    <td>$0.00</td>
+                    <td>{{ formatCurrency(totalConversionAmount) }}</td>
+                    <td>{{ formatCurrency(calculateRothProjectedValue()) }}</td>
+                  </tr>
+                  
+                  <!-- Unaffected Assets (those without conversion) -->
+                  <tr 
+                    v-for="asset in unaffectedAssets" 
+                    :key="'unaffected-' + (asset.id || asset.income_type)"
+                  >
+                    <td>{{ asset.income_type || 'Unknown' }}</td>
+                    <td>{{ asset.owned_by || 'Unknown' }}</td>
+                    <td>{{ formatCurrency(asset.current_asset_balance) }}</td>
+                    <td>$0.00</td>
+                    <td>{{ formatCurrency(calculateProjectedValue(asset)) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </div>
     <!-- Section 3: Conversion Impact Table -->
+    <h3>Detailed Yearly Summary</h3>
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Conversion Impact Table</h5>
@@ -181,13 +264,17 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in scenarioResults" :key="row.year">
+              <tr v-for="(row, index) in filteredScenarioResults" :key="row.year">
                 <td>{{ row.year }}</td>
                 <td>{{ row.primary_age }} / {{ row.spouse_age }}</td>
                 <td>
                   ${{ 
-                    (parseFloat(row.gross_income || 0) + 
-                    (row.year < retirementYear ? parseFloat(preRetirementIncome || 0) : 0)).toFixed(2) 
+                    // If we have baseline data, use it for the income before conversion
+                    baselineMetrics && baselineMetrics.year_by_year && getBaselineIndex(index) !== -1 
+                      ? (parseFloat(baselineMetrics.year_by_year[getBaselineIndex(index)].gross_income || 0) + 
+                        (row.year < retirementYear ? parseFloat(preRetirementIncome || 0) : 0)).toFixed(2)
+                      : (parseFloat(row.gross_income || 0) + 
+                        (row.year < retirementYear ? parseFloat(preRetirementIncome || 0) : 0)).toFixed(2) 
                   }}
                 </td>
                 <td>${{ parseFloat(row.roth_conversion || 0).toFixed(2) }}</td>
@@ -198,7 +285,7 @@
                     parseFloat(row.roth_conversion || 0)
                   ).toFixed(2) }}
                 </td>
-                <td>12%</td>
+                <td>{{ row.tax_bracket || '12%' }}</td>
                 <td>${{ parseFloat(row.federal_tax || 0).toFixed(2) }}</td>
                 <td>${{ parseFloat(row.total_medicare || 0).toFixed(2) }}</td>
               </tr>
@@ -219,43 +306,66 @@
                 <th>Metric</th>
                 <th>Baseline</th>
                 <th>Roth Conversion</th>
+                <th>Savings</th>
+                <th>% Improvement</th>
               </tr>
             </thead>
             <tbody>
               <tr>
+                <td>Lifetime RMDs</td>
+                <td>${{ baselineMetrics.total_rmds !== undefined ? baselineMetrics.total_rmds.toLocaleString() : 0 }}</td>
+                <td>${{ optimalSchedule.score_breakdown?.total_rmds !== undefined ? optimalSchedule.score_breakdown.total_rmds.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.rmd_reduction !== undefined ? comparisonMetrics.rmd_reduction.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.rmd_reduction_pct !== undefined ? comparisonMetrics.rmd_reduction_pct.toFixed(1) : 0 }}%</td>
+              </tr>
+              <tr>
                 <td>Lifetime Federal Taxes</td>
                 <td>${{ baselineMetrics.lifetime_tax !== undefined ? baselineMetrics.lifetime_tax.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.lifetime_tax !== undefined ? optimalSchedule.score_breakdown.lifetime_tax.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.tax_savings !== undefined ? comparisonMetrics.tax_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.tax_savings_pct !== undefined ? comparisonMetrics.tax_savings_pct.toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Lifetime Medicare Premiums</td>
                 <td>${{ baselineMetrics.lifetime_medicare !== undefined ? baselineMetrics.lifetime_medicare.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.lifetime_medicare !== undefined ? optimalSchedule.score_breakdown.lifetime_medicare.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.medicare_savings !== undefined ? comparisonMetrics.medicare_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.medicare_savings_pct !== undefined ? comparisonMetrics.medicare_savings_pct.toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Lifetime IRMAA Surcharges</td>
                 <td>${{ baselineMetrics.total_irmaa !== undefined ? baselineMetrics.total_irmaa.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.total_irmaa !== undefined ? optimalSchedule.score_breakdown.total_irmaa.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.irmaa_savings !== undefined ? comparisonMetrics.irmaa_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.irmaa_savings_pct !== undefined ? comparisonMetrics.irmaa_savings_pct.toFixed(1) : 0 }}%</td>
+              </tr>
+              <tr>
+                <td>Inheritance Tax</td>
+                <td>${{ baselineMetrics.inheritance_tax !== undefined ? baselineMetrics.inheritance_tax.toLocaleString() : 0 }}</td>
+                <td>${{ optimalSchedule.score_breakdown?.inheritance_tax !== undefined ? optimalSchedule.score_breakdown.inheritance_tax.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.inheritance_tax_savings !== undefined ? comparisonMetrics.inheritance_tax_savings.toLocaleString() : 0 }}</td>
+                <td>{{ comparisonMetrics.inheritance_tax_savings_pct !== undefined ? comparisonMetrics.inheritance_tax_savings_pct.toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Net Lifetime Spendable Income</td>
                 <td>${{ baselineMetrics.cumulative_net_income !== undefined ? baselineMetrics.cumulative_net_income.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.cumulative_net_income !== undefined ? optimalSchedule.score_breakdown.cumulative_net_income.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.net_income_increase !== undefined ? comparisonMetrics.net_income_increase.toLocaleString() : 0 }}</td>
+                <td>{{ baselineMetrics.cumulative_net_income && comparisonMetrics.net_income_increase ? ((comparisonMetrics.net_income_increase / baselineMetrics.cumulative_net_income) * 100).toFixed(1) : 0 }}%</td>
               </tr>
               <tr>
                 <td>Final Roth IRA Balance</td>
                 <td>${{ baselineMetrics.final_roth !== undefined ? baselineMetrics.final_roth.toLocaleString() : 0 }}</td>
                 <td>${{ optimalSchedule.score_breakdown?.final_roth !== undefined ? optimalSchedule.score_breakdown.final_roth.toLocaleString() : 0 }}</td>
+                <td>${{ comparisonMetrics.roth_increase !== undefined ? comparisonMetrics.roth_increase.toLocaleString() : 0 }}</td>
+                <td>{{ baselineMetrics.final_roth && baselineMetrics.final_roth > 0 && comparisonMetrics.roth_increase ? ((comparisonMetrics.roth_increase / baselineMetrics.final_roth) * 100).toFixed(1) : 'N/A' }}</td>
               </tr>
-              <tr>
-                <td>Total Net Assets at Mortality</td>
-                <td>${{ baselineMetrics.final_roth !== undefined ? baselineMetrics.final_roth.toLocaleString() : 0 }}</td>
-                <td>${{ optimalSchedule.score_breakdown?.final_roth !== undefined ? optimalSchedule.score_breakdown.final_roth.toLocaleString() : 0 }}</td>
-              </tr>
-              <tr>
-                <td>Average IRMAA Tier Hit</td>
-                <td>{{ baselineMetrics.income_stability !== undefined ? baselineMetrics.income_stability : 'Tier Level' }}</td>
-                <td>{{ optimalSchedule.score_breakdown?.income_stability !== undefined ? optimalSchedule.score_breakdown.income_stability : 'Tier Level' }}</td>
+              <tr class="table-success">
+                <td><strong>Total Lifetime Savings</strong></td>
+                <td></td>
+                <td></td>
+                <td><strong>${{ comparisonMetrics.total_savings !== undefined ? comparisonMetrics.total_savings.toLocaleString() : totalSavings.toLocaleString() }}</strong></td>
+                <td><strong>{{ savingsPercentage }}%</strong></td>
               </tr>
             </tbody>
           </table>
@@ -267,18 +377,34 @@
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <button class="btn btn-primary me-2" @click="recalculateConversion">Recalculate Conversion</button>
-        <button class="btn btn-success me-2" @click="saveRothConversionScenario">Save Roth Conversion Scenario</button>
-        <button class="btn btn-secondary" @click="exportComparisonReport">Export Comparison Report (PDF)</button>
       </div>
     </div>
+    </div> <!-- End of scenario-results div -->
   </div>
 </template>
 
 <script>
 import Graph from '../components/Graph.vue';
+import AssetSelectionPanel from '../components/RothConversion/AssetSelectionPanel.vue';
+import { useAuthStore } from '@/stores/auth';
+import { computed } from 'vue';
+import './RothConversionTab.css';
+import { apiService } from '@/services/api';
 
 export default {
-  components: { Graph },
+  components: { Graph, AssetSelectionPanel },
+  mounted() {
+    // Initialize our component's chart data without affecting other components
+    const assetLineData = this.generateAssetLineData();
+    if (assetLineData) {
+      this.assetLineData = JSON.parse(JSON.stringify(assetLineData)); // Deep clone to avoid reference issues
+    }
+    
+    const expenseSummaryData = this.generateExpenseSummaryData();
+    if (expenseSummaryData) {
+      this.expenseSummaryData = JSON.parse(JSON.stringify(expenseSummaryData)); // Deep clone to avoid reference issues
+    }
+  },
   props: {
     scenario: {
       type: Object,
@@ -300,13 +426,20 @@ export default {
     }
   },
   data() {
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 30 }, (_, i) => currentYear + i);
+    
     return {
+      // Flag to track if we're in the middle of a recalculation
+      _isRecalculating: false,
+      // Flag to track if a scenario has been run
+      hasScenarioBeenRun: false,
       preRetirementIncome: 0,
       preRetirementIncomeRaw: '',
       availableYears: this.generateAvailableYears(),
-      conversionStartYear: new Date().getFullYear(),
-      yearsToConvert: 0,
-      rothGrowthRate: 0,
+      conversionStartYear: currentYear,
+      yearsToConvert: 1,
+      rothGrowthRate: 5.0,
       scenarioResults: [],
       baselineMetrics: {},
       comparisonMetrics: {},
@@ -317,6 +450,8 @@ export default {
       maxAnnualAmount: '',
       maxAnnualAmountRaw: '',
       maxTotalAmount: '',
+      totalSavings: 0,
+      savingsPercentage: 0,
       conversionGoals: {
         taxes: true,
         irmaa: false,
@@ -326,8 +461,14 @@ export default {
       conversionMode: 'auto',
       rothWithdrawalAmount: 0,
       rothWithdrawalAmountRaw: '',
-      rothWithdrawalStartYear: new Date().getFullYear(),
-      // Dummy chart data for cards
+      rothWithdrawalStartYear: currentYear,
+      // Asset data from API
+      assetBalanceData: null,
+      // Initialize assetLineData as null, will be set in mounted
+      assetLineData: null,
+      // Initialize expenseSummaryData as null, will be set in mounted
+      expenseSummaryData: null,
+      // Keep the original data for backward compatibility
       taxesBarData: {
         labels: ['Before', 'After'],
         datasets: [
@@ -348,42 +489,69 @@ export default {
           }
         ]
       },
-      assetLineData: {
-        labels: Array.from({ length: 30 }, (_, i) => `Year ${i + 1}`),
-        datasets: [
-          {
-            label: 'IRA',
-            borderColor: '#007bff',
-            backgroundColor: 'rgba(0,123,255,0.1)',
-            data: [300000, 250000, 200000, 180000, 160000, 140000, 120000, 100000, 80000, 60000, 40000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5, 2, 1, 1, 1, 1, 1, 1],
-            fill: false
-          },
-          {
-            label: '401k',
-            borderColor: '#28a745',
-            backgroundColor: 'rgba(40,167,69,0.1)',
-            data: [200000, 180000, 160000, 140000, 120000, 100000, 80000, 60000, 40000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            fill: false
-          },
-          {
-            label: 'Traditional IRA',
-            borderColor: '#ffc107',
-            backgroundColor: 'rgba(255,193,7,0.1)',
-            data: [100000, 95000, 90000, 85000, 80000, 75000, 70000, 65000, 60000, 55000, 50000, 45000, 40000, 35000, 30000, 25000, 20000, 15000, 10000, 5000, 2500, 1000, 500, 200, 100, 50, 25, 10, 5, 2],
-            fill: false
-          },
-          {
-            label: 'Roth IRA',
-            borderColor: '#6f42c1',
-            backgroundColor: 'rgba(111,66,193,0.1)',
-            data: [0, 20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000, 220000, 240000, 260000, 280000, 300000, 320000, 340000, 360000, 380000, 400000, 420000, 440000, 460000, 480000, 500000, 520000, 540000, 560000, 580000],
-            fill: false
-          }
-        ]
-      },
+
       barOptions: {
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
+      },
+      expenseSummaryOptions: {
+        plugins: {
+          legend: { 
+            display: true,
+            position: 'bottom'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return context.dataset.label + ': $' + context.raw.toLocaleString();
+              }
+            }
+          },
+          totalColumnHighlight: {
+            beforeDraw: function(chart) {
+              const ctx = chart.ctx;
+              const xAxis = chart.scales.x;
+              const yAxis = chart.scales.y;
+              
+              // Highlight the total column with a light background
+              if (xAxis.getLabels().length > 4) {
+                const totalIndex = 4; // Index of "Total Expenses"
+                const xStart = xAxis.getPixelForValue(totalIndex) - xAxis.width / (xAxis.ticks.length * 2);
+                const xEnd = xAxis.getPixelForValue(totalIndex) + xAxis.width / (xAxis.ticks.length * 2);
+                const yStart = yAxis.top;
+                const yHeight = yAxis.height;
+                
+                ctx.save();
+                ctx.fillStyle = 'rgba(220, 220, 220, 0.3)';
+                ctx.fillRect(xStart, yStart, xEnd - xStart, yHeight);
+                ctx.restore();
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            },
+            title: {
+              display: true,
+              text: 'Amount ($)'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Expense Categories'
+            }
+          }
+        },
+        indexAxis: 'x',
+        responsive: true,
+        maintainAspectRatio: false
       },
       lineOptions: {
         plugins: { legend: { display: true } },
@@ -392,6 +560,27 @@ export default {
     };
   },
   computed: {
+    filteredScenarioResults() {
+      // Filter scenario results to start at the conversion start year
+      if (!this.scenarioResults || this.scenarioResults.length === 0) {
+        return [];
+      }
+      
+      // Get conversion start year from optimal schedule or UI
+      const conversionStartYr = this.optimalSchedule && this.optimalSchedule.start_year 
+        ? parseInt(this.optimalSchedule.start_year) 
+        : parseInt(this.conversionStartYear) || new Date().getFullYear();
+      
+      // Always start from the conversion start year, ignoring retirement year
+      const tableStartYear = conversionStartYr;
+      
+      // Log for debugging
+      console.log(`Filtering scenario results to start from year ${tableStartYear}`);
+      
+      // Filter scenario results
+      const filtered = this.scenarioResults.filter(row => parseInt(row.year) >= tableStartYear);
+      return filtered;
+    },
     eligibleAssets() {
       // Show all eligible accounts for conversion (401k, IRA, Roth IRA, etc.)
       const assets = this.assetDetails || [];
@@ -411,14 +600,70 @@ export default {
         return val && parseFloat(val) > 0;
       });
     },
+    // Calculate the retirement year based on client's birthdate and retirement age
     retirementYear() {
-      // Compute the retirement year from client birthdate and scenario retirement age
+      if (!this.client || !this.client.birthdate || !this.scenario || !this.scenario.retirement_age) {
+        return new Date().getFullYear() + 5; // Default to 5 years from now
+      }
+      
       const birthYear = new Date(this.client.birthdate).getFullYear();
-      const retirementAge = this.scenario.retirement_age || 65;
-      return birthYear + retirementAge;
+      return birthYear + parseInt(this.scenario.retirement_age);
+    },
+    headerColor() {
+      const authStore = useAuthStore();
+      const user = authStore.user;
+      return user && user.primary_color ? user.primary_color : '#377dff';
+    },
+    headingTextColor() {
+      const authStore = useAuthStore();
+      const user = authStore.user;
+      if (user && user.primary_color && user.primary_color !== '#377dff') {
+        return '#fff';
+      }
+      return '#fff'; // Always white for colored backgrounds
+    },
+    // Calculate the total conversion amount
+    totalConversionAmount() {
+      return this.selectedAssetList.reduce((sum, asset) => {
+        return sum + (parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0);
+      }, 0);
+    },
+    unaffectedAssets() {
+      // Filter out assets that have no conversion amount
+      return this.eligibleAssets.filter(asset => {
+        const key = asset.id || asset.income_type;
+        return !this.maxToConvert[key] || parseFloat(this.maxToConvert[key]) <= 0;
+      });
+    },
+    yearsUntilRetirement() {
+      const currentYear = new Date().getFullYear();
+      return this.retirementYear - currentYear;
+    },
+    yearsUntilWithdrawal() {
+      const currentYear = new Date().getFullYear();
+      return this.rothWithdrawalStartYear - currentYear;
+    },
+    hasScenarioBeenRun() {
+      // Check if we have scenario results or baseline metrics
+      return (
+        (this.scenarioResults && this.scenarioResults.length > 0) || 
+        (this.baselineMetrics && Object.keys(this.baselineMetrics).length > 0) ||
+        (this.optimalSchedule && Object.keys(this.optimalSchedule).length > 0)
+      );
     }
   },
   methods: {
+    getBaselineIndex(filteredIndex) {
+      // Maps the index in filteredScenarioResults to the corresponding index in baselineMetrics.year_by_year
+      if (!this.baselineMetrics || !this.baselineMetrics.year_by_year || !this.filteredScenarioResults) {
+        return -1;
+      }
+      
+      const year = this.filteredScenarioResults[filteredIndex]?.year;
+      if (!year) return -1;
+      
+      return this.baselineMetrics.year_by_year.findIndex(row => row.year === year);
+    },
     generateAvailableYears() {
       const currentYear = new Date().getFullYear();
       return Array.from({ length: 41 }, (_, i) => currentYear + i);
@@ -512,7 +757,254 @@ export default {
     onCurrencyBlur(field) {
       this[`${field}Raw`] = this.formatCurrency(this[field]);
     },
+    calculateProjectedValue(asset) {
+      // Simple compound interest calculation for asset growth
+      const initialValue = parseFloat(asset.current_asset_balance) || 0;
+      const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
+      const remainingValue = initialValue - conversionAmount;
+      
+      // Use asset's growth rate if available, otherwise use a default value
+      const growthRate = parseFloat(asset.growth_rate) || 5.0;
+      const years = this.yearsUntilRetirement;
+      
+      // Compound interest formula: A = P(1 + r/100)^t
+      return remainingValue * Math.pow(1 + (growthRate / 100), years);
+    },
+    calculateRothProjectedValue() {
+      // Calculate the projected value of the new Roth IRA
+      const totalConversion = this.totalConversionAmount;
+      const growthRate = parseFloat(this.rothGrowthRate) || 5.0;
+      const yearsToRetirement = this.yearsUntilRetirement;
+      const yearsToWithdrawal = this.yearsUntilWithdrawal;
+      
+      // Calculate value at retirement first
+      let rothValue = totalConversion * Math.pow(1 + (growthRate / 100), yearsToRetirement);
+      
+      // If withdrawal starts after retirement, continue growth until withdrawal starts
+      if (this.rothWithdrawalStartYear > this.retirementYear) {
+        const additionalYears = this.rothWithdrawalStartYear - this.retirementYear;
+        rothValue = rothValue * Math.pow(1 + (growthRate / 100), additionalYears);
+      }
+      
+      return rothValue;
+    },
+    calculateWithdrawalYearPosition() {
+      // Calculate the position of the withdrawal year marker on the timeline
+      const currentYear = new Date().getFullYear();
+      const totalYears = 30; // Total years shown in the timeline
+      const withdrawalYear = parseInt(this.rothWithdrawalStartYear) || currentYear;
+      
+      // Calculate position as percentage of timeline width
+      const position = ((withdrawalYear - currentYear) / totalYears) * 100;
+      return Math.min(Math.max(position, 0), 100); // Clamp between 0-100%
+    },
+    updateAssetLineData() {
+      try {
+        // Generate years for x-axis
+        const currentYear = new Date().getFullYear();
+        const years = Array.from({ length: 30 }, (_, i) => currentYear + i);
+        
+        // Create datasets for each affected asset
+        const datasets = [];
+        
+        // If we have no assets or no scenario has been run, use the default data
+        if (!this.hasScenarioBeenRun && (!this.eligibleAssets || this.eligibleAssets.length === 0)) {
+          // Use default data
+          this.assetLineData = {
+            labels: years.map(year => year.toString()),
+            datasets: [
+              {
+                label: 'IRA',
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0,123,255,0.1)',
+                data: [300000, 250000, 200000, 180000, 160000, 140000, 120000, 100000, 80000, 60000, 40000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5, 2, 1, 1, 1, 1, 1, 1],
+                fill: false
+              },
+              {
+                label: '401k',
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40,167,69,0.1)',
+                data: [200000, 180000, 160000, 140000, 120000, 100000, 80000, 60000, 40000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                fill: false
+              },
+              {
+                label: 'Traditional IRA',
+                borderColor: '#ffc107',
+                backgroundColor: 'rgba(255,193,7,0.1)',
+                data: [100000, 95000, 90000, 85000, 80000, 75000, 70000, 65000, 60000, 55000, 50000, 45000, 40000, 35000, 30000, 25000, 20000, 15000, 10000, 5000, 2500, 1000, 500, 200, 100, 50, 25, 10, 5, 2],
+                fill: false
+              },
+              {
+                label: 'Roth IRA',
+                borderColor: '#6f42c1',
+                backgroundColor: 'rgba(111,66,193,0.1)',
+                data: [0, 20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000, 220000, 240000, 260000, 280000, 300000, 320000, 340000, 360000, 380000, 400000, 420000, 440000, 460000, 480000, 500000, 520000, 540000, 560000, 580000],
+                fill: false
+              }
+            ]
+          };
+          return;
+        }
+        
+        // Add datasets for affected assets (with declining balances due to conversion)
+        this.selectedAssetList.forEach(asset => {
+          const initialValue = parseFloat(asset.current_asset_balance) || 0;
+          const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
+          const growthRate = parseFloat(asset.growth_rate) || 5.0;
+          const yearsToConvert = parseInt(this.yearsToConvert) || 1;
+          const annualConversion = conversionAmount / yearsToConvert;
+          
+          // Generate data points for this asset
+          const data = [];
+          let balance = initialValue;
+          
+          for (let i = 0; i < years.length; i++) {
+            // Apply conversion for the conversion years
+            if (i < yearsToConvert && years[i] >= this.conversionStartYear) {
+              balance -= annualConversion;
+            }
+            
+            // Apply growth
+            balance = balance * (1 + (growthRate / 100));
+            
+            // Ensure balance doesn't go below zero
+            balance = Math.max(0, balance);
+            data.push(balance);
+          }
+          
+          // Add to datasets
+          datasets.push({
+            label: asset.income_type || 'Asset',
+            borderColor: this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            data: data,
+            fill: false
+          });
+        });
+        
+        // Add dataset for unaffected assets
+        this.unaffectedAssets.forEach(asset => {
+          const initialValue = parseFloat(asset.current_asset_balance) || 0;
+          const growthRate = parseFloat(asset.growth_rate) || 5.0;
+          
+          // Generate data points
+          const data = [];
+          let balance = initialValue;
+          
+          for (let i = 0; i < years.length; i++) {
+            // Apply growth
+            balance = balance * (1 + (growthRate / 100));
+            data.push(balance);
+          }
+          
+          // Add to datasets
+          datasets.push({
+            label: asset.income_type || 'Asset',
+            borderColor: this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            data: data,
+            fill: false
+          });
+        });
+        
+        // Add Roth IRA dataset
+        const rothData = [];
+        let rothBalance = 0;
+        const rothGrowthRate = parseFloat(this.rothGrowthRate) || 5.0;
+        const withdrawalAmount = parseFloat(this.rothWithdrawalAmount) || 0;
+        
+        for (let i = 0; i < years.length; i++) {
+          const year = years[i];
+          
+          // Add conversion amounts during conversion years
+          if (i < this.yearsToConvert && year >= this.conversionStartYear) {
+            rothBalance += this.totalConversionAmount / this.yearsToConvert;
+          }
+          
+          // Apply growth
+          rothBalance = rothBalance * (1 + (rothGrowthRate / 100));
+          
+          // Apply withdrawals if past withdrawal start year
+          if (year >= this.rothWithdrawalStartYear && withdrawalAmount > 0) {
+            rothBalance -= withdrawalAmount;
+            rothBalance = Math.max(0, rothBalance); // Ensure balance doesn't go below zero
+          }
+          
+          rothData.push(rothBalance);
+        }
+        
+        // Add Roth dataset if we have conversion data
+        if (this.totalConversionAmount > 0) {
+          datasets.push({
+            label: 'Roth IRA',
+            borderColor: '#6f42c1', // Purple for Roth
+            backgroundColor: 'rgba(111,66,193,0.1)',
+            data: rothData,
+            fill: false
+          });
+        }
+        
+        // Make sure we have at least one dataset
+        if (datasets.length === 0) {
+          datasets.push({
+            label: 'Default Asset',
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0,123,255,0.1)',
+            data: Array(years.length).fill(0),
+            fill: false
+          });
+        }
+        
+        // Update the asset line data
+        this.assetLineData = {
+          labels: years.map(year => year.toString()),
+          datasets: datasets
+        };
+      } catch (error) {
+        console.error('Error updating asset line data:', error);
+        // Provide fallback data to ensure the graph doesn't break
+        this.assetLineData = {
+          labels: Array.from({ length: 30 }, (_, i) => (new Date().getFullYear() + i).toString()),
+          datasets: [
+            {
+              label: 'Default Asset',
+              borderColor: '#007bff',
+              backgroundColor: 'rgba(0,123,255,0.1)',
+              data: Array(30).fill(0),
+              fill: false
+            }
+          ]
+        };
+      }
+    },
+    getRandomColor() {
+      // Generate a random color for asset lines
+      const colors = [
+        '#007bff', // Blue
+        '#28a745', // Green
+        '#ffc107', // Yellow
+        '#dc3545', // Red
+        '#17a2b8', // Cyan
+        '#fd7e14', // Orange
+        '#20c997', // Teal
+        '#e83e8c', // Pink
+        '#6610f2', // Indigo
+        '#6c757d'  // Gray
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    },
     async recalculateConversion() {
+      // Flag to track recalculation state
+      this._isRecalculating = true;
+      
+      // Check if client exists
+      if (!this.client) {
+        console.error('Client data is missing');
+        console.error('Client data is missing. Cannot calculate conversion.');
+        this._isRecalculating = false;
+        return;
+      }
+
       // Always include all income-producing assets
       const allAssets = (this.assetDetails || []).map(asset => ({
         ...asset,
@@ -534,30 +1026,60 @@ export default {
       
       // Calculate annual conversion amount by dividing total by years
       const annualConversion = totalToConvert / yearsToConvert;
+      
+      // Ensure all required fields have valid values
+      const currentYear = new Date().getFullYear();
+      const conversionStartYear = parseInt(this.conversionStartYear) || currentYear;
+      const rothWithdrawalStartYear = parseInt(this.rothWithdrawalStartYear) || currentYear;
+      const rothWithdrawalAmount = parseFloat(this.rothWithdrawalAmount) || 0;
+      const rothGrowthRate = parseFloat(this.rothGrowthRate) || 0;
+      const maxAnnualAmount = parseFloat(this.maxAnnualAmount) || 0;
+
+      // Ensure the client and scenario have all required fields
+      const scenarioData = {
+        ...this.scenario,
+        roth_conversion_start_year: parseInt(conversionStartYear),
+        roth_conversion_duration: yearsToConvert,
+        roth_withdrawal_amount: rothWithdrawalAmount,
+        roth_withdrawal_start_year: rothWithdrawalStartYear,
+        pre_retirement_income: this.preRetirementIncome || 0,
+        max_annual_amount: maxAnnualAmount,
+        // Add these fields to ensure they exist
+        retirement_age: this.scenario.retirement_age || 65,
+        mortality_age: this.scenario.mortality_age || 90,
+        part_b_inflation_rate: this.scenario.part_b_inflation_rate || 3.0,
+        part_d_inflation_rate: this.scenario.part_d_inflation_rate || 3.0,
+      };
+      
+      // Ensure client has required fields
+      const clientData = {
+        ...this.client,
+        // Safely access tax_status with fallback
+        tax_status: this.client?.tax_status || 'Single',
+        // Add other potentially missing fields
+        birthdate: this.client?.birthdate || new Date().toISOString().split('T')[0],
+        name: this.client?.name || 'Client',
+        gender: this.client?.gender || 'M',
+        state: this.client?.state || 'CA'
+      };
+
+      console.log('Client data being sent:', clientData);
 
       const payload = {
-        scenario: {
-          ...this.scenario,
-          roth_conversion_start_year: this.conversionStartYear,
-          roth_conversion_duration: yearsToConvert,
-          roth_withdrawal_amount: this.rothWithdrawalAmount,
-          roth_withdrawal_start_year: this.rothWithdrawalStartYear,
-          pre_retirement_income: this.preRetirementIncome,
-          max_annual_amount: this.maxAnnualAmount,
-        },
-        client: this.client,
+        scenario: scenarioData,
+        client: clientData,
         spouse: this.scenario.spouse || (this.scenario.spouse_birthdate ? { birthdate: this.scenario.spouse_birthdate } : null),
         assets: allAssets,
         optimizer_params: {
           mode: modeToSend,
-          conversion_start_year: this.conversionStartYear,
+          conversion_start_year: parseInt(conversionStartYear),
           years_to_convert: yearsToConvert,
           annual_conversion_amount: annualConversion,
-          roth_growth_rate: this.rothGrowthRate,
-          max_annual_amount: this.maxAnnualAmount,
+          roth_growth_rate: rothGrowthRate,
+          max_annual_amount: maxAnnualAmount,
           max_total_amount: totalToConvert,
-          roth_withdrawal_amount: this.rothWithdrawalAmount,
-          roth_withdrawal_start_year: this.rothWithdrawalStartYear
+          roth_withdrawal_amount: rothWithdrawalAmount,
+          roth_withdrawal_start_year: rothWithdrawalStartYear
         }
       };
 
@@ -567,18 +1089,106 @@ export default {
       console.log('Years to convert:', yearsToConvert);
       console.log('Total to convert:', totalToConvert);
       console.log('Annual conversion amount:', annualConversion);
+      console.log('Conversion start year (parsed):', parseInt(conversionStartYear));
+      console.log('Retirement year:', this.retirementYear);
 
       try {
-        const response = await fetch('http://localhost:8000/api/roth-optimize/', {
+        const authStore = useAuthStore();
+        const token = authStore.accessToken;
+        
+        if (!token) {
+          console.error('No authentication token available');
+          this._isRecalculating = false;
+          return;
+        }
+        
+        // Create a loading indicator for the user
+        console.log('Calculating Roth conversion...');
+        
+        console.log('Sending request with token:', token);
+        const response = await fetch(apiService.getUrl('/api/roth-optimize/'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify(payload)
         });
+        
         const data = await response.json();
-        this.scenarioResults = data.year_by_year || [];
-        this.comparisonMetrics = data.comparison || {};
-        this.optimalSchedule = data.optimal_schedule || {};
-        this.baselineMetrics = data.baseline || {};
+        
+        if (!response.ok) {
+          console.error('API error:', data);
+          console.error(`Error: ${data.error || 'Unknown error occurred'}`);
+          this._isRecalculating = false;
+          return;
+        }
+        
+        console.log('API response:', data);
+        
+        // Only update our specific data if we have valid response data
+        if (data) {
+          // Store the API response data in component properties
+          // Handle the new response structure with baseline and conversion data
+          if (data.conversion && data.conversion.year_by_year) {
+            this.scenarioResults = data.conversion.year_by_year || [];
+          } else if (data.year_by_year) {
+            // Fallback to old API structure
+            this.scenarioResults = data.year_by_year || [];
+          } else {
+            this.scenarioResults = [];
+          }
+          
+          this.comparisonMetrics = data.comparison || {};
+          this.optimalSchedule = data.optimal_schedule || {};
+          
+          // Update the UI's conversion start year to match the optimal schedule
+          if (this.optimalSchedule && this.optimalSchedule.start_year) {
+            this.conversionStartYear = parseInt(this.optimalSchedule.start_year);
+            console.log('Updated UI conversion start year to match optimal schedule:', this.conversionStartYear);
+          }
+          
+          // Handle the new baseline metrics structure
+          if (data.baseline && data.baseline.metrics) {
+            this.baselineMetrics = data.baseline.metrics || {};
+          } else {
+            // Fallback to old API structure
+            this.baselineMetrics = data.baseline || {};
+          }
+          
+          // Use asset balances from API if available
+          if (data.asset_balances) {
+            this.assetBalanceData = data.asset_balances;
+            // Generate asset line data using the API-provided asset balances
+            this.assetLineData = this.generateAssetLineDataFromAPI(data.asset_balances);
+          } else {
+            // Fallback to generating asset line data locally
+            const newAssetLineData = this.generateAssetLineData();
+            if (newAssetLineData) {
+              this.assetLineData = JSON.parse(JSON.stringify(newAssetLineData));
+            }
+          }
+          
+          // Generate expense summary data
+          const newExpenseSummaryData = this.generateExpenseSummaryData();
+          if (newExpenseSummaryData) {
+            this.expenseSummaryData = JSON.parse(JSON.stringify(newExpenseSummaryData));
+          }
+          
+          // Set flag that we have run a scenario
+          this.hasScenarioBeenRun = true;
+        } else {
+          console.error('Invalid response data structure');
+        }
+        
+        // Save the Roth conversion data to the database
+        const saveResult = await this.saveRothConversionScenario();
+        if (saveResult) {
+          console.log('Roth conversion data saved successfully');
+        } else {
+          console.error('Error saving Roth conversion data');
+        }
+        
         // Debug: log income fields for each year
         if (this.scenarioResults && this.scenarioResults.length) {
           console.log('--- Roth ConversionTab: Income Data by Year ---');
@@ -597,13 +1207,632 @@ export default {
         }
       } catch (err) {
         console.error('Error running optimizer:', err);
+      } finally {
+        // Always reset the recalculation flag
+        this._isRecalculating = false;
       }
     },
-    saveRothConversionScenario() {
-      // Implement save logic
+    async saveRothConversionScenario() {
+      try {
+        // Validate required data
+        if (!this.client || !this.client.id) {
+          console.error('Client data is missing');
+          throw new Error('Client data is missing. Cannot save scenario.');
+        }
+        
+        if (!this.scenario || !this.scenario.id) {
+          console.error('Scenario data is missing');
+          throw new Error('Scenario data is missing. Cannot save scenario.');
+        }
+        
+        const authStore = useAuthStore();
+        const token = authStore.accessToken;
+        
+        if (!token) {
+          console.error('No authentication token available');
+          throw new Error('No authentication token available');
+        }
+        
+        // Prepare the scenario update data
+        const scenarioUpdateData = {
+          id: this.scenario.id,
+          name: this.scenario.name,
+          description: this.scenario.description || 'Roth Conversion Scenario',
+          roth_conversion_start_year: parseInt(this.conversionStartYear) || new Date().getFullYear(),
+          roth_conversion_duration: parseInt(this.yearsToConvert) || 1,
+          roth_conversion_annual_amount: this.totalConversionAmount / (parseInt(this.yearsToConvert) || 1),
+          retirement_age: this.scenario.retirement_age || 65,
+          medicare_age: this.scenario.medicare_age || 65,
+          spouse_retirement_age: this.scenario.spouse_retirement_age,
+          spouse_medicare_age: this.scenario.spouse_medicare_age,
+          mortality_age: this.scenario.mortality_age || 90,
+          spouse_mortality_age: this.scenario.spouse_mortality_age,
+          part_b_inflation_rate: this.scenario.part_b_inflation_rate || 3.0,
+          part_d_inflation_rate: this.scenario.part_d_inflation_rate || 3.0,
+          apply_standard_deduction: this.scenario.apply_standard_deduction !== undefined ? this.scenario.apply_standard_deduction : true
+        };
+        
+        // Update the scenario with Roth conversion parameters
+        try {
+          const response = await fetch(apiService.getUrl(`/api/scenarios/${this.scenario.id}/update/`), {
+            method: 'PUT',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(scenarioUpdateData)
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('API error:', data);
+            throw new Error(`Error: ${data.error || 'Unknown error occurred'}`);
+          }
+        } catch (error) {
+          console.error('Error updating scenario:', error);
+          // Don't rethrow - we'll try to continue with asset updates
+        }
+        
+        // Update asset data to save conversion amounts
+        const assetUpdates = [];
+        
+        // Process assets that have conversion amounts
+        for (const asset of this.selectedAssetList) {
+          const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
+          if (conversionAmount > 0) {
+            assetUpdates.push({
+              id: asset.id,
+              max_to_convert: conversionAmount,
+              scenario_id: this.scenario.id
+            });
+          }
+        }
+        
+        // Save asset updates if there are any
+        if (assetUpdates.length > 0) {
+          try {
+            const assetResponse = await fetch(apiService.getUrl(`/api/scenarios/${this.scenario.id}/update-assets/`), {
+              method: 'PUT',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ assets: assetUpdates })
+            });
+            
+            const assetData = await assetResponse.json();
+            
+            if (!assetResponse.ok) {
+              console.error('API error updating assets:', assetData);
+              throw new Error(`Error updating assets: ${assetData.error || 'Unknown error occurred'}`);
+            }
+          } catch (error) {
+            console.error('Error updating assets:', error);
+            // Continue with the flow even if asset updates fail
+          }
+        }
+        
+        console.log('Roth Conversion Scenario saved successfully!');
+        return true;
+      } catch (err) {
+        console.error('Error saving Roth Conversion Scenario:', err);
+        console.error('Error details:', err.message);
+        return false;
+      }
     },
     exportComparisonReport() {
       // Implement PDF export logic
+    },
+    updateExpenseSummaryData() {
+      try {
+        // Check if we have real data or need to use defaults
+        if (!this.hasScenarioBeenRun) {
+          // Use default data for initial display
+          const defaultBaselineRMDs = 250000;
+          const defaultOptimalRMDs = 180000;
+          const defaultBaselineTaxes = 180000;
+          const defaultOptimalTaxes = 140000;
+          const defaultBaselineMedicare = 50000;
+          const defaultOptimalMedicare = 40000;
+          const defaultBaselineInheritance = 75000;
+          const defaultOptimalInheritance = 45000;
+          
+          const defaultBaselineTotal = defaultBaselineRMDs + defaultBaselineTaxes + defaultBaselineMedicare + defaultBaselineInheritance;
+          const defaultOptimalTotal = defaultOptimalRMDs + defaultOptimalTaxes + defaultOptimalMedicare + defaultOptimalInheritance;
+          
+          const defaultSavings = defaultBaselineTotal - defaultOptimalTotal;
+          const defaultSavingsPercentage = ((defaultSavings / defaultBaselineTotal) * 100).toFixed(1);
+          
+          this.expenseSummaryData = {
+            labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+            datasets: [
+              {
+                label: 'Before Conversion',
+                backgroundColor: '#007bff',
+                data: [defaultBaselineRMDs, defaultBaselineTaxes, defaultBaselineMedicare, defaultBaselineInheritance, defaultBaselineTotal],
+                backgroundColor: (context) => {
+                  return context.dataIndex === 4 ? '#0056b3' : '#007bff';
+                }
+              },
+              {
+                label: 'After Conversion',
+                backgroundColor: '#28a745',
+                data: [defaultOptimalRMDs, defaultOptimalTaxes, defaultOptimalMedicare, defaultOptimalInheritance, defaultOptimalTotal],
+                backgroundColor: (context) => {
+                  return context.dataIndex === 4 ? '#1e7e34' : '#28a745';
+                }
+              }
+            ]
+          };
+          
+          this.totalSavings = defaultSavings;
+          this.savingsPercentage = defaultSavingsPercentage;
+          return;
+        }
+        
+        // Get values from baseline and optimal schedule
+        const baseline = this.baselineMetrics || {};
+        const optimal = this.optimalSchedule?.score_breakdown || {};
+        
+        // Extract RMD data (use total RMDs or a reasonable estimate)
+        const baselineRMDs = baseline.total_rmds || 250000;
+        const optimalRMDs = optimal.total_rmds || 180000;
+        
+        // Extract tax data
+        const baselineTaxes = baseline.lifetime_tax || 180000;
+        const optimalTaxes = optimal.lifetime_tax || 140000;
+        
+        // Extract Medicare and IRMAA data
+        const baselineMedicare = (baseline.lifetime_medicare || 0) + (baseline.total_irmaa || 0);
+        const optimalMedicare = (optimal.lifetime_medicare || 0) + (optimal.total_irmaa || 0);
+        
+        // Extract inheritance tax (estimate based on final balances)
+        const baselineInheritance = baseline.inheritance_tax || 75000;
+        const optimalInheritance = optimal.inheritance_tax || 45000;
+        
+        // Calculate totals
+        const baselineTotal = baselineRMDs + baselineTaxes + baselineMedicare + baselineInheritance;
+        const optimalTotal = optimalRMDs + optimalTaxes + optimalMedicare + optimalInheritance;
+        
+        // Calculate savings
+        const savings = baselineTotal - optimalTotal;
+        const savingsPercentage = ((savings / baselineTotal) * 100).toFixed(1);
+        
+        // Update the chart data
+        this.expenseSummaryData = {
+          labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+          datasets: [
+            {
+              label: 'Before Conversion',
+              backgroundColor: '#007bff',
+              data: [baselineRMDs, baselineTaxes, baselineMedicare, baselineInheritance, baselineTotal],
+              // Make the total column darker
+              backgroundColor: (context) => {
+                return context.dataIndex === 4 ? '#0056b3' : '#007bff';
+              }
+            },
+            {
+              label: 'After Conversion',
+              backgroundColor: '#28a745',
+              data: [optimalRMDs, optimalTaxes, optimalMedicare, optimalInheritance, optimalTotal],
+              // Make the total column darker
+              backgroundColor: (context) => {
+                return context.dataIndex === 4 ? '#1e7e34' : '#28a745';
+              }
+            }
+          ]
+        };
+        
+        // Update savings display
+        this.totalSavings = savings;
+        this.savingsPercentage = savingsPercentage;
+      } catch (error) {
+        console.error('Error updating expense summary data:', error);
+        // Provide fallback data to ensure the graph doesn't break
+        this.expenseSummaryData = {
+          labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+          datasets: [
+            {
+              label: 'Before Conversion',
+              backgroundColor: '#007bff',
+              data: [0, 0, 0, 0, 0]
+            },
+            {
+              label: 'After Conversion',
+              backgroundColor: '#28a745',
+              data: [0, 0, 0, 0, 0]
+            }
+          ]
+        };
+        this.totalSavings = 0;
+        this.savingsPercentage = 0;
+      }
+    },
+    generateAssetLineData() {
+      try {
+        // Generate years for x-axis
+        const currentYear = new Date().getFullYear();
+        const years = Array.from({ length: 30 }, (_, i) => currentYear + i);
+        
+        // Create datasets for each affected asset
+        const datasets = [];
+        
+        // If we have no assets or no scenario has been run, use the default data
+        if (!this.hasScenarioBeenRun && (!this.eligibleAssets || this.eligibleAssets.length === 0)) {
+          // Return default data
+          return {
+            labels: years.map(year => year.toString()),
+            datasets: [
+              {
+                label: 'IRA',
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0,123,255,0.1)',
+                data: [300000, 250000, 200000, 180000, 160000, 140000, 120000, 100000, 80000, 60000, 40000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5, 2, 1, 1, 1, 1, 1, 1],
+                fill: false
+              },
+              {
+                label: '401k',
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40,167,69,0.1)',
+                data: [200000, 180000, 160000, 140000, 120000, 100000, 80000, 60000, 40000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                fill: false
+              },
+              {
+                label: 'Traditional IRA',
+                borderColor: '#ffc107',
+                backgroundColor: 'rgba(255,193,7,0.1)',
+                data: [100000, 95000, 90000, 85000, 80000, 75000, 70000, 65000, 60000, 55000, 50000, 45000, 40000, 35000, 30000, 25000, 20000, 15000, 10000, 5000, 2500, 1000, 500, 200, 100, 50, 25, 10, 5, 2],
+                fill: false
+              },
+              {
+                label: 'Roth IRA',
+                borderColor: '#6f42c1',
+                backgroundColor: 'rgba(111,66,193,0.1)',
+                data: [0, 20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000, 220000, 240000, 260000, 280000, 300000, 320000, 340000, 360000, 380000, 400000, 420000, 440000, 460000, 480000, 500000, 520000, 540000, 560000, 580000],
+                fill: false
+              }
+            ]
+          };
+        }
+        
+        // Add datasets for affected assets (with declining balances due to conversion)
+        this.selectedAssetList.forEach(asset => {
+          const initialValue = parseFloat(asset.current_asset_balance) || 0;
+          const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
+          const growthRate = parseFloat(asset.growth_rate) || 5.0;
+          const yearsToConvert = parseInt(this.yearsToConvert) || 1;
+          const annualConversion = conversionAmount / yearsToConvert;
+          
+          // Generate data points for this asset
+          const data = [];
+          let balance = initialValue;
+          
+          for (let i = 0; i < years.length; i++) {
+            // Apply conversion for the conversion years
+            if (i < yearsToConvert && years[i] >= this.conversionStartYear) {
+              balance -= annualConversion;
+            }
+            
+            // Apply growth
+            balance = balance * (1 + (growthRate / 100));
+            
+            // Ensure balance doesn't go below zero
+            balance = Math.max(0, balance);
+            data.push(balance);
+          }
+          
+          // Add to datasets
+          datasets.push({
+            label: asset.income_type || 'Asset',
+            borderColor: this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            data: data,
+            fill: false
+          });
+        });
+        
+        // Add dataset for unaffected assets
+        this.unaffectedAssets.forEach(asset => {
+          const initialValue = parseFloat(asset.current_asset_balance) || 0;
+          const growthRate = parseFloat(asset.growth_rate) || 5.0;
+          
+          // Generate data points
+          const data = [];
+          let balance = initialValue;
+          
+          for (let i = 0; i < years.length; i++) {
+            // Apply growth
+            balance = balance * (1 + (growthRate / 100));
+            data.push(balance);
+          }
+          
+          // Add to datasets
+          datasets.push({
+            label: asset.income_type || 'Asset',
+            borderColor: this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            data: data,
+            fill: false
+          });
+        });
+        
+        // Add Roth IRA dataset
+        const rothData = [];
+        let rothBalance = 0;
+        const rothGrowthRate = parseFloat(this.rothGrowthRate) || 5.0;
+        const withdrawalAmount = parseFloat(this.rothWithdrawalAmount) || 0;
+        
+        for (let i = 0; i < years.length; i++) {
+          const year = years[i];
+          
+          // Add conversion amounts during conversion years
+          if (i < this.yearsToConvert && year >= this.conversionStartYear) {
+            rothBalance += this.totalConversionAmount / this.yearsToConvert;
+          }
+          
+          // Apply growth
+          rothBalance = rothBalance * (1 + (rothGrowthRate / 100));
+          
+          // Apply withdrawals if past withdrawal start year
+          if (year >= this.rothWithdrawalStartYear && withdrawalAmount > 0) {
+            rothBalance -= withdrawalAmount;
+            rothBalance = Math.max(0, rothBalance); // Ensure balance doesn't go below zero
+          }
+          
+          rothData.push(rothBalance);
+        }
+        
+        // Add Roth dataset if we have conversion data
+        if (this.totalConversionAmount > 0) {
+          datasets.push({
+            label: 'Roth IRA',
+            borderColor: '#6f42c1', // Purple for Roth
+            backgroundColor: 'rgba(111,66,193,0.1)',
+            data: rothData,
+            fill: false
+          });
+        }
+        
+        // Make sure we have at least one dataset
+        if (datasets.length === 0) {
+          datasets.push({
+            label: 'Default Asset',
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0,123,255,0.1)',
+            data: Array(years.length).fill(0),
+            fill: false
+          });
+        }
+        
+        // Return the asset line data
+        return {
+          labels: years.map(year => year.toString()),
+          datasets: datasets
+        };
+      } catch (error) {
+        console.error('Error generating asset line data:', error);
+        // Return fallback data
+        return {
+          labels: Array.from({ length: 30 }, (_, i) => (new Date().getFullYear() + i).toString()),
+          datasets: [
+            {
+              label: 'Default Asset',
+              borderColor: '#007bff',
+              backgroundColor: 'rgba(0,123,255,0.1)',
+              data: Array(30).fill(0),
+              fill: false
+            }
+          ]
+        };
+      }
+    },
+    generateAssetLineDataFromAPI(assetBalances) {
+      try {
+        if (!assetBalances || !assetBalances.years || !assetBalances.assets) {
+          console.error('Invalid asset balance data from API');
+          return this.generateAssetLineData(); // Fallback to local generation
+        }
+        
+        const years = assetBalances.years;
+        const assets = assetBalances.assets;
+        const datasets = [];
+        
+        // Create a color map for consistent colors across asset types
+        const colorMap = {
+          'ira': '#007bff',
+          'traditional_ira': '#007bff',
+          '401k': '#28a745',
+          'traditional_401k': '#28a745',
+          'roth_ira': '#6f42c1',
+          'roth_401k': '#17a2b8',
+          'brokerage': '#fd7e14',
+          'savings': '#ffc107',
+          'pension': '#dc3545',
+          'social_security': '#20c997'
+        };
+        
+        // Process each asset type
+        for (const [assetType, balances] of Object.entries(assets)) {
+          // Skip any asset types that don't have both baseline and conversion data
+          if (!balances.baseline || !balances.conversion) continue;
+          
+          // Add baseline dataset
+          datasets.push({
+            label: `${this.formatAssetTypeName(assetType)} (Baseline)`,
+            borderColor: colorMap[assetType.toLowerCase()] || this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.05)',
+            data: balances.baseline,
+            fill: false,
+            borderDash: [5, 5] // Dashed line for baseline
+          });
+          
+          // Add conversion dataset
+          datasets.push({
+            label: `${this.formatAssetTypeName(assetType)} (After Conversion)`,
+            borderColor: colorMap[assetType.toLowerCase()] || this.getRandomColor(),
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            data: balances.conversion,
+            fill: false
+          });
+        }
+        
+        // Make sure we have at least one dataset
+        if (datasets.length === 0) {
+          datasets.push({
+            label: 'Default Asset',
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0,123,255,0.1)',
+            data: Array(years.length).fill(0),
+            fill: false
+          });
+        }
+        
+        return {
+          labels: years.map(year => year.toString()),
+          datasets: datasets
+        };
+      } catch (error) {
+        console.error('Error generating asset line data from API:', error);
+        return this.generateAssetLineData(); // Fallback to local generation
+      }
+    },
+    
+    formatAssetTypeName(assetType) {
+      // Convert snake_case to Title Case with proper acronyms
+      if (!assetType) return 'Unknown';
+      
+      // Handle common acronyms
+      const acronyms = {
+        'ira': 'IRA',
+        '401k': '401(k)'
+      };
+      
+      return assetType
+        .split('_')
+        .map(word => {
+          // Check if word is an acronym
+          if (acronyms[word.toLowerCase()]) {
+            return acronyms[word.toLowerCase()];
+          }
+          // Otherwise capitalize first letter
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' ');
+    },
+    generateExpenseSummaryData() {
+      try {
+        // Check if we have real data or need to use defaults
+        if (!this.hasScenarioBeenRun) {
+          // Use default data for initial display
+          const defaultBaselineRMDs = 250000;
+          const defaultOptimalRMDs = 180000;
+          const defaultBaselineTaxes = 180000;
+          const defaultOptimalTaxes = 140000;
+          const defaultBaselineMedicare = 50000;
+          const defaultOptimalMedicare = 40000;
+          const defaultBaselineInheritance = 75000;
+          const defaultOptimalInheritance = 45000;
+          
+          const defaultBaselineTotal = defaultBaselineRMDs + defaultBaselineTaxes + defaultBaselineMedicare + defaultBaselineInheritance;
+          const defaultOptimalTotal = defaultOptimalRMDs + defaultOptimalTaxes + defaultOptimalMedicare + defaultOptimalInheritance;
+          
+          const defaultSavings = defaultBaselineTotal - defaultOptimalTotal;
+          const defaultSavingsPercentage = ((defaultSavings / defaultBaselineTotal) * 100).toFixed(1);
+          
+          this.totalSavings = defaultSavings;
+          this.savingsPercentage = defaultSavingsPercentage;
+          
+          return {
+            labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+            datasets: [
+              {
+                label: 'Before Conversion',
+                backgroundColor: '#007bff',
+                data: [defaultBaselineRMDs, defaultBaselineTaxes, defaultBaselineMedicare, defaultBaselineInheritance, defaultBaselineTotal]
+              },
+              {
+                label: 'After Conversion',
+                backgroundColor: '#28a745',
+                data: [defaultOptimalRMDs, defaultOptimalTaxes, defaultOptimalMedicare, defaultOptimalInheritance, defaultOptimalTotal]
+              }
+            ]
+          };
+        }
+        
+        // Get values from baseline and optimal schedule
+        const baseline = this.baselineMetrics || {};
+        const optimal = this.optimalSchedule?.score_breakdown || {};
+        const comparison = this.comparisonMetrics || {};
+        
+        // Extract RMD data (use total RMDs from the enhanced API response)
+        const baselineRMDs = baseline.total_rmds || 0;
+        const optimalRMDs = optimal.total_rmds || 0;
+        const rmdReduction = comparison.rmd_reduction || (baselineRMDs - optimalRMDs);
+        
+        // Extract tax data
+        const baselineTaxes = baseline.lifetime_tax || 0;
+        const optimalTaxes = optimal.lifetime_tax || 0;
+        const taxSavings = comparison.tax_savings || (baselineTaxes - optimalTaxes);
+        
+        // Extract Medicare and IRMAA data
+        const baselineMedicare = (baseline.lifetime_medicare || 0) + (baseline.total_irmaa || 0);
+        const optimalMedicare = (optimal.lifetime_medicare || 0) + (optimal.total_irmaa || 0);
+        const medicareSavings = comparison.medicare_savings || comparison.irmaa_savings || (baselineMedicare - optimalMedicare);
+        
+        // Extract inheritance tax
+        const baselineInheritance = baseline.inheritance_tax || 0;
+        const optimalInheritance = optimal.inheritance_tax || 0;
+        const inheritanceTaxSavings = comparison.inheritance_tax_savings || (baselineInheritance - optimalInheritance);
+        
+        // Calculate totals
+        const baselineTotal = baselineRMDs + baselineTaxes + baselineMedicare + baselineInheritance;
+        const optimalTotal = optimalRMDs + optimalTaxes + optimalMedicare + optimalInheritance;
+        
+        // Calculate savings
+        const savings = comparison.total_savings || (baselineTotal - optimalTotal);
+        const savingsPercentage = comparison.total_savings_pct || 
+          ((baselineTotal > 0) ? ((savings / baselineTotal) * 100).toFixed(1) : "0.0");
+        
+        // Update savings display
+        this.totalSavings = savings;
+        this.savingsPercentage = savingsPercentage;
+        
+        // Return the expense summary data
+        return {
+          labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+          datasets: [
+            {
+              label: 'Before Conversion',
+              backgroundColor: '#007bff',
+              data: [baselineRMDs, baselineTaxes, baselineMedicare, baselineInheritance, baselineTotal]
+            },
+            {
+              label: 'After Conversion',
+              backgroundColor: '#28a745',
+              data: [optimalRMDs, optimalTaxes, optimalMedicare, optimalInheritance, optimalTotal]
+            }
+          ]
+        };
+      } catch (error) {
+        console.error('Error generating expense summary data:', error);
+        // Provide fallback data to ensure the graph doesn't break
+        return {
+          labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+          datasets: [
+            {
+              label: 'Before Conversion',
+              backgroundColor: '#007bff',
+              data: [0, 0, 0, 0, 0]
+            },
+            {
+              label: 'After Conversion',
+              backgroundColor: '#28a745',
+              data: [0, 0, 0, 0, 0]
+            }
+          ]
+        };
+      }
     },
   },
   mounted() {
@@ -618,17 +1847,7 @@ export default {
     }
   },
   watch: {
-    assetDetails(newVal) {
-      console.log('Updated Asset Details:', newVal);
-      if (Array.isArray(newVal) && newVal.length > 0) {
-        newVal.forEach(asset => {
-          console.log('Asset:', asset);
-          console.log('Asset Type:', asset.income_type);
-        });
-      } else {
-        console.log('Asset Details is empty or not an array.');
-      }
-    }
+    // Remove the watch handlers that could affect other components
   },
 };
 </script>

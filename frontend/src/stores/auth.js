@@ -11,6 +11,10 @@ export const useAuthStore = defineStore('auth', {
     error: null,
   }),
   persist: true,
+  getters: {
+    accessToken: (state) => state.token,
+    isAuthenticated: (state) => !!state.token,
+  },
   actions: {
     init() {
       const token = this.token || localStorage.getItem('token');
