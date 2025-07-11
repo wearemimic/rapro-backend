@@ -1,9 +1,6 @@
 <template>
   <div v-if="eligibleAssets && eligibleAssets.length > 0">
     <!-- Mode Toggle -->
-    <div class="mb-3">
-      <label style="font-weight: bold;">Manual Settings</label>
-    </div>
     <!-- Section 1: Asset Selection Panel -->
     <div class="row align-items-stretch">
       <!-- Asset Selection Panel -->
