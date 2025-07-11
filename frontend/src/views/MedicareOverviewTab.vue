@@ -1,58 +1,57 @@
 <template>
   <div>
-    <!-- Medicare Chart Card -->
-    <div class="card mb-3 mb-lg-5">
-      <div class="card-body">
-        <div class="dropdown">
-          <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('medicare')" :aria-expanded="isDropdownOpen.medicare">
-            <i class="bi-download me-2"></i> Export
-          </button>
-          <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.medicare }" aria-labelledby="usersExportDropdown">
-            <span class="dropdown-header">Export Options</span>
-            <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-              <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-              Export graph and table to Excel
-            </a>
-            <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-              <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-              Export graph and data to PDF
-            </a>
-            <a id="export-graph" class="dropdown-item" href="javascript:;">
-              Export graph only
-            </a>
-            <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-              <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-              Export table only as CSV
-            </a>
-          </div>
-        </div>
-        <div class="row" style="margin-top:20px;">
-          <div class="col-sm-8 h-100">
-            <canvas id="medicareChart" style="width: 100%; height: 300px;"></canvas>
-          </div>
-          <div class="col-sm-4 h-100">
-            <h5 class="mb-4" style="text-align:center;">IRMAA as percentage of Overall Cost </h5>
-            <div class="circles-chart" style="padding-top:20px;">
-              <div class="js-circle" id="circle-medicare" data-hs-circles-options='{
-                "value": {{ totalIrmaaSurcharge }},
-                "maxValue": {{ totalMedicareCost }},
-                "duration": 2000,
-                "isViewportInit": true,
-                "radius": 80,
-                "width": 20,
-                "fgStrokeLinecap": "round",
-                "textColor": "#377dff"
-              }'>
+    <!-- Medicare Chart and IRMAA Circle in Separate Cards -->
+    <div class="row mb-3 mb-lg-5">
+      <!-- Medicare Chart Card (2/3 width) -->
+      <div class="col-lg-8 col-md-7 mb-3 mb-lg-0">
+        <div class="card h-100" style="min-height: 340px; max-height: 340px;">
+          <div class="card-body" style="height: 300px; display: flex; flex-direction: column; justify-content: flex-start;">
+            <div class="dropdown mb-3">
+              <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('medicare')" :aria-expanded="isDropdownOpen.medicare">
+                <i class="bi-download me-2"></i> Export
+              </button>
+              <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.medicare }" aria-labelledby="usersExportDropdown">
+                <span class="dropdown-header">Export Options</span>
+                <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
+                  <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
+                  Export graph and table to Excel
+                </a>
+                <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
+                  <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
+                  Export graph and data to PDF
+                </a>
+                <a id="export-graph" class="dropdown-item" href="javascript:;">
+                  Export graph only
+                </a>
+                <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
+                  <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
+                  Export table only as CSV
+                </a>
               </div>
             </div>
-            <div class="card-body">
-              <h4 style="text-align:center;margin-top:20px;">Total Medicare Expense: ${{ (totalMedicareCost).toFixed(2) }}</h4>
-              <h4 style="text-align:center;">IRMAA Surcharges: ${{ totalIrmaaSurcharge }}</h4>
+            <div style="flex: 1 1 auto; min-height: 0;">
+              <canvas id="medicareChart" style="width: 100%; height: 100%; max-height: 300px;"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- IRMAA Circle Card (1/3 width) -->
+      <div class="col-lg-4 col-md-5 mb-3 mb-lg-0">
+        <div class="card h-100 d-flex flex-column justify-content-center align-items-center">
+          <div class="card-body w-100">
+            <h5 class="mb-4 text-center">IRMAA as percentage of Overall Cost</h5>
+            <div class="circles-chart d-flex justify-content-center" style="padding-top:20px; min-height: 180px;">
+              <div class="js-circle" id="circle-medicare"></div>
+            </div>
+            <div class="card-body p-0 mt-4">
+              <h4 class="text-center">Total Medicare Expense: ${{ (totalMedicareCost).toFixed(2) }}</h4>
+              <h4 class="text-center">IRMAA Surcharges: ${{ totalIrmaaSurcharge }}</h4>
             </div>
           </div>
         </div>
       </div>
     </div>
+    <!-- Medicare Costs Table Card -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Medicare Costs</h5>
@@ -259,35 +258,26 @@ export default {
     },
     initializeCircles() {
       this.$nextTick(() => {
-        console.log('Initializing Circles...');
-        console.log('Total IRMAA Surcharge:', this.totalIrmaaSurcharge);
-        console.log('Total Medicare Cost:', this.totalMedicareCost);
-
         const maxRetries = 20;
         let retryCount = 0;
         const tryInit = () => {
           const CirclesGlobal = window.Circles;
           if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
-            console.log('Circles.js is ready.');
             const circleElement = document.getElementById('circle-medicare');
             if (circleElement) {
-              console.log('Circle element found:', circleElement);
+              // Clear previous SVG if any
+              circleElement.innerHTML = '';
               const irmaaPercentage = Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
-              let circleColor = '#377dff'; // Default color
-
-              // Determine color based on IRMAA percentage
+              let circleColor = '#377dff';
               if (irmaaPercentage > 50) {
-                circleColor = '#ff0000'; // Red for percentages above 50
+                circleColor = '#ff0000';
               } else if (irmaaPercentage > 25) {
-                circleColor = '#ffa500'; // Orange for percentages between 25 and 50
+                circleColor = '#ffa500';
               } else if (irmaaPercentage > 15) {
-                circleColor = '#ffff00'; // Yellow for percentages between 15 and 25
+                circleColor = '#ffff00';
               } else {
-                circleColor = '#00ff00'; // Green for percentages below 15
+                circleColor = '#00ff00';
               }
-
-              console.log('IRMAA Percentage:', irmaaPercentage, 'Circle Color:', circleColor);
-
               CirclesGlobal.create({
                 id: 'circle-medicare',
                 value: irmaaPercentage,
@@ -302,17 +292,12 @@ export default {
                 styleWrapper: true,
                 styleText: true
               });
-            } else {
-              console.error('Circle element not found.');
             }
           } else if (retryCount < maxRetries) {
             retryCount++;
             setTimeout(tryInit, 100);
-          } else {
-            console.error('Failed to initialize Circles.js after multiple attempts.');
           }
         };
-
         tryInit();
       });
     },
@@ -394,5 +379,14 @@ export default {
   z-index: 10;
   font-size: 0.95em;
   white-space: nowrap;
+}
+.js-circle {
+  min-width: 160px;
+  min-height: 160px;
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style> 
