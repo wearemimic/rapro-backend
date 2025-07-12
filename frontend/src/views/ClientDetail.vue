@@ -259,25 +259,51 @@
 
                     <div class="card-body">
                       <div v-if="client && client.scenarios && client.scenarios.length">
-                        <table class="table">
+                        <table class="table scenarios-table">
                           <thead class="thead-light">
                             <tr>
-                              <th scope="col">#</th>
                               <th scope="col">Name</th>
-                              <th scope="col">Financial Overview</th>
-                              <th scope="col">Medicare Overview</th>
+                              <th scope="col">Income vs Cost %</th>
+                              <th scope="col">Medicare/IRMAA %</th>
                               <th scope="col">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr v-for="(scenario, index) in client.scenarios" :key="scenario.id">
-                              <th scope="row">{{ index + 1 }}</th>
-                              <td>{{ scenario.name }}</td>
+                              <td class="scenario-name">{{ scenario.name }}</td>
                               <td>
-                                <CircleGraph :value="40" :maxValue="100" colorMode="fixed" fixedColor="#4285f4" />
+                                <div>
+                                  <!-- Debug: Show the calculated percentages -->
+                                  <pre style="font-size:10px; color:#888; background:#f8f9fa; border:1px solid #eee; padding:2px; margin-bottom:2px;">
+Tax+Medicare: {{ scenario.income_vs_cost_percent || 0 }}% of Income
+                                  </pre>
+                                  <CircleGraph
+                                    :value="scenario.income_vs_cost_percent || 0"
+                                    :maxValue="100"
+                                    colorMode="fixed"
+                                    :fixedColor="getColorForPercent(scenario.income_vs_cost_percent || 0)"
+                                    :radius="40"
+                                    :width="10"
+                                    class="mini-circle-graph"
+                                  />
+                                </div>
                               </td>
                               <td>
-                                <CircleGraph :value="20" :maxValue="100" colorMode="medicare" />
+                                <div>
+                                  <!-- Debug: Show the calculated percentages -->
+                                  <pre style="font-size:10px; color:#888; background:#f8f9fa; border:1px solid #eee; padding:2px; margin-bottom:2px;">
+IRMAA: {{ scenario.medicare_irmaa_percent || 0 }}% of Medicare
+                                  </pre>
+                                  <CircleGraph
+                                    :value="scenario.medicare_irmaa_percent || 0"
+                                    :maxValue="100"
+                                    colorMode="fixed"
+                                    :fixedColor="getColorForPercent(scenario.medicare_irmaa_percent || 0)"
+                                    :radius="40"
+                                    :width="10"
+                                    class="mini-circle-graph"
+                                  />
+                                </div>
                               </td>
                               <td>
                                 <router-link :to="{ 
@@ -305,7 +331,7 @@
             </div>
 
             <!-- Reports Card -->
-            <div class="card mb-4">
+            <!-- <div class="card mb-4">
                 <div class="card-body">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="card-header-title">Reports</h4>
@@ -346,7 +372,7 @@
                       </div>
                     </div>
                 </div>
-            </div>
+            </div> -->
         </div>
     </div>
 
@@ -1066,6 +1092,18 @@ export default {
         alert('Failed to delete scenario. Please try again.');
       }
     },
+    // Color helper method
+    getColorForPercent(percent) {
+      if (percent > 50) {
+        return '#ff0000'; // Red
+      } else if (percent > 25) {
+        return '#ffa500'; // Orange
+      } else if (percent > 15) {
+        return '#ffff00'; // Yellow
+      } else {
+        return '#00ff00'; // Green
+      }
+    },
   }
 };
 </script>
@@ -1156,5 +1194,62 @@ export default {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.mini-circle-graph {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 82px; /* tightly fits the circle */
+}
+.mini-circle-graph >>> .js-circle {
+  min-width: 70px;
+  min-height: 70px;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mini-circle-graph >>> .circles-text {
+  font-size: 1rem !important;
+  line-height: 1 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 70px;
+}
+.scenarios-table td, .scenarios-table th {
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  vertical-align: middle;
+}
+.scenarios-table tr {
+  height: 1.1rem;
+}
+.mini-circle-graph {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mini-circle-graph >>> .js-circle {
+  min-width: 80px;
+  min-height: 80px;
+  width: 80px;
+  height: 80px;
+}
+.mini-circle-graph >>> .circles-text {
+  font-size: 1rem !important;
+  line-height: 1.1 !important;
+}
+.scenarios-table .scenario-name {
+  line-height: 1.2;
+  margin-bottom: 0.1rem;
 }
 </style>
