@@ -325,6 +325,42 @@ def update_scenario(request, scenario_id):
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
+def update_scenario_percentages(request, scenario_id):
+    """
+    Update the income_vs_cost_percent and medicare_irmaa_percent fields for a scenario.
+    """
+    try:
+        scenario = get_object_or_404(Scenario, pk=scenario_id)
+        
+        # Check if the requesting user owns the client
+        if scenario.client.advisor != request.user:
+            return Response({"error": "You do not have permission to update this scenario."}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Extract percentages from request data
+        income_vs_cost_percent = request.data.get('income_vs_cost_percent')
+        medicare_irmaa_percent = request.data.get('medicare_irmaa_percent')
+        
+        # Update only if the fields are provided
+        if income_vs_cost_percent is not None:
+            scenario.income_vs_cost_percent = income_vs_cost_percent
+        
+        if medicare_irmaa_percent is not None:
+            scenario.medicare_irmaa_percent = medicare_irmaa_percent
+        
+        scenario.save()
+        
+        return Response({
+            "id": scenario.id,
+            "income_vs_cost_percent": scenario.income_vs_cost_percent,
+            "medicare_irmaa_percent": scenario.medicare_irmaa_percent
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
 def update_scenario_assets(request, scenario_id):
     """
     Update assets associated with a scenario, particularly for Roth conversion

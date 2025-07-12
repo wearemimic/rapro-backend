@@ -744,6 +744,9 @@ export default {
             console.log('Scenario Results:', this.scenarioResults); // Log scenario results
             // Re-initialize chart with new data
             this.initializeChartJS();
+            
+            // Calculate and update the percentage metrics
+            this.updateScenarioPercentages();
           } else {
             console.warn('No data received for scenarioResults');
           }
@@ -751,6 +754,55 @@ export default {
         .catch(error => {
           console.error("Error loading scenario data:", error);
         });
+    },
+    
+    updateScenarioPercentages() {
+      // Only proceed if we have scenario results
+      if (!this.scenarioResults || !this.scenarioResults.length) return;
+      
+      const scenarioId = this.$route.params.scenarioid;
+      
+      // Calculate income vs cost percentage (federal tax + medicare / gross income)
+      let totalGross = 0;
+      let totalTax = 0;
+      let totalMedicare = 0;
+      let totalIrmaa = 0;
+      
+      this.filteredScenarioResults.forEach(row => {
+        totalGross += parseFloat(row.gross_income || 0);
+        totalTax += parseFloat(row.federal_tax || 0);
+        totalMedicare += parseFloat(row.total_medicare || 0);
+        totalIrmaa += parseFloat(row.irmaa_surcharge || 0);
+      });
+      
+      // Calculate percentages
+      const incomeVsCostPercent = totalGross > 0 ? Math.round(((totalTax + totalMedicare) / totalGross) * 100) : 0;
+      const medicareIrmaaPercent = totalMedicare > 0 ? Math.round((totalIrmaa / totalMedicare) * 100) : 0;
+      
+      console.log('Calculated percentages:', {
+        incomeVsCostPercent,
+        medicareIrmaaPercent,
+        totalGross,
+        totalTax,
+        totalMedicare,
+        totalIrmaa
+      });
+      
+      // Send update to backend
+      axios.put(
+        `http://localhost:8000/api/scenarios/${scenarioId}/update-percentages/`,
+        {
+          income_vs_cost_percent: incomeVsCostPercent,
+          medicare_irmaa_percent: medicareIrmaaPercent
+        },
+        { headers }
+      )
+      .then(response => {
+        console.log('Updated scenario percentages:', response.data);
+      })
+      .catch(error => {
+        console.error('Error updating scenario percentages:', error);
+      });
     },
     toggleDropdown(tab) {
       // Close all dropdowns first

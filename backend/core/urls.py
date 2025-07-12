@@ -28,6 +28,7 @@ urlpatterns = [
     path('scenarios/<int:scenario_id>/assets/', get_scenario_assets, name='scenario-assets'),
     path('scenarios/<int:scenario_id>/update/', views.update_scenario, name='scenario-update'),
     path('scenarios/<int:scenario_id>/update-assets/', views.update_scenario_assets, name='scenario-update-assets'),
+    path('scenarios/<int:scenario_id>/update-percentages/', views.update_scenario_percentages, name='scenario-update-percentages'),
     path('integrations/', lambda request: HttpResponse('Integrations endpoint placeholder'), name='integrations'),
    #  path('proxy/<path:path>', proxy_to_wealthbox, name='proxy_to_wealthbox'),
     path('proxy/v1/me/', proxy_to_wealthbox, name='proxy_to_wealthbox'),
