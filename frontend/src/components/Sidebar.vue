@@ -114,15 +114,15 @@
                         </router-link>
                         <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'financial' }}">
-                          Financial Overview
+                          Financial Details
                         </router-link>
                         <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'socialSecurity' }}">
-                          Social Security Overview
+                          Social Security Details
                         </router-link>
                         <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'medicare' }}">
-                          Medicare Overview
+                          Medicare Details
                         </router-link>
                         <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'income' }}">

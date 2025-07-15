@@ -23,12 +23,6 @@
                     </div>
                 </div>
 
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Notes</h5>
-                        <div v-html="client.notes"></div>
-                    </div>
-                </div>
                
                 
 

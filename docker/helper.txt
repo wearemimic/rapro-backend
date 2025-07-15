@@ -8,3 +8,6 @@ docker compose exec backend python manage.py migrate
 
 # Database Schema Dump to create schema doc for AI
 docker exec -it docker-db-1 pg_dump -U postgres -s retirementadvisorpro > schema.sql
+
+# pulling docker logs
+docker logs -f wlx-api-api-1 
