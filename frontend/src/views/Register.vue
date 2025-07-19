@@ -80,7 +80,7 @@
                     @click="signupWithAuth0('apple')"
                     :disabled="isLoading"
                   >
-                    <img src="/assets/svg/brands/apple-icon.svg" class="me-2" width="20" alt="Apple">
+                    <img src="/assets/svg/brands/apple.svg.png" class="me-2" width="20" alt="Apple">
                     Continue with Apple
                   </button>
                   
