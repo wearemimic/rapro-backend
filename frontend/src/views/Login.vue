@@ -14,24 +14,7 @@
                 <p>Don't have an account yet? <a href="/register">Sign up here</a></p>
               </div>
             </div>
-            
-            <!-- Debug Test Button -->
-            <div class="mb-3">
-              <button 
-                type="button" 
-                class="btn btn-warning btn-sm"
-                @click="() => { console.log('🧪 Test button clicked'); alert('Test button works!'); }"
-              >
-                🧪 Test Button (Click to verify Vue is working)
-              </button>
-              <button 
-                type="button" 
-                class="btn btn-info btn-sm ms-2"
-                @click="testAuth0Direct"
-              >
-                🔬 Test Auth0 Direct
-              </button>
-            </div>
+           
             
             <!-- Primary Auth0 Login Buttons -->
             <div class="d-grid gap-2 mb-4">
@@ -59,7 +42,7 @@
                 class="btn btn-outline-primary btn-lg d-flex justify-content-center align-items-center"
                 @click="() => { console.log('🔵 Apple button clicked'); loginWithAuth0('apple'); }"
               >
-                <img src="/assets/svg/brands/apple-icon.svg" class="me-2" width="20" alt="Apple">
+                <img src="/assets/svg/brands/apple.svg.png" class="me-2" width="20" alt="Apple">
                 Continue with Apple
               </button>
               
