@@ -245,3 +245,46 @@ STRIPE_ANNUAL_PRICE_ID=your-annual-price-id
 2. Check browser console for Auth0 redirect URLs
 3. Verify tokens in browser DevTools → Application → Local Storage
 4. Test social logins in incognito mode to avoid session conflicts
+
+## Latest Development Session (2025-01-19)
+
+### Scenario Duplication Feature - COMPLETED ✅
+
+**Feature Overview:**
+Implemented complete scenario duplication functionality that allows users to duplicate existing retirement scenarios with all their data and settings, then edit them in the scenario creation interface.
+
+**Frontend Changes:**
+- **ScenarioDetail.vue (line 985):** Added `createScenario` method to handle both "from scratch" and "duplicate" options
+- **ScenarioDetail.vue (line 62):** Existing dropdown already had "Duplicate This Scenario" option
+- **ScenarioCreate.vue (line 732):** Enhanced `onMounted` to detect duplication via query parameter
+- **ScenarioCreate.vue (line 757):** Added `loadScenarioForDuplication` function to fetch and prefill scenario data
+
+**Backend Changes:**
+- **views.py (line 278):** Added `duplicate_scenario` endpoint for creating scenario copies
+- **views.py (line 346):** Added `get_scenario_detail` endpoint for fetching complete scenario data
+- **urls.py (line 39-40):** Added URL routes for both new endpoints:
+  - `scenarios/<int:scenario_id>/detail/` - Get scenario data for duplication
+  - `scenarios/<int:scenario_id>/duplicate/` - Create scenario duplicate
+
+**Feature Workflow:**
+1. User clicks "Duplicate This Scenario" in dropdown menu
+2. Navigates to ScenarioCreate.vue with `?duplicate=<scenario_id>` query parameter
+3. System automatically fetches original scenario data via API
+4. All form fields prefill with original values (income sources, tax settings, Medicare config, etc.)
+5. User can modify any values and save as new scenario
+6. New scenario gets name like "Original Scenario Name (Copy)"
+
+**Technical Implementation:**
+- Complete data preservation including all income sources and their specific configurations
+- Proper authentication and ownership checks on all endpoints
+- Reset certain fields (percentages, model changes) to defaults for new scenarios
+- UUID generation for frontend compatibility
+- Error handling for failed duplications
+
+**Files Modified:**
+- `/frontend/src/views/ScenarioDetail.vue`
+- `/frontend/src/views/ScenarioCreate.vue` 
+- `/backend/core/views.py`
+- `/backend/core/urls.py`
+
+This feature significantly improves user workflow by allowing advisors to create variations of existing scenarios without re-entering all the complex financial data.
