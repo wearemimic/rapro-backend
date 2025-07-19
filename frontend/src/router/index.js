@@ -8,11 +8,14 @@ import Login from '@/views/Login.vue'
 import ClientList from '@/views/ClientList.vue'
 import ClientsCreate from '@/views/ClientCreate.vue'
 import ScenarioDetail from '@/views/ScenarioDetail.vue'
+import Auth0Callback from '@/views/Auth0Callback.vue'
+import UserManagement from '@/views/UserManagement.vue'
 
 
 const routes = [
   { path: '/register', name: 'Register', component: Register },
   { path: '/login', name: 'Login', component: Login },
+  { path: '/auth/callback', name: 'Auth0Callback', component: Auth0Callback },
   {
     path: '/',
     component: DefaultLayout,
@@ -27,6 +30,7 @@ const routes = [
       { path: 'clients/:id/scenarios/new', name: 'ScenarioCreate', component: () => import('@/views/ScenarioCreate.vue'), meta: { requiresAuth: true }, props: true },
       { path: 'clients/:id/scenarios/detail/:scenarioid', name: 'ScenarioDetail', component: ScenarioDetail, meta: { requiresAuth: true } },
       { path: 'integrations', name: 'Integrations', component: () => import('@/views/Integrations.vue'), meta: { requiresAuth: true } },
+      { path: 'users', name: 'UserManagement', component: UserManagement, meta: { requiresAuth: true } },
     ]
   }
 ]
@@ -44,7 +48,7 @@ const app = createApp({});
 const pinia = createPinia();
 app.use(pinia);
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _, next) => {
   const authStore = useAuthStore();
 
   // Check if route requires auth

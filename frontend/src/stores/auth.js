@@ -1,14 +1,13 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 
-
-
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: JSON.parse(localStorage.getItem('user')) || null,
     token: localStorage.getItem('token') || null,
     loading: false,
     error: null,
+    isAuth0: false,
   }),
   persist: true,
   getters: {
@@ -59,44 +58,118 @@ export const useAuthStore = defineStore('auth', {
       );
     },
     async login(credentials) {
+      // Deprecated: Use Auth0 login instead
+      console.warn('Traditional login is deprecated. Use Auth0 authentication.');
+      return this.loginWithAuth0(credentials.auth0Token);
+    },
+    
+    async loginWithAuth0(auth0Token) {
       this.loading = true;
       this.error = null;
       try {
-        //ZAPHOD - GET RID OF HARD CODED URL
-        const response = await axios.post('http://localhost:8000/api/login/', {
-          email: credentials.email,
-          password: credentials.password
+        console.log('Making request to backend with Auth0 token...');
+        const response = await axios.post('http://localhost:8000/api/auth0/login/', {
+          auth0Token: auth0Token
         });
+
+        console.log('Backend response received:', response.status);
 
         this.token = response.data.access;
         localStorage.setItem('refresh_token', response.data.refresh);
-        this.user = response.data.user; // <-- this may throw if `user` is undefined
+        this.user = response.data.user;
+        this.isAuth0 = true;
 
         localStorage.setItem('token', this.token);
         localStorage.setItem('user', JSON.stringify(this.user));
+        localStorage.setItem('isAuth0', 'true');
 
         axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
 
+        console.log('Auth0 login successful, user:', this.user.email);
         return true;
       } catch (err) {
-        this.error = err.response?.data?.message || 'Login failed';
+        console.error('Auth0 login error:', err);
+        this.error = err.response?.data?.message || err.message || 'Auth0 login failed';
+        
+        // Log more details for debugging
+        if (err.response) {
+          console.error('Response status:', err.response.status);
+          console.error('Response data:', err.response.data);
+        }
+        
+        return false;
       } finally {
         this.loading = false;
       }
     },
 
-    register: async function (credentials) {
+    async register(credentials) {
+      this.loading = true;
+      this.error = null;
       try {
-        const response = await axios.post('http://localhost:8000/api/login/', credentials);
+        const response = await axios.post('http://localhost:8000/api/auth0/signup/', credentials);
         this.token = response.data.access;
         this.user = response.data.user;
+        this.isAuth0 = true;
+        
         localStorage.setItem('token', this.token);
+        localStorage.setItem('refresh_token', response.data.refresh);
+        localStorage.setItem('user', JSON.stringify(this.user));
+        localStorage.setItem('isAuth0', 'true');
+        
         axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
-        console.log("✅ Registered and token set:", this.token);
         return true;
       } catch (error) {
-        console.error("❌ Registration failed:", error);
+        this.error = error.response?.data?.message || 'Registration failed';
         return false;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // User Management Functions
+    async getUsers(params = {}) {
+      try {
+        const response = await axios.get('http://localhost:8000/api/users/', { params });
+        return response.data;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to fetch users');
+      }
+    },
+
+    async getUserById(userId) {
+      try {
+        const response = await axios.get(`http://localhost:8000/api/users/${userId}/`);
+        return response.data;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to fetch user');
+      }
+    },
+
+    async updateUser(userId, userData) {
+      try {
+        const response = await axios.put(`http://localhost:8000/api/users/${userId}/`, userData);
+        return response.data;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to update user');
+      }
+    },
+
+    async deleteUser(userId) {
+      try {
+        await axios.delete(`http://localhost:8000/api/users/${userId}/`);
+        return true;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to delete user');
+      }
+    },
+
+    async resetUserPassword(userId) {
+      try {
+        const response = await axios.post(`http://localhost:8000/api/users/${userId}/reset-password/`);
+        return response.data;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to reset password');
       }
     },
 
@@ -106,6 +179,19 @@ export const useAuthStore = defineStore('auth', {
         localStorage.setItem('user', JSON.stringify(user));
       } else {
         localStorage.removeItem('user');
+      }
+    },
+    
+    setTokens(tokens) {
+      if (tokens && tokens.access) {
+        this.token = tokens.access;
+        localStorage.setItem('token', tokens.access);
+        
+        if (tokens.refresh) {
+          localStorage.setItem('refresh_token', tokens.refresh);
+        }
+        
+        axios.defaults.headers.common['Authorization'] = `Bearer ${tokens.access}`;
       }
     },
 
@@ -128,13 +214,26 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    logout() {
+    logout(auth0) {
       this.token = null;
       this.user = null;
+      this.isAuth0 = false;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('isAuth0');
+      
+      // Remove Authorization header
+      delete axios.defaults.headers.common['Authorization'];
+      
+      // If Auth0 instance is provided, logout from Auth0 as well
+      if (auth0) {
+        auth0.logout({
+          logoutParams: {
+            returnTo: window.location.origin + '/login'
+          }
+        });
+      }
     }
-  },
-  
+  }
 });

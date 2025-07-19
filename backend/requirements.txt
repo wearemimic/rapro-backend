@@ -14,3 +14,8 @@ stripe
 python-pptx
 pdf2image
 numpy>=2.0.0
+social-auth-app-django
+python-jose[cryptography]
+PyJWT[crypto]
+cryptography
+python-dotenv

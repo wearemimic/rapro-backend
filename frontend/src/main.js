@@ -4,7 +4,9 @@ import router from './router';
 import { createPinia } from 'pinia';
 import Toast, { POSITION } from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
-import axios from 'axios'; 
+import axios from 'axios';
+import { createAuth0 } from '@auth0/auth0-vue';
+import { auth0Config } from './config/auth0';
 
 const token = localStorage.getItem('token');
 if (token) {
@@ -16,6 +18,18 @@ const pinia = createPinia();
 
 app.use(pinia);
 app.use(router);
+
+// Initialize Auth0
+app.use(
+  createAuth0({
+    domain: auth0Config.domain,
+    clientId: auth0Config.clientId,
+    authorizationParams: {
+      redirect_uri: auth0Config.redirectUri,
+      audience: auth0Config.audience,
+    },
+  })
+);
 
 import { useAuthStore } from './stores/auth';
 const authStore = useAuthStore();

@@ -15,6 +15,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from datetime import timedelta
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -49,6 +53,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
+    'social_django',  # Add social_django for Auth0
 ]
 
 MIDDLEWARE = [
@@ -97,6 +102,28 @@ REST_FRAMEWORK = {
     }
 }
 
+# Auth0 settings
+AUTH0_DOMAIN = os.environ.get('AUTH0_DOMAIN', 'your-auth0-domain.auth0.com')
+AUTH0_CLIENT_ID = os.environ.get('AUTH0_CLIENT_ID', 'your-auth0-client-id')
+AUTH0_CLIENT_SECRET = os.environ.get('AUTH0_CLIENT_SECRET', 'your-auth0-client-secret')
+AUTH0_AUDIENCE = os.environ.get('AUTH0_AUDIENCE', 'https://api.retirementadvisorpro.com')
+AUTH0_ALGORITHM = os.environ.get('AUTH0_ALGORITHM', 'RS256')
+
+# Social Auth settings
+SOCIAL_AUTH_TRAILING_SLASH = False
+SOCIAL_AUTH_AUTH0_DOMAIN = AUTH0_DOMAIN
+SOCIAL_AUTH_AUTH0_KEY = AUTH0_CLIENT_ID
+SOCIAL_AUTH_AUTH0_SECRET = AUTH0_CLIENT_SECRET
+SOCIAL_AUTH_AUTH0_SCOPE = [
+    'openid',
+    'profile',
+    'email'
+]
+
+AUTHENTICATION_BACKENDS = {
+    'social_core.backends.auth0.Auth0OAuth2',
+    'django.contrib.auth.backends.ModelBackend',
+}
 
 ROOT_URLCONF = 'retirementadvisorpro.urls'
 
