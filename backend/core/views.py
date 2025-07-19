@@ -134,6 +134,9 @@ def register_view(request):
 def run_scenario_calculation(request, scenario_id):
     try:
         scenario = Scenario.objects.get(id=scenario_id)
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
         # New instantiation: only pass scenario_id and debug
         processor = ScenarioProcessor(scenario_id=scenario.id, debug=True)
         result = processor.calculate()
@@ -275,6 +278,9 @@ class ScenarioCreateView(APIView):
 def get_scenario_assets(request, scenario_id):
     try:
         scenario = Scenario.objects.get(id=scenario_id)
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
         assets = scenario.income_sources.all()
         asset_details = [
             {
@@ -307,13 +313,9 @@ def update_scenario(request, scenario_id):
     """
     try:
         scenario = Scenario.objects.get(id=scenario_id)
-        
-        # Check if the user has access to this scenario
+        # Check if the user owns the client associated with this scenario
         if scenario.client.advisor != request.user:
-            return Response(
-                {"error": "You don't have permission to modify this scenario"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"error": "Access denied."}, status=403)
         
         serializer = ScenarioUpdateSerializer(scenario, data=request.data, partial=True)
         if serializer.is_valid():
@@ -331,11 +333,9 @@ def update_scenario_percentages(request, scenario_id):
     """
     try:
         scenario = get_object_or_404(Scenario, pk=scenario_id)
-        
-        # Check if the requesting user owns the client
+        # Check if the user owns the client associated with this scenario
         if scenario.client.advisor != request.user:
-            return Response({"error": "You do not have permission to update this scenario."}, 
-                          status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Access denied."}, status=403)
         
         # Extract percentages from request data
         income_vs_cost_percent = request.data.get('income_vs_cost_percent')
@@ -367,14 +367,11 @@ def update_scenario_assets(request, scenario_id):
     """
     try:
         scenario = Scenario.objects.get(id=scenario_id)
-        
-        # Check if the user has access to this scenario
+        # Check if the user owns the client associated with this scenario
         if scenario.client.advisor != request.user:
-            return Response(
-                {"error": "You don't have permission to modify this scenario's assets"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"error": "Access denied."}, status=403)
         
+        # Update assets for the scenario
         if 'assets' not in request.data:
             return Response(
                 {"error": "Assets data is required"},

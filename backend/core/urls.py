@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .webhooks import stripe_webhook
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
+from .auth0_views import auth0_login, auth0_signup, list_users, user_detail, reset_user_password, auth0_debug, auth0_exchange_code, auth0_complete_registration, validate_coupon
 
 # Create a router for ReportTemplateViewSet
 reporttemplate_router = DefaultRouter()
@@ -19,6 +20,15 @@ urlpatterns = [
     path('register/', register_view, name='register'),
     path('profile/', profile_view, name='profile'),
     path('login/', login_view),  # 👈 expose JWT login at root if needed
+    path('auth0/login/', auth0_login, name='auth0_login'),  # Auth0 login endpoint
+    path('auth0/signup/', auth0_signup, name='auth0_signup'),  # Auth0 signup endpoint
+    path('auth0/debug/', auth0_debug, name='auth0_debug'),  # Auth0 debug endpoint
+    path('auth0/exchange-code/', auth0_exchange_code, name='auth0_exchange_code'),  # Auth0 code exchange
+    path('auth0/complete-registration/', auth0_complete_registration, name='auth0_complete_registration'),  # Auth0 registration completion
+    path('validate-coupon/', validate_coupon, name='validate_coupon'),  # Validate coupon code
+    path('users/', list_users, name='list_users'),  # List all users
+    path('users/<int:user_id>/', user_detail, name='user_detail'),  # Get/Update/Delete user
+    path('users/<int:user_id>/reset-password/', reset_user_password, name='reset_user_password'),  # Reset user password
     path('clients/', AdvisorClientListView.as_view(), name='advisor-client-list'),
     path('clients/create/', ClientCreateView.as_view(), name='client-create'),
     path('clients/<int:pk>/', ClientDetailView.as_view(), name='client-detail'),
