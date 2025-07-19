@@ -982,6 +982,19 @@ export default {
           console.error('Error fetching asset details:', error);
         });
     },
+    createScenario(type) {
+      const clientId = this.$route.params.id;
+      if (type === 'scratch') {
+        this.$router.push({ name: 'ScenarioCreate', params: { id: clientId } });
+      } else if (type === 'duplicate') {
+        const scenarioId = this.$route.params.scenarioid;
+        this.$router.push({ 
+          name: 'ScenarioCreate', 
+          params: { id: clientId },
+          query: { duplicate: scenarioId }
+        });
+      }
+    },
   },
   computed: {
     filteredScenarioResults() {

@@ -739,6 +739,12 @@ onMounted(async () => {
     primaryFirstName.value = client.first_name ?? 'Primary';
     spouseFirstName.value = client.spouse?.first_name?.trim() || 'Spouse';
     clientTaxStatus.value = client.tax_status?.toLowerCase() ?? 'single';
+
+    // Check if we're duplicating a scenario
+    const duplicateId = route.query.duplicate;
+    if (duplicateId) {
+      await loadScenarioForDuplication(duplicateId);
+    }
   } catch (err) {
     if (err.response && err.response.status === 404) {
       console.error(`Client with ID ${clientId} not found (404).`);
@@ -747,6 +753,26 @@ onMounted(async () => {
     }
   }
 });
+
+async function loadScenarioForDuplication(scenarioId) {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers });
+    const scenarioData = response.data;
+    
+    // Prefill the scenario object with data from the duplicated scenario
+    scenario.value = {
+      ...scenario.value,
+      ...scenarioData
+    };
+    
+    console.log('Loaded scenario data for duplication:', scenarioData);
+  } catch (error) {
+    console.error('Failed to load scenario for duplication:', error);
+    alert('Failed to load scenario data for duplication. Please try again.');
+  }
+}
 
 function calculateSocialSecurityBenefit(amountAtFRA, startAge) {
   if (!amountAtFRA || !startAge) return '';

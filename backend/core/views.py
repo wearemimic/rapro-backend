@@ -272,6 +272,148 @@ class ScenarioCreateView(APIView):
             scenario = serializer.save()
             return Response({'id': scenario.id, 'message': 'Scenario created successfully'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def duplicate_scenario(request, scenario_id):
+    """
+    Duplicate a scenario with all its income sources and settings
+    """
+    try:
+        # Get the original scenario
+        original_scenario = Scenario.objects.get(id=scenario_id)
+        
+        # Check if the user owns the client associated with this scenario
+        if original_scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
+        
+        # Create a copy of the scenario
+        duplicated_scenario = Scenario.objects.create(
+            client=original_scenario.client,
+            name=f"{original_scenario.name} (Copy)",
+            description=original_scenario.description,
+            retirement_age=original_scenario.retirement_age,
+            medicare_age=original_scenario.medicare_age,
+            spouse_retirement_age=original_scenario.spouse_retirement_age,
+            spouse_medicare_age=original_scenario.spouse_medicare_age,
+            mortality_age=original_scenario.mortality_age,
+            spouse_mortality_age=original_scenario.spouse_mortality_age,
+            retirement_year=original_scenario.retirement_year,
+            share_with_client=original_scenario.share_with_client,
+            part_b_inflation_rate=original_scenario.part_b_inflation_rate,
+            part_d_inflation_rate=original_scenario.part_d_inflation_rate,
+            FRA_amount=original_scenario.FRA_amount,
+            roth_conversion_start_year=original_scenario.roth_conversion_start_year,
+            roth_conversion_duration=original_scenario.roth_conversion_duration,
+            roth_conversion_annual_amount=original_scenario.roth_conversion_annual_amount,
+            apply_standard_deduction=original_scenario.apply_standard_deduction,
+            income_vs_cost_percent=0,  # Reset to 0 for new scenario
+            medicare_irmaa_percent=0   # Reset to 0 for new scenario
+        )
+        
+        # Duplicate all income sources
+        for income_source in original_scenario.income_sources.all():
+            IncomeSource.objects.create(
+                scenario=duplicated_scenario,
+                owned_by=income_source.owned_by,
+                income_type=income_source.income_type,
+                income_name=income_source.income_name,
+                current_asset_balance=income_source.current_asset_balance,
+                monthly_amount=income_source.monthly_amount,
+                monthly_contribution=income_source.monthly_contribution,
+                age_to_begin_withdrawal=income_source.age_to_begin_withdrawal,
+                age_to_end_withdrawal=income_source.age_to_end_withdrawal,
+                rate_of_return=income_source.rate_of_return,
+                cola=income_source.cola,
+                exclusion_ratio=income_source.exclusion_ratio,
+                tax_rate=income_source.tax_rate,
+                max_to_convert=income_source.max_to_convert
+            )
+        
+        return Response({
+            'id': duplicated_scenario.id,
+            'name': duplicated_scenario.name,
+            'message': 'Scenario duplicated successfully'
+        }, status=status.HTTP_201_CREATED)
+        
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_scenario_detail(request, scenario_id):
+    """
+    Get detailed scenario data for editing/duplicating
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
+        
+        # Get all income sources for this scenario
+        income_sources = scenario.income_sources.all()
+        income_data = []
+        
+        for income in income_sources:
+            income_dict = {
+                'id': str(uuid.uuid4()),  # Generate new UUID for frontend
+                'income_type': income.income_type,
+                'owned_by': income.owned_by,
+                'start_age': income.age_to_begin_withdrawal,
+                'end_age': income.age_to_end_withdrawal,
+                'current_balance': float(income.current_asset_balance or 0),
+                'monthly_contribution': float(income.monthly_contribution or 0),
+                'growth_rate': income.rate_of_return,
+                'withdrawal_amount': float(income.monthly_amount or 0),
+                'amount_per_month': float(income.monthly_amount or 0),
+                'amount_at_fra': float(income.monthly_amount or 0),
+                'cola': income.cola,
+                'exclusion_ratio': income.exclusion_ratio,
+                'tax_rate': income.tax_rate,
+                'max_to_convert': float(income.max_to_convert or 0)
+            }
+            
+            # Add specific fields for different income types
+            if income.income_type == 'social_security':
+                income_dict['amount_at_fra'] = float(income.monthly_amount or 0)
+            elif income.income_type == 'Life_Insurance':
+                income_dict['loan_amount'] = float(income.monthly_amount or 0)
+            elif income.income_type == 'Annuity':
+                income_dict['percent_taxable'] = income.exclusion_ratio * 100
+            
+            income_data.append(income_dict)
+        
+        scenario_data = {
+            'name': f"{scenario.name} (Copy)",
+            'description': scenario.description,
+            'primary_retirement_age': scenario.retirement_age,
+            'primary_medicare_age': scenario.medicare_age,
+            'primary_lifespan': scenario.mortality_age,
+            'spouse_retirement_age': scenario.spouse_retirement_age,
+            'spouse_medicare_age': scenario.spouse_medicare_age,
+            'spouse_lifespan': scenario.spouse_mortality_age,
+            'model_tax_change': '',  # Reset to default
+            'reduction_2030_ss': False,  # Reset to default
+            'apply_standard_deduction': scenario.apply_standard_deduction,
+            'primary_blind': False,  # Reset to default
+            'spouse_blind': False,  # Reset to default
+            'is_dependent': False,  # Reset to default
+            'part_b_inflation_rate': str(int(scenario.part_b_inflation_rate)),
+            'part_d_inflation_rate': str(int(scenario.part_d_inflation_rate)),
+            'primary_state': '',  # Reset to default
+            'income': income_data
+        }
+        
+        return Response(scenario_data, status=status.HTTP_200_OK)
+        
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
