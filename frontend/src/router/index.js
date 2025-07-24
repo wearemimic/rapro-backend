@@ -10,6 +10,7 @@ import ClientsCreate from '@/views/ClientCreate.vue'
 import ScenarioDetail from '@/views/ScenarioDetail.vue'
 import Auth0Callback from '@/views/Auth0Callback.vue'
 import UserManagement from '@/views/UserManagement.vue'
+import ComparisonReport from '@/views/ComparisonReport.vue'
 
 
 const routes = [
@@ -27,6 +28,7 @@ const routes = [
       { path: 'clients/create', name: 'ClientsCreate', component: ClientsCreate, meta: { requiresAuth: true } },
       { path: 'clients/:id', name: 'ClientDetail', component: () => import('@/views/ClientDetail.vue'), meta: { requiresAuth: true } },
       { path: 'clients/:id/edit', name: 'ClientEdit', component: () => import('@/views/ClientEdit.vue'), meta: { requiresAuth: true } },
+      { path: 'clients/:id/comparison-report', name: 'ComparisonReport', component: ComparisonReport, meta: { requiresAuth: true } },
       { path: 'clients/:id/scenarios/new', name: 'ScenarioCreate', component: () => import('@/views/ScenarioCreate.vue'), meta: { requiresAuth: true }, props: true },
       { path: 'clients/:id/scenarios/detail/:scenarioid', name: 'ScenarioDetail', component: ScenarioDetail, meta: { requiresAuth: true } },
       { path: 'integrations', name: 'Integrations', component: () => import('@/views/Integrations.vue'), meta: { requiresAuth: true } },
