@@ -1,189 +1,23 @@
 <template>
   <div class="p-6 max-w-7xl mx-auto">
-    <div class="row d-flex align-items-stretch" style="margin-top:20px;">
-      <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <h3 class="card-title">Create New Scenario</h3>
-            <div class="mb-3">
-              <label class="block mb-1 font-medium">Scenario Name</label>
-              <input v-model="scenario.name" type="text" class="input form-control" placeholder="Enter scenario name" />
-            </div>
-            <div class="mb-3">
-              <label class="block mt-4 mb-1 font-medium">2030 Reduction in SS</label>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" v-model="scenario.reduction_2030_ss" />
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="block mt-4 mb-1 font-medium">Apply Standard Deductions</label>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" v-model="scenario.apply_standard_deduction" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <h3 class="card-title">Scenario Options</h3>
-            <div class="mb-3">
-              <label class="block mb-1 font-medium">Model Change in Taxes</label>
-              <select v-model="scenario.model_tax_change" class="form-control">
-                <option value="">No Change</option>
-                <option value="sunset_tcja">Sunset of TCJA (2026)</option>
-                <option value="raise_top_bracket">Raise Top Bracket to 39.6%</option>
-                <option value="lower_standard_deduction">Lower Standard Deduction</option>
-                <option value="cap_itemized_deductions">Cap on Itemized Deductions</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="block mt-4 mb-1 font-medium">Medicare Part B Inflation Rate</label>
-              <select v-model="scenario.part_b_inflation_rate" class="form-control">
-                <option value="6">6%</option>
-                <option value="7">7%</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="block mt-4 mb-1 font-medium">Medicare Part D Inflation Rate</label>
-              <select v-model="scenario.part_d_inflation_rate" class="form-control">
-                <option value="6">6%</option>
-                <option value="7">7%</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-        <div class="card h-100">
-          <div class="card-body">  
-            <h3 class="text-lg font-semibold mb-2">{{ primaryFirstName }}</h3>
-            <div class="mb-3">
-              <label class="block mt-2">Medicare Start Age</label>
-              <select v-model.number="scenario.primary_medicare_age" class="form-control">
-                <option v-for="age in Array.from({ length: 11 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="block mt-2">Lifespan (Age)</label>
-              <select v-model.number="scenario.primary_lifespan" class="form-control">
-                <option v-for="age in Array.from({ length: 31 }, (_, i) => 70 + i)" :key="age" :value="age">{{ age }}</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="block mt-2">State</label>
-              <select v-model="scenario.primary_state" class="form-control">
-                <option value="">Select a state</option>
-                <option value="AL">Alabama</option>
-                <option value="AK">Alaska</option>
-                <option value="AZ">Arizona</option>
-                <option value="AR">Arkansas</option>
-                <option value="CA">California</option>
-                <option value="CO">Colorado</option>
-                <option value="CT">Connecticut</option>
-                <option value="DE">Delaware</option>
-                <option value="FL">Florida</option>
-                <option value="GA">Georgia</option>
-                <option value="HI">Hawaii</option>
-                <option value="ID">Idaho</option>
-                <option value="IL">Illinois</option>
-                <option value="IN">Indiana</option>
-                <option value="IA">Iowa</option>
-                <option value="KS">Kansas</option>
-                <option value="KY">Kentucky</option>
-                <option value="LA">Louisiana</option>
-                <option value="ME">Maine</option>
-                <option value="MD">Maryland</option>
-                <option value="MA">Massachusetts</option>
-                <option value="MI">Michigan</option>
-                <option value="MN">Minnesota</option>
-                <option value="MS">Mississippi</option>
-                <option value="MO">Missouri</option>
-                <option value="MT">Montana</option>
-                <option value="NE">Nebraska</option>
-                <option value="NV">Nevada</option>
-                <option value="NH">New Hampshire</option>
-                <option value="NJ">New Jersey</option>
-                <option value="NM">New Mexico</option>
-                <option value="NY">New York</option>
-                <option value="NC">North Carolina</option>
-                <option value="ND">North Dakota</option>
-                <option value="OH">Ohio</option>
-                <option value="OK">Oklahoma</option>
-                <option value="OR">Oregon</option>
-                <option value="PA">Pennsylvania</option>
-                <option value="RI">Rhode Island</option>
-                <option value="SC">South Carolina</option>
-                <option value="SD">South Dakota</option>
-                <option value="TN">Tennessee</option>
-                <option value="TX">Texas</option>
-                <option value="UT">Utah</option>
-                <option value="VT">Vermont</option>
-                <option value="VA">Virginia</option>
-                <option value="WA">Washington</option>
-                <option value="WV">West Virginia</option>
-                <option value="WI">Wisconsin</option>
-                <option value="WY">Wyoming</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-xl-3 mb-3 mb-xl-6">
-        <div v-if="clientTaxStatus !== 'single'" class="card h-100">
-          <div class="card-body">  
-            <h3 class="text-lg font-semibold mb-2">{{ spouseFirstName }}</h3>
-            <div class="mb-3">
-              <label class="block mt-2">Medicare Start Age</label>
-              <select v-model.number="scenario.spouse_medicare_age" class="form-control">
-                <option v-for="age in Array.from({ length: 11 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="block mt-2">Lifespan (Age)</label>
-              <select v-model.number="scenario.spouse_lifespan" class="form-control">
-                <option v-for="age in Array.from({ length: 31 }, (_, i) => 70 + i)" :key="age" :value="age">{{ age }}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>   
+    <ScenarioHeader 
+      v-model:scenario="scenario"
+      :primary-first-name="primaryFirstName"
+      :spouse-first-name="spouseFirstName"
+      :client-tax-status="clientTaxStatus"
+      @save="submitScenario"
+    />
 
-    <div v-if="scenario.apply_standard_deduction" class="row">
-      <div class="card">
-        <div class="card-body">
-          <h3 class="card-title">Standard Deduction Options</h3>
-          <div class="mb-3">
-            <label class="form-label">Primary is Blind</label>
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" v-model="scenario.primary_blind" />
-            </div>
-          </div>
-          <div v-if="clientTaxStatus !== 'single'" class="mb-3">
-            <label class="form-label">Spouse is Blind</label>
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" v-model="scenario.spouse_blind" />
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Client Can Be Claimed as a Dependent</label>
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" v-model="scenario.is_dependent" />
-            </div>
-          </div>
-        </div>
+    <div class="card">
+      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+        <h5 class="mb-0">
+          <i class="bi bi-cash-coin me-2"></i>Retirement Income Information
+        </h5>
       </div>
-    </div>
-
-    <div class="row">
-      <div class="card" >
         <div class="card-body"> 
-          <h3 class="card-title">Retirement Income Information</h3> 
           <div class="row mb-3">
             <div class="col-auto">
-              <select v-model="newIncome.income_type" class="form-control">
+              <select v-model="newIncome.income_type" class="form-select" style="width: auto;">
                 <option disabled value="">Select income type</option>
                 <option
                   v-for="option in incomeTypes"
@@ -193,7 +27,9 @@
               </select>
             </div>
             <div class="col-auto">
-              <button class="btn btn-primary" @click="addIncome">Add Income Product</button>
+              <button class="btn btn-primary" @click="addIncome">
+                <i class="bi bi-plus-circle me-2"></i>Add Income Product
+              </button>
             </div>
           </div>
 
@@ -506,17 +342,19 @@
           </div>
         </div>
       </div>
-    </div>
 
     <!-- Investment Accounts Section -->
-    <div class="row" style="margin-top:40px;">
-      <div class="card">
-        <div class="card-body">
-          <h3 class="card-title">Investment Accounts</h3>
+    <div class="card" style="margin-top:40px;">
+      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+        <h5 class="mb-0">
+          <i class="bi bi-piggy-bank me-2"></i>Investment Accounts
+        </h5>
+      </div>
+      <div class="card-body">
           <div class="row mb-3">
             <div class="col-auto">
               <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#investmentModal">
-                Add Investment Account
+                <i class="bi bi-plus-circle me-2"></i>Add Investment Account
               </button>
             </div>
           </div>
@@ -575,13 +413,14 @@
           </div>
         </div>
       </div>
-    </div>
 
-<!-- Medicare Coverage Information Table -->
-<div class="row" style="margin-top:40px;">
-  <div class="card w-100">
-    <div class="card-body">
-      <h3 class="card-title">Coverage Information (Cost per Individual)</h3>
+        <div class="card" style="margin-top:40px;">
+      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+        <h5 class="mb-0">
+          <i class="bi bi-shield-plus me-2"></i>Coverage Information (Cost per Individual)
+        </h5>
+      </div>
+      <div class="card-body">
       <p class="text-muted">Please choose the types of coverage you would like to have in retirement. Note Part B is mandatory, also the associated costs are per individual.</p>
       <table class="table table-bordered mt-3">
         <thead class="thead-light">
@@ -619,12 +458,11 @@
       </table>
     </div>
   </div>
-</div>
 
     <!-- Submit -->
     <button class="btn btn-primary" @click="submitScenario" style="margin:10px 10px 0px 0px;">Create Scenario</button>
     <button class="btn btn-secondary" @click="router.push(`/clients/${clientId}`)" style="margin-top:10px;">Cancel</button>
-</div>
+  </div>
 
 <!-- Medicare Modal -->
 <div v-if="showMedicareModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
@@ -664,6 +502,8 @@ import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import InvestmentModal from '../components/InvestmentModal.vue';
+import ScenarioHeader from '../components/ScenarioHeader.vue';
+import { useAuthStore } from '../stores/auth';
 
 const route = useRoute();
 const router = useRouter();
@@ -752,6 +592,13 @@ const groupedInvestments = computed(() => {
     acc[item.income_type].push(item);
     return acc;
   }, {});
+});
+
+// Header color from user's primary color
+const headerColor = computed(() => {
+  const authStore = useAuthStore();
+  const user = authStore.user;
+  return user && user.primary_color ? user.primary_color : '#377dff';
 });
 
 async function submitScenario() {
