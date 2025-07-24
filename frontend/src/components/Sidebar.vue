@@ -95,6 +95,10 @@
                       <i class="bi-person-badge nav-icon me-2"></i>Client Detail
                     </router-link>
                     
+                    <router-link class="nav-link" :to="{ name: 'ComparisonReport', params: { id: currentClientId }}">
+                      <i class="bi-bar-chart nav-icon me-2"></i>Comparison Report
+                    </router-link>
+                    
                     <!-- For each scenario, create a collapsible section -->
                     <div v-for="scenario in clientScenarios" :key="scenario.id" class="nav-item">
                                           <!-- Non-clickable scenario name header -->

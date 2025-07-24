@@ -1254,3 +1254,71 @@ def update_template_slides(request, template_id):
     
     return Response({"slides": serializer.data})
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_scenario_comparison_data(request, scenario_id):
+    """Get scenario data formatted for comparison report"""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
+        
+        # Run calculation to get the latest data
+        try:
+            processor = ScenarioProcessor(scenario_id=scenario.id, debug=False)
+            calculation_result = processor.calculate()
+        except Exception as calc_error:
+            logger.error(f"Error calculating scenario {scenario_id}: {str(calc_error)}")
+            # Return basic data without calculation
+            comparison_data = {
+                'id': scenario.id,
+                'name': scenario.name,
+                'irmaa_reached': False,
+                'medicare_cost': 0,
+                'federal_taxes': 0,
+                'solution_cost': 0,
+                'total_costs': 0,
+                'out_of_pocket': 0
+            }
+            return Response(comparison_data, status=status.HTTP_200_OK)
+        
+        # Handle both list and dict return types from calculate()
+        if isinstance(calculation_result, list):
+            # If it's a list, look for the Summary in the last element or iterate
+            summary = {}
+            for item in calculation_result:
+                if isinstance(item, dict) and 'Summary' in item:
+                    summary = item['Summary']
+                    break
+            # If no Summary found in list items, check if last item is Summary
+            if not summary and calculation_result:
+                last_item = calculation_result[-1]
+                if isinstance(last_item, dict):
+                    summary = last_item
+        else:
+            # If it's a dict, extract Summary as before
+            summary = calculation_result.get('Summary', {})
+        
+        comparison_data = {
+            'id': scenario.id,
+            'name': scenario.name,
+            'irmaa_reached': summary.get('IRMAA_reached', False),
+            'medicare_cost': float(summary.get('Total_Medicare_costs', 0)),
+            'federal_taxes': float(summary.get('Total_Fed_Tax', 0)),
+            'solution_cost': float(summary.get('Total_Solution_cost', 0)),
+            'total_costs': float(summary.get('Total_Costs', 0)),
+            'out_of_pocket': float(summary.get('Total_Out_of_Pocket', 0))
+        }
+        
+        return Response(comparison_data, status=status.HTTP_200_OK)
+        
+    except Scenario.DoesNotExist:
+        return Response({"error": "Scenario not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error in get_scenario_comparison_data: {str(e)}")
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

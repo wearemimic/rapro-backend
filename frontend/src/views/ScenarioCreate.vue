@@ -507,6 +507,76 @@
         </div>
       </div>
     </div>
+
+    <!-- Investment Accounts Section -->
+    <div class="row" style="margin-top:40px;">
+      <div class="card">
+        <div class="card-body">
+          <h3 class="card-title">Investment Accounts</h3>
+          <div class="row mb-3">
+            <div class="col-auto">
+              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#investmentModal">
+                Add Investment Account
+              </button>
+            </div>
+          </div>
+
+          <div v-for="(group, type) in groupedInvestments" :key="type" class="mt-4">
+            <h5 class="font-semibold text-lg mb-3">{{ type }}</h5>
+            <div class="table-responsive">
+              <table class="table table-bordered">
+                <thead class="thead-light">
+                  <tr>
+                    <th>Owner</th>
+                    <th>Investment Name</th>
+                    <th>Current Balance</th>
+                    <th>Rate of Return</th>
+                    <th>Age Start Taking</th>
+                    <th>Age Stop Taking</th>
+                    <th class="text-center" style="width: 90px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="investment in group" :key="investment.id">
+                    <td>
+                      <select v-model="investment.owned_by" class="form-control">
+                        <option value="primary">{{ primaryFirstName }}</option>
+                        <option value="spouse">{{ spouseFirstName }}</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input v-model="investment.income_name" type="text" class="form-control" />
+                    </td>
+                    <td>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input v-model.number="investment.current_balance" type="number" class="form-control" />
+                      </div>
+                    </td>
+                    <td>
+                      <div class="input-group">
+                        <input v-model.number="investment.growth_rate" type="number" class="form-control" step="0.01" />
+                        <span class="input-group-text">%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <input v-model.number="investment.start_age" type="number" class="form-control" />
+                    </td>
+                    <td>
+                      <input v-model.number="investment.end_age" type="number" class="form-control" />
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-sm btn-danger" @click="removeInvestmentById(investment.id)">Remove</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
 <!-- Medicare Coverage Information Table -->
 <div class="row" style="margin-top:40px;">
   <div class="card w-100">
@@ -579,6 +649,13 @@
     </div>
   </div>
 </div>
+
+<InvestmentModal 
+  :primary-first-name="primaryFirstName" 
+  :spouse-first-name="spouseFirstName"
+  @save="addInvestment"
+/>
+
 </template>
 
 <script setup>
@@ -586,6 +663,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import InvestmentModal from '../components/InvestmentModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -605,6 +683,7 @@ const scenario = ref({
   spouse_medicare_age: 65,
   spouse_lifespan: 90,
   income: [],
+  investments: [],
   model_tax_change: '',
   reduction_2030_ss: false,
   apply_standard_deduction: true,
@@ -618,18 +697,9 @@ const scenario = ref({
 
 const incomeTypes = [
   'social_security',
-  'Traditional_401k',
-  'Annuity',
-  'Brokerage_Account',
-  'Traditional_IRA',
-  'Life_Insurance',
   'Pension',
-  'Roth_401k',
-  'Roth_IRA',
-  'Rental_Income',
   'Wages',
-  'Reverse_Mortgage',
-  'Cash_Savings',
+  'Rental_Income',
   'Other'
 ];
 
@@ -664,6 +734,26 @@ const groupedIncome = computed(() => {
   }, {});
 });
 
+// Investment functions
+function addInvestment(investmentData) {
+  // Convert growth_rate back to percentage for display
+  investmentData.growth_rate = investmentData.growth_rate * 100;
+  scenario.value.investments.push(investmentData);
+}
+
+function removeInvestmentById(id) {
+  scenario.value.investments = scenario.value.investments.filter(investment => investment.id !== id);
+}
+
+// Group investments by type
+const groupedInvestments = computed(() => {
+  return scenario.value.investments.reduce((acc, item) => {
+    if (!acc[item.income_type]) acc[item.income_type] = [];
+    acc[item.income_type].push(item);
+    return acc;
+  }, {});
+});
+
 async function submitScenario() {
   try {
     // Validate scenario name and provide fallback if blank
@@ -692,6 +782,29 @@ async function submitScenario() {
       return sanitized;
     });
 
+    // Clean and map investment sources for API payload
+    const investments = scenario.value.investments;
+    const cleanedInvestments = investments.map(row => {
+      const sanitized = { ...row };
+      // Ensure fields match expected database schema
+      sanitized.owned_by = row.owned_by;
+      sanitized.income_type = row.income_type;
+      sanitized.income_name = row.income_name;
+      sanitized.current_asset_balance = row.current_balance;
+      sanitized.monthly_amount = 0; // Calculated withdrawal amount
+      sanitized.monthly_contribution = row.monthly_contribution || 0;
+      sanitized.age_to_begin_withdrawal = row.start_age;
+      sanitized.age_to_end_withdrawal = row.end_age;
+      sanitized.rate_of_return = row.growth_rate / 100; // Convert percentage to decimal
+      sanitized.cola = 0;
+      sanitized.exclusion_ratio = 0;
+      sanitized.tax_rate = 0;
+      return sanitized;
+    });
+
+    // Combine income and investment sources
+    const allIncomeSources = [...cleanedIncomeSources, ...cleanedInvestments];
+
     // Debug log of payload before submission
     const payload = {
       client: clientId,
@@ -703,7 +816,7 @@ async function submitScenario() {
       spouse_retirement_age: scenario.value.spouse_retirement_age,
       spouse_medicare_age: scenario.value.spouse_medicare_age,
       spouse_mortality_age: scenario.value.spouse_lifespan,
-      income_sources: cleanedIncomeSources,
+      income_sources: allIncomeSources,
       model_tax_change: scenario.value.model_tax_change,
       reduction_2030_ss: scenario.value.reduction_2030_ss,
       apply_standard_deduction: scenario.value.apply_standard_deduction,
@@ -764,7 +877,9 @@ async function loadScenarioForDuplication(scenarioId) {
     // Prefill the scenario object with data from the duplicated scenario
     scenario.value = {
       ...scenario.value,
-      ...scenarioData
+      ...scenarioData,
+      // Ensure investments array exists even if empty
+      investments: scenarioData.investments || []
     };
     
     console.log('Loaded scenario data for duplication:', scenarioData);
