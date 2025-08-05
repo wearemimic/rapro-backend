@@ -56,8 +56,11 @@
               <div class="input-group">
                 <span class="input-group-text">$</span>
                 <input 
-                  v-model.number="investment.current_balance" 
-                  type="number" 
+                  :value="currentBalanceDisplay"
+                  @input="onCurrentBalanceInput"
+                  @focus="onCurrentBalanceFocus"
+                  @blur="onCurrentBalanceBlur"
+                  type="text" 
                   class="form-control" 
                   placeholder="500,000"
                 />
@@ -73,7 +76,7 @@
               />
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-bold">Anticipated Rate of Return</label>
+              <label class="form-label fw-bold">Est. Rate of Return</label>
               <div class="input-group">
                 <input 
                   v-model.number="investment.rate_of_return" 
@@ -89,7 +92,7 @@
 
           <div class="row mb-3">
             <div class="col-md-6">
-              <label class="form-label fw-bold">Age to Start Taking</label>
+              <label class="form-label fw-bold">Age to Begin Withdrawals</label>
               <input 
                 v-model.number="investment.age_start_taking" 
                 type="number" 
@@ -98,7 +101,7 @@
               />
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-bold">Age to Stop Taking</label>
+              <label class="form-label fw-bold">Age to End Withdrawals</label>
               <input 
                 v-model.number="investment.age_stop_taking" 
                 type="number" 
@@ -222,6 +225,9 @@ const investment = ref({
   age_last_contribution: null
 })
 
+// For formatted display
+const currentBalanceDisplay = ref('')
+
 const resetForm = () => {
   investment.value = {
     owned_by: 'primary',
@@ -237,6 +243,69 @@ const resetForm = () => {
     annual_contribution_percentage: null,
     employer_match: null,
     age_last_contribution: null
+  }
+  currentBalanceDisplay.value = ''
+}
+
+// Currency formatting functions
+const formatCurrency = (value) => {
+  if (!value || value === 0) return '$0'
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value)
+}
+
+const onCurrentBalanceFocus = () => {
+  // Show raw number on focus
+  currentBalanceDisplay.value = investment.value.current_balance ? investment.value.current_balance.toString() : ''
+}
+
+const onCurrentBalanceInput = (event) => {
+  // Remove non-numeric characters except decimal
+  let raw = event.target.value.replace(/[^0-9.]/g, '')
+  
+  // Handle multiple decimals
+  const parts = raw.split('.')
+  if (parts.length > 2) raw = parts[0] + '.' + parts[1]
+  
+  // Limit decimal places to 2
+  if (parts[1]) raw = parts[0] + '.' + parts[1].slice(0, 2)
+  
+  // Handle edge cases
+  if (raw === '.') {
+    currentBalanceDisplay.value = '0.'
+    investment.value.current_balance = 0
+    return
+  }
+  
+  if (raw === '') {
+    currentBalanceDisplay.value = ''
+    investment.value.current_balance = null
+    return
+  }
+  
+  // Parse numeric value
+  let numeric = parseFloat(raw)
+  if (isNaN(numeric)) numeric = 0
+  
+  // Format with commas for display
+  const [intPart, decPart] = numeric.toString().split('.')
+  let formatted = parseInt(intPart, 10).toLocaleString()
+  if (decPart !== undefined) {
+    formatted += '.' + decPart
+  }
+  
+  currentBalanceDisplay.value = formatted
+  investment.value.current_balance = numeric
+}
+
+const onCurrentBalanceBlur = () => {
+  // Format as currency on blur
+  if (investment.value.current_balance) {
+    currentBalanceDisplay.value = formatCurrency(investment.value.current_balance)
   }
 }
 

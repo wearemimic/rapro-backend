@@ -1,37 +1,16 @@
 <template>
-  <aside id="sidebar" class="sidebar" style="width:270px;">
+  <aside id="sidebar" class="sidebar" :class="{ 'sidebar-collapsed': isCollapsed }" :style="{ width: isCollapsed ? '60px' : '270px' }">
     <div class="navbar-vertical-container">
       <div class="navbar-vertical-footer-offset">
-        <!-- Logo -->
-
-        <a class="navbar-brand" href="./index.html" aria-label="Front">
-          
-          <!-- <img class="navbar-brand-logo" src="./assets/svg/logos-light/logo.svg" alt="Logo" data-hs-theme-appearance="dark">
-          <img class="navbar-brand-logo-mini" src="./assets/svg/logos/logo-short.svg" alt="Logo" data-hs-theme-appearance="default">
-          <img class="navbar-brand-logo-mini" src="./assets/svg/logos-light/logo-short.svg" alt="Logo" data-hs-theme-appearance="dark"> -->
-        </a>
-
-        <!-- End Logo -->
-
-        <!-- Navbar Vertical Toggle -->
-        <button type="button" class="js-navbar-vertical-aside-toggle-invoker navbar-aside-toggler">
-          <i class="bi-arrow-bar-left navbar-toggler-short-align" data-bs-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' data-bs-toggle="tooltip" data-bs-placement="right" title="Collapse"></i>
-          <i class="bi-arrow-bar-right navbar-toggler-full-align" data-bs-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' data-bs-toggle="tooltip" data-bs-placement="right" title="Expand"></i>
-        </button>
-
-        <!-- End Navbar Vertical Toggle -->
-
         <!-- Content -->
         <div class="navbar-vertical-content">
           <div id="navbarVerticalMenu" class="nav nav-pills nav-vertical card-navbar-nav">
             <!-- Collapse -->
             <div class="nav-item">
-              <a class="nav-link" href="/dashboard" role="button"  aria-expanded="true" aria-controls="navbarVerticalMenuDashboards">
+              <a class="nav-link" href="/dashboard" role="button" :title="isCollapsed ? 'Dashboard' : ''" aria-expanded="true" aria-controls="navbarVerticalMenuDashboards">
                 <i class="bi-people nav-icon"></i>
-                <span class="nav-link-title">Dashboard</span>
+                <span class="nav-link-title" v-show="!isCollapsed">Dashboard</span>
               </a>
-
-              
             </div>
             <!-- End Collapse -->
             <!-- Collapse -->
@@ -41,12 +20,14 @@
             <div id="navbarVerticalMenuPagesMenu">
               <!-- Collapse -->
               <div class="nav-item">
-                <a class="nav-link dropdown-toggle " href="#navbarVerticalMenuPagesUsersMenu" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuPagesUsersMenu" aria-expanded="false" aria-controls="navbarVerticalMenuPagesUsersMenu">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuPagesUsersMenu" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuPagesUsersMenu'" 
+                   :title="isCollapsed ? 'Clients' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuPagesUsersMenu">
                   <i class="bi-people nav-icon"></i>
-                  <span class="nav-link-title">Clients</span>
+                  <span class="nav-link-title" v-show="!isCollapsed">Clients</span>
                 </a>
 
-                <div id="navbarVerticalMenuPagesUsersMenu" class="nav-collapse collapse " data-bs-parent="#navbarVerticalMenuPagesMenu">
+                <div id="navbarVerticalMenuPagesUsersMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
                   <a class="nav-link " href="/clients">Overview</a>
                   <a class="nav-link " href="/clients/create">Add Client <span class="badge bg-info rounded-pill ms-1">Hot</span></a>
                 </div>
@@ -57,12 +38,14 @@
 
               <!-- Collapse -->
               <div class="nav-item">
-                <a class="nav-link dropdown-toggle " href="#navbarVerticalMenuPagesAccountMenu" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuPagesAccountMenu" aria-expanded="false" aria-controls="navbarVerticalMenuPagesAccountMenu">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuPagesAccountMenu" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuPagesAccountMenu'" 
+                   :title="isCollapsed ? 'Account' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuPagesAccountMenu">
                   <i class="bi-person-badge nav-icon"></i>
-                  <span class="nav-link-title">Account</span>
+                  <span class="nav-link-title" v-show="!isCollapsed">Account</span>
                 </a>
 
-                <div id="navbarVerticalMenuPagesAccountMenu" class="nav-collapse collapse " data-bs-parent="#navbarVerticalMenuPagesMenu">
+                <div id="navbarVerticalMenuPagesAccountMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
                   <a class="nav-link " href="./account-settings.html">Settings</a>
                   <a class="nav-link " href="./account-billing.html">Billing</a>
                   <a class="nav-link " href="./account-white-label.html">White Label</a>
@@ -72,25 +55,29 @@
 
               <!-- Collapse -->
               <div class="nav-item">
-                <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuIntegrationsMenu" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuIntegrationsMenu" aria-expanded="false" aria-controls="navbarVerticalMenuIntegrationsMenu">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuIntegrationsMenu" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuIntegrationsMenu'" 
+                   :title="isCollapsed ? 'Integrations' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuIntegrationsMenu">
                   <i class="bi-plug nav-icon"></i>
-                  <span class="nav-link-title">Integrations</span>
+                  <span class="nav-link-title" v-show="!isCollapsed">Integrations</span>
                 </a>
 
-                <div id="navbarVerticalMenuIntegrationsMenu" class="nav-collapse collapse" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                <div id="navbarVerticalMenuIntegrationsMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
                   <a class="nav-link" href="/integrations/crm">CRM</a>
                 </div>
               </div>
               
               <!-- Client navigation section - only shown when in client context -->
               <div class="nav-item" v-if="isClientRoute">
-                <a class="nav-link dropdown-toggle" href="#navbarVerticalMenuCurrentClient" role="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalMenuCurrentClient" aria-expanded="true" aria-controls="navbarVerticalMenuCurrentClient">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuCurrentClient" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuCurrentClient'" 
+                   :title="isCollapsed ? 'Current Client' : ''" aria-expanded="true" aria-controls="navbarVerticalMenuCurrentClient">
                   <i class="bi-person nav-icon"></i>
-                  <span class="nav-link-title">Current Client</span>
-                  <span class="badge bg-primary rounded-pill ms-1">Active</span>
+                  <span class="nav-link-title" v-show="!isCollapsed">Current Client</span>
+                  <span class="badge bg-primary rounded-pill ms-1" v-show="!isCollapsed">Active</span>
                 </a>
 
-                                  <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" :class="{ show: isClientRoute }" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                                  <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" :class="{ show: isClientRoute && !isCollapsed }" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
                     <router-link class="nav-link" :to="{ name: 'ClientDetail', params: { id: currentClientId }}">
                       <i class="bi-person-badge nav-icon me-2"></i>Client Detail
                     </router-link>
@@ -161,6 +148,13 @@
         <!-- End Content -->
       </div>
     </div>
+    
+    <!-- Navbar Vertical Toggle - positioned on right side -->
+    <button type="button" class="navbar-aside-toggler-right" @click="toggleSidebar">
+      <i v-if="!isCollapsed" class="bi-chevron-left" title="Collapse"></i>
+      <i v-else class="bi-chevron-right" title="Expand"></i>
+    </button>
+    <!-- End Navbar Vertical Toggle -->
   </aside>
 </template>
 
@@ -172,10 +166,17 @@ export default {
       currentClientId: null,
       currentScenarioId: null,
       clientScenarios: [],
-      isClientRoute: false
+      isClientRoute: false,
+      isCollapsed: false
     };
   },
   created() {
+    // Restore collapsed state from localStorage
+    const savedCollapsedState = localStorage.getItem('sidebarCollapsed');
+    if (savedCollapsedState !== null) {
+      this.isCollapsed = savedCollapsedState === 'true';
+    }
+    
     // Check the initial route
     this.checkIfClientRoute(this.$route);
     
@@ -226,6 +227,14 @@ export default {
   },
   
   methods: {
+    toggleSidebar() {
+      this.isCollapsed = !this.isCollapsed;
+      // Save state to localStorage
+      localStorage.setItem('sidebarCollapsed', this.isCollapsed.toString());
+      // Emit event to parent if needed for layout adjustments
+      this.$emit('sidebar-toggle', this.isCollapsed);
+    },
+    
     // Check if a scenario is the currently selected one
     isCurrentScenario(scenarioId) {
       // First check if we have a current scenario ID and we're viewing a scenario
@@ -320,10 +329,150 @@ export default {
 <style scoped>
 /* You can move real styles from dist/assets/css or define here */
 .sidebar {
+  position: relative;
   width: 250px;
   background-color: #f8f9fa;
   min-height: 100vh;
   padding-top: 1rem;
   border-right: 1px solid #e3e6f0;
 }
+
+/* Fix for scrolling when content overflows */
+.navbar-vertical-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar-vertical-footer-offset {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar-vertical-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 2rem;
+  padding-top: 2.5rem;
+}
+
+/* Ensure the dropdown menu items are visible within scroll container */
+#navbarVerticalMenuCurrentClient {
+  max-height: calc(100vh - 400px); /* Adjust based on other nav items */
+  overflow-y: auto;
+}
+
+/* Optional: Add subtle scrollbar styling */
+.navbar-vertical-content::-webkit-scrollbar,
+#navbarVerticalMenuCurrentClient::-webkit-scrollbar {
+  width: 6px;
+}
+
+.navbar-vertical-content::-webkit-scrollbar-track,
+#navbarVerticalMenuCurrentClient::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.navbar-vertical-content::-webkit-scrollbar-thumb,
+#navbarVerticalMenuCurrentClient::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.navbar-vertical-content::-webkit-scrollbar-thumb:hover,
+#navbarVerticalMenuCurrentClient::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Collapsed sidebar styles */
+.sidebar-collapsed .nav-link {
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+}
+
+.sidebar-collapsed .nav-icon {
+  margin-right: 0 !important;
+  font-size: 1.2rem;
+}
+
+.sidebar-collapsed .navbar-aside-toggler {
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Hide badges and text when collapsed */
+.sidebar-collapsed .nav-link-title,
+.sidebar-collapsed .badge {
+  display: none !important;
+}
+
+/* Center the icons in collapsed mode */
+.sidebar-collapsed .nav-link {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Smooth transition */
+.sidebar {
+  transition: width 0.3s ease;
+}
+
+/* Tooltip styles for collapsed mode */
+.sidebar-collapsed .nav-link:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Remove dropdown arrows in collapsed mode */
+.sidebar-collapsed .dropdown-toggle::after {
+  display: none;
+}
+
+/* Toggle button styling - positioned on right side */
+.navbar-aside-toggler-right {
+  position: absolute;
+  top: 50%;
+  right: -15px;
+  transform: translateY(-50%);
+  background: #ffffff;
+  border: 1px solid #e3e6f0;
+  color: #6c757d;
+  padding: 0.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  width: 30px;
+  height: 30px;
+}
+
+.navbar-aside-toggler-right:hover {
+  background-color: #f8f9fa;
+  color: #495057;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.navbar-aside-toggler-right i {
+  font-size: 0.9rem;
+}
+
+/* Reduce spacing for first navigation item */
+#navbarVerticalMenu .nav-item:first-child {
+  margin-top: 0;
+}
+
+#navbarVerticalMenu .nav-item:first-child .nav-link {
+  margin-top: 0;
+}
+
 </style>

@@ -58,6 +58,37 @@
       </div>
     </div>
     <!-- End Row -->
+
+    <!-- Financial Flow Diagram Section -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-header card-header-content-between">
+        <h4 class="card-header-title">Financial Flow Overview</h4>
+        <div class="dropdown">
+          <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('flow')" :aria-expanded="isDropdownOpen.flow">
+            <i class="bi-download me-2"></i> Export
+          </button>
+          <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.flow }">
+            <span class="dropdown-header">Export Options</span>
+            <a class="dropdown-item" href="javascript:;" @click="exportFlowToPDF">
+              <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="PDF">
+              Export flow diagram to PDF
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="flow-chart-container">
+          <svg id="financialFlowChart"></svg>
+        </div>
+        <div class="mt-3">
+          <p class="text-muted small">
+            This diagram shows the flow of your total income through taxes, Medicare, IRMAA, and other expenses to arrive at your net income.
+            The width of each flow represents the relative amount.
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Table Card (unchanged) -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-header card-header-content-between">
@@ -127,6 +158,8 @@ import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Chart } from 'chart.js';
+import * as d3 from 'd3';
+import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -193,7 +226,8 @@ export default {
   data() {
     return {
       isDropdownOpen: {
-        financial: false
+        financial: false,
+        flow: false
       },
       openIrmaaTooltipIdx: null,
       chartInstance: null
@@ -236,6 +270,7 @@ export default {
     filteredResults: {
       handler(newResults) {
         this.renderFinancialChart(newResults);
+        this.renderFlowChart(newResults);
         this.initializeCircles();
       },
       deep: true,
@@ -350,6 +385,157 @@ export default {
         }
       });
     },
+    renderFlowChart(results) {
+      if (!results || results.length === 0) return;
+
+      // Clear previous chart
+      d3.select('#financialFlowChart').selectAll('*').remove();
+
+      // Calculate totals for the flow
+      const totalGrossIncome = results.reduce((sum, row) => sum + parseFloat(row.gross_income || 0), 0);
+      const totalFederalTax = results.reduce((sum, row) => sum + parseFloat(row.federal_tax || 0), 0);
+      const totalMedicare = results.reduce((sum, row) => sum + parseFloat(row.total_medicare || 0), 0);
+      
+      // Estimate IRMAA as a portion of Medicare (for demonstration)
+      const estimatedIRMAA = totalMedicare * 0.3; // Assume 30% of Medicare is IRMAA
+      const regularMedicare = totalMedicare - estimatedIRMAA;
+      
+      // Calculate other expenses (we'll estimate this as remaining amount after basic expenses)
+      const basicExpenses = totalFederalTax + totalMedicare;
+      const netIncome = totalGrossIncome - basicExpenses;
+      const otherExpenses = Math.max(0, netIncome * 0.6); // Assume 60% of net goes to other expenses
+      const finalNetIncome = netIncome - otherExpenses;
+
+      // Create D3 Sankey data structure
+      const data = {
+        nodes: [
+          { id: 0, name: 'Total Income' },
+          { id: 1, name: 'Taxable Income' },
+          { id: 2, name: 'Federal Tax' },
+          { id: 3, name: 'Medicare' },
+          { id: 4, name: 'IRMAA' },
+          { id: 5, name: 'Other Expenses' },
+          { id: 6, name: 'Net Income' }
+        ],
+        links: [
+          { source: 0, target: 1, value: totalGrossIncome },
+          { source: 1, target: 2, value: totalFederalTax },
+          { source: 1, target: 3, value: regularMedicare },
+          { source: 1, target: 4, value: estimatedIRMAA },
+          { source: 1, target: 5, value: otherExpenses },
+          { source: 1, target: 6, value: finalNetIncome }
+        ]
+      };
+
+      // Set up SVG dimensions
+      const container = document.querySelector('.flow-chart-container');
+      const width = container.clientWidth;
+      const height = 400;
+
+      const svg = d3.select('#financialFlowChart')
+        .attr('width', width)
+        .attr('height', height);
+
+      // Create sankey generator
+      const sankeyGenerator = sankey()
+        .nodeWidth(15)
+        .nodePadding(10)
+        .extent([[1, 1], [width - 1, height - 5]]);
+
+      // Generate the sankey layout
+      const { nodes, links } = sankeyGenerator(data);
+
+      // Color mapping
+      const colorMap = {
+        'Total Income': '#4285f4',
+        'Taxable Income': '#4285f4',
+        'Federal Tax': '#ea4335',
+        'Medicare': '#fbbc05',
+        'IRMAA': '#ff6d01',
+        'Other Expenses': '#9aa0a6',
+        'Net Income': '#34a853'
+      };
+
+      // Draw links
+      svg.append('g')
+        .selectAll('.link')
+        .data(links)
+        .join('path')
+        .attr('class', 'link')
+        .attr('d', sankeyLinkHorizontal())
+        .attr('stroke', d => colorMap[d.target.name] || '#ccc')
+        .attr('stroke-width', d => Math.max(1, d.width))
+        .attr('fill', 'none')
+        .attr('opacity', 0.7)
+        .append('title')
+        .text(d => `${d.source.name} → ${d.target.name}\n${this.formatCurrency(d.value)}`);
+
+      // Draw nodes
+      const node = svg.append('g')
+        .selectAll('.node')
+        .data(nodes)
+        .join('g')
+        .attr('class', 'node');
+
+      node.append('rect')
+        .attr('x', d => d.x0)
+        .attr('y', d => d.y0)
+        .attr('height', d => d.y1 - d.y0)
+        .attr('width', d => d.x1 - d.x0)
+        .attr('fill', d => colorMap[d.name] || '#ccc')
+        .attr('stroke', '#000')
+        .attr('stroke-width', 0.5);
+
+      // Add labels
+      node.append('text')
+        .attr('x', d => d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6)
+        .attr('y', d => (d.y1 + d.y0) / 2)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
+        .style('font-size', '12px')
+        .style('font-weight', 'bold')
+        .text(d => d.name);
+
+      // Add value labels
+      node.append('text')
+        .attr('x', d => d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6)
+        .attr('y', d => (d.y1 + d.y0) / 2 + 15)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
+        .style('font-size', '10px')
+        .style('fill', '#666')
+        .text(d => this.formatCurrency(d.value));
+
+      // Add tooltips to nodes
+      node.append('title')
+        .text(d => `${d.name}\n${this.formatCurrency(d.value)}`);
+    },
+    exportFlowToPDF() {
+      const svg = document.getElementById('financialFlowChart');
+      if (svg) {
+        // Convert SVG to canvas for PDF export
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = svg.clientWidth;
+          canvas.height = svg.clientHeight;
+          ctx.drawImage(img, 0, 0);
+          
+          const pdf = new jsPDF();
+          const imgData = canvas.toDataURL('image/png');
+          pdf.addImage(imgData, 'PNG', 10, 10, 190, 100);
+          pdf.save('financial-flow-diagram.pdf');
+          
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      }
+    },
     toggleDropdown(tab) {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
@@ -456,6 +642,7 @@ export default {
     document.addEventListener('click', this.handleClickOutside);
     if (this.filteredResults && this.filteredResults.length) {
       this.renderFinancialChart(this.filteredResults);
+      this.renderFlowChart(this.filteredResults);
       this.initializeCircles();
     }
   },
@@ -465,6 +652,7 @@ export default {
       this.chartInstance.destroy();
       this.chartInstance = null;
     }
+    // D3 SVG cleanup is handled by d3.select('#financialFlowChart').selectAll('*').remove() in renderFlowChart
   },
 };
 </script>
@@ -515,5 +703,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.flow-chart-container {
+  width: 100%;
+  height: 400px;
+  min-height: 400px;
+  max-height: 400px;
+  position: relative;
+}
+
+#financialFlowChart {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 400px !important;
+  max-height: 400px !important;
+  display: block;
 }
 </style> 
