@@ -1,34 +1,44 @@
 <template>
-    <div class="row" style="margin-top:50px;">
-        <div class="col-lg-4" style="margin-top:-30px;">  
-            <div class="container mt-5" v-if="client">
+    <div class="container-fluid" style="margin-top:80px;">
+        <!-- Client Header Card spanning full width -->
+        <div class="row mb-3" v-if="client">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <h2 class="mb-0 me-3">{{ client.first_name }} {{ client.last_name }}</h2>
+                            <span class="badge bg-primary">{{ client.status || 'Active' }}</span>
+                        </div>
+                        <div>
+                            <router-link :to="`/clients/${client.id}/edit`" class="btn btn-secondary me-2">Edit</router-link>
+                            <button @click="deleteClient" class="btn btn-danger">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Two column layout with reduced spacing -->
+        <div class="row gx-3">
+            <div class="col-lg-4">  
+                <div v-if="client">
                 <div class="card mb-4">
                     <div class="card-body">
                         <h5 class="card-title">Basic Info</h5>
-                        <h2>{{ client.first_name }} {{ client.last_name }}</h2>
                         <p><strong>Email:</strong> {{ client.email }}</p>
                         <p><strong>Birthdate:</strong> {{ client.birthdate }}</p>
                         <p><strong>Gender:</strong> {{ client.gender }}</p>
                         <p><strong>Tax Status:</strong> {{ client.tax_status }}</p>
                         <p><strong>Status:</strong> {{ client.status }}</p>
+                        
+                        <div v-if="client.spouse">
+                            <hr class="my-3" style="border-color: #e7eaf3;">
+                            <h6 class="mb-3">Spouse Information</h6>
+                            <p><strong>Name:</strong> {{ client.spouse.first_name }} {{ client.spouse.last_name }}</p>
+                            <p><strong>Birthdate:</strong> {{ client.spouse.birthdate }}</p>
+                            <p><strong>Gender:</strong> {{ client.spouse.gender }}</p>
+                        </div>
                     </div>
-                </div>
-
-                <div v-if="client.spouse" class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Spouse Info</h5>
-                        <p><strong>Name:</strong> {{ client.spouse.first_name }} {{ client.spouse.last_name }}</p>
-                        <p><strong>Birthdate:</strong> {{ client.spouse.birthdate }}</p>
-                        <p><strong>Gender:</strong> {{ client.spouse.gender }}</p>
-                    </div>
-                </div>
-
-               
-                
-
-                <div class="mb-3">
-                <router-link :to="`/clients/${client.id}/edit`" class="btn btn-secondary">Edit</router-link>
-                <button @click="deleteClient" class="btn btn-danger" style="margin-left:10px;margin-right:10px;">Delete</button>
                 </div>
 
                 <!-- Real Estate Card -->
@@ -368,6 +378,7 @@ IRMAA: {{ scenario.medicare_irmaa_percent || 0 }}% of Medicare
                 </div>
             </div> -->
         </div>
+    </div>
     </div>
 
  

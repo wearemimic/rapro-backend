@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
+import router from '@/router';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -8,6 +9,10 @@ export const useAuthStore = defineStore('auth', {
     loading: false,
     error: null,
     isAuth0: false,
+    refreshAttempts: 0,
+    maxRefreshAttempts: 3,
+    isRefreshing: false,
+    failedRequestsQueue: [],
   }),
   persist: true,
   getters: {
@@ -23,19 +28,71 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     setupAxiosInterceptor() {
+      // Request interceptor to add token
+      axios.interceptors.request.use(
+        config => {
+          const token = this.token || localStorage.getItem('token');
+          if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+          }
+          return config;
+        },
+        error => Promise.reject(error)
+      );
+
+      // Response interceptor for token refresh and error handling
       axios.interceptors.response.use(
         response => response,
         async error => {
           const originalRequest = error.config;
 
+          // Check for rate limiting (429 status)
+          if (error.response && error.response.status === 429) {
+            console.error('Rate limited - too many requests');
+            // Clear tokens and redirect to login
+            this.clearAuthData();
+            router.push('/login');
+            return Promise.reject(new Error('Rate limited. Please log in again.'));
+          }
+
+          // Skip refresh for certain endpoints
+          const skipRefreshEndpoints = ['/api/token/refresh/', '/api/auth0/'];
+          const shouldSkipRefresh = skipRefreshEndpoints.some(endpoint => 
+            originalRequest.url.includes(endpoint)
+          );
+
+          if (shouldSkipRefresh && error.response?.status === 401) {
+            // Refresh token is invalid, clear auth and redirect
+            this.clearAuthData();
+            router.push('/login');
+            return Promise.reject(error);
+          }
+
+          // Handle 401 errors with token refresh
           if (
             error.response &&
             error.response.status === 401 &&
             !originalRequest._retry &&
-            localStorage.getItem('refresh_token')
+            localStorage.getItem('refresh_token') &&
+            this.refreshAttempts < this.maxRefreshAttempts
           ) {
             originalRequest._retry = true;
+
+            // If already refreshing, queue the request
+            if (this.isRefreshing) {
+              return new Promise((resolve, reject) => {
+                this.failedRequestsQueue.push({ resolve, reject, originalRequest });
+              });
+            }
+
+            this.isRefreshing = true;
+            this.refreshAttempts++;
+
             try {
+              // Add exponential backoff delay
+              const delay = Math.min(1000 * Math.pow(2, this.refreshAttempts - 1), 10000);
+              await new Promise(resolve => setTimeout(resolve, delay));
+
               const res = await axios.post('http://localhost:8000/api/token/refresh/', {
                 refresh: localStorage.getItem('refresh_token'),
               });
@@ -44,18 +101,70 @@ export const useAuthStore = defineStore('auth', {
               this.token = newToken;
               localStorage.setItem('token', newToken);
               axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+              
+              // Reset refresh attempts on success
+              this.refreshAttempts = 0;
+              this.isRefreshing = false;
 
+              // Process queued requests
+              this.processQueue(null, newToken);
+
+              // Retry original request with new token
+              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
               return axios(originalRequest);
             } catch (refreshError) {
               console.error('Token refresh failed:', refreshError);
-              this.logout(); // Optional: force logout
+              this.isRefreshing = false;
+              
+              // Process queue with error
+              this.processQueue(refreshError, null);
+              
+              // Clear auth and redirect to login
+              this.clearAuthData();
+              router.push('/login');
+              
+              return Promise.reject(refreshError);
             }
+          }
+
+          // For other errors or max attempts reached
+          if (error.response?.status === 401 && this.refreshAttempts >= this.maxRefreshAttempts) {
+            console.error('Max refresh attempts reached');
+            this.clearAuthData();
+            router.push('/login');
           }
 
           return Promise.reject(error);
         }
       );
+    },
+
+    processQueue(error, token = null) {
+      this.failedRequestsQueue.forEach(promise => {
+        if (error) {
+          promise.reject(error);
+        } else {
+          promise.originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          promise.resolve(axios(promise.originalRequest));
+        }
+      });
+      this.failedRequestsQueue = [];
+    },
+
+    clearAuthData() {
+      this.token = null;
+      this.user = null;
+      this.isAuth0 = false;
+      this.refreshAttempts = 0;
+      this.isRefreshing = false;
+      this.failedRequestsQueue = [];
+      
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('isAuth0');
+      
+      delete axios.defaults.headers.common['Authorization'];
     },
     async login(credentials) {
       // Deprecated: Use Auth0 login instead
@@ -215,16 +324,8 @@ export const useAuthStore = defineStore('auth', {
     },
 
     logout(auth0) {
-      this.token = null;
-      this.user = null;
-      this.isAuth0 = false;
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('isAuth0');
-      
-      // Remove Authorization header
-      delete axios.defaults.headers.common['Authorization'];
+      // Use the centralized clearAuthData method
+      this.clearAuthData();
       
       // If Auth0 instance is provided, logout from Auth0 as well
       if (auth0) {
@@ -233,6 +334,9 @@ export const useAuthStore = defineStore('auth', {
             returnTo: window.location.origin + '/login'
           }
         });
+      } else {
+        // If no Auth0 instance, just redirect to login
+        router.push('/login');
       }
     }
   }

@@ -1,20 +1,21 @@
 <!-- Dashboard.vue -->
 <template>
-  <div class="row align-items-center">
-    <div>
-      <!-- End Col -->
-      <div class="col-auto" style="margin-top:50px;">
-        <a class="btn btn-primary" href="/clients/create">
-          <i class="bi-person-plus-fill me-1"></i> Create Client
-        </a>
+  <div class="container-fluid" style="margin-top:80px;">
+    <div class="row align-items-center">
+      <div>
+        <!-- End Col -->
+        <div class="col-auto">
+          <a class="btn btn-primary" href="/clients/create">
+            <i class="bi-person-plus-fill me-1"></i> Create Client
+          </a>
+        </div>
+        <!-- End Col -->
       </div>
-      <!-- End Col -->
+      <!-- End Row -->
     </div>
-    <!-- End Row -->
-  </div>
-  <!-- End Page Header -->
-  <!-- Stats -->
-  <div class="row" style="margin-top:20px;">
+    <!-- End Page Header -->
+    <!-- Stats -->
+    <div class="row" style="margin-top:20px;">
     <div class="col-sm-6 col-lg-8 mb-3 mb-lg-5">
       <div class="card mb-3 mb-lg-5">
         <h2 class="card-title px-3 pt-3 mb-0">Recent Clients</h2>
@@ -124,6 +125,7 @@
     
   </div>
   <!-- End Stats -->
+  </div>
 </template>
 
 <script>

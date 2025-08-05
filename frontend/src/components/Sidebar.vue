@@ -349,6 +349,7 @@ export default {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding-bottom: 0 !important; /* Remove footer offset space */
 }
 
 .navbar-vertical-content {

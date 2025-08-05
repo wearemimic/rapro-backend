@@ -35,6 +35,6 @@ import Footer from '@/components/Footer.vue'
 }
 main {
   flex: 1;
-  padding: 2rem;
+  padding: 0.5rem 0.5rem; /* Match the gx-3 gutter spacing (0.5rem on each side) */
 }
 </style>

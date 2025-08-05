@@ -1,6 +1,6 @@
 <template>
   <div class="container mt-12">
-    <div class="row" style="margin-top:60px;">
+    <div class="row" style="margin-top:80px;">
       <div class="col-sm-6 col-lg-2 mb-3 mb-lg-5">
         <!-- Card -->
         <div class="card h-100">

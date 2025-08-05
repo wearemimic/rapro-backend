@@ -1,11 +1,9 @@
 <template>
-<main id="content" role="main" class="main">
-    <!-- Content -->
-    <div class="content container-fluid">
+    <div class="container-fluid" style="margin-top:80px;">
       <!-- Page Header -->
       <div class="page-header">
         <div class="d-flex mb-3">
-          <div class="flex-grow-1 ms-4">
+          <div class="flex-grow-1">
             <div class="row">
               <div class="col-lg mb-3 mb-lg-0">
                 
@@ -161,7 +159,6 @@
     <div class="footer">
       <div class="row justify-content-between align-items-center">
         <div class="col">
-          <p class="fs-6 mb-0">&copy; Front. <span class="d-none d-sm-inline-block">2022 Htmlstream.</span></p>
         </div>
         <!-- End Col -->
 
@@ -191,10 +188,9 @@
         <!-- End Col -->
       </div>
       <!-- End Row -->
-    </div>
 
     <!-- End Footer -->
-  </main>
+    </div>
 </template>
 
 <script>
