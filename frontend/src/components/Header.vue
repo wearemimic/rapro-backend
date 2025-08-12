@@ -174,10 +174,10 @@ onMounted(() => {
   authStore.fetchProfile();
 });
 
-// Add this computed property after other computed properties
+// Header color computed property - only affects top navbar, not card headers
 const headerColor = computed(() => {
   const user = authStore.user;
-  return user && user.primary_color ? user.primary_color : '#377dff';
+  return user && user.primary_color ? user.primary_color : '#377dff'; // Default blue
 });
 </script>
 <style scoped>

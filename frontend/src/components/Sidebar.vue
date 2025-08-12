@@ -1,5 +1,5 @@
 <template>
-  <aside id="sidebar" class="sidebar" :class="{ 'sidebar-collapsed': isCollapsed }" :style="{ width: isCollapsed ? '60px' : '270px' }">
+  <aside id="sidebar" class="sidebar js-navbar-vertical-aside" :class="{ 'sidebar-collapsed': isCollapsed }" :style="{ width: isCollapsed ? '60px' : '270px' }">
     <div class="navbar-vertical-container">
       <div class="navbar-vertical-footer-offset">
         <!-- Content -->
@@ -36,22 +36,6 @@
 
               
 
-              <!-- Collapse -->
-              <div class="nav-item">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuPagesAccountMenu" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuPagesAccountMenu'" 
-                   :title="isCollapsed ? 'Account' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuPagesAccountMenu">
-                  <i class="bi-person-badge nav-icon"></i>
-                  <span class="nav-link-title" v-show="!isCollapsed">Account</span>
-                </a>
-
-                <div id="navbarVerticalMenuPagesAccountMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link " href="./account-settings.html">Settings</a>
-                  <a class="nav-link " href="./account-billing.html">Billing</a>
-                  <a class="nav-link " href="./account-white-label.html">White Label</a>
-                </div>
-              </div>
-              <!-- End Collapse -->
 
               <!-- Collapse -->
               <div class="nav-item">

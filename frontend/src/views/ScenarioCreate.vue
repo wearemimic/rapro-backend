@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 max-w-7xl mx-auto">
+  <div class="p-6 max-w-7xl mx-auto" style="margin-top: 80px;">
     <ScenarioHeader 
       v-model:scenario="scenario"
       :primary-first-name="primaryFirstName"
@@ -9,7 +9,7 @@
     />
 
     <div class="card">
-      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+      <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
         <h5 class="mb-0">
           <i class="bi bi-cash-coin me-2"></i>Retirement Income Information
         </h5>
@@ -345,7 +345,7 @@
 
     <!-- Investment Accounts Section -->
     <div class="card" style="margin-top:40px;">
-      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+      <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
         <h5 class="mb-0">
           <i class="bi bi-piggy-bank me-2"></i>Investment Accounts
         </h5>
@@ -415,7 +415,7 @@
       </div>
 
         <div class="card" style="margin-top:40px;">
-      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+      <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
         <h5 class="mb-0">
           <i class="bi bi-shield-plus me-2"></i>Coverage Information (Cost per Individual)
         </h5>
@@ -594,12 +594,7 @@ const groupedInvestments = computed(() => {
   }, {});
 });
 
-// Header color from user's primary color
-const headerColor = computed(() => {
-  const authStore = useAuthStore();
-  const user = authStore.user;
-  return user && user.primary_color ? user.primary_color : '#377dff';
-});
+// Removed headerColor computed property - using consistent light grey headers
 
 async function submitScenario() {
   try {

@@ -1,0 +1,24 @@
+/* Force card header text to be dark - override any JavaScript styling */
+.card-header,
+.card-header *,
+.card-header h1,
+.card-header h2, 
+.card-header h3,
+.card-header h4,
+.card-header h5,
+.card-header h6,
+.card-header .card-title,
+.card-header .card-header-title,
+.card-header-title {
+  color: #1e2022 !important;
+}
+
+/* Prevent JavaScript from overriding card header text color */
+[style*="color: rgb(255, 255, 255)"] .card-header,
+[style*="color: rgb(255, 255, 255)"] .card-header *,
+[style*="color: white"] .card-header,
+[style*="color: white"] .card-header *,
+[style*="color: #fff"] .card-header,
+[style*="color: #fff"] .card-header * {
+  color: #1e2022 !important;
+}

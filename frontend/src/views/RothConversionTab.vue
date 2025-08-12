@@ -9,7 +9,6 @@
           :eligibleAssets="eligibleAssets"
           :maxToConvert="maxToConvert"
           :maxToConvertRaw="maxToConvertRaw"
-          :headerColor="headerColor"
           @update:maxToConvert="val => maxToConvert = val"
           @update:maxToConvertRaw="val => maxToConvertRaw = val"
         />
@@ -17,7 +16,7 @@
       <!-- Conversion Schedule Parameters -->
       <div class="col-md-5 mb-3 mb-lg-5">
         <div class="card h-100">
-          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+          <div class="card-header">
             <h5 class="mb-0">Conversion Schedule Parameters</h5>
           </div>
           <div class="card-body">
@@ -608,19 +607,6 @@ export default {
       
       const birthYear = new Date(this.client.birthdate).getFullYear();
       return birthYear + parseInt(this.scenario.retirement_age);
-    },
-    headerColor() {
-      const authStore = useAuthStore();
-      const user = authStore.user;
-      return user && user.primary_color ? user.primary_color : '#377dff';
-    },
-    headingTextColor() {
-      const authStore = useAuthStore();
-      const user = authStore.user;
-      if (user && user.primary_color && user.primary_color !== '#377dff') {
-        return '#fff';
-      }
-      return '#fff'; // Always white for colored backgrounds
     },
     // Calculate the total conversion amount
     totalConversionAmount() {
