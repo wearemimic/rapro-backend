@@ -17,7 +17,7 @@
 
     <!-- Essential Settings Card -->
     <div class="card mb-4">
-      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+      <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
         <h5 class="card-title mb-0">
           <i class="bi bi-gear me-2"></i>Essential Settings
         </h5>
@@ -59,8 +59,8 @@
       <!-- Primary Client Card -->
       <div class="col-md-6">
         <div class="card h-100">
-          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
-            <h6 class="card-title mb-0" style="color: #fff;">
+          <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
+            <h6 class="card-title mb-0">
               <i class="bi bi-person me-2"></i>{{ primaryFirstName }}
             </h6>
           </div>
@@ -98,8 +98,8 @@
       <!-- Spouse Card (if applicable) -->
       <div v-if="clientTaxStatus !== 'single'" class="col-md-6">
         <div class="card h-100">
-          <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
-            <h6 class="card-title mb-0" style="color: #fff;">
+          <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
+            <h6 class="card-title mb-0">
               <i class="bi bi-person me-2"></i>{{ spouseFirstName }}
             </h6>
           </div>
@@ -137,15 +137,15 @@
 
     <!-- Advanced Options (Collapsible) -->
     <div class="card">
-      <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+      <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
         <button 
           class="btn btn-link p-0 text-decoration-none d-flex align-items-center w-100"
           type="button"
           @click="showAdvanced = !showAdvanced"
-          style="color: #fff !important;"
+          style="color: #000000 !important;"
         >
-          <i :class="['bi', showAdvanced ? 'bi-chevron-down' : 'bi-chevron-right', 'me-2']" style="color: #fff;"></i>
-          <h6 class="mb-0" style="color: #fff;">Advanced Options</h6>
+          <i :class="['bi', showAdvanced ? 'bi-chevron-down' : 'bi-chevron-right', 'me-2']" style="color: #000000;"></i>
+          <h6 class="mb-0" style="color: #000000;">Advanced Options</h6>
         </button>
       </div>
       <div v-show="showAdvanced" class="card-body">
@@ -318,12 +318,7 @@ const ageRange = (start, end) => {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i)
 }
 
-// Header color from user's primary color
-const headerColor = computed(() => {
-  const authStore = useAuthStore();
-  const user = authStore.user;
-  return user && user.primary_color ? user.primary_color : '#377dff';
-})
+// Removed headerColor computed property - using consistent light grey headers
 </script>
 
 <style scoped>

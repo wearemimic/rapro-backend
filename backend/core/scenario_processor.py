@@ -532,11 +532,58 @@ class ScenarioProcessor:
             results.append(summary)
         return results
 
+    def _requires_rmd(self, asset):
+        """
+        Determine if an asset type requires RMD calculations.
+        Only the new asset types that are traditional/qualified accounts require RMD.
+        """
+        income_type = asset.get("income_type", "")
+        
+        # New asset types that require RMD
+        rmd_asset_types = [
+            "Qualified",  # Traditional tax-deferred accounts
+            "Inherited Traditional Spouse",
+            "Inherited Traditional Non-Spouse"
+        ]
+        
+        return income_type in rmd_asset_types
+
+    def _get_rmd_start_age(self, asset, owner_birthdate):
+        """
+        Get the RMD start age based on current IRS rules and birth year.
+        """
+        if not owner_birthdate:
+            return 73  # Default to current rule
+            
+        birth_year = owner_birthdate.year
+        asset_type = asset.get("income_type", "")
+        
+        # Inherited accounts have different rules
+        if "Inherited" in asset_type:
+            if "Non-Spouse" in asset_type:
+                # Inherited non-spouse: 10-year rule (no annual RMD required until year 10)
+                return None  # Special handling needed
+            else:
+                # Inherited spouse: can use their own life expectancy, starts immediately
+                return 0  # Can start RMDs immediately
+        
+        # Regular accounts - based on birth year
+        if birth_year <= 1950:
+            return 72  # Old rule for those already subject to it
+        elif birth_year <= 1959:
+            return 73  # Current rule (2023+)
+        else:
+            return 75  # Future rule (2033+) for those born 1960+
+
     def _calculate_rmd(self, asset, year):
         """
         Calculate the Required Minimum Distribution (RMD) for a given asset in a specific year.
+        Uses current IRS rules including different start ages and inherited account rules.
         """
-        rmd_start_age = 72
+        # Check if this asset type requires RMD
+        if not self._requires_rmd(asset):
+            return 0
+            
         owner = asset.get("owned_by", "primary")
         birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
         if not birthdate:
@@ -544,11 +591,32 @@ class ScenarioProcessor:
             return 0
 
         current_age = year - birthdate.year
-        self._log_debug(f"Year {year} - Current age of owner: {current_age}")
+        asset_type = asset.get("income_type", "")
+        rmd_start_age = self._get_rmd_start_age(asset, birthdate)
+        
+        # Handle inherited non-spouse accounts (10-year rule)
+        if asset_type == "Inherited Traditional Non-Spouse":
+            # For inherited non-spouse, must deplete by end of 10th year
+            # No annual RMDs required, but account must be empty by year 10
+            inheritance_year = asset.get("inheritance_year", year - 1)  # Default to previous year
+            years_since_inheritance = year - inheritance_year
+            
+            if years_since_inheritance >= 10:
+                # Must withdraw entire remaining balance in year 10
+                return Decimal(str(asset.get("current_asset_balance", 0)))
+            else:
+                # No required distribution in years 1-9 (but beneficiary can take distributions)
+                return Decimal('0')
+        
+        # Handle regular and inherited spouse accounts
+        if rmd_start_age is None or current_age < rmd_start_age:
+            self._log_debug(f"Year {year} - Owner age {current_age} below RMD start age {rmd_start_age}")
+            return 0
+
+        # Calculate standard RMD using IRS Uniform Lifetime Table
+        self._log_debug(f"Year {year} - Current age of owner: {current_age}, RMD start age: {rmd_start_age}")
 
         previous_year_balance = asset.get("previous_year_balance", 0)
-
-        # Log the previous year balance
         self._log_debug(f"Year {year} - Previous Year Balance: {previous_year_balance}")
 
         # Fetch the life expectancy factor from the RMD table
@@ -559,19 +627,14 @@ class ScenarioProcessor:
 
         # Convert life expectancy factor to Decimal for division
         life_expectancy_factor = Decimal(life_expectancy_factor)
+        rmd_amount = Decimal(str(previous_year_balance)) / life_expectancy_factor
 
-        rmd_amount = previous_year_balance / life_expectancy_factor
-
-        # Calculate RMD percentage
+        # Calculate RMD percentage for debugging
         rmd_percentage = 100 / life_expectancy_factor
-
-        # Debugging lines
+        
+        self._log_debug(f"Year {year} - Asset type: {asset_type}")
         self._log_debug(f"Year {year} - RMD percentage: {rmd_percentage:.2f}%")
-        self._log_debug(f"Year {year} - Calculated RMD amount based on income and percentage: {rmd_amount}")
-        self._log_debug(f"Year {year} - Expected RMD based on federal tables: {rmd_amount}")
-
-        # Explicitly log the RMD value
-        self._log_debug(f"DEBUG RMD = {rmd_amount}")
+        self._log_debug(f"Year {year} - Calculated RMD amount: {rmd_amount}")
 
         return rmd_amount
 
@@ -708,10 +771,10 @@ class ScenarioProcessor:
                 monthly_amount = Decimal(asset.get("monthly_amount") or 0)
                 inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                 annual_income = inflated_amount * 12
-                if asset.get("income_type") == "Traditional_401k":
-                    rmd_amount = self._calculate_rmd(asset, year)
-                    if rmd_amount > annual_income:
-                        annual_income = rmd_amount
+                # Apply RMD override for qualifying asset types
+                rmd_amount = self._calculate_rmd(asset, year)
+                if rmd_amount > annual_income:
+                    annual_income = rmd_amount
                 income_total += annual_income
         return income_total
 
@@ -941,7 +1004,8 @@ class ScenarioProcessor:
 
         if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
             # Apply pro-rata asset depletion across eligible balances
-            eligible_balances = [asset for asset in self.assets if asset["income_type"] in ["ira", "401k"]]
+            # New asset types eligible for Roth conversion (traditional/qualified accounts only)
+            eligible_balances = [asset for asset in self.assets if asset["income_type"] in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"]]
             total_eligible_balance = sum(asset["current_asset_balance"] for asset in eligible_balances)
             for asset in eligible_balances:
                 depletion_ratio = asset["current_asset_balance"] / total_eligible_balance

@@ -1,6 +1,6 @@
 <template>
   <div class="card h-100">
-    <div class="card-header" :style="{ backgroundColor: headerColor, color: '#fff' }">
+    <div class="card-header">
       <h5 class="mb-0">Asset Selection Panel</h5>
     </div>
     <div class="card-body">
@@ -59,10 +59,6 @@ export default {
     maxToConvertRaw: {
       type: Object,
       required: true
-    },
-    headerColor: {
-      type: String,
-      default: '#377dff'
     }
   },
   emits: ['update:maxToConvert', 'update:maxToConvertRaw'],

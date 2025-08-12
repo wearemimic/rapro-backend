@@ -1,5 +1,5 @@
 <template>
-  <div class="container content-space-1">
+  <div class="container content-space-1" style="margin-top: 80px;">
     <div class="row">
       <div class="col-lg-3">
         <div id="navbarVerticalNavMenu" class="js-sticky-block card mb-5 mb-lg-0"
@@ -88,8 +88,8 @@
                   </div>
                   <div class="col-sm-6 mb-4">
                     <label for="website" class="form-label">Website URL</label>
-                    <input type="url" id="website" class="form-control" v-model="form.website_url" 
-                           placeholder="https://example.com">
+                    <input type="text" id="website" class="form-control" v-model="form.website_url" 
+                           placeholder="https://example.com (optional)">
                     <small class="text-muted">Must include http:// or https://</small>
                   </div>
                 </div>
@@ -270,10 +270,11 @@ const fetchUserProfile = async () => {
   try {
     const response = await axios.get(`${apiBaseUrl}/profile/`, getAuthHeaders())
     
-    // Update form with response data
+    // Update form with response data, ensuring no null values
     Object.keys(form.value).forEach(key => {
       if (response.data[key] !== undefined) {
-        form.value[key] = response.data[key]
+        // Convert null values to empty strings to prevent backend "may not be null" errors
+        form.value[key] = response.data[key] || ''
       }
     })
   } catch (error) {
@@ -291,8 +292,8 @@ const updateProfile = async () => {
   successMessage.value = ''
   errorMessage.value = ''
   
-  // Validate website URL
-  if (form.value.website_url && !isValidUrl(form.value.website_url)) {
+  // Validate website URL only if there's actually a value
+  if (form.value.website_url && form.value.website_url.trim() !== '' && !isValidUrl(form.value.website_url)) {
     errorMessage.value = 'Please enter a valid website URL including http:// or https://'
     toast.error('Invalid website URL format')
     saving.value = false
@@ -307,7 +308,19 @@ const updateProfile = async () => {
     Object.keys(form.value).forEach(key => {
       // Skip logo since we'll handle it separately
       if (key !== 'logo') {
-        formData.append(key, form.value[key] || '')
+        let value = form.value[key]
+        if (value === null || value === undefined) {
+          value = ''
+        }
+        
+        // For website_url, don't send it if it's empty (backend expects null, not empty string)
+        if (key === 'website_url' && value.trim() === '') {
+          console.log(`Skipping empty ${key}`) // Debug log
+          return // Don't send empty website_url
+        }
+        
+        formData.append(key, value)
+        console.log(`Sending ${key}:`, value) // Debug log
       }
     })
     
@@ -340,6 +353,8 @@ const updateProfile = async () => {
     await authStore.fetchProfile()
   } catch (error) {
     console.error('Error updating profile:', error)
+    console.error('Raw error response data:', error.response?.data)
+    console.error('Error status:', error.response?.status)
     if (error.response?.data) {
       // Format the error messages from Django's validation errors
       const errorData = error.response.data

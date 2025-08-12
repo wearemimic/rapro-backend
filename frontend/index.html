@@ -8,7 +8,10 @@
     <link rel="stylesheet" href="/assets/css/theme.min.css">
     <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/font/bootstrap-icons.css">
     <link rel="stylesheet" href="/assets/vendor/hs-table-sticky-header/src/hs.table-sticky-header.css">
+    <!-- Load our custom styles LAST to ensure they override theme styles -->
     <link rel="stylesheet" href="/src/style.css">
+    <!-- Header text fix - load AFTER everything -->
+    <link rel="stylesheet" href="/assets/css/header-fix.css">
     <script src="/assets/vendor/hs-toggle-switch/dist/hs-toggle-switch.min.js"></script>
     <script src="/assets/vendor/chart.js/dist/Chart.min.js"></script>
     <script src="/assets/vendor/chartjs-chart-matrix/dist/chartjs-chart-matrix.min.js"></script>
@@ -33,10 +36,32 @@
     <script src="/assets/vendor/jquery-migrate/dist/jquery-migrate.min.js"></script>
 
     <!-- JS Implementing Plugins -->
-    <script src="/assets/vendor/hs-navbar-vertical-aside/dist/hs-navbar-vertical-aside.min.js"></script>
     <script src="/assets/vendor/hs-form-search/dist/hs-form-search.min.js"></script>
-
-    <script src="/assets/vendor/hs-nav-scroller/dist/hs-nav-scroller.min.js"></script>
+    
+    <!-- Conditionally load navbar scripts only when sidebar exists -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Only load and initialize navbar scripts if sidebar elements exist
+        if (document.querySelector('.js-navbar-vertical-aside') || document.querySelector('.navbar-vertical-aside')) {
+          
+          // Load navbar scripts dynamically
+          const navbarScript = document.createElement('script');
+          navbarScript.src = '/assets/vendor/hs-navbar-vertical-aside/dist/hs-navbar-vertical-aside.min.js';
+          navbarScript.onload = function() {
+            // Initialize navbar after script loads
+            if (window.HSSideNav) {
+              new HSSideNav('.js-navbar-vertical-aside').init();
+            }
+          };
+          document.head.appendChild(navbarScript);
+          
+          // Load nav scroller script
+          const scrollerScript = document.createElement('script');
+          scrollerScript.src = '/assets/vendor/hs-nav-scroller/dist/hs-nav-scroller.min.js';
+          document.head.appendChild(scrollerScript);
+        }
+      });
+    </script>
     <script src="/assets/vendor/tom-select/dist/js/tom-select.complete.min.js"></script>
     <script src="/assets/vendor/flatpickr/dist/flatpickr.min.js"></script>
     <script src="/assets/vendor/daterangepicker/moment.min.js"></script>
