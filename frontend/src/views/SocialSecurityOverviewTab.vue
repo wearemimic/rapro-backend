@@ -6,7 +6,14 @@
       <div class="col-lg-8">
         <div class="card h-100">
           <div class="card-body">
-            <canvas id="socialSecurityChart" style="width: 100%; height: 300px !important;"></canvas>
+            <div style="height: 300px">
+              <Graph 
+                :data="chartData" 
+                :options="chartOptions"
+                :height="300"
+                type="line"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -82,6 +89,7 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -122,6 +130,9 @@ const IRMAA_LABELS = {
 };
 
 export default {
+  components: {
+    Graph
+  },
   props: {
     scenarioResults: {
       type: Array,
@@ -150,6 +161,9 @@ export default {
   },
   computed: {
     filteredResults() {
+      if (!this.scenarioResults || !Array.isArray(this.scenarioResults)) {
+        return [];
+      }
       const mortalityAge = Number(this.mortalityAge) || 90;
       const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
       const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
@@ -175,6 +189,89 @@ export default {
         return IRMAA_LABELS[status];
       }
       return IRMAA_LABELS['single'];
+    },
+    chartData() {
+      console.log('🔍 SocialSecurity chartData computed with filteredResults:', this.filteredResults);
+      if (!this.filteredResults || !this.filteredResults.length) {
+        console.warn('⚠️ SocialSecurity: No filtered results, returning empty chart data');
+        return { labels: [], datasets: [] };
+      }
+
+      const labels = this.filteredResults.map(row => row.year.toString());
+      const datasets = [
+        {
+          type: 'line',
+          label: 'SSI Benefit',
+          data: this.filteredResults.map(row => parseFloat(row.ss_income || 0)),
+          borderColor: "#377dff",
+          backgroundColor: "rgba(55, 125, 255, 0.1)",
+          borderWidth: 2,
+          tension: 0.3,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: 'Remaining SSI Benefit',
+          data: this.filteredResults.map(row => {
+            const ssiBenefit = parseFloat(row.ss_income || 0);
+            const medicareExpense = parseFloat(row.total_medicare || 0);
+            const remainingSSI = ssiBenefit - medicareExpense;
+            return remainingSSI;
+          }),
+          borderColor: "#00c9db",
+          backgroundColor: "rgba(0, 201, 219, 0.1)",
+          borderWidth: 2,
+          tension: 0.3,
+          yAxisID: 'y'
+        },
+        {
+          type: 'bar',
+          label: 'Medicare Expense',
+          data: this.filteredResults.map(row => parseFloat(row.total_medicare || 0)),
+          backgroundColor: "#ffc107",
+          stack: 'Stack 0',
+          yAxisID: 'y'
+        }
+      ];
+
+      console.log('✅ SocialSecurity chartData computed successfully:', { labels, datasets });
+      return { labels, datasets };
+    },
+    chartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Year'
+            }
+          },
+          y: {
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Amount ($)'
+            },
+            ticks: {
+              beginAtZero: true,
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          },
+          legend: {
+            position: 'bottom'
+          }
+        }
+      };
     }
   },
   methods: {

@@ -34,7 +34,12 @@
           </div>
           <div class="card-body">
             <div class="financial-chart-container">
-              <canvas id="financialOverviewChart"></canvas>
+              <Graph 
+                :data="chartData" 
+                :options="chartOptions"
+                :height="300"
+                type="line"
+              />
             </div>
           </div>
         </div>
@@ -157,9 +162,9 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Chart } from 'chart.js';
 import * as d3 from 'd3';
 import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -200,7 +205,9 @@ const IRMAA_LABELS = {
 };
 
 export default {
-  // No Graph component needed
+  components: {
+    Graph
+  },
   props: {
     scenarioResults: {
       type: Array,
@@ -229,8 +236,7 @@ export default {
         financial: false,
         flow: false
       },
-      openIrmaaTooltipIdx: null,
-      chartInstance: null
+      openIrmaaTooltipIdx: null
     };
   },
   computed: {
@@ -264,35 +270,20 @@ export default {
         const medicare = parseFloat(row.total_medicare || 0);
         return total + (gross - tax - medicare);
       }, 0);
-    }
-  },
-  watch: {
-    filteredResults: {
-      handler(newResults) {
-        this.renderFinancialChart(newResults);
-        this.renderFlowChart(newResults);
-        this.initializeCircles();
-      },
-      deep: true,
-      immediate: true
-    }
-  },
-  methods: {
-    renderFinancialChart(results) {
-      if (!results || results.length === 0) return;
-      // Destroy previous chart instance if exists
-      if (this.chartInstance) {
-        this.chartInstance.destroy();
-        this.chartInstance = null;
+    },
+    chartData() {
+      console.log('🔍 FinancialOverview chartData computed with filteredResults:', this.filteredResults);
+      if (!this.filteredResults || !this.filteredResults.length) {
+        console.warn('⚠️ FinancialOverview: No filtered results, returning empty chart data');
+        return { labels: [], datasets: [] };
       }
-      // Extract years for labels
-      const years = results.map(row => row.year);
-      // Build datasets: lines for income, stacked bars for tax/medicare
+
+      const labels = this.filteredResults.map(row => row.year.toString());
       const datasets = [
         {
           type: 'line',
           label: 'Gross Income',
-          data: results.map(row => parseFloat(row.gross_income) || 0),
+          data: this.filteredResults.map(row => parseFloat(row.gross_income) || 0),
           borderColor: '#4285f4',
           backgroundColor: 'rgba(66,133,244,0.1)',
           borderWidth: 2,
@@ -304,7 +295,7 @@ export default {
         {
           type: 'line',
           label: 'Net Income',
-          data: results.map(row => {
+          data: this.filteredResults.map(row => {
             const gross = parseFloat(row.gross_income) || 0;
             const tax = parseFloat(row.federal_tax) || 0;
             const medicare = parseFloat(row.total_medicare) || 0;
@@ -321,7 +312,7 @@ export default {
         {
           type: 'bar',
           label: 'Federal Tax',
-          data: results.map(row => parseFloat(row.federal_tax) || 0),
+          data: this.filteredResults.map(row => parseFloat(row.federal_tax) || 0),
           backgroundColor: '#ea4335',
           stack: 'Stack 0',
           yAxisID: 'y',
@@ -330,61 +321,73 @@ export default {
         {
           type: 'bar',
           label: 'Medicare',
-          data: results.map(row => parseFloat(row.total_medicare) || 0),
+          data: this.filteredResults.map(row => parseFloat(row.total_medicare) || 0),
           backgroundColor: '#fbbc05',
           stack: 'Stack 0',
           yAxisID: 'y',
           order: 2
         }
       ];
-      const ctx = document.getElementById('financialOverviewChart');
-      this.chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: years,
-          datasets: datasets
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: 'Year'
-              }
-            },
-            y: {
-              stacked: true,
-              title: {
-                display: true,
-                text: 'Amount ($)'
-              },
-              ticks: {
-                beginAtZero: true,
-                callback: function(value) {
-                  return '$' + value.toLocaleString();
-                }
-              }
-            }
-          },
-          plugins: {
-            legend: {
+
+      console.log('✅ FinancialOverview chartData computed successfully:', { labels, datasets });
+      return { labels, datasets };
+    },
+    chartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
               display: true,
-              position: 'top'
-            },
-            tooltip: {
-              mode: 'index',
-              intersect: false
+              text: 'Year'
             }
           },
-          interaction: {
+          y: {
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Amount ($)'
+            },
+            ticks: {
+              beginAtZero: true,
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom'
+          },
+          tooltip: {
             mode: 'index',
             intersect: false
           }
+        },
+        interaction: {
+          mode: 'index',
+          intersect: false
         }
-      });
-    },
+      };
+    }
+  },
+  watch: {
+    filteredResults: {
+      handler(newResults) {
+        // Use nextTick to ensure DOM is ready
+        this.$nextTick(() => {
+          this.renderFlowChart(newResults);
+          this.initializeCircles();
+        });
+      },
+      deep: true,
+      immediate: true
+    }
+  },
+  methods: {
     renderFlowChart(results) {
       if (!results || results.length === 0) return;
 
@@ -641,17 +644,13 @@ export default {
   mounted() {
     document.addEventListener('click', this.handleClickOutside);
     if (this.filteredResults && this.filteredResults.length) {
-      this.renderFinancialChart(this.filteredResults);
       this.renderFlowChart(this.filteredResults);
       this.initializeCircles();
     }
   },
   beforeUnmount() {
     document.removeEventListener('click', this.handleClickOutside);
-    if (this.chartInstance) {
-      this.chartInstance.destroy();
-      this.chartInstance = null;
-    }
+    // Chart cleanup is now handled by Graph component
     // D3 SVG cleanup is handled by d3.select('#financialFlowChart').selectAll('*').remove() in renderFlowChart
   },
 };
