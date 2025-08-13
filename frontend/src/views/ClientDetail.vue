@@ -257,7 +257,7 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="card-header-title">Scenarios</h4>
                         <div v-if="client && client.scenarios && client.scenarios.length">
-                            <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary">Add Scenario</router-link>
+                            <router-link :to="`/clients/${client.id}/scenarios/new`" class="btn btn-primary text-white">Add Scenario</router-link>
                         </div>
                     </div>
 
@@ -276,37 +276,39 @@
                             <tr v-for="(scenario, index) in client.scenarios" :key="scenario.id">
                               <td class="scenario-name">{{ scenario.name }}</td>
                               <td>
-                                <div>
-                                  <!-- Debug: Show the calculated percentages -->
-                                  <pre style="font-size:10px; color:#888; background:#f8f9fa; border:1px solid #eee; padding:2px; margin-bottom:2px;">
-Tax+Medicare: {{ scenario.income_vs_cost_percent || 0 }}% of Income
-                                  </pre>
-                                  <CircleGraph
-                                    :value="scenario.income_vs_cost_percent || 0"
-                                    :maxValue="100"
-                                    colorMode="fixed"
-                                    :fixedColor="getColorForPercent(scenario.income_vs_cost_percent || 0)"
-                                    :radius="40"
-                                    :width="10"
-                                    class="mini-circle-graph"
-                                  />
+                                <div class="progress-container">
+                                  <div class="progress" style="height: 25px; position: relative;">
+                                    <div 
+                                      class="progress-bar" 
+                                      :class="getProgressBarClass(scenario.income_vs_cost_percent || 0)"
+                                      role="progressbar" 
+                                      :style="{ width: (scenario.income_vs_cost_percent || 0) + '%' }"
+                                      :aria-valuenow="scenario.income_vs_cost_percent || 0"
+                                      aria-valuemin="0" 
+                                      aria-valuemax="100">
+                                    </div>
+                                    <div class="progress-label">
+                                      <strong>{{ scenario.income_vs_cost_percent || 0 }}%</strong>
+                                    </div>
+                                  </div>
                                 </div>
                               </td>
                               <td>
-                                <div>
-                                  <!-- Debug: Show the calculated percentages -->
-                                  <pre style="font-size:10px; color:#888; background:#f8f9fa; border:1px solid #eee; padding:2px; margin-bottom:2px;">
-IRMAA: {{ scenario.medicare_irmaa_percent || 0 }}% of Medicare
-                                  </pre>
-                                  <CircleGraph
-                                    :value="scenario.medicare_irmaa_percent || 0"
-                                    :maxValue="100"
-                                    colorMode="fixed"
-                                    :fixedColor="getColorForPercent(scenario.medicare_irmaa_percent || 0)"
-                                    :radius="40"
-                                    :width="10"
-                                    class="mini-circle-graph"
-                                  />
+                                <div class="progress-container">
+                                  <div class="progress" style="height: 25px; position: relative;">
+                                    <div 
+                                      class="progress-bar" 
+                                      :class="getProgressBarClass(scenario.medicare_irmaa_percent || 0)"
+                                      role="progressbar" 
+                                      :style="{ width: (scenario.medicare_irmaa_percent || 0) + '%' }"
+                                      :aria-valuenow="scenario.medicare_irmaa_percent || 0"
+                                      aria-valuemin="0" 
+                                      aria-valuemax="100">
+                                    </div>
+                                    <div class="progress-label">
+                                      <strong>{{ scenario.medicare_irmaa_percent || 0 }}%</strong>
+                                    </div>
+                                  </div>
                                 </div>
                               </td>
                               <td>
@@ -389,11 +391,11 @@ IRMAA: {{ scenario.medicare_irmaa_percent || 0 }}% of Medicare
 <script>
 import axios from 'axios';
 import Sortable from 'sortablejs';
-import CircleGraph from '../components/CircleGraph.vue';
+// CircleGraph removed - using progress bars instead
 
 export default {
   name: 'ClientDetail',
-  components: { CircleGraph },
+  components: { },
   data() {
     return {
       client: null,
@@ -1109,6 +1111,17 @@ export default {
         return '#00ff00'; // Green
       }
     },
+    getProgressBarClass(percent) {
+      if (percent > 50) {
+        return 'bg-danger'; // Red
+      } else if (percent > 25) {
+        return 'bg-warning'; // Orange/Yellow
+      } else if (percent > 15) {
+        return 'bg-info'; // Light blue
+      } else {
+        return 'bg-success'; // Green
+      }
+    },
   }
 };
 </script>
@@ -1201,60 +1214,54 @@ export default {
   border: 0;
 }
 
-.mini-circle-graph {
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 82px; /* tightly fits the circle */
+.progress-container {
+  min-width: 150px;
 }
-.mini-circle-graph >>> .js-circle {
-  min-width: 70px;
-  min-height: 70px;
-  width: 70px;
-  height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+.progress {
+  background-color: #f0f0f0;
+  border-radius: 10px;
+  overflow: visible;
 }
-.mini-circle-graph >>> .circles-text {
-  font-size: 1rem !important;
-  line-height: 1 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 70px;
+
+.progress-bar {
+  transition: width 0.6s ease;
+  border-radius: 10px;
 }
+
+.progress-label {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  line-height: 25px;
+  top: 0;
+  color: #333;
+  pointer-events: none;
+}
+
+.progress-label strong {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 .scenarios-table td, .scenarios-table th {
-  padding-top: 0.15rem;
-  padding-bottom: 0.15rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
   vertical-align: middle;
 }
 .scenarios-table tr {
-  height: 1.1rem;
-}
-.mini-circle-graph {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.mini-circle-graph >>> .js-circle {
-  min-width: 80px;
-  min-height: 80px;
-  width: 80px;
-  height: 80px;
-}
-.mini-circle-graph >>> .circles-text {
-  font-size: 1rem !important;
-  line-height: 1.1 !important;
+  height: auto;
 }
 .scenarios-table .scenario-name {
   line-height: 1.2;
   margin-bottom: 0.1rem;
+}
+
+/* Ensure Add Scenario button text is always white */
+.btn-primary.text-white,
+.btn-primary.text-white:hover,
+.btn-primary.text-white:focus,
+.btn-primary.text-white:active {
+  color: #fff !important;
 }
 </style>
