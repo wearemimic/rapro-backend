@@ -193,6 +193,26 @@
                   </div>
                 </div>
 
+                <!-- Scenario Deletion Confirmation Modal -->
+                <div v-if="showDeleteConfirmModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.5);">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Confirm Deletion</h5>
+                        <button type="button" class="btn-close" @click="showDeleteConfirmModal = false"></button>
+                      </div>
+                      <div class="modal-body">
+                        <p>Are you sure you want to delete the scenario "{{ scenarioToDelete?.name || 'this scenario' }}"?</p>
+                        <p class="text-danger"><strong>This action cannot be undone.</strong></p>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @click="showDeleteConfirmModal = false">Cancel</button>
+                        <button type="button" class="btn btn-danger" @click="confirmDeleteScenario">Delete Scenario</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Slide Editor Modal -->
                 <div v-if="showSlideEditorModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.5);">
                   <div class="modal-dialog modal-xl">
@@ -312,15 +332,17 @@
                                 </div>
                               </td>
                               <td>
-                                <router-link :to="{ 
-                                  name: 'ScenarioDetail',
-                                  params: { clientId: client.id, scenarioid: scenario.id },
-                                  state: { scenarios: client.scenarios }
-                                  }"
-                                  class="btn btn-sm btn-outline-primary">
-                                  View
-                                </router-link>
-                                <button @click="deleteScenario(scenario.id)" class="btn btn-sm btn-outline-danger ms-2">Delete</button>
+                                <div class="btn-group" role="group">
+                                  <router-link :to="{ 
+                                    name: 'ScenarioDetail',
+                                    params: { clientId: client.id, scenarioid: scenario.id },
+                                    state: { scenarios: client.scenarios }
+                                    }"
+                                    class="btn btn-sm btn-outline-primary">
+                                    View
+                                  </router-link>
+                                  <button @click="showDeleteModal(scenario)" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </div>
                               </td>
                             </tr>
                           </tbody>
@@ -424,6 +446,9 @@ export default {
       currentTemplateId: null,
       sortableInstance: null,
       isDragOver: false,
+      // Scenario deletion modal state
+      showDeleteConfirmModal: false,
+      scenarioToDelete: null,
     };
   },
   watch: {
@@ -1086,17 +1111,51 @@ export default {
         return (size / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
       }
     },
-    async deleteScenario(scenarioId) {
-      if (!confirm('Are you sure you want to delete this scenario?')) return;
+    showDeleteModal(scenario) {
+      this.scenarioToDelete = scenario;
+      this.showDeleteConfirmModal = true;
+    },
+    async confirmDeleteScenario() {
+      if (!this.scenarioToDelete) return;
+      
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
-        await axios.delete(`http://localhost:8000/api/scenarios/${scenarioId}/`, { headers });
+        
+        // Fix the API endpoint to include client_id
+        const response = await axios.delete(
+          `http://localhost:8000/api/clients/${this.client.id}/scenarios/${this.scenarioToDelete.id}/`, 
+          { headers }
+        );
+        
         // Remove from local array
-        this.client.scenarios = this.client.scenarios.filter(s => s.id !== scenarioId);
+        this.client.scenarios = this.client.scenarios.filter(s => s.id !== this.scenarioToDelete.id);
+        
+        // Close modal and reset
+        this.showDeleteConfirmModal = false;
+        this.scenarioToDelete = null;
+        
+        // Show success message (optional)
+        console.log('Scenario deleted successfully');
       } catch (error) {
         console.error('Error deleting scenario:', error);
-        alert('Failed to delete scenario. Please try again.');
+        console.error('Response:', error.response);
+        
+        // Close modal
+        this.showDeleteConfirmModal = false;
+        
+        // Show error message
+        let errorMessage = 'Failed to delete scenario. ';
+        if (error.response && error.response.status === 404) {
+          errorMessage += 'Scenario not found.';
+        } else if (error.response && error.response.data && error.response.data.detail) {
+          errorMessage += error.response.data.detail;
+        } else {
+          errorMessage += 'Please try again.';
+        }
+        alert(errorMessage);
+        
+        this.scenarioToDelete = null;
       }
     },
     // Color helper method

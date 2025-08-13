@@ -612,15 +612,15 @@ async function submitScenario() {
       sanitized.owned_by = row.owned_by;
       sanitized.income_type = row.income_type;
       sanitized.income_name = row.income_type.replace(/_/g, ' ');
-      sanitized.current_asset_balance = row.current_balance;
-      sanitized.monthly_amount = row.withdrawal_amount || row.amount_at_fra || 0;
-      sanitized.monthly_contribution = row.monthly_contribution || 0;
+      sanitized.current_asset_balance = parseFloat(row.current_balance || 0).toFixed(2);
+      sanitized.monthly_amount = parseFloat(row.withdrawal_amount || row.amount_at_fra || 0).toFixed(2);
+      sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
-      sanitized.rate_of_return = row.growth_rate;
-      sanitized.cola = row.cola || 0;
-      sanitized.exclusion_ratio = row.exclusion_ratio || 0;
-      sanitized.tax_rate = row.tax_rate || 0;
+      sanitized.rate_of_return = parseFloat(row.growth_rate || 0).toFixed(4);
+      sanitized.cola = parseFloat(row.cola || 0).toFixed(2);
+      sanitized.exclusion_ratio = parseFloat(row.exclusion_ratio || 0).toFixed(4);
+      sanitized.tax_rate = parseFloat(row.tax_rate || 0).toFixed(4);
       return sanitized;
     });
 
@@ -632,12 +632,12 @@ async function submitScenario() {
       sanitized.owned_by = row.owned_by;
       sanitized.income_type = row.income_type;
       sanitized.income_name = row.income_name;
-      sanitized.current_asset_balance = row.current_balance;
+      sanitized.current_asset_balance = parseFloat(row.current_balance || 0).toFixed(2);
       sanitized.monthly_amount = 0; // Calculated withdrawal amount
-      sanitized.monthly_contribution = row.monthly_contribution || 0;
+      sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
-      sanitized.rate_of_return = row.growth_rate / 100; // Convert percentage to decimal
+      sanitized.rate_of_return = (parseFloat(row.growth_rate || 0) / 100).toFixed(4); // Convert percentage to decimal
       sanitized.cola = 0;
       sanitized.exclusion_ratio = 0;
       sanitized.tax_rate = 0;
@@ -676,11 +676,33 @@ async function submitScenario() {
     );
     router.push(`/clients/${clientId}/scenarios/detail/${response.data.id}`);
   } catch (error) {
-    //console.log("🚀 income_sources payload:", JSON.parse(JSON.stringify(scenario.value.income)));
-    //console.log("🚀 income_sources payload:", scenario.value.income);
-    //console.error('❌ Error saving scenario:', error);
-    //console.error('❌ Response data:', error.response?.data);
-    //console.error('Failed to create scenario:', error);
+    console.error('❌ Error saving scenario:', error);
+    console.error('❌ Response data:', error.response?.data);
+    
+    // Log specific income_sources errors
+    if (error.response?.data?.income_sources) {
+      console.error('❌ Income sources errors:', error.response.data.income_sources);
+      error.response.data.income_sources.forEach((err, index) => {
+        if (err && typeof err === 'object') {
+          console.error(`❌ Income source ${index} errors:`, err);
+        }
+      });
+    }
+    
+    console.error('❌ Status:', error.response?.status);
+    console.error('❌ Full error response:', error.response);
+    
+    // Show more detailed error message
+    let errorMessage = 'Failed to create scenario.\n\n';
+    if (error.response?.data?.income_sources) {
+      errorMessage += 'Income source errors:\n';
+      error.response.data.income_sources.forEach((err, index) => {
+        if (err && typeof err === 'object') {
+          errorMessage += `- Income ${index + 1}: ${JSON.stringify(err)}\n`;
+        }
+      });
+    }
+    alert(errorMessage);
   }
 }
 

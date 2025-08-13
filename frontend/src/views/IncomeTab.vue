@@ -16,17 +16,6 @@
                   <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
                   <div><strong>COLA %:</strong> {{ asset.cola }}</div>
                 </template>
-                <template v-else-if="['Traditional_401k', 'Roth_401k', 'Traditional_IRA', 'Roth_IRA'].includes(asset.income_type)">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Current Balance:</strong> ${{ parseFloat(asset.current_asset_balance || 0).toLocaleString() }}</div>
-                  <div><strong>Monthly Contribution:</strong> ${{ parseFloat(asset.monthly_contribution || 0).toLocaleString() }}</div>
-                  <div><strong>Growth Rate (%):</strong> {{ asset.rate_of_return }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>Monthly Withdrawal:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div v-if="getProjectedBalance(asset)" style="color: green; font-weight: bold;">
-                    <strong>Projected Balance at Retirement:</strong> ${{ getProjectedBalance(asset).toLocaleString() }}
-                  </div>
-                </template>
                 <template v-else-if="asset.income_type === 'Pension'">
                   <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
                   <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
@@ -52,11 +41,29 @@
                   <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
                   <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
                 </template>
+                <template v-else-if="asset.income_type === 'Qualified' || asset.income_type === 'Non-Qualified'">
+                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div><strong>Asset Type:</strong> {{ asset.income_type }}</div>
+                  <div><strong>Starting Balance:</strong> ${{ parseFloat(asset.current_asset_balance || 0).toLocaleString() }}</div>
+                  <div><strong>Monthly Contribution:</strong> ${{ parseFloat(asset.monthly_contribution || 0).toLocaleString() }}</div>
+                  <div><strong>Growth Rate:</strong> {{ (parseFloat(asset.rate_of_return || 0) * 100).toFixed(2) }}%</div>
+                  <div><strong>Withdrawal Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
+                  <div><strong>Withdrawal End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
+                  <div><strong>Monthly Withdrawal:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
+                  <div v-if="asset.income_type === 'Qualified'" style="color: orange;">
+                    <strong>RMDs Required:</strong> Starting at age 73
+                  </div>
+                  <div v-if="getProjectedBalance(asset)" style="color: green; font-weight: bold;">
+                    <strong>Projected Balance at Retirement:</strong> ${{ getProjectedBalance(asset).toLocaleString() }}
+                  </div>
+                </template>
                 <template v-else>
                   <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
+                  <div v-if="asset.current_asset_balance"><strong>Balance:</strong> ${{ parseFloat(asset.current_asset_balance || 0).toLocaleString() }}</div>
                   <div><strong>Monthly Amount:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
                   <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
                   <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
+                  <div v-if="asset.rate_of_return"><strong>Growth Rate:</strong> {{ (parseFloat(asset.rate_of_return || 0) * 100).toFixed(2) }}%</div>
                 </template>
               </div>
             </div>
@@ -117,23 +124,8 @@ export default {
   },
   methods: {
     getGraphData(incomeType) {
-      // Normalize incomeType for retirement accounts
-      let normalizedType = incomeType;
-      if (typeof incomeType === 'string') {
-        const lower = incomeType.toLowerCase();
-        if (lower.includes('401k')) normalizedType = '401k';
-        else if (lower.includes('ira')) normalizedType = 'ira';
-        else if (lower.includes('social_security')) normalizedType = 'social_security';
-      }
       // Find the asset for this incomeType
-      const asset = this.assetDetails.find(a => {
-        if (!a.income_type) return false;
-        const lower = a.income_type.toLowerCase();
-        if (normalizedType === '401k') return lower.includes('401k');
-        if (normalizedType === 'ira') return lower.includes('ira');
-        if (normalizedType === 'social_security') return lower.includes('social_security');
-        return lower === normalizedType;
-      });
+      const asset = this.assetDetails.find(a => a.income_type === incomeType);
       if (!asset) return {};
       
       // Get client's actual current age from birthdate
@@ -163,8 +155,8 @@ export default {
       const withdrawalEndAge = parseInt(asset.age_to_end_withdrawal || endAge);
       const annualWithdrawal = parseFloat(asset.monthly_amount || 0) * 12;
 
-      // 401k/IRA: handle retirement accounts
-      if (normalizedType === '401k' || normalizedType === 'ira') {
+      // Qualified/Non-Qualified: handle investment accounts with balances
+      if (incomeType === 'Qualified' || incomeType === 'Non-Qualified' || startBalance > 0) {
         console.log(`Retirement account data:`, {
           type: asset.income_type,
           currentAge: actualCurrentAge,
@@ -218,9 +210,9 @@ export default {
             // No more contributions
             contributions.push(0);
             
-            // Calculate RMD if applicable (only for traditional accounts)
+            // Calculate RMD if applicable (only for Qualified accounts)
             let rmd = 0;
-            if (age >= rmdStartAge && !asset.income_type.toLowerCase().includes('roth')) {
+            if (age >= rmdStartAge && asset.income_type === 'Qualified') {
               const rmdTable = {
                 72: 27.4, 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0,
                 79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0,
@@ -298,7 +290,7 @@ export default {
         };
       }
       // Social Security: payout graph only
-      if (normalizedType === 'social_security') {
+      if (incomeType === 'social_security') {
         const cola = parseFloat(asset.cola || 0) / 100;
         const payouts = [];
         const labels = [];
