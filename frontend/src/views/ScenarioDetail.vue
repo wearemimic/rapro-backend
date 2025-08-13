@@ -200,19 +200,7 @@ import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { mapActions } from 'vuex';
 
-import {
-  Chart,
-  LineController,
-  LineElement,
-  BarController,
-  BarElement,
-  PointElement,
-  LinearScale,
-  Title,
-  Tooltip,
-  Legend,
-  CategoryScale
-} from 'chart.js';
+import Chart from 'chart.js/auto';
 
 import FinancialOverviewTab from './FinancialOverviewTab.vue';
 import SocialSecurityOverviewTab from './SocialSecurityOverviewTab.vue';
@@ -223,18 +211,7 @@ import WorksheetsTab from './WorksheetsTab.vue';
 import ScenarioMetrics from './ScenarioMetrics.vue';
 import NextStepsTab from './NextStepsTab.vue';
 
-Chart.register(
-  LineController,
-  LineElement,
-  BarController,
-  BarElement,
-  PointElement,
-  LinearScale,
-  Title,
-  Tooltip,
-  Legend,
-  CategoryScale
-);
+// Chart.js registration moved to Graph.vue to avoid conflicts
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -330,6 +307,12 @@ export default {
   beforeUnmount() {
     // Remove event listener when component is destroyed
     document.removeEventListener('click', this.handleClickOutside);
+    
+    // Clean up chart instances
+    if (this.chartInstance) {
+      this.chartInstance.destroy();
+      this.chartInstance = null;
+    }
   },
   methods: {
     ...mapActions(['fetchScenarioData']),
@@ -371,243 +354,50 @@ export default {
       }
     },
     initializeChartJS() {
+      // Only worksheets tab needs chart initialization from ScenarioDetail
+      // Other tabs now handle their own charts via Graph component
+      if (this.activeTab !== 'worksheets') {
+        return;
+      }
+      
       this.$nextTick(() => {
-        const ctx = document.getElementById(
-          this.activeTab === 'worksheets' ? 'breakevenChart' :
-          this.activeTab === 'medicare' ? 'medicareChart' :
-          this.activeTab === 'socialSecurity' ? 'socialSecurityChart' :
-          'financial_overview_chart'
-        );
+        const ctx = document.getElementById('breakevenChart');
         console.log('Canvas Context:', ctx); // Log the canvas context
         if (ctx && this.scenarioResults.length) {
           if (this.chartInstance) {
             this.chartInstance.destroy();
           }
 
-          const datasets = this.activeTab === 'worksheets' ? [
-            ...Object.entries(this.benefitByAge).map(([age, benefit], i) => {
-              const label = `Age ${age}`;
-              const data = [];
-              let cumulativeIncome = 0;
-              const startYear = 62 + (age - 62);
-              for (let year = 62; year <= 90; year++) {
-                if (year >= startYear) {
-                  cumulativeIncome += benefit;
-                  data.push(cumulativeIncome);
-                } else {
-                  data.push(null);
-                }
+          // Only handle worksheets tab - other tabs use Graph component
+          const datasets = Object.entries(this.benefitByAge).map(([age, benefit], i) => {
+            const label = `Age ${age}`;
+            const data = [];
+            let cumulativeIncome = 0;
+            const startYear = 62 + (age - 62);
+            for (let year = 62; year <= 90; year++) {
+              if (year >= startYear) {
+                cumulativeIncome += benefit;
+                data.push(cumulativeIncome);
+              } else {
+                data.push(null);
               }
-              return {
-                type: 'line',
-                label,
-                data,
-                borderColor: `hsl(${(i * 40) % 360}, 70%, 50%)`,
-                backgroundColor: `hsla(${(i * 40) % 360}, 70%, 50%, 0.1)`,
-                borderWidth: 2,
-                tension: 0.3,
-                yAxisID: 'y'
-              };
-            })
-          ] : this.activeTab === 'socialSecurity' ? [
-            // Use filtered results for social security overview chart
-            ...(() => {
-              const mortalityAge = Number(this.scenario?.mortality_age) || 90;
-              const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
-              const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-              const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-              const filtered = this.scenarioResults.filter(row => {
-                if (isSingle) {
-                  return row.primary_age <= mortalityAge;
-                } else {
-                  return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-                }
-              });
-              return [
-                {
-                  type: 'line',
-                  label: 'SSI Benefit',
-                  data: filtered.map(row => parseFloat(row.ss_income || 0)),
-                  borderColor: "#377dff",
-                  backgroundColor: "rgba(55, 125, 255, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'line',
-                  label: 'Remaining SSI Benefit',
-                  data: filtered.map(row => {
-                    const ssiBenefit = parseFloat(row.ss_income || 0);
-                    const medicareExpense = parseFloat(row.total_medicare || 0);
-                    const remainingSSI = ssiBenefit - medicareExpense;
-                    return remainingSSI;
-                  }),
-                  borderColor: "#00c9db",
-                  backgroundColor: "rgba(0, 201, 219, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'Medicare Expense',
-                  data: filtered.map(row => parseFloat(row.total_medicare || 0)),
-                  backgroundColor: "#ffc107",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                }
-              ];
-            })()
-          ] : this.activeTab === 'medicare' ? [
-            // Use filtered results for medicare overview chart
-            ...(() => {
-              const mortalityAge = Number(this.scenario?.mortality_age) || 90;
-              const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
-              const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-              const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-              const filtered = this.scenarioResults.filter(row => {
-                if (isSingle) {
-                  return row.primary_age <= mortalityAge;
-                } else {
-                  return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-                }
-              });
-              return [
-                {
-                  type: 'bar',
-                  label: 'Part B',
-                  data: filtered.map(row => parseFloat(row.part_b || 0)),
-                  backgroundColor: '#377dff',
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'Part D',
-                  data: filtered.map(row => parseFloat(row.part_d || 0)),
-                  backgroundColor: '#00c9db',
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'IRMAA Surcharge',
-                  data: filtered.map(row => parseFloat(row.irmaa_surcharge || 0)),
-                  backgroundColor: '#ffc107',
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                }
-              ];
-            })()
-          ] : [
-            // Use filtered results for financial overview chart
-            ...(() => {
-              // Filtering logic matching FinancialOverviewTab.vue
-              const mortalityAge = Number(this.scenario?.mortality_age) || 90;
-              const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
-              const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-              const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-              const filtered = this.scenarioResults.filter(row => {
-                if (isSingle) {
-                  return row.primary_age <= mortalityAge;
-                } else {
-                  return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-                }
-              });
-              return [
-                {
-                  type: 'line',
-                  label: 'Total Income',
-                  data: filtered.map(row => parseFloat(row.gross_income)),
-                  borderColor: "#377dff",
-                  backgroundColor: "rgba(55, 125, 255, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'line',
-                  label: 'Remaining Income',
-                  data: filtered.map(row => {
-                    const gross = parseFloat(row.gross_income);
-                    const tax = parseFloat(row.federal_tax);
-                    const medicare = parseFloat(row.total_medicare);
-                    const remaining = gross - (tax + medicare);
-                    return parseFloat(remaining.toFixed(2));
-                  }),
-                  borderColor: "#00c9db",
-                  backgroundColor: "rgba(0, 201, 219, 0.1)",
-                  borderWidth: 2,
-                  tension: 0.3,
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'Federal Tax',
-                  data: filtered.map(row => parseFloat(row.federal_tax)),
-                  backgroundColor: "#ff6b6b",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                },
-                {
-                  type: 'bar',
-                  label: 'Total Medicare',
-                  data: filtered.map(row => parseFloat(row.total_medicare)),
-                  backgroundColor: "#ffc107",
-                  stack: 'Stack 0',
-                  yAxisID: 'y'
-                }
-              ];
-            })()
-          ];
+            }
+            return {
+              type: 'line',
+              label,
+              data,
+              borderColor: `hsl(${(i * 40) % 360}, 70%, 50%)`,
+              backgroundColor: `hsla(${(i * 40) % 360}, 70%, 50%, 0.1)`,
+              borderWidth: 2,
+              tension: 0.3,
+              yAxisID: 'y'
+            };
+          });
 
           this.chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: this.activeTab === 'socialSecurity'
-                ? (() => {
-                    const mortalityAge = Number(this.scenario?.mortality_age) || 90;
-                    const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
-                    const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-                    const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-                    return this.scenarioResults.filter(row => {
-                      if (isSingle) {
-                        return row.primary_age <= mortalityAge;
-                      } else {
-                        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-                      }
-                    }).map(row => row.year.toString());
-                  })()
-                : this.activeTab === 'financial'
-                ? (() => {
-                    const mortalityAge = Number(this.scenario?.mortality_age) || 90;
-                    const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
-                    const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-                    const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-                    return this.scenarioResults.filter(row => {
-                      if (isSingle) {
-                        return row.primary_age <= mortalityAge;
-                      } else {
-                        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-                      }
-                    }).map(row => row.year.toString());
-                  })()
-                : this.activeTab === 'medicare'
-                ? (() => {
-                    const mortalityAge = Number(this.scenario?.mortality_age) || 90;
-                    const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
-                    const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
-                    const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-                    return this.scenarioResults.filter(row => {
-                      if (isSingle) {
-                        return row.primary_age <= mortalityAge;
-                      } else {
-                        return (row.primary_age <= maxAge || (row.spouse_age && row.spouse_age <= maxAge));
-                      }
-                    }).map(row => row.year.toString());
-                  })()
-                : this.scenarioResults.map(row => row.year.toString()),
+              labels: this.scenarioResults.map(row => row.year.toString()),
               datasets: datasets
             },
             options: {
@@ -615,14 +405,12 @@ export default {
               maintainAspectRatio: false,
               scales: {
                 x: {
-                  stacked: this.activeTab === 'medicare',
                   title: {
                     display: true,
                     text: 'Year'
                   }
                 },
                 y: {
-                  stacked: this.activeTab === 'medicare',
                   title: {
                     display: true,
                     text: 'Amount ($)'
@@ -732,12 +520,19 @@ export default {
     },
     fetchScenarioData() {
       const scenarioId = this.$route.params.scenarioid;
+      
+      // Clean up existing charts when switching scenarios
+      if (this.chartInstance) {
+        this.chartInstance.destroy();
+        this.chartInstance = null;
+      }
+      
       axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/calculate/`, { headers })
         .then(response => {
           if (response.data && response.data.length) {
             this.scenarioResults = response.data;
-            console.log('API Response:', response.data); // Log the API response
-            console.log('Scenario Results:', this.scenarioResults); // Log scenario results
+            console.log('API Response:', response.data);
+            
             // Re-initialize chart with new data
             this.initializeChartJS();
             
@@ -837,34 +632,14 @@ export default {
       const doc = new jsPDF();
       let canvasId, tableData;
 
-      // Determine which graph and table to export based on the active tab
-      if (this.activeTab === 'financial') {
-        canvasId = 'financial_overview_chart';
-        tableData = this.scenarioResults;
-      } else if (this.activeTab === 'socialSecurity') {
-        canvasId = 'socialSecurityChart';
-        tableData = this.scenarioResults.map(row => ({
-          year: row.year,
-          primary_age: row.primary_age,
-          social_security_benefit: row.ss_income,
-          total_medicare: row.total_medicare,
-          ssi_taxed: row.ssi_taxed,
-          remaining_ssi: row.remaining_ssi
-        }));
-      } else if (this.activeTab === 'medicare') {
-        canvasId = 'medicareChart';
-        tableData = this.scenarioResults.map(row => ({
-          year: row.year,
-          primary_age: row.primary_age,
-          gross_income: row.gross_income,
-          medicare_income: row.medicare_income,
-          part_b: row.part_b,
-          part_d: row.part_d,
-          total_medicare: row.total_medicare
-        }));
-      } else if (this.activeTab === 'worksheets') {
+      // Only worksheets tab is handled by ScenarioDetail export
+      // Other tabs handle their own exports via Graph component
+      if (this.activeTab === 'worksheets') {
         canvasId = 'breakevenChart';
         tableData = this.benefitByAge;
+      } else {
+        console.warn('Export not supported from ScenarioDetail for tab:', this.activeTab);
+        return;
       }
 
       // Capture the graph as an image
@@ -1030,13 +805,11 @@ export default {
     },
     activeTab(newVal) {
       console.log('Active tab changed to:', newVal);
-      if (['socialSecurity', 'medicare', 'worksheets', 'financial'].includes(newVal)) {
-        console.log('🔍 Debug - scenarioResults:', this.scenarioResults);
+      // Only worksheets tab needs chart initialization from ScenarioDetail
+      if (newVal === 'worksheets') {
         if (this.scenarioResults.length) {
-          console.log('🔍 Debug - First row year:', this.scenarioResults[0].year);
           this.initializeChartJS();
         } else {
-          console.warn(`⚠️ scenarioResults is empty when switching to ${newVal} tab`);
           this.fetchScenarioData();
         }
       }

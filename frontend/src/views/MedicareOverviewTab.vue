@@ -29,8 +29,13 @@
                 </a>
               </div>
             </div>
-            <div style="flex: 1 1 auto; min-height: 0;">
-              <canvas id="medicareChart" style="width: 100%; height: 100%; max-height: 300px;"></canvas>
+            <div style="flex: 1 1 auto; min-height: 0; height: 250px;">
+              <Graph 
+                :data="chartData" 
+                :options="chartOptions"
+                :height="250"
+                type="bar"
+              />
             </div>
           </div>
         </div>
@@ -129,6 +134,7 @@
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Graph from '../components/Graph.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -169,6 +175,9 @@ const IRMAA_LABELS = {
 };
 
 export default {
+  components: {
+    Graph
+  },
   props: {
     scenarioResults: {
       type: Array,
@@ -213,6 +222,9 @@ export default {
   },
   computed: {
     filteredResults() {
+      if (!this.scenarioResults || !Array.isArray(this.scenarioResults)) {
+        return [];
+      }
       const mortalityAge = Number(this.mortalityAge) || 90;
       const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
       const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
@@ -238,6 +250,78 @@ export default {
         return IRMAA_LABELS[status];
       }
       return IRMAA_LABELS['single'];
+    },
+    chartData() {
+      if (!this.filteredResults || !this.filteredResults.length) {
+        return { labels: [], datasets: [] };
+      }
+
+      const labels = this.filteredResults.map(row => row.year.toString());
+      const datasets = [
+        {
+          type: 'bar',
+          label: 'Part B',
+          data: this.filteredResults.map(row => parseFloat(row.part_b || 0)),
+          backgroundColor: '#377dff',
+          stack: 'Stack 0',
+          yAxisID: 'y'
+        },
+        {
+          type: 'bar',
+          label: 'Part D',
+          data: this.filteredResults.map(row => parseFloat(row.part_d || 0)),
+          backgroundColor: '#00c9db',
+          stack: 'Stack 0',
+          yAxisID: 'y'
+        },
+        {
+          type: 'bar',
+          label: 'IRMAA Surcharge',
+          data: this.filteredResults.map(row => parseFloat(row.irmaa_surcharge || 0)),
+          backgroundColor: '#ffc107',
+          stack: 'Stack 0',
+          yAxisID: 'y'
+        }
+      ];
+
+      return { labels, datasets };
+    },
+    chartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Year'
+            }
+          },
+          y: {
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Amount ($)'
+            },
+            ticks: {
+              beginAtZero: true,
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          },
+          legend: {
+            position: 'bottom'
+          }
+        }
+      };
     }
   },
   methods: {
