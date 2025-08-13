@@ -467,6 +467,27 @@ def update_scenario(request, scenario_id):
     except Scenario.DoesNotExist:
         return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_scenario(request, client_id, scenario_id):
+    """
+    Delete a scenario
+    """
+    try:
+        # Get the scenario and verify ownership
+        scenario = Scenario.objects.get(id=scenario_id, client_id=client_id)
+        
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
+        
+        # Delete the scenario
+        scenario.delete()
+        
+        return Response({"message": "Scenario deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_scenario_percentages(request, scenario_id):
