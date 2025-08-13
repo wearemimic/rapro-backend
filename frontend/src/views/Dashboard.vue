@@ -16,10 +16,6 @@
     <!-- End Page Header -->
     <!-- Stats -->
     <div class="row" style="margin-top:20px;">
-    <!-- Test Chart Component -->
-    <div class="col-12 mb-3">
-      <TestChart />
-    </div>
     <div class="col-sm-6 col-lg-8 mb-3 mb-lg-5">
       <div class="card mb-3 mb-lg-5">
         <h2 class="card-title px-3 pt-3 mb-0">Recent Clients</h2>
@@ -134,7 +130,7 @@
 
 <script>
 import axios from 'axios'
-import TestChart from '../components/TestChart.vue'
+// TestChart removed
 
 const token = localStorage.getItem('token')
 const headers = { Authorization: `Bearer ${token}` }
@@ -142,7 +138,6 @@ const headers = { Authorization: `Bearer ${token}` }
 export default {
   name: 'ClientList',
   components: {
-    TestChart
   },
   data() {
     return {
