@@ -611,15 +611,15 @@ async function submitScenario() {
       // Ensure fields match expected database schema
       sanitized.owned_by = row.owned_by;
       sanitized.income_type = row.income_type;
-      sanitized.income_name = row.income_type.replace(/_/g, ' ');
+      sanitized.income_name = row.title || row.income_type.replace(/_/g, ' ');
       sanitized.current_asset_balance = parseFloat(row.current_balance || 0).toFixed(2);
-      sanitized.monthly_amount = parseFloat(row.withdrawal_amount || row.amount_at_fra || 0).toFixed(2);
+      sanitized.monthly_amount = parseFloat(row.withdrawal_amount || row.amount_at_fra || row.amount_per_month || row.loan_amount || 0).toFixed(2);
       sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
       sanitized.rate_of_return = parseFloat(row.growth_rate || 0).toFixed(4);
       sanitized.cola = parseFloat(row.cola || 0).toFixed(2);
-      sanitized.exclusion_ratio = parseFloat(row.exclusion_ratio || 0).toFixed(4);
+      sanitized.exclusion_ratio = parseFloat(row.exclusion_ratio || row.percent_taxable || 0).toFixed(4);
       sanitized.tax_rate = parseFloat(row.tax_rate || 0).toFixed(4);
       return sanitized;
     });

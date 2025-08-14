@@ -4,9 +4,10 @@
     <div class="row mb-3 mb-lg-5">
       <!-- Medicare Chart Card (2/3 width) -->
       <div class="col-lg-8 col-md-7 mb-3 mb-lg-0">
-        <div class="card h-100" style="min-height: 340px; max-height: 340px;">
-          <div class="card-body" style="height: 300px; display: flex; flex-direction: column; justify-content: flex-start;">
-            <div class="dropdown mb-3">
+        <div class="card h-100">
+          <div class="card-header card-header-content-between">
+            <!-- Dropdown -->
+            <div class="dropdown">
               <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('medicare')" :aria-expanded="isDropdownOpen.medicare">
                 <i class="bi-download me-2"></i> Export
               </button>
@@ -29,11 +30,14 @@
                 </a>
               </div>
             </div>
-            <div style="flex: 1 1 auto; min-height: 0; height: 250px;">
+            <!-- End Dropdown -->
+          </div>
+          <div class="card-body">
+            <div class="medicare-chart-container">
               <Graph 
                 :data="chartData" 
                 :options="chartOptions"
-                :height="250"
+                :height="300"
                 type="bar"
               />
             </div>
@@ -472,5 +476,13 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.medicare-chart-container {
+  width: 100%;
+  height: 300px;
+  min-height: 300px;
+  max-height: 300px;
+  position: relative;
 }
 </style> 
