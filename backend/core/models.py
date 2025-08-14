@@ -242,3 +242,19 @@ class TemplateSlide(models.Model):
 
     def __str__(self):
         return f"Slide {self.order} - {self.template.name}"
+
+
+class ComparisonPreference(models.Model):
+    """Store user's default scenario comparison selections for each client"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    client = models.ForeignKey('Client', on_delete=models.CASCADE)
+    scenario1 = models.ForeignKey('Scenario', on_delete=models.SET_NULL, null=True, blank=True, related_name='comparison_scenario1')
+    scenario2 = models.ForeignKey('Scenario', on_delete=models.SET_NULL, null=True, blank=True, related_name='comparison_scenario2')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['user', 'client']
+        
+    def __str__(self):
+        return f"{self.user.email} - {self.client} comparison preferences"

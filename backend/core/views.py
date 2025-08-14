@@ -1281,6 +1281,8 @@ def get_scenario_comparison_data(request, scenario_id):
     """Get scenario data formatted for comparison report"""
     logger = logging.getLogger(__name__)
     
+    logger.info(f"COMPARISON ENDPOINT CALLED: scenario_id={scenario_id}, user={request.user}")
+    
     try:
         scenario = Scenario.objects.get(id=scenario_id)
         
@@ -1292,6 +1294,8 @@ def get_scenario_comparison_data(request, scenario_id):
         try:
             processor = ScenarioProcessor(scenario_id=scenario.id, debug=False)
             calculation_result = processor.calculate()
+            logger.info(f"Calculation result type: {type(calculation_result)}")
+            logger.info(f"Calculation result: {str(calculation_result)[:500]}...")  # Log first 500 chars
         except Exception as calc_error:
             logger.error(f"Error calculating scenario {scenario_id}: {str(calc_error)}")
             # Return basic data without calculation
@@ -1308,32 +1312,78 @@ def get_scenario_comparison_data(request, scenario_id):
             return Response(comparison_data, status=status.HTTP_200_OK)
         
         # Handle both list and dict return types from calculate()
+        summary = {}
         if isinstance(calculation_result, list):
+            logger.info(f"Calculation result is list with {len(calculation_result)} items")
             # If it's a list, look for the Summary in the last element or iterate
-            summary = {}
-            for item in calculation_result:
+            for i, item in enumerate(calculation_result):
+                logger.info(f"Item {i}: type={type(item)}, keys={list(item.keys()) if isinstance(item, dict) else 'N/A'}")
                 if isinstance(item, dict) and 'Summary' in item:
                     summary = item['Summary']
+                    logger.info(f"Found Summary in item {i}: {summary}")
                     break
             # If no Summary found in list items, check if last item is Summary
             if not summary and calculation_result:
                 last_item = calculation_result[-1]
                 if isinstance(last_item, dict):
                     summary = last_item
+                    logger.info(f"Using last item as summary: {summary}")
         else:
+            logger.info(f"Calculation result is dict with keys: {list(calculation_result.keys()) if isinstance(calculation_result, dict) else 'N/A'}")
             # If it's a dict, extract Summary as before
             summary = calculation_result.get('Summary', {})
+            logger.info(f"Extracted summary: {summary}")
+        
+        logger.info(f"Final summary data: {summary}")
+        
+        # Calculate totals from the actual calculation result data
+        total_federal_taxes = 0
+        total_medicare_costs = 0
+        total_gross_income = 0
+        irmaa_reached = False
+        
+        # The calculation result is a list of yearly data
+        if isinstance(calculation_result, list):
+            for year_data in calculation_result:
+                if isinstance(year_data, dict):
+                    # Extract values and convert Decimal to float
+                    fed_tax_raw = year_data.get('federal_tax', 0)
+                    medicare_raw = year_data.get('total_medicare', 0)
+                    gross_raw = year_data.get('gross_income', 0)
+                    irmaa_raw = year_data.get('irmaa_surcharge', 0)
+                    
+                    # Convert to float, handling Decimal objects
+                    fed_tax_float = float(fed_tax_raw) if fed_tax_raw is not None else 0
+                    medicare_float = float(medicare_raw) if medicare_raw is not None else 0
+                    gross_float = float(gross_raw) if gross_raw is not None else 0
+                    irmaa_float = float(irmaa_raw) if irmaa_raw is not None else 0
+                    
+                    # Add to totals
+                    total_federal_taxes += fed_tax_float
+                    total_medicare_costs += medicare_float
+                    total_gross_income += gross_float
+                    
+                    # Check if IRMAA is reached (any year with IRMAA surcharge > 0)
+                    if irmaa_float > 0:
+                        irmaa_reached = True
+        
+        # Calculate derived values
+        total_costs = total_federal_taxes + total_medicare_costs
+        out_of_pocket = total_gross_income - total_costs  # Net income
+        solution_cost = 0  # This might need to be calculated differently based on business logic
         
         comparison_data = {
             'id': scenario.id,
             'name': scenario.name,
-            'irmaa_reached': summary.get('IRMAA_reached', False),
-            'medicare_cost': float(summary.get('Total_Medicare_costs', 0)),
-            'federal_taxes': float(summary.get('Total_Fed_Tax', 0)),
-            'solution_cost': float(summary.get('Total_Solution_cost', 0)),
-            'total_costs': float(summary.get('Total_Costs', 0)),
-            'out_of_pocket': float(summary.get('Total_Out_of_Pocket', 0))
+            'irmaa_reached': irmaa_reached,
+            'medicare_cost': total_medicare_costs,
+            'federal_taxes': total_federal_taxes,
+            'solution_cost': solution_cost,
+            'total_costs': total_costs,
+            'out_of_pocket': out_of_pocket
         }
+        
+        logger.info(f"Final comparison data: {comparison_data}")
         
         return Response(comparison_data, status=status.HTTP_200_OK)
         
@@ -1342,4 +1392,67 @@ def get_scenario_comparison_data(request, scenario_id):
     except Exception as e:
         logger.error(f"Error in get_scenario_comparison_data: {str(e)}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def comparison_preferences(request, client_id):
+    """Get or update comparison preferences for a client"""
+    from .models import ComparisonPreference, Client, Scenario
+    
+    try:
+        client = Client.objects.get(id=client_id, advisor=request.user)
+    except Client.DoesNotExist:
+        return Response({"error": "Client not found or access denied"}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        # Get existing preferences
+        try:
+            preference = ComparisonPreference.objects.get(user=request.user, client=client)
+            return Response({
+                'scenario1': preference.scenario1.id if preference.scenario1 else None,
+                'scenario2': preference.scenario2.id if preference.scenario2 else None
+            })
+        except ComparisonPreference.DoesNotExist:
+            return Response({
+                'scenario1': None,
+                'scenario2': None
+            })
+    
+    elif request.method == 'POST':
+        # Save or update preferences
+        scenario1_id = request.data.get('scenario1')
+        scenario2_id = request.data.get('scenario2')
+        
+        # Validate scenarios belong to the client
+        scenario1 = None
+        scenario2 = None
+        
+        if scenario1_id:
+            try:
+                scenario1 = Scenario.objects.get(id=scenario1_id, client=client)
+            except Scenario.DoesNotExist:
+                return Response({"error": "Scenario 1 not found"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if scenario2_id:
+            try:
+                scenario2 = Scenario.objects.get(id=scenario2_id, client=client)
+            except Scenario.DoesNotExist:
+                return Response({"error": "Scenario 2 not found"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update or create preference
+        preference, created = ComparisonPreference.objects.update_or_create(
+            user=request.user,
+            client=client,
+            defaults={
+                'scenario1': scenario1,
+                'scenario2': scenario2
+            }
+        )
+        
+        return Response({
+            'message': 'Preferences saved successfully',
+            'scenario1': preference.scenario1.id if preference.scenario1 else None,
+            'scenario2': preference.scenario2.id if preference.scenario2 else None
+        }, status=status.HTTP_200_OK)
 

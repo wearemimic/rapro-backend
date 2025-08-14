@@ -1,10 +1,10 @@
 <template>
-  <main id="content" role="main" class="main">
+  <main id="content" role="main" class="main login-main">
     <div class="container py-5 py-sm-7">
       <div class="mx-auto" style="max-width: 30rem;">
         <!-- Card -->
         <div class="text-center mb-4">
-          <img src="/assets/img/logo.png" style="height:50px;margin-bottom:20px;" alt="Logo">
+          <img src="/assets/img/RAD-white-logo.png" style="height:50px;margin-bottom:20px;" alt="Logo">
         </div>
         <div class="card card-lg mb-5">
           <div class="card-body">
@@ -231,10 +231,16 @@ const loginWithAuth0 = async (connection) => {
 </script>
 
 <style scoped>
-.main {
-  background-color: #f9fafb;
+.login-main {
+  background-color: #377dff;
   min-height: 100vh;
   display: flex;
   align-items: center;
+}
+
+.card {
+  background-color: white;
+  border: none;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 </style>

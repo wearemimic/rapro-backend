@@ -117,7 +117,7 @@
                     <tr v-if="['Wages', 'Reverse_Mortgage'].includes(income.income_type)">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td>
@@ -143,7 +143,7 @@
                     <tr v-else-if="income.income_type === 'social_security'">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.amount_at_fra" type="number" class="form-control" placeholder="Amount at FRA" /></td>
                       <td>
@@ -160,7 +160,7 @@
                     <tr v-else-if="income.income_type === 'Life_Insurance'">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.loan_amount" type="number" class="form-control" placeholder="Monthly Loan" /></td>
                       <td>
@@ -186,7 +186,7 @@
                     <tr v-else-if="income.income_type === 'Pension'">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td><input v-model.number="income.cola" type="number" class="form-control" placeholder="COLA %" /></td>
@@ -202,7 +202,7 @@
                     <tr v-else-if="income.income_type === 'Annuity'">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td><input v-model.number="income.percent_taxable" type="number" class="form-control" /></td>
@@ -230,7 +230,7 @@
                       <td>
                         <select v-model="income.owned_by" class="form-control">
                           <option value="primary">{{ primaryFirstName }}</option>
-                          <option value="spouse">{{ spouseFirstName }}</option>
+                          <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                         </select>
                       </td>
                       <td>
@@ -259,7 +259,7 @@
                     <tr v-else-if="income.income_type === 'Brokerage_Account'">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
@@ -285,7 +285,7 @@
                     <tr v-else-if="income.income_type === 'Rental_Income'">
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td>
@@ -313,7 +313,7 @@
                       <td v-if="type === 'other_taxable_income'"><input v-model="income.title" class="form-control" placeholder="Income Title" /></td>
                       <td><select v-model="income.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td>
@@ -379,7 +379,7 @@
                     <td>
                       <select v-model="investment.owned_by" class="form-control">
                         <option value="primary">{{ primaryFirstName }}</option>
-                        <option value="spouse">{{ spouseFirstName }}</option>
+                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select>
                     </td>
                     <td>
@@ -460,8 +460,10 @@
   </div>
 
     <!-- Submit -->
-    <button class="btn btn-primary" @click="submitScenario" style="margin:10px 10px 0px 0px;">Create Scenario</button>
-    <button class="btn btn-secondary" @click="router.push(`/clients/${clientId}`)" style="margin-top:10px;">Cancel</button>
+    <button class="btn btn-primary" @click="submitScenario" style="margin:10px 10px 0px 0px;">
+      {{ scenario.id ? 'Update Scenario' : 'Create Scenario' }}
+    </button>
+    <button class="btn btn-secondary" @click="handleCancel" style="margin-top:10px;">Cancel</button>
   </div>
 
 <!-- Medicare Modal -->
@@ -491,6 +493,9 @@
 <InvestmentModal 
   :primary-first-name="primaryFirstName" 
   :spouse-first-name="spouseFirstName"
+  :primary-lifespan="scenario.primary_lifespan"
+  :spouse-lifespan="scenario.spouse_lifespan"
+  :is-single="isSingle"
   @save="addInvestment"
 />
 
@@ -564,6 +569,11 @@ function addIncome() {
 function removeIncomeById(id) {
   scenario.value.income = scenario.value.income.filter(income => income.id !== id);
 }
+
+// Check if client is single
+const isSingle = computed(() => {
+  return clientTaxStatus.value === 'single';
+});
 
 // Group income products by type
 const groupedIncome = computed(() => {
@@ -670,10 +680,27 @@ async function submitScenario() {
       primary_state: scenario.value.primary_state,
     };
     console.log("🚀 Payload to submit:", payload);
-    const response = await axios.post(
-      `http://localhost:8000/api/clients/${clientId}/scenarios/create/`,
-      payload
-    );
+    
+    // Check if we're editing an existing scenario or creating a new one
+    const isEditing = scenario.value.id;
+    let response;
+    
+    if (isEditing) {
+      // Update existing scenario
+      console.log("📝 Updating existing scenario with ID:", scenario.value.id);
+      response = await axios.put(
+        `http://localhost:8000/api/scenarios/${scenario.value.id}/update/`,
+        payload
+      );
+    } else {
+      // Create new scenario
+      console.log("✨ Creating new scenario");
+      response = await axios.post(
+        `http://localhost:8000/api/clients/${clientId}/scenarios/create/`,
+        payload
+      );
+    }
+    
     router.push(`/clients/${clientId}/scenarios/detail/${response.data.id}`);
   } catch (error) {
     console.error('❌ Error saving scenario:', error);
@@ -717,10 +744,14 @@ onMounted(async () => {
     spouseFirstName.value = client.spouse?.first_name?.trim() || 'Spouse';
     clientTaxStatus.value = client.tax_status?.toLowerCase() ?? 'single';
 
-    // Check if we're duplicating a scenario
+    // Check if we're duplicating or editing a scenario
     const duplicateId = route.query.duplicate;
+    const editId = route.query.edit;
+    
     if (duplicateId) {
       await loadScenarioForDuplication(duplicateId);
+    } else if (editId) {
+      await loadScenarioForEditing(editId);
     }
   } catch (err) {
     if (err.response && err.response.status === 404) {
@@ -738,18 +769,72 @@ async function loadScenarioForDuplication(scenarioId) {
     const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers });
     const scenarioData = response.data;
     
-    // Prefill the scenario object with data from the duplicated scenario
+    // Define investment account types
+    const investmentTypes = ['Qualified', 'Non-Qualified', 'Roth', 'Inherited Traditional Spouse', 'Inherited Roth Spouse', 'Inherited Traditional Non-Spouse', 'Inherited Roth Non-Spouse'];
+    
+    // Separate income sources and investments
+    const allIncomeSources = scenarioData.income || [];
+    const investments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
+    const incomeSources = allIncomeSources.filter(item => !investmentTypes.includes(item.income_type));
+    
+    // Prefill the scenario object with properly separated data
     scenario.value = {
       ...scenario.value,
       ...scenarioData,
-      // Ensure investments array exists even if empty
-      investments: scenarioData.investments || []
+      income: incomeSources,
+      investments: investments
     };
     
     console.log('Loaded scenario data for duplication:', scenarioData);
+    console.log('Separated income sources:', incomeSources);
+    console.log('Separated investments:', investments);
   } catch (error) {
     console.error('Failed to load scenario for duplication:', error);
     alert('Failed to load scenario data for duplication. Please try again.');
+  }
+}
+
+async function loadScenarioForEditing(scenarioId) {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers });
+    const scenarioData = response.data;
+    
+    // Define investment account types
+    const investmentTypes = ['Qualified', 'Non-Qualified', 'Roth', 'Inherited Traditional Spouse', 'Inherited Roth Spouse', 'Inherited Traditional Non-Spouse', 'Inherited Roth Non-Spouse'];
+    
+    // Separate income sources and investments
+    const allIncomeSources = scenarioData.income || [];
+    const investments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
+    const incomeSources = allIncomeSources.filter(item => !investmentTypes.includes(item.income_type));
+    
+    // Prefill the scenario object with properly separated data for editing
+    scenario.value = {
+      ...scenario.value,
+      ...scenarioData,
+      // Keep the original ID for editing (unlike duplication)
+      id: scenarioData.id,
+      income: incomeSources,
+      investments: investments
+    };
+    
+    console.log('Loaded scenario data for editing:', scenarioData);
+    console.log('Separated income sources:', incomeSources);
+    console.log('Separated investments:', investments);
+  } catch (error) {
+    console.error('Failed to load scenario for editing:', error);
+    alert('Failed to load scenario data for editing. Please try again.');
+  }
+}
+
+function handleCancel() {
+  if (scenario.value.id) {
+    // If editing an existing scenario, go back to that scenario's detail page
+    router.push(`/clients/${clientId}/scenarios/detail/${scenario.value.id}`);
+  } else {
+    // If creating a new scenario (including duplication), go back to client page
+    router.push(`/clients/${clientId}`);
   }
 }
 

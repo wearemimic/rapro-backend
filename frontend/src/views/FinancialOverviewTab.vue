@@ -65,7 +65,7 @@
     <!-- End Row -->
 
     <!-- Financial Flow Diagram Section -->
-    <div class="card mb-3 mb-lg-5">
+    <div v-if="false" class="card mb-3 mb-lg-5">
       <div class="card-header card-header-content-between">
         <h4 class="card-header-title">Financial Flow Overview</h4>
         <div class="dropdown">

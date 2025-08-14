@@ -2,7 +2,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration
-from .views import ScenarioCreateView, create_scenario, run_scenario_calculation, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_comparison_data
+from .views import ScenarioCreateView, create_scenario, run_scenario_calculation, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_comparison_data, comparison_preferences
 from .views import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
 from . import views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -33,6 +33,7 @@ urlpatterns = [
     path('clients/create/', ClientCreateView.as_view(), name='client-create'),
     path('clients/<int:pk>/', ClientDetailView.as_view(), name='client-detail'),
     path('clients/<int:pk>/edit/', ClientEditView.as_view(), name='client-edit'),
+    path('clients/<int:client_id>/comparison-preferences/', comparison_preferences, name='comparison-preferences'),
     path('clients/<int:client_id>/scenarios/create/', create_scenario, name='scenario-create'),
     path('scenarios/<int:scenario_id>/calculate/', run_scenario_calculation, name='scenario-calculate'),
     path('scenarios/<int:scenario_id>/assets/', get_scenario_assets, name='scenario-assets'),

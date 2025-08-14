@@ -11,7 +11,7 @@
         />
         <img v-else
           style="height:30px;margin-left:20px;"
-          src="/assets/img/logo-white.png"
+          src="/assets/img/RAD-white-logo.png"
           alt="Logo"
         />
       </a>
@@ -126,7 +126,7 @@ watch(
 function onLogoError(event) {
   // fallback to default logo if image fails to load
   if (event && event.target) {
-    event.target.src = '/assets/img/logo-white.png';
+    event.target.src = '/assets/img/RAD-white-logo.png';
   }
 }
 

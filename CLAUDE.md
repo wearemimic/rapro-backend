@@ -288,3 +288,57 @@ Implemented complete scenario duplication functionality that allows users to dup
 - `/backend/core/urls.py`
 
 This feature significantly improves user workflow by allowing advisors to create variations of existing scenarios without re-entering all the complex financial data.
+
+## Latest Development Session (2025-01-20)
+
+### Comparison Report and UI Improvements - COMPLETED ✅
+
+**Major Bug Fix - Comparison Report Data Issue:**
+- ✅ **Fixed critical data display bug** where comparison report showed all zeros instead of actual financial calculations
+- ✅ **Root cause:** Backend was calculating correctly but data extraction wasn't handling Python Decimal objects properly
+- ✅ **Solution:** Added explicit Decimal-to-float conversion in `get_scenario_comparison_data` function
+- ✅ **Files modified:** `/backend/core/views.py` - lines with federal tax and medicare calculations
+
+**Comparison Report Enhancements:**
+- ✅ **Database-backed preferences** - Replaced localStorage with `ComparisonPreference` model for cross-device persistence
+- ✅ **Automatic preference saving** - Selections are saved automatically when scenarios are loaded
+- ✅ **Preference restoration** - Previously selected scenarios are automatically loaded on page refresh
+- ✅ **Backend endpoints:** `/api/clients/<id>/comparison-preferences/` for GET/POST operations
+- ✅ **Files modified:** 
+  - `/backend/core/models.py` - Added ComparisonPreference model
+  - `/backend/core/views.py` - Added comparison_preferences endpoint
+  - `/frontend/src/views/ComparisonReport.vue` - Added preference loading/saving logic
+
+**UI Layout and Styling Fixes:**
+- ✅ **Fixed table width issues** on Financial Overview, Social Security, and Medicare tabs
+- ✅ **Resolved chart alignment problems** where Net Income line appeared higher than Gross Income
+- ✅ **Standardized card heights** across comparison columns for consistent alignment
+- ✅ **Improved page spacing** - Fixed navbar overlap and reduced excessive spacing
+- ✅ **Removed debug output** from comparison report UI
+- ✅ **Files modified:** Multiple tab components with CSS and Chart.js configuration updates
+
+**Single Client Scenario Creation:**
+- ✅ **Added single client awareness** - Hide spouse options in all dropdowns when client tax status is "single"
+- ✅ **Dynamic dropdown filtering** - All ownership dropdowns (income, investments, etc.) conditionally show spouse
+- ✅ **Computed property implementation** - `isSingle` computed based on client tax status
+- ✅ **Files modified:** `/frontend/src/views/ScenarioCreate.vue`
+
+**Investment Modal Enhancements:**
+- ✅ **Converted age fields to dropdowns** - Age to Begin/End Withdrawals now use select dropdowns
+- ✅ **Dynamic age ranges** - Age options respect individual lifespan settings (primary vs spouse)
+- ✅ **Lifespan constraints** - End withdrawal age limited to owner's configured lifespan
+- ✅ **Added Monthly Withdrawal Amount field** - New currency input for specifying monthly withdrawal amounts
+- ✅ **Removed Annual Contribution Percentage** - Simplified contribution options to amount-only
+- ✅ **Files modified:** `/frontend/src/components/InvestmentModal.vue`
+
+**Key Technical Implementations:**
+- Database migration for ComparisonPreference model with user/client foreign keys
+- Computed properties for dynamic age ranges based on ownership and lifespan
+- Proper null checks in Vue templates to prevent compilation errors
+- Chart.js configuration fixes for proper line/bar chart stacking
+- Bootstrap CSS improvements for consistent card layouts and spacing
+
+**API Endpoints Added:**
+- `GET/POST /api/clients/<id>/comparison-preferences/` - Manage comparison selections
+
+This session focused heavily on UI/UX improvements, data accuracy fixes, and form enhancements to streamline the advisor workflow when creating and comparing retirement scenarios.
