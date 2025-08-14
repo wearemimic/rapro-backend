@@ -135,7 +135,7 @@
               <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'income'" class="tab-pane active" style="margin-top:50px;">
-              <IncomeTab :scenario="scenario" :assetDetails="assetDetails" />
+              <IncomeTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" :client="client" />
             </div>
             <div v-show="activeTab === 'rothConversion'" class="tab-pane active" style="margin-top:50px;">
               <RothConversionTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" :client="client" />
@@ -830,6 +830,7 @@ export default {
         this.scenario = this.scenarios.find(s => s.id === scenarioId);
         this.selectedScenarioId = scenarioId;
         this.fetchScenarioData();
+        this.fetchAssetDetails();
       }
     },
   }

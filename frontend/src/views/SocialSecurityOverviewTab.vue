@@ -33,52 +33,54 @@
     <!-- End Row for Graph and Insights -->
     <!-- Card for Table -->
     <div class="card mb-3 mb-lg-5">
+      <div class="card-header">
+        <h4 class="card-header-title">Social Security Overview Table</h4>
+      </div>
       <div class="card-body">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Year</th>
-              <th>Primary Age</th>
-              <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
-              <th>Social Security Benefit</th>
-              <th>Total Medicare</th>
-              <th>SSI Taxed</th>
-              <th>Remaining SSI</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, idx) in filteredResults" :key="row.year" :class="{ 'irmaa-bracket-row': isIrmaaBracketHit(row, idx) }">
-              <td>{{ row.year }}</td>
-              <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
-              <td v-else></td>
-              <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
-              <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-              <td>
-                <span v-if="client?.tax_status?.toLowerCase() !== 'single'">
-                  ${{ parseFloat(row.ss_income || 0).toFixed(2) }} /
-                  <span v-if="row.ss_income_spouse !== undefined">${{ parseFloat(row.ss_income_spouse || 0).toFixed(2) }}</span>
-                  <span v-else>N/A</span>
-                </span>
-                <span v-else>
-                  ${{ parseFloat(row.ss_income || 0).toFixed(2) }}
-                </span>
-              </td>
-              <td style="position: relative;">
-                ${{ parseFloat(row.total_medicare || 0).toFixed(2) }}
-                <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)">
-                  ℹ️
-                </span>
-                <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                  IRMAA Bracket: {{ getIrmaaBracketLabel(row) }}
-                </div>
-              </td>
-              <td>${{ parseFloat(row.ssi_taxed || 0).toFixed(2) }}</td>
-              <td :class="{ 'cell-negative': (parseFloat(row.ss_income || 0) - parseFloat(row.total_medicare || 0)) < 0 }">
-                ${{ (parseFloat(row.ss_income || 0) - parseFloat(row.total_medicare || 0)).toFixed(2) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="thead-light">
+              <tr>
+                <th>Year</th>
+                <th>Primary Age</th>
+                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
+                <th>Primary SSI Benefit</th>
+                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse SSI Benefit</th>
+                <th>Total Medicare</th>
+                <th>SSI Taxed</th>
+                <th>Remaining SSI</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in filteredResults" :key="row.year" :class="{ 'irmaa-bracket-row': isIrmaaBracketHit(row, idx) }">
+                <td>{{ row.year }}</td>
+                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
+                <td v-else></td>
+                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
+                <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
+                <td>
+                  ${{ parseFloat(row.ss_income_primary || row.ss_income || 0).toFixed(2) }}
+                </td>
+                <td v-if="client?.tax_status?.toLowerCase() !== 'single'">
+                  ${{ parseFloat(row.ss_income_spouse || 0).toFixed(2) }}
+                </td>
+                <td style="position: relative;">
+                  ${{ parseFloat(row.total_medicare || 0).toFixed(2) }}
+                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)">
+                    ℹ️
+                  </span>
+                  <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
+                    IRMAA Bracket: {{ getIrmaaBracketLabel(row) }}
+                  </div>
+                </td>
+                <td>${{ parseFloat(row.ssi_taxed || 0).toFixed(2) }}</td>
+                <td :class="{ 'cell-negative': ((parseFloat(row.ss_income_primary || 0) + parseFloat(row.ss_income_spouse || 0)) - parseFloat(row.total_medicare || 0)) < 0 }">
+                  ${{ ((parseFloat(row.ss_income_primary || 0) + parseFloat(row.ss_income_spouse || 0)) - parseFloat(row.total_medicare || 0)).toFixed(2) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
     <!-- End Card for Table -->
@@ -164,6 +166,7 @@ export default {
       if (!this.scenarioResults || !Array.isArray(this.scenarioResults)) {
         return [];
       }
+      
       const mortalityAge = Number(this.mortalityAge) || 90;
       const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
       const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
@@ -201,28 +204,36 @@ export default {
       const datasets = [
         {
           type: 'line',
-          label: 'SSI Benefit',
-          data: this.filteredResults.map(row => parseFloat(row.ss_income || 0)),
+          label: 'Primary SSI Benefit',
+          data: this.filteredResults.map(row => parseFloat(row.ss_income_primary || 0)),
           borderColor: "#377dff",
-          backgroundColor: "rgba(55, 125, 255, 0.1)",
-          borderWidth: 2,
+          backgroundColor: "transparent",
+          borderWidth: 3,
           tension: 0.3,
-          yAxisID: 'y'
+          yAxisID: 'y',
+          pointRadius: 3,
+          pointBackgroundColor: "#377dff",
+          fill: false
         },
         {
           type: 'line',
           label: 'Remaining SSI Benefit',
           data: this.filteredResults.map(row => {
-            const ssiBenefit = parseFloat(row.ss_income || 0);
+            const primarySSI = parseFloat(row.ss_income_primary || 0);
+            const spouseSSI = parseFloat(row.ss_income_spouse || 0);
+            const totalSSI = primarySSI + spouseSSI;
             const medicareExpense = parseFloat(row.total_medicare || 0);
-            const remainingSSI = ssiBenefit - medicareExpense;
+            const remainingSSI = totalSSI - medicareExpense;
             return remainingSSI;
           }),
           borderColor: "#00c9db",
-          backgroundColor: "rgba(0, 201, 219, 0.1)",
-          borderWidth: 2,
+          backgroundColor: "transparent",
+          borderWidth: 3,
           tension: 0.3,
-          yAxisID: 'y'
+          yAxisID: 'y',
+          pointRadius: 3,
+          pointBackgroundColor: "#00c9db",
+          fill: false
         },
         {
           type: 'bar',
@@ -233,6 +244,28 @@ export default {
           yAxisID: 'y'
         }
       ];
+      
+      // Add spouse SSI if married and has spouse benefits
+      if (this.client?.tax_status?.toLowerCase() !== 'single') {
+        // Check if there are any spouse benefits in the data
+        const hasSpouseBenefits = this.filteredResults.some(row => parseFloat(row.ss_income_spouse || 0) > 0);
+        
+        if (hasSpouseBenefits) {
+          datasets.splice(1, 0, {
+            type: 'line',
+            label: 'Spouse SSI Benefit',
+            data: this.filteredResults.map(row => parseFloat(row.ss_income_spouse || 0)),
+            borderColor: "#9b59b6",
+            backgroundColor: "transparent",
+            borderWidth: 3,
+            tension: 0.3,
+            yAxisID: 'y',
+            pointRadius: 3,
+            pointBackgroundColor: "#9b59b6",
+            fill: false
+          });
+        }
+      }
 
       console.log('✅ SocialSecurity chartData computed successfully:', { labels, datasets });
       return { labels, datasets };
@@ -249,7 +282,6 @@ export default {
             }
           },
           y: {
-            stacked: true,
             title: {
               display: true,
               text: 'Amount ($)'

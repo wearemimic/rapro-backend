@@ -348,7 +348,7 @@ class ScenarioProcessor:
             ss_income = 0
             if primary_alive or spouse_alive:
                 gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
-                ss_income = self._calculate_social_security(year, primary_alive, spouse_alive)
+                ss_income, ss_income_primary, ss_income_spouse = self._calculate_social_security(year, primary_alive, spouse_alive)
                 
                 # Add pre-retirement income if we're before retirement year
                 if year < retirement_year and pre_retirement_income:
@@ -503,6 +503,8 @@ class ScenarioProcessor:
                 "spouse_age": spouse_age if spouse_alive else None,
                 "gross_income": round(gross_income, 2),
                 "ss_income": round(ss_income, 2),
+                "ss_income_primary": round(ss_income_primary, 2),
+                "ss_income_spouse": round(ss_income_spouse, 2),
                 "taxable_ss": round(taxable_ss, 2),
                 "agi": round(agi, 2),
                 "magi": round(magi, 2),
@@ -781,6 +783,9 @@ class ScenarioProcessor:
     def _calculate_social_security(self, year, primary_alive=True, spouse_alive=True):
         self._log_debug(f"Processing social security income for year {year}")
         total_ss = 0
+        primary_ss = 0
+        spouse_ss = 0
+        
         for asset in self.assets:
             if asset.get("income_type") == "social_security":
                 owner = asset.get("owned_by", "primary")
@@ -799,8 +804,15 @@ class ScenarioProcessor:
                     inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                     annual_income = inflated_amount * 12
                     total_ss += annual_income
-        self._log_debug(f"Total Social Security Income for year {year}: {total_ss}")
-        return total_ss
+                    
+                    # Track primary vs spouse separately
+                    if owner == "primary":
+                        primary_ss += annual_income
+                    else:
+                        spouse_ss += annual_income
+                        
+        self._log_debug(f"Total Social Security Income for year {year}: {total_ss} (Primary: {primary_ss}, Spouse: {spouse_ss})")
+        return total_ss, primary_ss, spouse_ss
 
     def _calculate_taxable_income(self, gross_income, ss_income):
         return gross_income + ss_income * Decimal("0.85")

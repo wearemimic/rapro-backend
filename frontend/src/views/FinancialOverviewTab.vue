@@ -94,10 +94,13 @@
       </div>
     </div>
 
-    <!-- Table Card (unchanged) -->
+    <!-- Table Card -->
     <div class="card mb-3 mb-lg-5">
-      <div class="card-header card-header-content-between">
-        <div v-if="filteredResults.length" class="table-responsive mt-4">
+      <div class="card-header">
+        <h4 class="card-header-title">Financial Overview Table</h4>
+      </div>
+      <div class="card-body">
+        <div v-if="filteredResults.length" class="table-responsive">
           <table class="table table-hover">
             <thead class="thead-light">
               <tr>
@@ -285,12 +288,14 @@ export default {
           label: 'Gross Income',
           data: this.filteredResults.map(row => parseFloat(row.gross_income) || 0),
           borderColor: '#4285f4',
-          backgroundColor: 'rgba(66,133,244,0.1)',
-          borderWidth: 2,
+          backgroundColor: 'transparent',
+          borderWidth: 3,
           tension: 0.3,
           yAxisID: 'y',
-          pointRadius: 2,
-          order: 1
+          pointRadius: 3,
+          pointBackgroundColor: '#4285f4',
+          order: 1,
+          fill: false
         },
         {
           type: 'line',
@@ -302,12 +307,14 @@ export default {
             return gross - tax - medicare;
           }),
           borderColor: '#34a853',
-          backgroundColor: 'rgba(52,168,83,0.1)',
-          borderWidth: 2,
+          backgroundColor: 'transparent',
+          borderWidth: 3,
           tension: 0.3,
           yAxisID: 'y',
-          pointRadius: 2,
-          order: 1
+          pointRadius: 3,
+          pointBackgroundColor: '#34a853',
+          order: 1,
+          fill: false
         },
         {
           type: 'bar',
@@ -344,7 +351,6 @@ export default {
             }
           },
           y: {
-            stacked: true,
             title: {
               display: true,
               text: 'Amount ($)'

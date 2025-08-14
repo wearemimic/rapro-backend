@@ -1,75 +1,161 @@
 <template>
   <div>
-    
-    
+    <!-- Income Projection Table -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
-        <h5 class="mb-4">Assets in Scenario</h5>
-        <ul>
-          <li v-for="asset in assetDetails" :key="asset.id" class="asset-details" style="margin-bottom: 2rem;">
-            <div>
-              <h5 style="margin-bottom: 0.5rem; text-transform: capitalize;">{{ asset.income_type.replace(/_/g, ' ') }}</h5>
-              <div style="display: flex; flex-wrap: wrap; gap: 2rem; align-items: center;">
-                <template v-if="asset.income_type === 'social_security'">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Amount at FRA:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>COLA %:</strong> {{ asset.cola }}</div>
-                </template>
-                <template v-else-if="asset.income_type === 'Pension'">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div><strong>COLA %:</strong> {{ asset.cola }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                </template>
-                <template v-else-if="asset.income_type === 'Annuity'">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div><strong>% Taxable:</strong> {{ asset.tax_rate }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
-                </template>
-                <template v-else-if="asset.income_type === 'Rental_Income'">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Monthly Income:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
-                </template>
-                <template v-else-if="['Wages', 'Reverse_Mortgage'].includes(asset.income_type)">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Amount per Month:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
-                </template>
-                <template v-else-if="asset.income_type === 'Qualified' || asset.income_type === 'Non-Qualified'">
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div><strong>Asset Type:</strong> {{ asset.income_type }}</div>
-                  <div><strong>Starting Balance:</strong> ${{ parseFloat(asset.current_asset_balance || 0).toLocaleString() }}</div>
-                  <div><strong>Monthly Contribution:</strong> ${{ parseFloat(asset.monthly_contribution || 0).toLocaleString() }}</div>
-                  <div><strong>Growth Rate:</strong> {{ (parseFloat(asset.rate_of_return || 0) * 100).toFixed(2) }}%</div>
-                  <div><strong>Withdrawal Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>Withdrawal End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
-                  <div><strong>Monthly Withdrawal:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div v-if="asset.income_type === 'Qualified'" style="color: orange;">
-                    <strong>RMDs Required:</strong> Starting at age 73
+        <h5 class="mb-4">Income Projection Table</h5>
+        <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
+          <table class="table table-bordered table-sm" style="min-width: 800px;">
+            <thead class="table-light">
+              <tr>
+                <th :style="`position: sticky; left: ${stickyPositions.year.left}; background-color: #f8f9fa; z-index: 10; min-width: ${stickyPositions.year.width};`">Year</th>
+                <th :style="`position: sticky; left: ${stickyPositions.primaryAge.left}; background-color: #f8f9fa; z-index: 10; min-width: ${stickyPositions.primaryAge.width};`">{{ client?.first_name || 'Primary' }} Age</th>
+                <th v-if="client?.tax_status && client?.tax_status.toLowerCase() !== 'single'" :style="`position: sticky; left: ${stickyPositions.spouseAge.left}; background-color: #f8f9fa; z-index: 10; min-width: ${stickyPositions.spouseAge.width};`">{{ client?.spouse?.first_name || 'Spouse' }} Age</th>
+                <th v-for="asset in assetDetails" :key="'header-' + asset.id">
+                  <div class="d-flex align-items-center justify-content-center">
+                    <span>{{ formatAssetColumnHeader(asset) }}</span>
+                    <button 
+                      @click="showAssetModal(asset)" 
+                      class="btn btn-link btn-sm p-0 ms-1"
+                      style="text-decoration: none;"
+                      title="View graph and details">
+                      <i class="bi bi-graph-up"></i>
+                    </button>
                   </div>
-                  <div v-if="getProjectedBalance(asset)" style="color: green; font-weight: bold;">
-                    <strong>Projected Balance at Retirement:</strong> ${{ getProjectedBalance(asset).toLocaleString() }}
-                  </div>
-                </template>
-                <template v-else>
-                  <div><strong>Owner:</strong> {{ asset.owned_by }}</div>
-                  <div v-if="asset.current_asset_balance"><strong>Balance:</strong> ${{ parseFloat(asset.current_asset_balance || 0).toLocaleString() }}</div>
-                  <div><strong>Monthly Amount:</strong> ${{ parseFloat(asset.monthly_amount || 0).toLocaleString() }}</div>
-                  <div><strong>Start Age:</strong> {{ asset.age_to_begin_withdrawal }}</div>
-                  <div><strong>End Age:</strong> {{ asset.age_to_end_withdrawal }}</div>
-                  <div v-if="asset.rate_of_return"><strong>Growth Rate:</strong> {{ (parseFloat(asset.rate_of_return || 0) * 100).toFixed(2) }}%</div>
-                </template>
-              </div>
+                </th>
+                <th class="table-dark" style="position: sticky; right: 0; background-color: #343a40; z-index: 10; min-width: 120px;">TOTAL</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in incomeProjectionTable" :key="row.year">
+                <td :style="`position: sticky; left: ${stickyPositions.year.left}; background-color: white; z-index: 5; min-width: ${stickyPositions.year.width};`">{{ row.year }}</td>
+                <td :style="`position: sticky; left: ${stickyPositions.primaryAge.left}; background-color: white; z-index: 5; min-width: ${stickyPositions.primaryAge.width};`">{{ row.primaryAge || '-' }}</td>
+                <td v-if="client?.tax_status && client?.tax_status.toLowerCase() !== 'single'" :style="`position: sticky; left: ${stickyPositions.spouseAge.left}; background-color: white; z-index: 5; min-width: ${stickyPositions.spouseAge.width};`">{{ row.spouseAge || '-' }}</td>
+                <td v-for="asset in assetDetails" :key="'data-' + asset.id + '-' + row.year">
+                  {{ formatCurrency(row.incomes[asset.id] || 0) }}
+                </td>
+                <td class="table-info" style="position: sticky; right: 0; background-color: #d1ecf1; z-index: 5; min-width: 120px;"><strong>{{ formatCurrency(row.total) }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Asset Detail Modal -->
+    <div v-if="showAssetDetailModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.5);">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" style="text-transform: capitalize;">
+              {{ selectedAsset?.income_type.replace(/_/g, ' ') }} Details
+            </h5>
+            <button type="button" class="btn-close" @click="closeAssetModal"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Asset Details Table -->
+            <div class="mb-4">
+              <h6 class="mb-3">Asset Information</h6>
+              
+              <!-- Table for Social Security -->
+              <table v-if="getAssetType(selectedAsset) === 'social_security'" class="table table-bordered table-sm mb-3">
+                <thead class="table-light">
+                  <tr>
+                    <th>Owner</th>
+                    <th>Amount at FRA</th>
+                    <th>Start Age</th>
+                    <th>COLA %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ selectedAsset.owned_by }}</td>
+                    <td>${{ parseFloat(selectedAsset.monthly_amount || 0).toLocaleString() }}</td>
+                    <td>{{ selectedAsset.age_to_begin_withdrawal }}</td>
+                    <td>{{ selectedAsset.cola }}%</td>
+                  </tr>
+                </tbody>
+              </table>
+              
+              <!-- Table for Pension -->
+              <table v-else-if="getAssetType(selectedAsset) === 'pension'" class="table table-bordered table-sm mb-3">
+                <thead class="table-light">
+                  <tr>
+                    <th>Owner</th>
+                    <th>Monthly Income</th>
+                    <th>COLA %</th>
+                    <th>Start Age</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ selectedAsset.owned_by }}</td>
+                    <td>${{ parseFloat(selectedAsset.monthly_amount || 0).toLocaleString() }}</td>
+                    <td>{{ selectedAsset.cola }}%</td>
+                    <td>{{ selectedAsset.age_to_begin_withdrawal }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              
+              <!-- Table for Qualified/Non-Qualified Assets -->
+              <table v-else-if="['qualified', 'non_qualified'].includes(getAssetType(selectedAsset))" class="table table-bordered table-sm mb-3">
+                <thead class="table-light">
+                  <tr>
+                    <th>Owner</th>
+                    <th>Asset Type</th>
+                    <th>Starting Balance</th>
+                    <th>Monthly Contribution</th>
+                    <th>Growth Rate</th>
+                    <th>Withdrawal Start</th>
+                    <th>Withdrawal End</th>
+                    <th>Monthly Withdrawal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ selectedAsset.owned_by }}</td>
+                    <td>{{ selectedAsset.income_type }}</td>
+                    <td>${{ parseFloat(selectedAsset.current_asset_balance || 0).toLocaleString() }}</td>
+                    <td>${{ parseFloat(selectedAsset.monthly_contribution || 0).toLocaleString() }}</td>
+                    <td>{{ (parseFloat(selectedAsset.rate_of_return || 0) * 100).toFixed(2) }}%</td>
+                    <td>{{ selectedAsset.age_to_begin_withdrawal }}</td>
+                    <td>{{ selectedAsset.age_to_end_withdrawal }}</td>
+                    <td>${{ parseFloat(selectedAsset.monthly_amount || 0).toLocaleString() }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              
+              <!-- Default table for other asset types -->
+              <table v-else class="table table-bordered table-sm mb-3">
+                <thead class="table-light">
+                  <tr>
+                    <th>Owner</th>
+                    <th>Monthly Amount</th>
+                    <th>Start Age</th>
+                    <th>End Age</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{{ selectedAsset.owned_by }}</td>
+                    <td>${{ parseFloat(selectedAsset.monthly_amount || 0).toLocaleString() }}</td>
+                    <td>{{ selectedAsset.age_to_begin_withdrawal }}</td>
+                    <td>{{ selectedAsset.age_to_end_withdrawal }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <Graph :data="getGraphData(asset.income_type)" :height="200" />
-          </li>
-        </ul>
+            
+            <!-- Asset Graph -->
+            <div>
+              <h6 class="mb-3">Projection Graph</h6>
+              <Graph v-if="selectedAsset" :data="getGraphData(selectedAsset.income_type)" :height="300" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeAssetModal">Close</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -95,6 +181,10 @@ export default {
     scenarioResults: {
       type: Array,
       required: true
+    },
+    client: {
+      type: Object,
+      required: true
     }
   },
   data() {
@@ -103,10 +193,23 @@ export default {
       availableYears: [],
       conversionStartYear: null,
       yearsToConvert: 0,
-      rothGrowthRate: 0
+      rothGrowthRate: 0,
+      // Modal state
+      showAssetDetailModal: false,
+      selectedAsset: null
     };
   },
   computed: {
+    stickyPositions() {
+      // Calculate sticky positions based on whether spouse column is shown
+      const isMarried = this.client?.tax_status && this.client?.tax_status.toLowerCase() !== 'single';
+      return {
+        year: { left: '0px', width: '80px' },
+        primaryAge: { left: '80px', width: '100px' },
+        spouseAge: { left: '180px', width: '100px' },
+        totalOffset: isMarried ? '280px' : '180px'
+      };
+    },
     incomeFields() {
       if (!this.scenarioResults || !this.scenarioResults.length) return [];
 
@@ -120,9 +223,201 @@ export default {
       // List any field that seems to represent income but is not excluded
       return Object.keys(firstRow)
         .filter(key => key.includes('income') && !knownKeys.includes(key));
+    },
+    incomeProjectionTable() {
+      // Generate income projection table data using backend scenario results
+      const projections = [];
+      
+      // If we have scenario results, use them for accurate calculations
+      if (this.scenarioResults && this.scenarioResults.length > 0) {
+        return this.generateTableFromScenarioResults();
+      }
+      
+      if (!this.scenario || !this.assetDetails) return projections;
+      
+      
+      // Get client ages - handle invalid dates
+      const currentYear = new Date().getFullYear();
+      let clientBirthYear = null;
+      let spouseBirthYear = null;
+      let currentClientAge = null;
+      let currentSpouseAge = null;
+      
+      if (this.scenario.client?.birthdate) {
+        const birthDate = new Date(this.scenario.client.birthdate);
+        if (!isNaN(birthDate.getTime())) {
+          clientBirthYear = birthDate.getFullYear();
+          currentClientAge = currentYear - clientBirthYear;
+        }
+      }
+      
+      if (this.scenario.client?.spouse?.birthdate) {
+        const spouseBirthDate = new Date(this.scenario.client.spouse.birthdate);
+        if (!isNaN(spouseBirthDate.getTime())) {
+          spouseBirthYear = spouseBirthDate.getFullYear();
+          currentSpouseAge = currentYear - spouseBirthYear;
+        }
+      }
+      
+      // If we can't determine ages, use defaults
+      if (currentClientAge === null) {
+        console.warn('Could not determine client age from birthdate, using default age 50');
+        currentClientAge = 50;
+      }
+      
+      // Get scenario parameters
+      const primaryRetirementAge = this.scenario.primary_retirement_age || 65;
+      const spouseRetirementAge = this.scenario.spouse_retirement_age || 65;
+      const mortalityAge = this.scenario.mortality_age || 90;
+      const spouseMortalityAge = this.scenario.spouse_mortality_age || 90;
+      
+      // Calculate the starting year and ending year for the table
+      let startYear, endYear;
+      
+      if (currentSpouseAge !== null) {
+        // Married - use earliest retirement and latest mortality
+        const primaryRetirementYear = currentYear + (primaryRetirementAge - currentClientAge);
+        const spouseRetirementYear = currentYear + (spouseRetirementAge - currentSpouseAge);
+        startYear = Math.min(primaryRetirementYear, spouseRetirementYear);
+        
+        const primaryMortalityYear = currentYear + (mortalityAge - currentClientAge);
+        const spouseMortalityYear = currentYear + (spouseMortalityAge - currentSpouseAge);
+        endYear = Math.max(primaryMortalityYear, spouseMortalityYear);
+      } else {
+        // Single - use primary's retirement and mortality years
+        startYear = currentYear + (primaryRetirementAge - currentClientAge);
+        endYear = currentYear + (mortalityAge - currentClientAge);
+      }
+      
+      // Generate rows from earliest retirement year to latest mortality year
+      for (let year = startYear; year <= endYear; year++) {
+        const yearsFromNow = year - currentYear;
+        const primaryAge = currentClientAge + yearsFromNow;
+        const spouseAge = currentSpouseAge !== null ? currentSpouseAge + yearsFromNow : null;
+        
+        // Only show age if person is still alive
+        const primaryAgeDisplay = primaryAge <= mortalityAge ? primaryAge : null;
+        const spouseAgeDisplay = (spouseAge !== null && spouseAge <= spouseMortalityAge) ? spouseAge : null;
+        
+        const row = {
+          year: year,
+          primaryAge: primaryAgeDisplay,
+          spouseAge: spouseAgeDisplay,
+          incomes: {},
+          total: 0
+        };
+        
+        // Calculate income for each asset
+        this.assetDetails.forEach(asset => {
+          const income = this.calculateAssetIncomeForYear(asset, primaryAge, primaryAgeDisplay, spouseAgeDisplay);
+          row.incomes[asset.id] = income;
+          row.total += income;
+        });
+        
+        projections.push(row);
+      }
+      
+      return projections;
     }
   },
   methods: {
+    generateTableFromScenarioResults() {
+      // Generate income table using accurate backend scenario results
+      const projections = [];
+      
+      // Create a map of assets for easy lookup
+      const assetMap = {};
+      this.assetDetails.forEach(asset => {
+        assetMap[asset.id] = asset;
+      });
+      
+      // Process each year from scenario results
+      this.scenarioResults.forEach(result => {
+        const row = {
+          year: result.year,
+          primaryAge: result.primary_age,
+          spouseAge: result.spouse_age,
+          incomes: {},
+          total: 0
+        };
+        
+        
+        // Map the backend results to our assets
+        this.assetDetails.forEach(asset => {
+          let income = 0;
+          const normalizedType = this.getAssetType(asset);
+          const owner = asset.owned_by?.toLowerCase();
+          
+          // Map backend results to frontend assets
+          if (normalizedType === 'social_security') {
+            if (owner === 'primary') {
+              income = parseFloat(result.ss_income_primary || 0);
+            } else if (owner === 'spouse' || owner === 'secondary') {
+              income = parseFloat(result.ss_income_spouse || 0);
+            }
+            
+          } else if (normalizedType === 'qualified') {
+            // For now, use the calculated method for other asset types
+            // Later we can add more backend fields for these
+            const primaryAgeDisplay = result.primary_age;
+            const spouseAgeDisplay = result.spouse_age;
+            income = this.calculateAssetIncomeForYear(asset, result.primary_age, primaryAgeDisplay, spouseAgeDisplay);
+          } else {
+            // For other asset types, use the calculated method
+            const primaryAgeDisplay = result.primary_age;
+            const spouseAgeDisplay = result.spouse_age;
+            income = this.calculateAssetIncomeForYear(asset, result.primary_age, primaryAgeDisplay, spouseAgeDisplay);
+          }
+          
+          row.incomes[asset.id] = income;
+          row.total += income;
+        });
+        
+        projections.push(row);
+      });
+      
+      return projections;
+    },
+    getAssetType(asset) {
+      // Normalize asset type for consistent comparison
+      const type = (asset.income_type || '').toLowerCase().trim();
+      
+      // Map various social security formats
+      if (type === 'social_security' || type === 'social security' || type === 'socialsecurity') {
+        return 'social_security';
+      }
+      // Map pension formats
+      if (type === 'pension' || type === 'pensions') {
+        return 'pension';
+      }
+      // Map annuity formats
+      if (type === 'annuity' || type === 'annuities') {
+        return 'annuity';
+      }
+      // Map rental income formats
+      if (type === 'rental_income' || type === 'rental income' || type === 'rentalincome' || type === 'rental') {
+        return 'rental_income';
+      }
+      // Map wages formats
+      if (type === 'wages' || type === 'wage' || type === 'salary' || type === 'salaries') {
+        return 'wages';
+      }
+      // Map reverse mortgage formats
+      if (type === 'reverse_mortgage' || type === 'reverse mortgage' || type === 'reversemortgage') {
+        return 'reverse_mortgage';
+      }
+      // Map qualified assets
+      if (type === 'qualified' || type === 'qualified_asset') {
+        return 'qualified';
+      }
+      // Map non-qualified assets
+      if (type === 'non-qualified' || type === 'non_qualified' || type === 'nonqualified') {
+        return 'non_qualified';
+      }
+      
+      // Return normalized type or original if no match
+      return type;
+    },
     getGraphData(incomeType) {
       // Find the asset for this incomeType
       const asset = this.assetDetails.find(a => a.income_type === incomeType);
@@ -154,9 +449,12 @@ export default {
       const withdrawalStartAge = parseInt(asset.age_to_begin_withdrawal || retirementAge);
       const withdrawalEndAge = parseInt(asset.age_to_end_withdrawal || endAge);
       const annualWithdrawal = parseFloat(asset.monthly_amount || 0) * 12;
+      
+      // Get normalized income type for comparison
+      const normalizedType = this.getAssetType(asset);
 
       // Qualified/Non-Qualified: handle investment accounts with balances
-      if (incomeType === 'Qualified' || incomeType === 'Non-Qualified' || startBalance > 0) {
+      if (normalizedType === 'qualified' || normalizedType === 'non_qualified' || startBalance > 0) {
         console.log(`Retirement account data:`, {
           type: asset.income_type,
           currentAge: actualCurrentAge,
@@ -212,7 +510,7 @@ export default {
             
             // Calculate RMD if applicable (only for Qualified accounts)
             let rmd = 0;
-            if (age >= rmdStartAge && asset.income_type === 'Qualified') {
+            if (age >= rmdStartAge && normalizedType === 'qualified') {
               const rmdTable = {
                 72: 27.4, 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0,
                 79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0,
@@ -290,7 +588,7 @@ export default {
         };
       }
       // Social Security: payout graph only
-      if (incomeType === 'social_security') {
+      if (normalizedType === 'social_security') {
         const cola = parseFloat(asset.cola || 0) / 100;
         const payouts = [];
         const labels = [];
@@ -301,8 +599,10 @@ export default {
         
         let payout = annualAmount;
         
-        // We'll simulate from their actual current age
-        for (let age = actualCurrentAge; age <= endAge; age++) {
+        // Start from withdrawal start age (when SS benefits begin)
+        const startAge = withdrawalStartAge;
+        
+        for (let age = startAge; age <= endAge; age++) {
           labels.push(age);
           
           // Check if we're in the eligible age range for benefits
@@ -334,8 +634,10 @@ export default {
         const payouts = [];
         const labels = [];
         
-        // We'll simulate from their actual current age
-        for (let age = actualCurrentAge; age <= endAge; age++) {
+        // Start from withdrawal start age for income types (pensions, annuities, etc.)
+        const startAge = withdrawalStartAge;
+        
+        for (let age = startAge; age <= endAge; age++) {
           labels.push(age);
           
           // Check if we're in the eligible age range for payouts
@@ -426,6 +728,158 @@ export default {
       }
       
       return parseFloat(projectedBalance.toFixed(2));
+    },
+    calculateAssetIncomeForYear(asset, primaryAge, actualPrimaryAge, actualSpouseAge) {
+      // Calculate the income from an asset for a specific year
+      const normalizedType = this.getAssetType(asset);
+      const startAge = parseInt(asset.age_to_begin_withdrawal || 65);
+      const endAge = parseInt(asset.age_to_end_withdrawal || 90);
+      
+      // Determine which age to use based on owner
+      let relevantAge = actualPrimaryAge;
+      const ownerLower = (asset.owned_by || '').toLowerCase();
+      if ((ownerLower === 'spouse' || ownerLower === 'secondary') && actualSpouseAge !== null) {
+        relevantAge = actualSpouseAge;
+      }
+      
+      
+      // No income if person is deceased or outside age range
+      if (!relevantAge || relevantAge < startAge || relevantAge > endAge) {
+        return 0;
+      }
+      
+      // For qualified/non-qualified assets, calculate withdrawals and RMDs
+      if ((normalizedType === 'qualified' || normalizedType === 'non_qualified')) {
+        const currentBalance = parseFloat(asset.current_asset_balance || 0);
+        
+        // For RMD calculation (age 73+)
+        if (normalizedType === 'qualified' && relevantAge >= 73 && currentBalance > 0) {
+          // RMD divisor table from IRS
+          const rmdTable = {
+            73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0,
+            79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 
+            85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2
+          };
+          
+          const divisor = rmdTable[relevantAge] || 10; // Default divisor for ages > 90
+          // Simple RMD calculation - in reality would need to track balance changes
+          // For now, use initial balance as approximation
+          const rmdAmount = currentBalance / divisor;
+          
+          // Use the greater of RMD or specified withdrawal
+          const monthlyAmount = parseFloat(
+            asset.monthly_amount || 
+            asset.monthly_withdrawal || 
+            asset.withdrawal_amount || 
+            0
+          );
+          const annualWithdrawal = monthlyAmount * 12;
+          
+          const finalAmount = Math.max(rmdAmount, annualWithdrawal);
+          
+          console.log(`RMD calculation for age ${relevantAge}:`, {
+            balance: currentBalance,
+            divisor,
+            rmdAmount,
+            specifiedWithdrawal: annualWithdrawal,
+            finalAmount
+          });
+          
+          return finalAmount;
+        }
+        
+        // Regular withdrawals (before RMD age or for non-qualified)
+        // Check various possible fields for the withdrawal amount
+        const monthlyAmount = parseFloat(
+          asset.monthly_amount || 
+          asset.monthly_withdrawal || 
+          asset.withdrawal_amount || 
+          0
+        );
+        const annualAmount = monthlyAmount * 12;
+        
+        // Debug log to see what withdrawal amount is being used
+        if (relevantAge === startAge) {
+          console.log(`Qualified asset withdrawal at age ${relevantAge}:`, {
+            monthlyAmount,
+            annualAmount,
+            balance: currentBalance,
+            asset_details: {
+              monthly_amount: asset.monthly_amount,
+              withdrawal_amount: asset.withdrawal_amount,
+              monthly_withdrawal: asset.monthly_withdrawal
+            }
+          });
+        }
+        
+        // Only return income if there's an actual withdrawal amount specified
+        // Don't use a default - the user should specify their withdrawal strategy
+        return annualAmount;
+      }
+      
+      // Calculate income for other asset types
+      const monthlyAmount = parseFloat(asset.monthly_amount || 0);
+      const annualAmount = monthlyAmount * 12;
+      
+      // Apply COLA if applicable (for Social Security, Pensions, etc.)
+      if (asset.cola && relevantAge >= startAge) {
+        const cola = parseFloat(asset.cola || 0) / 100;
+        const yearsWithCola = relevantAge - startAge;
+        return annualAmount * Math.pow(1 + cola, yearsWithCola);
+      }
+      
+      return annualAmount;
+    },
+    formatAssetColumnHeader(asset) {
+      // Format the column header for each asset
+      const type = this.getAssetType(asset);
+      const ownerName = asset.owned_by === 'spouse' ? 
+        (this.client?.spouse?.first_name || 'Spouse') : 
+        (this.client?.first_name || 'Primary');
+      
+      // Special formatting for different asset types
+      let typeLabel = '';
+      switch(type) {
+        case 'social_security':
+          typeLabel = 'SSI';
+          break;
+        case 'pension':
+          typeLabel = 'Pension';
+          break;
+        case 'annuity':
+          typeLabel = 'Annuity';
+          break;
+        case 'qualified':
+          typeLabel = '401k/IRA';
+          break;
+        case 'non_qualified':
+          typeLabel = 'Non-Qual';
+          break;
+        case 'rental_income':
+          typeLabel = 'Rental';
+          break;
+        default:
+          typeLabel = asset.income_type.replace(/_/g, ' ');
+      }
+      
+      return `${typeLabel} (${ownerName})`;
+    },
+    formatCurrency(value) {
+      if (value === 0 || value === null || value === undefined) return '-';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value);
+    },
+    showAssetModal(asset) {
+      this.selectedAsset = asset;
+      this.showAssetDetailModal = true;
+    },
+    closeAssetModal() {
+      this.showAssetDetailModal = false;
+      this.selectedAsset = null;
     }
   }
 };
