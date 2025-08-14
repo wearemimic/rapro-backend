@@ -49,8 +49,14 @@
                     <option v-for="s in scenarios" :value="s.id" :key="s.id">{{ s.name }}</option>
                   </select>
                 </div>
-                <!-- New Scenario Dropdown -->
-                <div class="d-flex align-items-center">
+                <!-- Action Buttons -->
+                <div class="d-flex align-items-center gap-2">
+                  <!-- Edit Scenario Button -->
+                  <button class="btn btn-outline-primary" type="button" @click="editScenario">
+                    <i class="bi-pencil me-1"></i> Edit Scenario
+                  </button>
+                  
+                  <!-- New Scenario Dropdown -->
                   <div class="dropdown">
                     <button class="btn btn-primary dropdown-toggle" type="button" id="newScenarioDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                       New Scenario
@@ -102,8 +108,8 @@
                         <h5>Client Information</h5>
                         <p><strong>Name:</strong> {{ formatClientName(client) }}</p>
                         <p><strong>Tax Status:</strong> {{ client?.tax_status || 'Not specified' }}</p>
-                        <p><strong>Current Age:</strong> {{ client?.age || 'Not specified' }}</p>
-                        <p v-if="client?.tax_status?.toLowerCase() !== 'single'"><strong>Spouse Age:</strong> {{ client?.spouse_age || 'Not specified' }}</p>
+                        <p><strong>Current Age:</strong> {{ currentAge || 'Not specified' }}</p>
+                        <p v-if="client?.tax_status?.toLowerCase() !== 'single'"><strong>Spouse Age:</strong> {{ spouseAge || 'Not specified' }}</p>
                       </div>
                       <div class="col-sm-6 mb-4">
                         <h5>Scenario Details</h5>
@@ -766,6 +772,15 @@ export default {
         });
       }
     },
+    editScenario() {
+      const clientId = this.$route.params.id;
+      const scenarioId = this.$route.params.scenarioid;
+      this.$router.push({ 
+        name: 'ScenarioCreate', 
+        params: { id: clientId },
+        query: { edit: scenarioId }
+      });
+    },
   },
   computed: {
     filteredScenarioResults() {
@@ -792,6 +807,28 @@ export default {
     },
     totalMedicareCost() {
       return parseFloat(this.filteredScenarioResults.reduce((total, row) => total + (parseFloat(row.total_medicare || 0)), 0).toFixed(2));
+    },
+    currentAge() {
+      if (!this.client?.birthdate) return null;
+      const birthDate = new Date(this.client.birthdate);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    },
+    spouseAge() {
+      if (!this.client?.spouse?.birthdate) return null;
+      const birthDate = new Date(this.client.spouse.birthdate);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
     },
   },
   watch: {

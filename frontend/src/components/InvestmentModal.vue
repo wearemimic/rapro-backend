@@ -23,7 +23,7 @@
               <label class="form-label fw-bold">Account Owner</label>
               <select v-model="investment.owned_by" class="form-control">
                 <option value="primary">{{ primaryFirstName }}</option>
-                <option value="spouse">{{ spouseFirstName }}</option>
+                <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
               </select>
             </div>
             <div class="col-md-6">
@@ -68,12 +68,12 @@
             </div>
             <div class="col-md-3">
               <label class="form-label fw-bold">Age Asset Established</label>
-              <input 
-                v-model.number="investment.age_established" 
-                type="number" 
-                class="form-control" 
-                placeholder="65"
-              />
+              <select v-model.number="investment.age_established" class="form-control">
+                <option :value="null">Select age</option>
+                <option v-for="age in availableEstablishedAges" :key="age" :value="age">
+                  {{ age }}
+                </option>
+              </select>
             </div>
             <div class="col-md-3">
               <label class="form-label fw-bold">Est. Rate of Return</label>
@@ -91,23 +91,34 @@
           </div>
 
           <div class="row mb-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-bold">Age to Begin Withdrawals</label>
-              <input 
-                v-model.number="investment.age_start_taking" 
-                type="number" 
-                class="form-control" 
-                placeholder="65"
-              />
+              <select v-model.number="investment.age_start_taking" class="form-control">
+                <option v-for="age in availableStartAges" :key="age" :value="age">
+                  {{ age }}
+                </option>
+              </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-bold">Age to End Withdrawals</label>
-              <input 
-                v-model.number="investment.age_stop_taking" 
-                type="number" 
-                class="form-control" 
-                placeholder="95"
-              />
+              <select v-model.number="investment.age_stop_taking" class="form-control">
+                <option v-for="age in availableEndAges" :key="age" :value="age">
+                  {{ age }}
+                </option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">Monthly Withdrawal Amount</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input 
+                  v-model.number="investment.monthly_withdrawal_amount" 
+                  type="number" 
+                  class="form-control" 
+                  placeholder="0"
+                  step="0.01"
+                />
+              </div>
             </div>
           </div>
 
@@ -128,7 +139,7 @@
           </div>
 
           <div v-if="investment.is_contributing">
-            <p class="text-muted mb-3">Please provide either a Contribution Amount or Contribution Percentage.</p>
+            <p class="text-muted mb-3">Please provide your annual contribution amount.</p>
             
             <div class="row mb-3">
               <div class="col-md-6">
@@ -141,19 +152,6 @@
                     class="form-control" 
                     placeholder=""
                   />
-                </div>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label fw-bold">Annual Contribution Percentage</label>
-                <div class="input-group">
-                  <input 
-                    v-model.number="investment.annual_contribution_percentage" 
-                    type="number" 
-                    class="form-control" 
-                    placeholder="8"
-                    step="0.1"
-                  />
-                  <span class="input-group-text">%</span>
                 </div>
               </div>
             </div>
@@ -174,12 +172,12 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label fw-bold">Age Last Year of Contribution</label>
-                <input 
-                  v-model.number="investment.age_last_contribution" 
-                  type="number" 
-                  class="form-control" 
-                  placeholder=""
-                />
+                <select v-model.number="investment.age_last_contribution" class="form-control">
+                  <option :value="null">Not specified</option>
+                  <option v-for="age in availableContributionEndAges" :key="age" :value="age">
+                    {{ age }}
+                  </option>
+                </select>
               </div>
             </div>
           </div>
@@ -194,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
   primaryFirstName: {
@@ -204,6 +202,18 @@ const props = defineProps({
   spouseFirstName: {
     type: String, 
     default: 'Spouse'
+  },
+  primaryLifespan: {
+    type: Number,
+    default: 90
+  },
+  spouseLifespan: {
+    type: Number,
+    default: 90
+  },
+  isSingle: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -218,6 +228,7 @@ const investment = ref({
   rate_of_return: 6,
   age_start_taking: 65,
   age_stop_taking: 95,
+  monthly_withdrawal_amount: null,
   is_contributing: false,
   annual_contribution_amount: null,
   annual_contribution_percentage: null,
@@ -227,6 +238,48 @@ const investment = ref({
 
 // For formatted display
 const currentBalanceDisplay = ref('')
+
+// Computed properties for age ranges
+const currentLifespan = computed(() => {
+  return investment.value.owned_by === 'primary' ? props.primaryLifespan : props.spouseLifespan
+})
+
+const availableEstablishedAges = computed(() => {
+  // Age when asset was established - typically from 18 to current retirement age
+  const ages = []
+  for (let age = 18; age <= currentLifespan.value; age++) {
+    ages.push(age)
+  }
+  return ages
+})
+
+const availableStartAges = computed(() => {
+  // Start ages from 50 to the owner's lifespan
+  const ages = []
+  for (let age = 50; age <= currentLifespan.value; age++) {
+    ages.push(age)
+  }
+  return ages
+})
+
+const availableEndAges = computed(() => {
+  // End ages from start age (if selected) to the owner's lifespan
+  const startAge = investment.value.age_start_taking || 50
+  const ages = []
+  for (let age = startAge; age <= currentLifespan.value; age++) {
+    ages.push(age)
+  }
+  return ages
+})
+
+const availableContributionEndAges = computed(() => {
+  // Contribution end ages from current age to retirement age (typically 65-70)
+  const ages = []
+  for (let age = 30; age <= Math.min(currentLifespan.value, 70); age++) {
+    ages.push(age)
+  }
+  return ages
+})
 
 const resetForm = () => {
   investment.value = {
@@ -238,6 +291,7 @@ const resetForm = () => {
     rate_of_return: 6,
     age_start_taking: 65,
     age_stop_taking: 95,
+    monthly_withdrawal_amount: null,
     is_contributing: false,
     annual_contribution_amount: null,
     annual_contribution_percentage: null,
@@ -331,7 +385,7 @@ const saveInvestment = () => {
     age_last_contribution: investment.value.age_last_contribution,
     start_age: investment.value.age_start_taking || 65,
     end_age: investment.value.age_stop_taking || 95,
-    withdrawal_amount: 0 // Default withdrawal amount - could be calculated based on strategy
+    withdrawal_amount: investment.value.monthly_withdrawal_amount || 0
   }
 
   emit('save', investmentData)
