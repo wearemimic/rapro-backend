@@ -362,6 +362,7 @@ def get_scenario_detail(request, scenario_id):
             income_dict = {
                 'id': str(uuid.uuid4()),  # Generate new UUID for frontend
                 'income_type': income.income_type,
+                'income_name': income.income_name,  # Add the missing income_name field
                 'owned_by': income.owned_by,
                 'start_age': income.age_to_begin_withdrawal,
                 'end_age': income.age_to_end_withdrawal,
@@ -387,8 +388,12 @@ def get_scenario_detail(request, scenario_id):
             
             income_data.append(income_dict)
         
+        # Check if this is for duplication (add "Copy") or editing (keep original name)
+        is_for_duplication = request.GET.get('mode') == 'duplicate'
+        scenario_name = f"{scenario.name} (Copy)" if is_for_duplication else scenario.name
+        
         scenario_data = {
-            'name': f"{scenario.name} (Copy)",
+            'name': scenario_name,
             'description': scenario.description,
             'primary_retirement_age': scenario.retirement_age,
             'primary_medicare_age': scenario.medicare_age,

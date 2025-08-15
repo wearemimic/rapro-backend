@@ -161,6 +161,24 @@ export default {
       this.isCollapsed = savedCollapsedState === 'true';
     }
     
+    // Create handler for scenario deletion events
+    this.handleScenarioDeleted = (event) => {
+      console.log('🔄 Sidebar: Scenario deleted event received:', event.detail);
+      console.log('🔍 Current client ID:', this.currentClientId);
+      console.log('🔍 Event client ID:', event.detail?.clientId);
+      
+      // Refresh the scenarios list
+      if (event.detail && event.detail.clientId == this.currentClientId) {
+        console.log('✅ Client IDs match, refreshing scenarios...');
+        this.fetchClientScenarios();
+      } else {
+        console.log('❌ Client IDs do not match, skipping refresh');
+      }
+    };
+    
+    // Listen for scenario deletion events
+    window.addEventListener('scenario-deleted', this.handleScenarioDeleted);
+    
     // Check the initial route
     this.checkIfClientRoute(this.$route);
     
@@ -207,6 +225,13 @@ export default {
         this.currentScenarioId = storedScenarioId;
         this.fetchClientScenarios();
       }
+    }
+  },
+  
+  destroyed() {
+    // Clean up event listener to prevent memory leaks
+    if (this.handleScenarioDeleted) {
+      window.removeEventListener('scenario-deleted', this.handleScenarioDeleted);
     }
   },
   

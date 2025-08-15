@@ -342,3 +342,82 @@ This feature significantly improves user workflow by allowing advisors to create
 - `GET/POST /api/clients/<id>/comparison-preferences/` - Manage comparison selections
 
 This session focused heavily on UI/UX improvements, data accuracy fixes, and form enhancements to streamline the advisor workflow when creating and comparing retirement scenarios.
+
+## Latest Development Session (2025-01-20 - Evening)
+
+### Current Age Display Fix - COMPLETED ✅
+
+**Problem Fixed:**
+- ✅ **Scenario Detail Page Age Display** - Fixed "Current age: Not Specified" issue on scenario detail pages
+- ✅ **Root cause:** Frontend was looking for `client.age` field that doesn't exist in the database model
+- ✅ **Solution:** Added computed properties to calculate current age from `client.birthdate` field
+- ✅ **Files modified:** `/frontend/src/views/ScenarioDetail.vue` - Added `currentAge()` and `spouseAge()` computed properties
+
+### UI and Logo Updates - COMPLETED ✅
+
+**Default Logo Update:**
+- ✅ **Updated default logo** across all pages to use `RAD-white-logo.png`
+- ✅ **Files modified:**
+  - `/frontend/src/components/Header.vue` - Updated default and fallback logo references
+  - `/frontend/src/views/Login.vue` - Updated logo on login page  
+  - `/frontend/src/views/Register.vue` - Updated logo on registration page
+
+**Authentication Page Styling:**
+- ✅ **Blue background theme** - Login and registration pages now use header blue (`#377dff`) background
+- ✅ **White card contrast** - Maintained white cards with enhanced shadows for better visual separation
+- ✅ **Consistent branding** - Matches internal application header color scheme
+
+### Financial Flow Overview Hiding - COMPLETED ✅
+
+**UI Improvement:**
+- ✅ **Hidden Financial Flow Overview card** from Financial Overview tab as requested
+- ✅ **Implementation:** Used `v-if="false"` directive for easy future re-enabling
+- ✅ **Files modified:** `/frontend/src/views/FinancialOverviewTab.vue`
+
+### Enhanced Scenario Management - COMPLETED ✅
+
+**Edit Scenario Functionality:**
+- ✅ **Added "Edit Scenario" button** next to New Scenario dropdown in scenario detail pages
+- ✅ **Smart navigation logic:**
+  - "From Scratch" → Clean scenario creation page
+  - "Duplicate This Scenario" → Pre-filled scenario creation (existing functionality)
+  - "Edit Scenario" → Pre-filled scenario creation with original ID preserved
+- ✅ **Dynamic form behavior:**
+  - Button text changes: "Create Scenario" vs "Update Scenario"
+  - API calls: POST for creation, PUT for updates
+  - Cancel behavior: Returns to original scenario when editing, client page when creating
+
+**Investment Modal Enhancements:**
+- ✅ **Added Monthly Withdrawal Amount field** to investment information modal
+- ✅ **Updated layout:** Converted withdrawal row from 2 columns to 3 columns (`col-md-4`)
+- ✅ **Backend integration:** Field properly mapped to `withdrawal_amount` in save function
+
+**Smart Cancel Navigation:**
+- ✅ **Context-aware cancel button:**
+  - When editing: Returns to `/clients/{id}/scenarios/detail/{scenarioId}`
+  - When creating/duplicating: Returns to `/clients/{id}`
+- ✅ **Prevents user navigation loss** during scenario editing workflows
+
+### Investment Account Categorization Fix - COMPLETED ✅
+
+**Data Separation Bug Fix:**
+- ✅ **Fixed investment accounts appearing in Income Sources** when editing/duplicating scenarios
+- ✅ **Root cause:** Backend returns all income sources in single array without proper categorization
+- ✅ **Solution:** Added data filtering logic in `loadScenarioForDuplication()` and `loadScenarioForEditing()` functions
+- ✅ **Investment account types properly categorized:**
+  - Qualified, Non-Qualified, Roth accounts → Investment Accounts section
+  - Social Security, Pension, etc. → Income Sources section
+- ✅ **Files modified:** `/frontend/src/views/ScenarioCreate.vue`
+
+**Key Technical Implementations:**
+- Computed properties for age calculation from birthdates with proper month/day handling
+- Dynamic logo system with fallback support and cache-busting
+- Comprehensive scenario management with create/edit/duplicate workflows
+- Data filtering and categorization for proper UI component separation
+- Context-aware navigation patterns for improved user experience
+
+**API Endpoints Enhanced:**
+- `PUT /api/scenarios/<id>/update/` - Update existing scenarios (used by edit functionality)
+- Enhanced query parameter support: `?edit=scenarioId` vs `?duplicate=scenarioId`
+
+This session focused on resolving user experience issues, fixing data display problems, and enhancing the scenario management workflow with comprehensive edit capabilities.

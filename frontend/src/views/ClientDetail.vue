@@ -1128,12 +1128,24 @@ export default {
           { headers }
         );
         
+        // Store the scenario ID before resetting
+        const deletedScenarioId = this.scenarioToDelete.id;
+        
         // Remove from local array
-        this.client.scenarios = this.client.scenarios.filter(s => s.id !== this.scenarioToDelete.id);
+        this.client.scenarios = this.client.scenarios.filter(s => s.id !== deletedScenarioId);
         
         // Close modal and reset
         this.showDeleteConfirmModal = false;
         this.scenarioToDelete = null;
+        
+        // Emit a global event to notify sidebar to refresh (after removing from array)
+        console.log('Emitting scenario-deleted event for client:', this.client.id, 'scenario:', deletedScenarioId);
+        window.dispatchEvent(new CustomEvent('scenario-deleted', { 
+          detail: { 
+            clientId: this.client.id,
+            scenarioId: deletedScenarioId 
+          } 
+        }));
         
         // Show success message (optional)
         console.log('Scenario deleted successfully');
