@@ -383,7 +383,7 @@
                       </select>
                     </td>
                     <td>
-                      <input v-model="investment.income_name" type="text" class="form-control" />
+                      <input v-model="investment.investment_name" type="text" class="form-control" />
                     </td>
                     <td>
                       <div class="input-group">
@@ -681,20 +681,25 @@ async function submitScenario() {
     };
     console.log("🚀 Payload to submit:", payload);
     
-    // Check if we're editing an existing scenario or creating a new one
-    const isEditing = scenario.value.id;
+    // Check if we're editing an existing scenario or creating/duplicating a new one
+    const isEditMode = route.query.edit; // Only true edit mode updates existing scenario
+    const isDuplicateMode = route.query.duplicate; // Duplicate mode creates new scenario
     let response;
     
-    if (isEditing) {
-      // Update existing scenario
-      console.log("📝 Updating existing scenario with ID:", scenario.value.id);
+    if (isEditMode) {
+      // Update existing scenario - only in edit mode
+      console.log("📝 Updating existing scenario with ID:", isEditMode);
       response = await axios.put(
-        `http://localhost:8000/api/scenarios/${scenario.value.id}/update/`,
+        `http://localhost:8000/api/scenarios/${isEditMode}/update/`,
         payload
       );
     } else {
-      // Create new scenario
-      console.log("✨ Creating new scenario");
+      // Create new scenario - for both new creation and duplicate mode
+      if (isDuplicateMode) {
+        console.log("📋 Creating new scenario from duplicate of:", isDuplicateMode);
+      } else {
+        console.log("✨ Creating new scenario from scratch");
+      }
       response = await axios.post(
         `http://localhost:8000/api/clients/${clientId}/scenarios/create/`,
         payload
@@ -766,7 +771,7 @@ async function loadScenarioForDuplication(scenarioId) {
   try {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers });
+    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/?mode=duplicate`, { headers });
     const scenarioData = response.data;
     
     // Define investment account types
@@ -774,8 +779,22 @@ async function loadScenarioForDuplication(scenarioId) {
     
     // Separate income sources and investments
     const allIncomeSources = scenarioData.income || [];
-    const investments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
+    const rawInvestments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
     const incomeSources = allIncomeSources.filter(item => !investmentTypes.includes(item.income_type));
+    
+    // Debug: Log raw investment data to see what fields are available
+    console.log('Raw investment data from backend:', rawInvestments);
+    
+    // Map investment fields properly for frontend compatibility  
+    const investments = rawInvestments.map(item => ({
+      ...item,
+      investment_name: item.income_name || item.investment_name || '', // Don't fall back to income_type
+      current_balance: item.current_asset_balance || item.current_balance || 0,
+      start_age: item.age_to_begin_withdrawal || item.start_age || 65,
+      end_age: item.age_to_end_withdrawal || item.end_age || 95,
+      growth_rate: item.rate_of_return || item.growth_rate || 0.06,
+      withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0
+    }));
     
     // Prefill the scenario object with properly separated data
     scenario.value = {
@@ -786,8 +805,6 @@ async function loadScenarioForDuplication(scenarioId) {
     };
     
     console.log('Loaded scenario data for duplication:', scenarioData);
-    console.log('Separated income sources:', incomeSources);
-    console.log('Separated investments:', investments);
   } catch (error) {
     console.error('Failed to load scenario for duplication:', error);
     alert('Failed to load scenario data for duplication. Please try again.');
@@ -798,7 +815,7 @@ async function loadScenarioForEditing(scenarioId) {
   try {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers });
+    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/?mode=edit`, { headers });
     const scenarioData = response.data;
     
     // Define investment account types
@@ -806,8 +823,19 @@ async function loadScenarioForEditing(scenarioId) {
     
     // Separate income sources and investments
     const allIncomeSources = scenarioData.income || [];
-    const investments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
+    const rawInvestments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
     const incomeSources = allIncomeSources.filter(item => !investmentTypes.includes(item.income_type));
+    
+    // Map investment fields properly for frontend compatibility  
+    const investments = rawInvestments.map(item => ({
+      ...item,
+      investment_name: item.income_name || item.investment_name || '', // Don't fall back to income_type
+      current_balance: item.current_asset_balance || item.current_balance || 0,
+      start_age: item.age_to_begin_withdrawal || item.start_age || 65,
+      end_age: item.age_to_end_withdrawal || item.end_age || 95,
+      growth_rate: item.rate_of_return || item.growth_rate || 0.06,
+      withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0
+    }));
     
     // Prefill the scenario object with properly separated data for editing
     scenario.value = {
@@ -820,8 +848,6 @@ async function loadScenarioForEditing(scenarioId) {
     };
     
     console.log('Loaded scenario data for editing:', scenarioData);
-    console.log('Separated income sources:', incomeSources);
-    console.log('Separated investments:', investments);
   } catch (error) {
     console.error('Failed to load scenario for editing:', error);
     alert('Failed to load scenario data for editing. Please try again.');
@@ -829,11 +855,20 @@ async function loadScenarioForEditing(scenarioId) {
 }
 
 function handleCancel() {
-  if (scenario.value.id) {
-    // If editing an existing scenario, go back to that scenario's detail page
+  // Check if we're editing by looking at route query params first
+  const editId = route.query.edit;
+  
+  if (editId) {
+    // If we have an edit query param, go back to that scenario's detail page
+    console.log('🔙 Cancel from edit mode, returning to scenario:', editId);
+    router.push(`/clients/${clientId}/scenarios/detail/${editId}`);
+  } else if (scenario.value.id) {
+    // Fallback: if scenario has an ID, go back to that scenario's detail page
+    console.log('🔙 Cancel with scenario ID, returning to scenario:', scenario.value.id);
     router.push(`/clients/${clientId}/scenarios/detail/${scenario.value.id}`);
   } else {
     // If creating a new scenario (including duplication), go back to client page
+    console.log('🔙 Cancel from create mode, returning to client page');
     router.push(`/clients/${clientId}`);
   }
 }

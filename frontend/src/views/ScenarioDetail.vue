@@ -62,8 +62,8 @@
                       New Scenario
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="newScenarioDropdown">
-                      <li><a class="dropdown-item" href="#" @click="createScenario('scratch')">From Scratch</a></li>
-                      <li><a class="dropdown-item" href="#" @click="createScenario('duplicate')">Duplicate This Scenario</a></li>
+                      <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')">From Scratch</a></li>
+                      <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')">Duplicate This Scenario</a></li>
                     </ul>
                   </div>
                 </div>
@@ -761,10 +761,16 @@ export default {
     },
     createScenario(type) {
       const clientId = this.$route.params.id;
+      console.log('🔄 createScenario called with type:', type);
+      console.log('📍 Client ID:', clientId);
+      
       if (type === 'scratch') {
+        console.log('➡️ Navigating to create new scenario from scratch');
         this.$router.push({ name: 'ScenarioCreate', params: { id: clientId } });
       } else if (type === 'duplicate') {
         const scenarioId = this.$route.params.scenarioid;
+        console.log('📋 Duplicating scenario ID:', scenarioId);
+        console.log('➡️ Navigating to duplicate scenario page');
         this.$router.push({ 
           name: 'ScenarioCreate', 
           params: { id: clientId },
