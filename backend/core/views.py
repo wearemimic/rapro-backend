@@ -409,7 +409,7 @@ def get_scenario_detail(request, scenario_id):
             'is_dependent': False,  # Reset to default
             'part_b_inflation_rate': str(int(scenario.part_b_inflation_rate)),
             'part_d_inflation_rate': str(int(scenario.part_d_inflation_rate)),
-            'primary_state': '',  # Reset to default
+            'primary_state': scenario.primary_state or '',  # Use stored value or default
             'income': income_data
         }
         
@@ -456,7 +456,7 @@ def get_scenario_assets(request, scenario_id):
 @permission_classes([IsAuthenticated])
 def update_scenario(request, scenario_id):
     """
-    Update a scenario with Roth conversion parameters
+    Update a scenario with Roth conversion parameters and income sources
     """
     try:
         scenario = Scenario.objects.get(id=scenario_id)
@@ -464,10 +464,51 @@ def update_scenario(request, scenario_id):
         if scenario.client.advisor != request.user:
             return Response({"error": "Access denied."}, status=403)
         
+        # Extract income sources from request data
+        income_sources_data = request.data.pop('income_sources', None)
+        
+        # Update scenario fields
         serializer = ScenarioUpdateSerializer(scenario, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            
+            # Update income sources if provided
+            if income_sources_data is not None:
+                # Delete existing income sources for this scenario
+                scenario.income_sources.all().delete()
+                
+                # Create new income sources
+                for income_data in income_sources_data:
+                    # Remove any frontend-specific fields
+                    income_data.pop('id', None)  # Remove frontend ID
+                    
+                    # Map frontend field names to backend model field names
+                    mapped_data = {
+                        'owned_by': income_data.get('owned_by'),
+                        'income_type': income_data.get('income_type'),
+                        'income_name': income_data.get('income_name', ''),
+                        'current_asset_balance': income_data.get('current_asset_balance') or income_data.get('current_balance', 0),
+                        'monthly_amount': income_data.get('monthly_amount') or income_data.get('withdrawal_amount', 0),
+                        'monthly_contribution': income_data.get('monthly_contribution', 0),
+                        'age_to_begin_withdrawal': income_data.get('age_to_begin_withdrawal') or income_data.get('start_age'),
+                        'age_to_end_withdrawal': income_data.get('age_to_end_withdrawal') or income_data.get('end_age'),
+                        'rate_of_return': income_data.get('rate_of_return') or income_data.get('growth_rate', 0),
+                        'cola': income_data.get('cola', 0),
+                        'exclusion_ratio': income_data.get('exclusion_ratio', 0),
+                        'tax_rate': income_data.get('tax_rate', 0),
+                        'max_to_convert': income_data.get('max_to_convert', 0)
+                    }
+                    
+                    # Remove None values to use model defaults
+                    mapped_data = {k: v for k, v in mapped_data.items() if v is not None}
+                    
+                    IncomeSource.objects.create(scenario=scenario, **mapped_data)
+            
+            # Return updated scenario with income sources
+            return Response({
+                'id': scenario.id,
+                'message': 'Scenario updated successfully'
+            })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Scenario.DoesNotExist:
         return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)

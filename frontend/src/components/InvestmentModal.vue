@@ -373,7 +373,8 @@ const saveInvestment = () => {
   const investmentData = {
     id: Date.now() + Math.random(), // Temporary ID for frontend
     income_type: investment.value.income_type,
-    income_name: investment.value.investment_name,
+    income_name: investment.value.investment_name,  // For backend compatibility
+    investment_name: investment.value.investment_name,  // For frontend display
     owned_by: investment.value.owned_by,
     current_balance: investment.value.current_balance || 0,
     age_established: investment.value.age_established,

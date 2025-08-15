@@ -201,7 +201,7 @@ class ScenarioCreateSerializer(serializers.ModelSerializer):
             'id', 'client', 'name', 'description', 'retirement_age', 'medicare_age',
             'spouse_retirement_age', 'spouse_medicare_age', 'mortality_age',
             'spouse_mortality_age', 'retirement_year', 'share_with_client', 'income_sources',
-            'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction'
+            'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction', 'primary_state'
         ]
 
     def create(self, validated_data):
@@ -220,7 +220,7 @@ class ScenarioUpdateSerializer(serializers.ModelSerializer):
             'spouse_mortality_age', 'retirement_year', 'share_with_client',
             'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction',
             'roth_conversion_start_year', 'roth_conversion_duration', 'roth_conversion_annual_amount',
-            'income_vs_cost_percent', 'medicare_irmaa_percent'
+            'income_vs_cost_percent', 'medicare_irmaa_percent', 'primary_state'
         ]
 
 class IncomeSourceUpdateSerializer(serializers.ModelSerializer):
