@@ -375,7 +375,11 @@ def get_scenario_detail(request, scenario_id):
                 'cola': income.cola,
                 'exclusion_ratio': income.exclusion_ratio,
                 'tax_rate': income.tax_rate,
-                'max_to_convert': float(income.max_to_convert or 0)
+                'max_to_convert': float(income.max_to_convert or 0),
+                'age_established': income.age_established,
+                'is_contributing': income.is_contributing,
+                'employer_match': income.employer_match,
+                'age_last_contribution': income.age_last_contribution
             }
             
             # Add specific fields for different income types
@@ -492,11 +496,15 @@ def update_scenario(request, scenario_id):
                         'monthly_contribution': income_data.get('monthly_contribution', 0),
                         'age_to_begin_withdrawal': income_data.get('age_to_begin_withdrawal') or income_data.get('start_age'),
                         'age_to_end_withdrawal': income_data.get('age_to_end_withdrawal') or income_data.get('end_age'),
-                        'rate_of_return': income_data.get('rate_of_return') or income_data.get('growth_rate', 0),
+                        'rate_of_return': income_data.get('rate_of_return') or (float(income_data.get('growth_rate', 0)) / 100 if income_data.get('growth_rate') else 0),
                         'cola': income_data.get('cola', 0),
                         'exclusion_ratio': income_data.get('exclusion_ratio', 0),
                         'tax_rate': income_data.get('tax_rate', 0),
-                        'max_to_convert': income_data.get('max_to_convert', 0)
+                        'max_to_convert': income_data.get('max_to_convert', 0),
+                        'age_established': income_data.get('age_established'),
+                        'is_contributing': income_data.get('is_contributing', False),
+                        'employer_match': income_data.get('employer_match', 0),
+                        'age_last_contribution': income_data.get('age_last_contribution')
                     }
                     
                     # Remove None values to use model defaults
