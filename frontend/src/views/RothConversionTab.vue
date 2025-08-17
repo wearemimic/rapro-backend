@@ -11,11 +11,19 @@
                 <h5 class="mb-0" style="color: #000000 !important;">{{ currentStepTitle }}</h5>
               </div>
               <div class="step-indicator">
-                <span class="badge" :class="currentStep >= 1 ? 'bg-primary' : 'bg-light text-dark'">1</span>
-                <span class="mx-1" style="color: #000000 !important;">→</span>
-                <span class="badge" :class="currentStep >= 2 ? 'bg-primary' : 'bg-light text-dark'">2</span>
-                <span class="mx-1" style="color: #000000 !important;">→</span>
-                <span class="badge" :class="currentStep >= 3 ? 'bg-primary' : 'bg-light text-dark'">3</span>
+                <div class="step-container">
+                  <div class="step-item" :class="{ 'completed': currentStep >= 1, 'active': currentStep === 1 }" @click="goToStep(1)">
+                    <div class="step-number">1</div>
+                  </div>
+                  <div class="step-connector" :class="{ 'completed': currentStep >= 2 }"></div>
+                  <div class="step-item" :class="{ 'completed': currentStep >= 2, 'active': currentStep === 2 }" @click="goToStep(2)">
+                    <div class="step-number">2</div>
+                  </div>
+                  <div class="step-connector" :class="{ 'completed': currentStep >= 3 }"></div>
+                  <div class="step-item" :class="{ 'completed': currentStep >= 3, 'active': currentStep === 3 }" @click="goToStep(3)">
+                    <div class="step-number">3</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -148,7 +156,7 @@
 
       <!-- Right Side: Summary (1/4 width) -->
       <div class="col-lg-3 mb-3 mb-lg-5">
-        <div class="card sticky-top">
+        <div class="card conversion-summary-card">
           <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
             <h6 class="mb-0" style="color: #000000 !important;">Conversion Summary</h6>
           </div>
@@ -848,6 +856,12 @@ export default {
     previousStep() {
       if (this.currentStep > 1) {
         this.currentStep--;
+      }
+    },
+    goToStep(step) {
+      // Allow navigation to any step (users can jump between steps freely)
+      if (step >= 1 && step <= 3) {
+        this.currentStep = step;
       }
     },
     onMaxToConvertFocus(asset) {

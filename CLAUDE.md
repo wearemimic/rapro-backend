@@ -655,3 +655,77 @@ Redesign the Roth conversion interface from a single-page form to a guided multi
 6. **Automatic Calculations** - Smart defaults and auto-updating fields reduce manual input
 
 The Roth conversion interface now provides a significantly improved user experience with better guidance, validation, and visual feedback while maintaining all existing functionality in a more organized and intuitive format.
+
+## Latest Development Session (2025-08-17 - Tax Calculations & Step Indicator)
+
+### Roth Conversion Tax Calculation Fix - COMPLETED ✅
+
+**Problem Identified:**
+Tax calculations in the Roth conversion table were showing incorrect values due to hardcoded simplified tax calculations instead of proper progressive tax brackets.
+
+**Issues Fixed:**
+- ✅ **Incorrect tax amounts**: $210,000 income showing only $19,800 tax (now shows $39,647)
+- ✅ **Wrong tax brackets**: 12% bracket for $210k income (now shows correct 24% bracket)
+- ✅ **Missing standard deductions**: Now properly applies $15,000 single/$30,000 married deductions
+- ✅ **Zero Medicare costs**: Now shows proper IRMAA calculations for high MAGI years
+
+**Technical Implementation:**
+- **Updated RothConversionProcessor** (`/backend/core/roth_conversion_processor.py`):
+  - Added import: `from .tax_csv_loader import get_tax_loader`
+  - Added proper tax calculation methods: `_calculate_federal_tax_and_bracket()`, `_get_standard_deduction()`, `_calculate_medicare_costs()`
+  - Replaced hardcoded 22% tax rate with progressive CSV-based tax brackets
+  - Integrated proper MAGI-based IRMAA calculations
+
+**Before vs After Results:**
+| Scenario | Before Fix | After Fix |
+|----------|------------|-----------|
+| **$210,000 total income** | $19,800 tax @ 12% | **$39,647 tax @ 24%** |
+| **$120,000 base income** | $19,800 tax @ 12% | **$13,947 tax @ 22%** |
+| **Medicare (high MAGI)** | $0.00 | **$730+ with IRMAA** |
+
+### Modern Step Indicator Design - COMPLETED ✅
+
+**Objective:**
+Replace the basic "1→2→3" step indicators with a modern, visually appealing design using rounded squares that fill when completed.
+
+**New Step Indicator Features:**
+- ✅ **Modern Design**: Rounded square containers (32x32px) with smooth transitions
+- ✅ **Visual States**:
+  - **Inactive**: Light gray border, white background, gray text
+  - **Active**: Blue border, white background, blue text, subtle shadow
+  - **Completed**: App blue (#377dff) border and background, white text, completion animation
+- ✅ **Smart Connectors**: Horizontal lines between steps that turn blue when the next step is reached
+- ✅ **Click Navigation**: Users can click any step to jump directly to that section
+- ✅ **Smooth Animations**: 0.3s transitions and a scale animation when steps complete
+- ✅ **Responsive Design**: Smaller dimensions on mobile devices
+
+**Technical Implementation:**
+- **HTML Structure** (`/frontend/src/views/RothConversionTab.vue`):
+  ```html
+  <div class="step-container">
+    <div class="step-item" :class="{ 'completed': currentStep >= 1, 'active': currentStep === 1 }" @click="goToStep(1)">
+      <div class="step-number">1</div>
+    </div>
+    <div class="step-connector" :class="{ 'completed': currentStep >= 2 }"></div>
+    <!-- ... repeat for steps 2 and 3 -->
+  </div>
+  ```
+- **CSS Styling** (`/frontend/src/views/RothConversionTab.css`):
+  - Modern rounded squares with 8px border radius
+  - Smooth color transitions and hover effects
+  - Completion animation with scale effect
+  - Mobile-responsive sizing
+- **JavaScript Navigation** - Added `goToStep(step)` method for click navigation
+
+**User Experience Improvements:**
+1. **Visual Clarity** - Clear indication of current step and completion status
+2. **Interactive Navigation** - Click any step to jump directly to that section
+3. **Progress Feedback** - Visual confirmation as users complete each step
+4. **Modern Aesthetics** - Professional appearance matching the overall design system
+5. **Accessibility** - Proper hover states and visual feedback for interactions
+
+**Files Modified:**
+- `/frontend/src/views/RothConversionTab.vue` - Updated step indicator HTML and added click handlers
+- `/frontend/src/views/RothConversionTab.css` - Added comprehensive step indicator styling with animations
+
+The Roth conversion interface now combines accurate tax calculations with a modern, intuitive step-by-step design that guides users through the conversion analysis process while providing real-time visual feedback on their progress.
