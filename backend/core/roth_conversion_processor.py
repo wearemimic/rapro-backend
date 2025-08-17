@@ -575,15 +575,20 @@ class RothConversionProcessor:
                             # Create a row for this pre-retirement year
                             pre_retirement_row = {
                                 'year': year,
-                                'age': primary_age,
+                                'primary_age': primary_age,
                                 'spouse_age': spouse_age,
                                 'is_synthetic': True,  # Flag this as a synthetic row
-                                'income': float(self.pre_retirement_income),
+                                'gross_income': float(self.pre_retirement_income),
+                                'ss_income': 0,  # No SS before retirement
+                                'taxable_ss': 0,
                                 'magi': float(self.pre_retirement_income),  # Base MAGI is pre-retirement income
+                                'taxable_income': float(self.pre_retirement_income),
                                 'federal_tax': 0,  # Will calculate below
                                 'medicare_base': 0,
                                 'irmaa_surcharge': 0,
+                                'total_medicare': 0,
                                 'net_income': float(self.pre_retirement_income),
+                                'roth_conversion': 0,  # No conversion in baseline
                             }
                             
                             # Calculate federal tax based on pre-retirement income
@@ -675,16 +680,20 @@ class RothConversionProcessor:
                             # Create a row for this pre-retirement year
                             pre_retirement_row = {
                                 'year': year,
-                                'age': primary_age,
+                                'primary_age': primary_age,
                                 'spouse_age': spouse_age,
                                 'is_synthetic': True,  # Flag this as a synthetic row
-                                'income': float(self.pre_retirement_income),
+                                'gross_income': float(self.pre_retirement_income),
+                                'ss_income': 0,  # No SS before retirement
+                                'taxable_ss': 0,
                                 'magi': float(self.pre_retirement_income) + float(self.annual_conversion),  # MAGI includes conversion amount
+                                'taxable_income': float(self.pre_retirement_income) + float(self.annual_conversion),
                                 'federal_tax': 0,  # Will calculate below
                                 'medicare_base': 0,
                                 'irmaa_surcharge': 0,
+                                'total_medicare': 0,
                                 'net_income': float(self.pre_retirement_income),
-                                'conversion_amount': float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0,
+                                'roth_conversion': float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0,
                             }
                             
                             # Calculate federal tax based on pre-retirement income + conversion

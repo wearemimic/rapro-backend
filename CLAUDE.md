@@ -421,3 +421,237 @@ This session focused heavily on UI/UX improvements, data accuracy fixes, and for
 - Enhanced query parameter support: `?edit=scenarioId` vs `?duplicate=scenarioId`
 
 This session focused on resolving user experience issues, fixing data display problems, and enhancing the scenario management workflow with comprehensive edit capabilities.
+
+## Latest Development Session (2025-08-17)
+
+### Tax Configuration System - COMPLETED ✅
+
+**Problem Addressed:**
+Tax rates, brackets, IRMAA thresholds, and Medicare costs were hardcoded throughout the codebase, making annual updates difficult and error-prone.
+
+**Solution Implemented:**
+- ✅ **CSV-Based Tax Configuration System** - Created centralized tax data management using easily editable CSV files
+- ✅ **Comprehensive Tax Data Coverage** - Federal brackets, state taxes, IRMAA thresholds, Medicare rates, Social Security thresholds
+- ✅ **Annual Update Process** - Simple copy-and-edit workflow for tax year updates
+
+**Files Created:**
+- **Tax Data CSVs** (all in `/backend/core/tax_data/`):
+  - `federal_tax_brackets_2025.csv` - All federal tax brackets by filing status
+  - `standard_deductions_2025.csv` - Standard deduction amounts
+  - `irmaa_thresholds_2025.csv` - Medicare IRMAA thresholds and surcharges  
+  - `medicare_base_rates_2025.csv` - Base Medicare Part B/D premiums
+  - `social_security_thresholds_2025.csv` - Social Security taxation thresholds
+  - `state_tax_rates_2025.csv` - All 50 states' tax rates and retirement income treatment
+- **Python Loader:** `/backend/core/tax_csv_loader.py` - Loads CSV data with caching and calculation methods
+- **Documentation:** `/backend/core/tax_data/README.md` - Complete guide for annual updates
+- **Analysis Document:** `/TAX_ANALYSIS_AND_CENTRALIZATION.md` - Implementation plan and benefits
+
+**Key Features:**
+- **Easy Annual Updates**: Copy previous year's CSVs and update values - no code changes required
+- **Automatic Data Conversion**: CSV loader converts strings to Decimal for precision financial calculations
+- **Comprehensive State Coverage**: All 50 states plus DC with retirement income tax treatment
+- **Calculation Methods**: Built-in federal tax and IRMAA calculation functions
+- **Caching System**: Performance optimization with intelligent caching
+- **Version Control**: Each tax year has separate files for historical reference
+
+**Usage Examples:**
+```python
+# Load 2025 tax data
+from core.tax_csv_loader import TaxCSVLoader
+loader = TaxCSVLoader(2025)
+
+# Calculate federal tax
+tax, bracket = loader.calculate_federal_tax(Decimal('75000'), "Single")
+
+# Get IRMAA surcharges
+part_b, part_d = loader.calculate_irmaa(Decimal('150000'), "Married Filing Jointly") 
+
+# Get state tax info
+ca_tax = loader.get_state_tax_info("CA")
+```
+
+**Annual Update Process:**
+1. Copy previous year's CSV files (e.g., `*_2025.csv` → `*_2026.csv`)
+2. Update values with new IRS/Medicare/state rates
+3. Change default year in `tax_csv_loader.py` 
+4. Test and deploy
+
+**Benefits:**
+- **Maintainability**: All tax values in one location
+- **Accuracy**: Single source of truth prevents inconsistencies
+- **Compliance**: Easy to update for annual tax law changes
+- **State Tax Ready**: Framework supports all state tax calculations
+- **Audit Trail**: Git tracks all changes to tax values
+
+### Roth Calculator Updates - PARTIALLY COMPLETED ⚠️
+
+**Problem Addressed:**
+Roth conversion calculator was using outdated asset type filtering and missing conversion amounts in pre-retirement years.
+
+**Fixes Applied:**
+- ✅ **Asset Type Filtering Fix** (`/frontend/src/views/RothConversionTab.vue` lines 583-597):
+  - Updated from old types (`traditional_401k`, `traditional_ira`) 
+  - Now correctly filters for `Qualified`, `Inherited Traditional Spouse`, `Inherited Traditional Non-Spouse`
+- ✅ **Backend Parameter Fix** (`/frontend/src/views/RothConversionTab.vue` line 1033):
+  - Added missing `roth_conversion_annual_amount` field to scenario data
+- ✅ **Field Name Consistency** (`/backend/core/roth_conversion_processor.py` lines 687, 591):
+  - Changed `conversion_amount` to `roth_conversion` for frontend compatibility
+- ✅ **Enhanced Pre-retirement Data** (`/backend/core/roth_conversion_processor.py`):
+  - Added complete field structure for pre-retirement conversion years
+
+**Remaining Issue:**
+Despite fixes, conversion amounts still show as `$0.00` in the table. Root cause appears to be:
+- Backend changes may not have taken effect properly
+- RothConversionProcessor may not be executing correctly
+- Frontend may be displaying baseline instead of conversion results
+
+**Documentation:**
+- ✅ **Analysis Document:** `/ROTH_CALCULATOR_ANALYSIS.md` - Complete technical reference with fixes applied
+
+This session established a robust tax configuration system and made significant progress on Roth calculator fixes, with debugging still required for the conversion amount display issue.
+
+## Latest Development Session (2025-08-17)
+
+### CSV Tax System Integration - COMPLETED ✅
+
+**Objective:**
+Integrate the existing CSV-based tax configuration system with the actual scenario processing code to replace all hardcoded tax values.
+
+**Integration Completed:**
+- ✅ **Federal Tax Brackets** (`/backend/core/scenario_processor.py` lines 821-840):
+  - Replaced hardcoded 2025 tax brackets with CSV loader
+  - Added tax status normalization for CSV lookup
+  - Maintained same calculation accuracy with improved maintainability
+- ✅ **IRMAA Calculations** (`/backend/core/scenario_processor.py` lines 842-872):
+  - Replaced hardcoded IRMAA thresholds with CSV data
+  - Updated Medicare cost calculation to use CSV base rates
+  - Proper filing status mapping for all scenarios
+- ✅ **Standard Deductions** (`/backend/core/scenario_processor.py` lines 399-417):
+  - Replaced hardcoded standard deduction amounts with CSV loader
+  - Dynamic lookup based on filing status
+  - Maintains existing logic flow with improved data source
+- ✅ **Medicare Base Rates** (integrated within IRMAA calculation):
+  - Base Part B and Part D rates now loaded from CSV
+  - Automatic doubling for married filing jointly cases
+
+**Technical Implementation:**
+- **Tax Loader Import:** Added `from core.tax_csv_loader import get_tax_loader` to scenario processor
+- **Status Mapping:** Consistent normalization of tax status strings for CSV lookups
+- **Error Handling:** Graceful fallbacks for missing data or invalid filing statuses
+- **Performance:** Cached CSV loading prevents repeated file reads
+
+**Files Modified:**
+- `/backend/core/scenario_processor.py` - Integrated CSV tax loader throughout tax calculations
+- Updated imports and replaced 4 major hardcoded tax calculation sections
+
+**Testing Results:**
+```
+Federal tax on $75,000 (Single): $11,414.00 at 22% bracket
+Standard deduction (Single): $15,000.00
+IRMAA on $150,000 (Single): Part B +$179.80, Part D +$35.30
+Medicare base rates: Part B $185.00, Part D $71.00
+```
+
+**Benefits Achieved:**
+- **Centralized Tax Data**: All tax values now loaded from single CSV source
+- **Easy Annual Updates**: Change CSV files without touching code
+- **Consistency**: Eliminates duplicate/conflicting hardcoded values
+- **Audit Trail**: Git tracks all tax rate changes
+- **State Tax Ready**: Framework prepared for state tax integration
+
+**Annual Update Process:**
+1. Copy current year CSVs to new year (e.g., `*_2025.csv` → `*_2026.csv`)
+2. Update CSV values with new IRS/Medicare rates
+3. Change default year in `tax_csv_loader.py` line 220: `def get_tax_loader(tax_year=2026)`
+4. Deploy - no code changes required
+
+The tax system is now fully integrated and production-ready with the CSV configuration approach.
+
+## Latest Development Session (2025-08-17 - Roth Conversion Interface)
+
+### Multi-Step Roth Conversion Wizard - COMPLETED ✅
+
+**Objective:**
+Redesign the Roth conversion interface from a single-page form to a guided multi-step wizard with better user experience and validation.
+
+**New Interface Design:**
+- ✅ **3-Step Wizard Layout** - Step-by-step guided process replacing single complex form
+- ✅ **Progressive Summary** - Right-side summary panel that builds as user completes steps
+- ✅ **Smart Validation** - Button activation based on completion and conversion amount validation
+- ✅ **Improved Layout** - 3/4 left wizard, 1/4 right summary with sticky positioning
+
+### Step-by-Step Implementation:
+
+**Step 1: Asset Selection**
+- ✅ **Asset Selection Panel** - Full-width asset table for better visibility
+- ✅ **Conversion Amount Validation** - "Next" button disabled until at least one asset has conversion amount > 0
+- ✅ **Asset Name Display Fix** - Shows actual asset names (e.g., "John's 401k") instead of generic types ("Qualified")
+- ✅ **Real-time Summary** - Selected assets and total conversion amount displayed in summary panel
+
+**Step 2: Conversion Schedule**  
+- ✅ **Core Parameters** - Conversion Start Year, Max Annual Conversion Amount, Years to Convert
+- ✅ **Auto-calculated Fields** - Max Annual Amount auto-updates based on total conversion ÷ years
+- ✅ **Year Validation** - Roth Withdrawal Start Year automatically defaults to Conversion Start Year + 1
+- ✅ **Schedule Summary** - Conversion timeline details added to summary panel
+
+**Step 3: Income and Withdrawal Details**
+- ✅ **Final Parameters** - Pre-Retirement Income, Roth Growth Rate, Withdrawal Amount, Withdrawal Start Year  
+- ✅ **Smart Calculate Button** - Changes to green "Calculate Conversion" when all steps complete
+- ✅ **Year Dependencies** - Withdrawal year auto-updates when conversion year changes
+- ✅ **Complete Summary** - All configuration details shown in summary panel
+
+### Button and Validation Logic:
+
+**Smart Button States:**
+- ✅ **Step Navigation** - Previous/Next buttons with proper enabling/disabling
+- ✅ **Calculate Button** - Only enabled when conversion amounts > 0 are entered
+- ✅ **Visual Feedback** - Button colors change (gray → blue → green) based on completion status
+- ✅ **Tooltips** - Helpful messages explain why buttons are disabled
+
+**Year Validation Logic:**
+- ✅ **Auto-defaulting** - Roth Withdrawal Start Year = Conversion Start Year + 1 on page load
+- ✅ **Dependency Handling** - Withdrawal year auto-updates when conversion year changes
+- ✅ **Validation Feedback** - Red border and error messages for invalid year selections
+
+### User Experience Improvements:
+
+**Visual Design:**
+- ✅ **Step Indicators** - Numbered badges (1→2→3) showing progress
+- ✅ **Dynamic Headers** - Card title changes to show current step ("Step 1: Select Assets to Convert")
+- ✅ **Progress Bar** - Visual completion indicator in summary panel
+- ✅ **Consistent Styling** - Light gray headers with black text for proper contrast
+
+**Summary Panel Features:**
+- ✅ **Sticky Positioning** - Summary stays visible during scrolling
+- ✅ **Progressive Building** - Information appears as user completes each step
+- ✅ **Asset Details** - Shows selected assets with conversion amounts
+- ✅ **Schedule Overview** - Start year, duration, and annual limits
+- ✅ **Final Configuration** - All parameters in one consolidated view
+
+### Technical Implementation:
+
+**Vue.js Components:**
+- ✅ **Step Management** - `currentStep` data property (1-3) controls wizard flow
+- ✅ **Navigation Methods** - `nextStep()`, `previousStep()` for wizard control
+- ✅ **Computed Properties** - `currentStepTitle()`, `canProceedFromStep1()`, `canRecalculateConversion()`
+- ✅ **Dynamic Display** - `v-show` directives based on current step
+
+**Data Flow Improvements:**
+- ✅ **Asset Name Mapping** - Fixed display to show `asset.income_name || asset.investment_name || asset.income_type`
+- ✅ **Auto-calculation** - Max Annual Amount updates when total conversion amount changes
+- ✅ **Year Dependencies** - Withdrawal year watcher automatically adjusts based on conversion year
+
+**Files Modified:**
+- `/frontend/src/views/RothConversionTab.vue` - Complete wizard implementation
+- `/frontend/src/components/RothConversion/AssetSelectionPanel.vue` - Asset name display fix
+
+### Benefits Achieved:
+
+1. **Guided Process** - Step-by-step wizard prevents user confusion and errors
+2. **Better Validation** - Smart button states and real-time feedback guide user input
+3. **Improved Visibility** - Asset names show meaningful titles instead of generic types
+4. **Progressive Disclosure** - Complex form broken into logical, manageable steps
+5. **Visual Feedback** - Progress indicators and summary panel reinforce user choices
+6. **Automatic Calculations** - Smart defaults and auto-updating fields reduce manual input
+
+The Roth conversion interface now provides a significantly improved user experience with better guidance, validation, and visual feedback while maintaining all existing functionality in a more organized and intuitive format.
