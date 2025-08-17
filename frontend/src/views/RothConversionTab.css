@@ -220,4 +220,117 @@ datalist option::before {
   color: #6c757d;
   max-width: 500px;
   margin: 0 auto;
+}
+
+/* Modern Step Indicator Styles */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.step-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.step-item.active {
+  border-color: #007bff;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.step-item.completed {
+  border-color: #377dff;
+  background-color: #377dff;
+  color: #fff;
+}
+
+.step-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6c757d;
+  transition: color 0.3s ease;
+}
+
+.step-item.active .step-number {
+  color: #007bff;
+}
+
+.step-item.completed .step-number {
+  color: #fff !important;
+}
+
+.step-connector {
+  width: 24px;
+  height: 2px;
+  background-color: #dee2e6;
+  transition: background-color 0.3s ease;
+}
+
+.step-connector.completed {
+  background-color: #377dff;
+}
+
+/* Hover effects */
+.step-item:hover:not(.completed) {
+  border-color: #007bff;
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.step-item:hover:not(.completed) .step-number {
+  color: #007bff;
+}
+
+/* Animation for completion */
+.step-item.completed {
+  animation: stepComplete 0.3s ease;
+}
+
+@keyframes stepComplete {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .step-item {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .step-number {
+    font-size: 12px;
+  }
+  
+  .step-connector {
+    width: 16px;
+  }
+}
+
+/* Conversion summary card styling */
+.conversion-summary-card {
+  /* Normal card behavior - scrolls with content like the steps card */
 } 

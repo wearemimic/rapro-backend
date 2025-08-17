@@ -2,6 +2,7 @@ import datetime
 import copy
 from decimal import Decimal, InvalidOperation
 from .scenario_processor import ScenarioProcessor, RMD_TABLE
+from .tax_csv_loader import get_tax_loader
 
 class RothConversionProcessor:
     """
@@ -110,6 +111,122 @@ class RothConversionProcessor:
         """Print debug messages if debug mode is enabled."""
         if self.debug:
             print(f"[RothConversionProcessor] {message}")
+    
+    def _calculate_federal_tax_and_bracket(self, taxable_income):
+        """Calculate federal tax using CSV-based tax bracket data."""
+        tax_loader = get_tax_loader()
+        
+        # Normalize tax status for CSV lookup
+        status_mapping = {
+            'single': 'Single',
+            'married filing jointly': 'Married Filing Jointly',
+            'married filing separately': 'Married Filing Separately', 
+            'head of household': 'Head of Household',
+            'qualifying widow(er)': 'Qualifying Widow(er)'
+        }
+        
+        # Get tax status from scenario or default to single
+        tax_status = self.scenario.get('tax_filing_status', 'single')
+        normalized_status = (tax_status or '').strip().lower()
+        filing_status = status_mapping.get(normalized_status, 'Single')
+        
+        # Use CSV loader to calculate tax
+        tax, bracket_str = tax_loader.calculate_federal_tax(Decimal(taxable_income), filing_status)
+        
+        return tax, bracket_str
+    
+    def _get_standard_deduction(self):
+        """Get standard deduction for the tax year."""
+        tax_loader = get_tax_loader()
+        
+        # Normalize tax status for CSV lookup
+        status_mapping = {
+            'single': 'Single',
+            'married filing jointly': 'Married Filing Jointly',
+            'married filing separately': 'Married Filing Separately', 
+            'head of household': 'Head of Household',
+            'qualifying widow(er)': 'Qualifying Widow(er)'
+        }
+        
+        # Get tax status from scenario or default to single
+        tax_status = self.scenario.get('tax_filing_status', 'single')
+        normalized_status = (tax_status or '').strip().lower()
+        filing_status = status_mapping.get(normalized_status, 'Single')
+        
+        return tax_loader.get_standard_deduction(filing_status)
+    
+    def _calculate_medicare_costs(self, magi):
+        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds."""
+        tax_loader = get_tax_loader()
+        
+        # Get base Medicare rates from CSV
+        medicare_rates = tax_loader.get_medicare_base_rates()
+        base_part_b = medicare_rates.get('part_b', Decimal('185'))
+        base_part_d = medicare_rates.get('part_d', Decimal('71'))
+        
+        # Normalize tax status for CSV lookup
+        status_mapping = {
+            'single': 'Single',
+            'married filing jointly': 'Married Filing Jointly',
+            'married filing separately': 'Married Filing Separately'
+        }
+        
+        # Get tax status from scenario or default to single
+        tax_status = self.scenario.get('tax_filing_status', 'single')
+        normalized_status = (tax_status or '').strip().lower()
+        filing_status = status_mapping.get(normalized_status, 'Single')
+        
+        # Calculate IRMAA surcharges using CSV data
+        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)
+        
+        # For married filing jointly, double the base rates
+        if filing_status == "Married Filing Jointly":
+            base_part_b *= 2
+            base_part_d *= 2
+        
+        # Total costs
+        total_medicare = base_part_b + part_b_surcharge + base_part_d + part_d_irmaa
+        irmaa_surcharge = part_b_surcharge + part_d_irmaa
+        
+        return float(total_medicare), float(irmaa_surcharge)
+    
+    def _calculate_gross_income_for_year(self, year, primary_age, spouse_age):
+        """Calculate gross income from all sources for a given year."""
+        total_income = Decimal('0')
+        
+        # Add pre-retirement income (salary, etc.)
+        total_income += self.pre_retirement_income
+        
+        # Calculate income from all assets for this year
+        for asset in self.assets:
+            if asset.get('is_synthetic_roth'):
+                continue  # Skip synthetic Roth asset
+                
+            # Check asset ownership and if owner is alive
+            owner = asset.get('owned_by', 'primary')
+            if owner == 'primary' and not primary_age:
+                continue
+            if owner == 'spouse' and not spouse_age:
+                continue
+                
+            current_age = primary_age if owner == 'primary' else spouse_age
+            start_age = asset.get('age_to_begin_withdrawal', 0)
+            end_age = asset.get('age_to_end_withdrawal', 120)
+            
+            # Check if this asset provides income in this year
+            if start_age <= current_age <= end_age:
+                # Calculate asset income for this year
+                monthly_amount = asset.get('monthly_amount', 0)
+                if monthly_amount:
+                    annual_income = Decimal(str(monthly_amount)) * 12
+                    total_income += annual_income
+                    
+                # Add any asset balance withdrawals if specified
+                withdrawal_amount = asset.get('withdrawal_amount', 0)
+                if withdrawal_amount:
+                    total_income += Decimal(str(withdrawal_amount))
+        
+        return total_income
     
     def _prepare_assets_for_conversion(self):
         """
@@ -572,37 +689,50 @@ class RothConversionProcessor:
                                     except:
                                         pass
                             
+                            # Calculate actual gross income from all sources for this year
+                            gross_income = self._calculate_gross_income_for_year(year, primary_age, spouse_age)
+                            
                             # Create a row for this pre-retirement year
                             pre_retirement_row = {
                                 'year': year,
                                 'primary_age': primary_age,
                                 'spouse_age': spouse_age,
                                 'is_synthetic': True,  # Flag this as a synthetic row
-                                'gross_income': float(self.pre_retirement_income),
+                                'gross_income': float(gross_income),
                                 'ss_income': 0,  # No SS before retirement
                                 'taxable_ss': 0,
-                                'magi': float(self.pre_retirement_income),  # Base MAGI is pre-retirement income
-                                'taxable_income': float(self.pre_retirement_income),
+                                'magi': float(gross_income),  # MAGI includes all income
+                                'taxable_income': float(gross_income),  # Will be adjusted after standard deduction
                                 'federal_tax': 0,  # Will calculate below
                                 'medicare_base': 0,
                                 'irmaa_surcharge': 0,
                                 'total_medicare': 0,
-                                'net_income': float(self.pre_retirement_income),
+                                'net_income': float(gross_income),
                                 'roth_conversion': 0,  # No conversion in baseline
                             }
                             
-                            # Calculate federal tax based on pre-retirement income
-                            # Simple approximation - in a real implementation, you'd use proper tax brackets
-                            if self.pre_retirement_income > 0:
-                                tax_rate = 0.22  # Simplified tax rate
-                                pre_retirement_row['federal_tax'] = float(self.pre_retirement_income) * tax_rate
+                            # Calculate federal tax based on actual gross income using proper tax calculations
+                            if gross_income > 0:
+                                # Apply standard deduction
+                                standard_deduction = self._get_standard_deduction()
+                                taxable_income = max(0, float(gross_income) - float(standard_deduction))
+                                
+                                # Calculate federal tax using CSV tax brackets
+                                federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
+                                pre_retirement_row['federal_tax'] = float(federal_tax)
+                                pre_retirement_row['tax_bracket'] = tax_bracket
+                                pre_retirement_row['taxable_income'] = taxable_income  # Update with actual taxable income
                                 pre_retirement_row['net_income'] -= pre_retirement_row['federal_tax']
                             
                             # Add Medicare/IRMAA if age >= 65
                             if primary_age and primary_age >= 65:
-                                pre_retirement_row['medicare_base'] = 2000  # Simplified Medicare base cost
-                                pre_retirement_row['irmaa_surcharge'] = 0  # Simplified IRMAA
-                                pre_retirement_row['net_income'] -= pre_retirement_row['medicare_base'] + pre_retirement_row['irmaa_surcharge']
+                                # Calculate Medicare costs using proper MAGI and IRMAA calculations
+                                magi = float(self.pre_retirement_income)  # MAGI is same as income for baseline
+                                total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi)
+                                pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
+                                pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
+                                pre_retirement_row['total_medicare'] = total_medicare
+                                pre_retirement_row['net_income'] -= total_medicare
                             
                             # Add asset balances (copy from first year of baseline results if available)
                             if baseline_results:
@@ -677,41 +807,52 @@ class RothConversionProcessor:
                                     except:
                                         pass
                             
+                            # Calculate actual gross income from all sources for this year (conversion scenario)
+                            gross_income = self._calculate_gross_income_for_year(year, primary_age, spouse_age)
+                            conversion_amount = float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0
+                            
                             # Create a row for this pre-retirement year
                             pre_retirement_row = {
                                 'year': year,
                                 'primary_age': primary_age,
                                 'spouse_age': spouse_age,
                                 'is_synthetic': True,  # Flag this as a synthetic row
-                                'gross_income': float(self.pre_retirement_income),
+                                'gross_income': float(gross_income),
                                 'ss_income': 0,  # No SS before retirement
                                 'taxable_ss': 0,
-                                'magi': float(self.pre_retirement_income) + float(self.annual_conversion),  # MAGI includes conversion amount
-                                'taxable_income': float(self.pre_retirement_income) + float(self.annual_conversion),
+                                'magi': float(gross_income) + conversion_amount,  # MAGI includes conversion amount
+                                'taxable_income': float(gross_income) + conversion_amount,  # Will be adjusted after standard deduction
                                 'federal_tax': 0,  # Will calculate below
                                 'medicare_base': 0,
                                 'irmaa_surcharge': 0,
                                 'total_medicare': 0,
-                                'net_income': float(self.pre_retirement_income),
-                                'roth_conversion': float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0,
+                                'net_income': float(gross_income),
+                                'roth_conversion': conversion_amount,
                             }
                             
-                            # Calculate federal tax based on pre-retirement income + conversion
-                            # Simple approximation - in a real implementation, you'd use proper tax brackets
-                            taxable_income = float(self.pre_retirement_income) + float(self.annual_conversion)
-                            if taxable_income > 0:
-                                tax_rate = 0.22  # Simplified tax rate
-                                pre_retirement_row['federal_tax'] = taxable_income * tax_rate
-                                pre_retirement_row['net_income'] = float(self.pre_retirement_income) - pre_retirement_row['federal_tax']
+                            # Calculate federal tax based on actual gross income + conversion using proper tax calculations
+                            total_income = float(gross_income) + conversion_amount
+                            if total_income > 0:
+                                # Apply standard deduction
+                                standard_deduction = self._get_standard_deduction()
+                                taxable_income = max(0, total_income - float(standard_deduction))
+                                
+                                # Calculate federal tax using CSV tax brackets
+                                federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
+                                pre_retirement_row['federal_tax'] = float(federal_tax)
+                                pre_retirement_row['tax_bracket'] = tax_bracket
+                                pre_retirement_row['taxable_income'] = taxable_income  # Update with actual taxable income
+                                pre_retirement_row['net_income'] = float(gross_income) - pre_retirement_row['federal_tax']
                             
                             # Add Medicare/IRMAA if age >= 65
                             if primary_age and primary_age >= 65:
-                                pre_retirement_row['medicare_base'] = 2000  # Simplified Medicare base cost
-                                
-                                # IRMAA is higher due to conversion
-                                pre_retirement_row['irmaa_surcharge'] = 500 if float(self.annual_conversion) > 0 else 0
-                                
-                                pre_retirement_row['net_income'] -= pre_retirement_row['medicare_base'] + pre_retirement_row['irmaa_surcharge']
+                                # Calculate Medicare costs using proper MAGI (includes conversion amount)
+                                magi = float(gross_income) + conversion_amount
+                                total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi)
+                                pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
+                                pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
+                                pre_retirement_row['total_medicare'] = total_medicare
+                                pre_retirement_row['net_income'] -= total_medicare
                             
                             # Add asset balances (copy from first year of conversion results if available)
                             if conversion_results:
