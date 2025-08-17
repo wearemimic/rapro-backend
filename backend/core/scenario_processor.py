@@ -1,6 +1,7 @@
 import datetime
 from decimal import Decimal, InvalidOperation
 from core.models import Scenario, Client, Spouse, IncomeSource
+from core.tax_csv_loader import get_tax_loader
 
 # RMD Table based on IRS Uniform Lifetime Table
 RMD_TABLE = {
@@ -395,16 +396,23 @@ class ScenarioProcessor:
 
             taxable_income = agi_excl_ss + taxable_ss
             
-            # Apply 2025 standard deduction if enabled
+            # Apply standard deduction from CSV data if enabled
             if getattr(self.scenario, 'apply_standard_deduction', True):
-                if self.tax_status in ["Single", "Married Filing Separately"]:
-                    standard_deduction = Decimal('15000')
-                elif self.tax_status == "Married Filing Jointly" or self.tax_status == "Qualifying Widow(er)":
-                    standard_deduction = Decimal('30000')
-                elif self.tax_status == "Head of Household":
-                    standard_deduction = Decimal('22500')
-                else:
-                    standard_deduction = Decimal('15000')
+                tax_loader = get_tax_loader()
+                
+                # Normalize tax status for CSV lookup
+                status_mapping = {
+                    'single': 'Single',
+                    'married filing jointly': 'Married Filing Jointly',
+                    'married filing separately': 'Married Filing Separately', 
+                    'head of household': 'Head of Household',
+                    'qualifying widow(er)': 'Qualifying Widow(er)'
+                }
+                
+                normalized_status = (self.tax_status or '').strip().lower()
+                filing_status = status_mapping.get(normalized_status, 'Single')
+                
+                standard_deduction = tax_loader.get_standard_deduction(filing_status)
                 taxable_income = max(Decimal('0'), taxable_income - standard_deduction)
                 print(f"\nSTANDARD DEDUCTION APPLIED: {standard_deduction} for {self.tax_status}. Taxable Income after deduction: ${taxable_income:,.2f}")
 
@@ -818,142 +826,57 @@ class ScenarioProcessor:
         return gross_income + ss_income * Decimal("0.85")
 
     def _calculate_federal_tax_and_bracket(self, taxable_income):
-        # 2025 IRS tax brackets (all rates as Decimal)
-        brackets = {
-            "single": [
-                (11925, Decimal('0.10')),
-                (48475, Decimal('0.12')),
-                (103350, Decimal('0.22')),
-                (197300, Decimal('0.24')),
-                (250525, Decimal('0.32')),
-                (626350, Decimal('0.35')),
-                (Decimal('Infinity'), Decimal('0.37'))
-            ],
-            "married filing jointly": [
-                (23850, Decimal('0.10')),
-                (96950, Decimal('0.12')),
-                (206700, Decimal('0.22')),
-                (394600, Decimal('0.24')),
-                (501050, Decimal('0.32')),
-                (751600, Decimal('0.35')),
-                (Decimal('Infinity'), Decimal('0.37'))
-            ],
-            "married filing separately": [
-                (11925, Decimal('0.10')),
-                (48475, Decimal('0.12')),
-                (103350, Decimal('0.22')),
-                (197300, Decimal('0.24')),
-                (250525, Decimal('0.32')),
-                (375800, Decimal('0.35')),
-                (Decimal('Infinity'), Decimal('0.37'))
-            ],
-            "head of household": [
-                (17000, Decimal('0.10')),
-                (64850, Decimal('0.12')),
-                (103350, Decimal('0.22')),
-                (197300, Decimal('0.24')),
-                (250500, Decimal('0.32')),
-                (626350, Decimal('0.35')),
-                (Decimal('Infinity'), Decimal('0.37'))
-            ],
-            "qualifying widow(er)": [
-                (23850, Decimal('0.10')),
-                (96950, Decimal('0.12')),
-                (206700, Decimal('0.22')),
-                (394600, Decimal('0.24')),
-                (501050, Decimal('0.32')),
-                (751600, Decimal('0.35')),
-                (Decimal('Infinity'), Decimal('0.37'))
-            ]
+        """Calculate federal tax using CSV-based tax bracket data."""
+        tax_loader = get_tax_loader()
+        
+        # Normalize tax status for CSV lookup
+        status_mapping = {
+            'single': 'Single',
+            'married filing jointly': 'Married Filing Jointly',
+            'married filing separately': 'Married Filing Separately', 
+            'head of household': 'Head of Household',
+            'qualifying widow(er)': 'Qualifying Widow(er)'
         }
-        # Normalize tax status
-        status = (self.tax_status or '').strip().lower()
-        bracket_list = brackets.get(status, brackets["single"])
-        tax = Decimal('0')
-        last_cap = Decimal('0')
-        marginal_rate = Decimal('0.10')
-        taxable_income = Decimal(taxable_income)
-        for cap, rate in bracket_list:
-            cap = Decimal(cap)
-            if taxable_income > cap:
-                tax += (cap - last_cap) * marginal_rate
-                last_cap = cap
-                marginal_rate = rate
-            else:
-                tax += (taxable_income - last_cap) * marginal_rate
-                break
-        # Find the marginal bracket
-        for cap, rate in bracket_list:
-            cap = Decimal(cap)
-            if taxable_income <= cap:
-                bracket_str = f"{int(rate*100)}%"
-                break
-        else:
-            bracket_str = f"{int(bracket_list[-1][1]*100)}%"
+        
+        normalized_status = (self.tax_status or '').strip().lower()
+        filing_status = status_mapping.get(normalized_status, 'Single')
+        
+        # Use CSV loader to calculate tax
+        tax, bracket_str = tax_loader.calculate_federal_tax(Decimal(taxable_income), filing_status)
+        
         return tax, bracket_str
 
     def _calculate_medicare_costs(self, magi, year):
+        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds."""
         self._log_debug(f"Calculating Medicare costs based on MAGI: {magi}")
-        base_part_b = 185  # Base monthly rate per person for Part B
-        base_part_d = 71  # Base monthly rate for Part D
-        irmaa = 0
-        part_d_irmaa = 0
-
-        # Determine IRMAA based on filing status and MAGI
-        if self.tax_status == "Single":
-            if magi > 500000:
-                irmaa = 616
-                part_d_irmaa = 85.80
-            elif magi > 200000:
-                irmaa = 581
-                part_d_irmaa = 78.60
-            elif magi > 167000:
-                irmaa = 472.80
-                part_d_irmaa = 57.00
-            elif magi > 133000:
-                irmaa = 364.90
-                part_d_irmaa = 35.30
-            elif magi > 106000:
-                irmaa = 256.90
-                part_d_irmaa = 13.70
-            elif magi <= 106000:
-                irmaa = 185.00
-                part_d_irmaa = 0
-        elif self.tax_status == "Married Filing Jointly":
-            if magi > 750000:
-                irmaa = 616
-                part_d_irmaa = 85.80
-            elif magi > 400000:
-                irmaa = 581
-                part_d_irmaa = 78.60
-            elif magi > 334000:
-                irmaa = 472.80
-                part_d_irmaa = 57.00
-            elif magi > 266000:
-                irmaa = 364.90
-                part_d_irmaa = 35.30
-            elif magi > 212000:
-                irmaa = 256.90
-                part_d_irmaa = 13.70
-            elif magi <= 212000:
-                irmaa = 185.00
-                part_d_irmaa = 0
-            base_part_b *= 2  # Double the base for married couples
-            base_part_d *= 2  # Double the base for married couples
-        elif self.tax_status == "Married Filing Separately":
-            if magi > 394000:
-                irmaa = 443.90
-                part_d_irmaa = 85.80
-            elif magi > 106000:
-                irmaa = 406.90
-                part_d_irmaa = 78.60
-            elif magi <= 106000:
-                irmaa = 406.90
-                part_d_irmaa = 0
-
-        # Convert irmaa and part_d_irmaa to Decimal before applying the inflation rate
-        irmaa = Decimal(irmaa)
-        part_d_irmaa = Decimal(part_d_irmaa)
+        
+        tax_loader = get_tax_loader()
+        
+        # Get base Medicare rates from CSV
+        medicare_rates = tax_loader.get_medicare_base_rates()
+        base_part_b = medicare_rates.get('part_b', Decimal('185'))
+        base_part_d = medicare_rates.get('part_d', Decimal('71'))
+        
+        # Normalize tax status for CSV lookup
+        status_mapping = {
+            'single': 'Single',
+            'married filing jointly': 'Married Filing Jointly',
+            'married filing separately': 'Married Filing Separately'
+        }
+        
+        normalized_status = (self.tax_status or '').strip().lower()
+        filing_status = status_mapping.get(normalized_status, 'Single')
+        
+        # Calculate IRMAA surcharges using CSV data
+        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)
+        
+        # For married filing jointly, double the base rates
+        if filing_status == "Married Filing Jointly":
+            base_part_b *= 2
+            base_part_d *= 2
+        
+        # Total IRMAA (base + surcharge)
+        irmaa = base_part_b + part_b_surcharge
 
         # Retrieve inflation rates from the scenario
         part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100

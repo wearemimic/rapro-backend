@@ -1,101 +1,208 @@
 <template>
   <div v-if="eligibleAssets && eligibleAssets.length > 0">
-    <!-- Mode Toggle -->
-    <!-- Section 1: Asset Selection Panel -->
-    <div class="row align-items-stretch">
-      <!-- Asset Selection Panel -->
-      <div class="col-md-7 mb-3 mb-lg-5">
-        <AssetSelectionPanel
-          :eligibleAssets="eligibleAssets"
-          :maxToConvert="maxToConvert"
-          :maxToConvertRaw="maxToConvertRaw"
-          @update:maxToConvert="val => maxToConvert = val"
-          @update:maxToConvertRaw="val => maxToConvertRaw = val"
-        />
-      </div>
-      <!-- Conversion Schedule Parameters -->
-      <div class="col-md-5 mb-3 mb-lg-5">
-        <div class="card h-100">
-          <div class="card-header">
-            <h5 class="mb-0">Conversion Schedule Parameters</h5>
+    <!-- Multi-Step Wizard Layout -->
+    <div class="row">
+      <!-- Left Side: Steps (3/4 width) -->
+      <div class="col-lg-9 mb-3 mb-lg-5">
+        <div class="card">
+          <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-0" style="color: #000000 !important;">{{ currentStepTitle }}</h5>
+              </div>
+              <div class="step-indicator">
+                <span class="badge" :class="currentStep >= 1 ? 'bg-primary' : 'bg-light text-dark'">1</span>
+                <span class="mx-1" style="color: #000000 !important;">→</span>
+                <span class="badge" :class="currentStep >= 2 ? 'bg-primary' : 'bg-light text-dark'">2</span>
+                <span class="mx-1" style="color: #000000 !important;">→</span>
+                <span class="badge" :class="currentStep >= 3 ? 'bg-primary' : 'bg-light text-dark'">3</span>
+              </div>
+            </div>
           </div>
           <div class="card-body">
-            <div class="row">
-              <!-- Row 1: Pre-Retirement Income & Conversion Start Year -->
-             
-              <div class="col-md-6">
-                <label for="conversionStartYear">Conversion Start Year</label>
-                <select id="conversionStartYear" v-model="conversionStartYear" class="form-control">
-                  <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
-                </select>
+            <!-- Step 1: Asset Selection -->
+            <div v-show="currentStep === 1">
+              <AssetSelectionPanel
+                :eligibleAssets="eligibleAssets"
+                :maxToConvert="maxToConvert"
+                :maxToConvertRaw="maxToConvertRaw"
+                @update:maxToConvert="val => maxToConvert = val"
+                @update:maxToConvertRaw="val => maxToConvertRaw = val"
+              />
+              <div class="text-end mt-3">
+                <button 
+                  class="btn btn-primary" 
+                  @click="nextStep" 
+                  :disabled="!canProceedFromStep1"
+                >
+                  Next: Conversion Schedule
+                </button>
               </div>
-              <div class="col-md-6">
-                <label for="preRetirementIncome">Pre-Retirement Income</label>
-                <input
-                  type="text"
-                  id="preRetirementIncome"
-                  :value="preRetirementIncomeRaw"
-                  @focus="onCurrencyFocus('preRetirementIncome')"
-                  @input="onCurrencyInput($event, 'preRetirementIncome')"
-                  @blur="onCurrencyBlur('preRetirementIncome')"
-                  class="form-control"
-                />
+            </div>
+
+            <!-- Step 2: Conversion Schedule -->
+            <div v-show="currentStep === 2">
+              <div class="row">
+                <div class="col-md-4">
+                  <label for="conversionStartYear">Conversion Start Year</label>
+                  <select id="conversionStartYear" v-model="conversionStartYear" class="form-control">
+                    <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label for="maxAnnualAmount">Max Annual Conversion Amount</label>
+                  <input
+                    type="text"
+                    id="maxAnnualAmount"
+                    :value="maxAnnualAmountRaw"
+                    @focus="onCurrencyFocus('maxAnnualAmount')"
+                    @input="onCurrencyInput($event, 'maxAnnualAmount')"
+                    @blur="onCurrencyBlur('maxAnnualAmount')"
+                    class="form-control"
+                    min="0"
+                  />
+                </div>
+                <div class="col-md-4">
+                  <label for="yearsToConvert">Years to Convert</label>
+                  <input type="range" id="yearsToConvert" v-model="yearsToConvert" min="1" max="10" class="form-range w-100" />
+                  <div class="text-center">
+                    <span>{{ yearsToConvert }} years</span>
+                  </div>
+                </div>
               </div>
-              <!-- Row 2: Roth Growth Rate & Max Annual Conversion Amount -->
-              <div class="col-md-6 mt-3">
-                <label for="rothGrowthRate">Roth Growth Rate (%)</label>
-                <input type="number" id="rothGrowthRate" v-model="rothGrowthRate" class="form-control" />
+              <div class="text-end mt-3">
+                <button class="btn btn-outline-secondary me-2" @click="previousStep">
+                  Previous
+                </button>
+                <button class="btn btn-primary" @click="nextStep">
+                  Next: Final Details
+                </button>
               </div>
-              <div class="col-md-6 mt-3">
-                <label for="maxAnnualAmount">Max Annual Conversion Amount</label>
-                <input
-                  type="text"
-                  id="maxAnnualAmount"
-                  :value="maxAnnualAmountRaw"
-                  @focus="onCurrencyFocus('maxAnnualAmount')"
-                  @input="onCurrencyInput($event, 'maxAnnualAmount')"
-                  @blur="onCurrencyBlur('maxAnnualAmount')"
-                  class="form-control"
-                  min="0"
-                />
+            </div>
+
+            <!-- Step 3: Final Details -->
+            <div v-show="currentStep === 3">
+              <div class="row">
+                <div class="col-md-6">
+                  <label for="preRetirementIncome">Pre-Retirement Income</label>
+                  <input
+                    type="text"
+                    id="preRetirementIncome"
+                    :value="preRetirementIncomeRaw"
+                    @focus="onCurrencyFocus('preRetirementIncome')"
+                    @input="onCurrencyInput($event, 'preRetirementIncome')"
+                    @blur="onCurrencyBlur('preRetirementIncome')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="col-md-6">
+                  <label for="rothGrowthRate">Roth Growth Rate (%)</label>
+                  <input type="number" id="rothGrowthRate" v-model="rothGrowthRate" class="form-control" />
+                </div>
+                <div class="col-md-6 mt-3">
+                  <label for="rothWithdrawalAmount">Roth Withdrawal Amount</label>
+                  <input
+                    type="text"
+                    id="rothWithdrawalAmount"
+                    :value="rothWithdrawalAmountRaw"
+                    @focus="onCurrencyFocus('rothWithdrawalAmount')"
+                    @input="onCurrencyInput($event, 'rothWithdrawalAmount')"
+                    @blur="onCurrencyBlur('rothWithdrawalAmount')"
+                    class="form-control"
+                    min="0"
+                  />
+                </div>
+                <div class="col-md-6 mt-3">
+                  <label for="rothWithdrawalStartYear">Roth Withdrawal Start Year</label>
+                  <select 
+                    id="rothWithdrawalStartYear" 
+                    v-model="rothWithdrawalStartYear" 
+                    class="form-control"
+                    :class="{ 'is-invalid': !isRothWithdrawalYearValid }"
+                  >
+                    <option v-for="year in availableWithdrawalYears" :key="year" :value="year">{{ year }}</option>
+                  </select>
+                  <div v-if="!isRothWithdrawalYearValid" class="invalid-feedback">
+                    Withdrawal start year must be after conversion start year ({{ conversionStartYear }})
+                  </div>
+                </div>
               </div>
-              <!-- Row 3: Roth Withdrawal Amount & Roth Withdrawal Start Year -->
-              <div class="col-md-6 mt-3">
-                <label for="rothWithdrawalAmount">Roth Withdrawal Amount</label>
-                <input
-                  type="text"
-                  id="rothWithdrawalAmount"
-                  :value="rothWithdrawalAmountRaw"
-                  @focus="onCurrencyFocus('rothWithdrawalAmount')"
-                  @input="onCurrencyInput($event, 'rothWithdrawalAmount')"
-                  @blur="onCurrencyBlur('rothWithdrawalAmount')"
-                  class="form-control"
-                  min="0"
-                />
-              </div>
-              <div class="col-md-6 mt-3">
-                <label for="rothWithdrawalStartYear">Roth Withdrawal Start Year</label>
-                <select id="rothWithdrawalStartYear" v-model="rothWithdrawalStartYear" class="form-control">
-                  <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
-                </select>
-              </div>
-              <!-- Years to Convert Slider (full width) -->
-              <div class="col-12 mt-3">
-                <label for="yearsToConvert" class="w-100 text-center" style="font-size: 1.2em; font-weight: bold;">Years to Convert</label>
-                <input type="range" id="yearsToConvert" v-model="yearsToConvert" min="1" max="10" class="form-range w-100" list="tickmarks" />
-                <datalist id="tickmarks">
-                  <option v-for="year in 10" :key="year" :value="year">{{ year }}</option>
-                </datalist>
-                <span>{{ yearsToConvert }} years</span>
+              <div class="text-end mt-3">
+                <button class="btn btn-outline-secondary me-2" @click="previousStep">
+                  Previous
+                </button>
+                <button 
+                  class="btn me-2" 
+                  :class="canRecalculateConversion ? 'btn-success' : 'btn-secondary'" 
+                  :disabled="!canRecalculateConversion"
+                  @click="recalculateConversion"
+                  :title="canRecalculateConversion ? 'Run Roth conversion analysis' : 'Please complete all steps'"
+                >
+                  Calculate Conversion
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="card mb-3 mb-lg-5">
-      <div class="card-body">
-        <button class="btn btn-primary me-2" @click="recalculateConversion">Recalculate Conversion</button>
+
+      <!-- Right Side: Summary (1/4 width) -->
+      <div class="col-lg-3 mb-3 mb-lg-5">
+        <div class="card sticky-top">
+          <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
+            <h6 class="mb-0" style="color: #000000 !important;">Conversion Summary</h6>
+          </div>
+          <div class="card-body">
+            <!-- Asset Summary -->
+            <div v-if="currentStep >= 1">
+              <strong>Selected Assets:</strong>
+              <ul class="list-unstyled mt-2 mb-3">
+                <li v-for="asset in selectedAssetList" :key="asset.id || asset.income_type" class="small">
+                  {{ asset.income_name || asset.investment_name || asset.income_type }}: {{ formatCurrency(maxToConvert[asset.id || asset.income_type] || 0) }}
+                </li>
+                <li v-if="selectedAssetList.length === 0" class="text-muted small">No assets selected</li>
+              </ul>
+              <div class="border-top pt-2">
+                <strong>Total: {{ formatCurrency(totalConversionAmount) }}</strong>
+              </div>
+            </div>
+
+            <!-- Schedule Summary -->
+            <div v-if="currentStep >= 2" class="mt-3">
+              <hr>
+              <strong>Schedule:</strong>
+              <ul class="list-unstyled mt-2 mb-0 small">
+                <li>Start: {{ conversionStartYear }}</li>
+                <li>Duration: {{ yearsToConvert }} years</li>
+                <li>Max Annual: {{ formatCurrency(maxAnnualAmount) }}</li>
+              </ul>
+            </div>
+
+            <!-- Details Summary -->
+            <div v-if="currentStep >= 3" class="mt-3">
+              <hr>
+              <strong>Details:</strong>
+              <ul class="list-unstyled mt-2 mb-0 small">
+                <li>Pre-Retirement Income: {{ formatCurrency(preRetirementIncome) }}</li>
+                <li>Growth Rate: {{ rothGrowthRate }}%</li>
+                <li>Withdrawal: {{ formatCurrency(rothWithdrawalAmount) }}</li>
+                <li>Withdrawal Start: {{ rothWithdrawalStartYear }}</li>
+              </ul>
+            </div>
+
+            <!-- Progress Indicator -->
+            <div class="mt-4">
+              <div class="progress">
+                <div 
+                  class="progress-bar" 
+                  :style="{ width: (currentStep / 3 * 100) + '%' }"
+                  :class="currentStep === 3 && canRecalculateConversion ? 'bg-success' : 'bg-primary'"
+                ></div>
+              </div>
+              <small class="text-muted">Step {{ currentStep }} of 3</small>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -104,7 +211,7 @@
       <div class="empty-state-icon">📊</div>
       <div class="empty-state-message">No Roth Conversion Scenario Yet</div>
       <div class="empty-state-description">
-        Select your assets and parameters above, then click "Recalculate Conversion" to see detailed analysis and projections.
+        Complete the 3-step wizard above, then click "Calculate Conversion" to see detailed analysis and projections.
       </div>
     </div>
     
@@ -375,7 +482,15 @@
     <!-- Section 5: Action Buttons -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
-        <button class="btn btn-primary me-2" @click="recalculateConversion">Recalculate Conversion</button>
+        <button 
+          class="btn me-2" 
+          :class="canRecalculateConversion ? 'btn-primary' : 'btn-secondary'" 
+          :disabled="!canRecalculateConversion"
+          @click="recalculateConversion"
+          :title="canRecalculateConversion ? 'Run Roth conversion analysis' : 'Please enter conversion amounts for at least one asset'"
+        >
+          Recalculate Conversion
+        </button>
       </div>
     </div>
     </div> <!-- End of scenario-results div -->
@@ -403,6 +518,8 @@ export default {
     if (expenseSummaryData) {
       this.expenseSummaryData = JSON.parse(JSON.stringify(expenseSummaryData)); // Deep clone to avoid reference issues
     }
+
+    // Roth Withdrawal Start Year is already set to currentYear + 1 in data()
   },
   props: {
     scenario: {
@@ -429,6 +546,8 @@ export default {
     const years = Array.from({ length: 30 }, (_, i) => currentYear + i);
     
     return {
+      // Multi-step wizard state
+      currentStep: 1,
       // Flag to track if we're in the middle of a recalculation
       _isRecalculating: false,
       // Flag to track if a scenario has been run
@@ -460,7 +579,7 @@ export default {
       conversionMode: 'auto',
       rothWithdrawalAmount: 0,
       rothWithdrawalAmountRaw: '',
-      rothWithdrawalStartYear: currentYear,
+      rothWithdrawalStartYear: currentYear + 1,
       // Asset data from API
       assetBalanceData: null,
       // Initialize assetLineData as null, will be set in mounted
@@ -581,13 +700,17 @@ export default {
       return filtered;
     },
     eligibleAssets() {
-      // Show all eligible accounts for conversion (401k, IRA, Roth IRA, etc.)
+      // Show all eligible accounts for conversion (Qualified and Inherited Traditional accounts only)
       const assets = this.assetDetails || [];
       return assets.filter(asset => {
         if (!asset || !asset.income_type) return false;
-        const type = asset.income_type.trim().toLowerCase();
+        const type = asset.income_type;
+        // Only traditional/qualified accounts can be converted to Roth
+        // Roth accounts are already tax-free and cannot be converted
         return [
-          'traditional_401k', 'traditional_ira', 'ira', 'roth_401k', 'roth_ira'
+          'Qualified',
+          'Inherited Traditional Spouse', 
+          'Inherited Traditional Non-Spouse'
         ].includes(type);
       });
     },
@@ -636,6 +759,65 @@ export default {
         (this.baselineMetrics && Object.keys(this.baselineMetrics).length > 0) ||
         (this.optimalSchedule && Object.keys(this.optimalSchedule).length > 0)
       );
+    },
+    canRecalculateConversion() {
+      // Button is only enabled if at least one asset has a conversion amount > 0
+      return this.totalConversionAmount > 0;
+    },
+    isRothWithdrawalYearValid() {
+      // Roth Withdrawal Start Year must be after Conversion Start Year
+      const conversionYear = parseInt(this.conversionStartYear) || 0;
+      const withdrawalYear = parseInt(this.rothWithdrawalStartYear) || 0;
+      return withdrawalYear > conversionYear;
+    },
+    availableWithdrawalYears() {
+      // Filter years to only show those after the conversion start year
+      const conversionYear = parseInt(this.conversionStartYear) || new Date().getFullYear();
+      return this.availableYears.filter(year => year > conversionYear);
+    },
+    rmdYear() {
+      // Calculate the year when client reaches RMD age (73)
+      if (!this.client || !this.client.birthdate) {
+        return new Date().getFullYear() + 5; // Default fallback
+      }
+      
+      const birthYear = new Date(this.client.birthdate).getFullYear();
+      return birthYear + 73; // RMD starts at age 73
+    },
+    canProceedFromStep1() {
+      // Can proceed from step 1 if at least one asset has conversion amount > 0
+      return this.totalConversionAmount > 0;
+    },
+    currentStepTitle() {
+      const titles = {
+        1: 'Step 1: Select Assets to Convert',
+        2: 'Step 2: Conversion Schedule', 
+        3: 'Step 3: Income and Withdrawal Details'
+      };
+      return titles[this.currentStep] || 'Roth Conversion Setup';
+    }
+  },
+  watch: {
+    conversionStartYear(newYear, oldYear) {
+      // Auto-update Roth Withdrawal Start Year when Conversion Start Year changes
+      if (newYear && oldYear && newYear !== oldYear) {
+        const newConversionYear = parseInt(newYear);
+        const currentWithdrawalYear = parseInt(this.rothWithdrawalStartYear);
+        
+        // If current withdrawal year is not valid (not after conversion year), 
+        // automatically set it to conversion year + 1
+        if (currentWithdrawalYear <= newConversionYear) {
+          this.rothWithdrawalStartYear = newConversionYear + 1;
+        }
+      }
+    },
+    totalConversionAmount(newTotal) {
+      // Auto-update Max Annual Conversion Amount when total changes
+      if (newTotal > 0 && this.yearsToConvert > 0) {
+        const annualAmount = newTotal / this.yearsToConvert;
+        this.maxAnnualAmount = annualAmount;
+        this.maxAnnualAmountRaw = this.formatCurrency(annualAmount);
+      }
     }
   },
   methods: {
@@ -656,6 +838,17 @@ export default {
     },
     formatCurrency(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
+    },
+    // Step navigation methods
+    nextStep() {
+      if (this.currentStep < 3) {
+        this.currentStep++;
+      }
+    },
+    previousStep() {
+      if (this.currentStep > 1) {
+        this.currentStep--;
+      }
     },
     onMaxToConvertFocus(asset) {
       const key = asset.id || asset.income_type;
@@ -1003,8 +1196,8 @@ export default {
       // Calculate total amount to convert from all selected assets
       const totalToConvert = allAssets
         .filter(asset => [
-          'traditional_401k', 'traditional_ira', 'ira', 'roth_401k', 'roth_ira', '401k'
-        ].includes((asset.income_type || '').trim().toLowerCase()))
+          'Qualified', 'Inherited Traditional Spouse', 'Inherited Traditional Non-Spouse'
+        ].includes(asset.income_type || ''))
         .reduce((sum, asset) => sum + (parseFloat(asset.max_to_convert) || 0), 0);
 
       // Ensure we have valid years to convert
@@ -1026,6 +1219,7 @@ export default {
         ...this.scenario,
         roth_conversion_start_year: parseInt(conversionStartYear),
         roth_conversion_duration: yearsToConvert,
+        roth_conversion_annual_amount: annualConversion,  // Add the annual conversion amount for backend
         roth_withdrawal_amount: rothWithdrawalAmount,
         roth_withdrawal_start_year: rothWithdrawalStartYear,
         pre_retirement_income: this.preRetirementIncome || 0,
@@ -1077,6 +1271,8 @@ export default {
       console.log('Annual conversion amount:', annualConversion);
       console.log('Conversion start year (parsed):', parseInt(conversionStartYear));
       console.log('Retirement year:', this.retirementYear);
+      console.log('Max annual amount:', maxAnnualAmount);
+      console.log('Scenario roth_conversion_annual_amount:', scenarioData.roth_conversion_annual_amount);
 
       try {
         const authStore = useAuthStore();
@@ -1186,6 +1382,7 @@ export default {
             if (Object.keys(assetWithdrawals).length > 0) {
               console.log('  Asset Withdrawals/Conversions:', assetWithdrawals);
             }
+            console.log(`  Roth Conversion Amount: ${row.roth_conversion}`);
             console.log(`  Gross Income: ${row.gross_income}, SS Income: ${row.ss_income}, Taxable SS: ${row.taxable_ss}, Taxable Income: ${row.taxable_income}`);
           });
         } else {

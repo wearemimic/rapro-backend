@@ -1,0 +1,3 @@
+filing_status,base_threshold,additional_threshold,description
+Single,25000,34000,Single filers thresholds for SS taxation
+Married Filing Jointly,32000,44000,Married filing jointly thresholds for SS taxation

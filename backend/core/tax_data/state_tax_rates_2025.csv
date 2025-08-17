@@ -1,0 +1,51 @@
+state,state_code,income_tax_rate,retirement_income_exempt,ss_taxed,description
+Alabama,AL,0.05,true,false,5% flat rate on retirement income over exemption
+Alaska,AK,0.00,true,false,No state income tax
+Arizona,AZ,0.045,partial,false,Retirement income partially exempt
+Arkansas,AR,0.055,partial,false,Some retirement income exempt
+California,CA,0.093,false,false,High rates but no tax on SS
+Colorado,CO,0.044,partial,false,Flat rate with retirement exemptions
+Connecticut,CT,0.065,partial,false,Tax on retirement income
+Delaware,DE,0.066,partial,false,Some pension exemptions
+Florida,FL,0.00,true,false,No state income tax
+Georgia,GA,0.0575,partial,false,Retirement income exemptions for 65+
+Hawaii,HI,0.075,false,false,Taxes most retirement income
+Idaho,ID,0.058,partial,false,Some retirement exemptions
+Illinois,IL,0.0495,true,false,No tax on retirement income
+Indiana,IN,0.032,false,false,Flat rate on all income
+Iowa,IA,0.053,partial,false,Some retirement exemptions
+Kansas,KS,0.057,partial,false,Some retirement exemptions
+Kentucky,KY,0.045,partial,false,Some retirement exemptions
+Louisiana,LA,0.04,partial,false,Some retirement exemptions
+Maine,ME,0.075,partial,false,Limited retirement exemptions
+Maryland,MD,0.0575,partial,false,Some retirement exemptions
+Massachusetts,MA,0.05,partial,false,Flat rate with some exemptions
+Michigan,MI,0.0425,partial,false,Some retirement exemptions
+Minnesota,MN,0.0985,false,false,Taxes most retirement income
+Mississippi,MS,0.05,true,false,No tax on retirement income
+Missouri,MO,0.048,partial,false,Some retirement exemptions
+Montana,MT,0.0675,partial,false,Some retirement exemptions
+Nebraska,NE,0.0684,partial,false,Some retirement exemptions
+Nevada,NV,0.00,true,false,No state income tax
+New Hampshire,NH,0.00,true,false,No tax on wages or retirement
+New Jersey,NJ,0.0897,partial,false,Some retirement exemptions
+New Mexico,NM,0.0490,partial,false,Some retirement exemptions
+New York,NY,0.0685,false,false,Taxes most retirement income
+North Carolina,NC,0.0475,partial,false,Some retirement exemptions
+North Dakota,ND,0.029,partial,false,Some retirement exemptions
+Ohio,OH,0.0399,partial,false,Some retirement exemptions
+Oklahoma,OK,0.05,partial,false,Some retirement exemptions
+Oregon,OR,0.099,false,false,Taxes most retirement income
+Pennsylvania,PA,0.0307,true,false,No tax on retirement income
+Rhode Island,RI,0.0599,partial,false,Some retirement exemptions
+South Carolina,SC,0.07,partial,false,Some retirement exemptions
+South Dakota,SD,0.00,true,false,No state income tax
+Tennessee,TN,0.00,true,false,No state income tax
+Texas,TX,0.00,true,false,No state income tax
+Utah,UT,0.0495,false,false,Flat rate on all income
+Vermont,VT,0.0875,partial,false,Some retirement exemptions
+Virginia,VA,0.0575,partial,false,Some retirement exemptions
+Washington,WA,0.00,true,false,No state income tax
+West Virginia,WV,0.065,partial,false,Some retirement exemptions
+Wisconsin,WI,0.0765,partial,false,Some retirement exemptions
+Wyoming,WY,0.00,true,false,No state income tax

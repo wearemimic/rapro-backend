@@ -16,7 +16,7 @@
           </thead>
           <tbody>
             <tr v-for="asset in (eligibleAssets && eligibleAssets.length ? eligibleAssets : [])" :key="asset.id || asset.income_type">
-              <td>{{ asset.income_type || 'Unknown' }}</td>
+              <td>{{ asset.income_name || asset.investment_name || asset.income_type || 'Unknown' }}</td>
               <td>{{ asset.owned_by || 'Unknown' }}</td>
               <td>{{ formatCurrency(asset.current_asset_balance) }}</td>
               <td>

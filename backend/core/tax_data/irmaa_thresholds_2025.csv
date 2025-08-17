@@ -1,0 +1,16 @@
+filing_status,magi_threshold,part_b_surcharge,part_d_surcharge,description
+Single,0,0,0,No surcharge
+Single,106000,71.90,13.70,First tier
+Single,133000,179.80,35.30,Second tier
+Single,167000,287.80,57.00,Third tier
+Single,200000,396.00,78.60,Fourth tier
+Single,500000,431.00,85.80,Highest tier
+Married Filing Jointly,0,0,0,No surcharge
+Married Filing Jointly,212000,71.90,13.70,First tier
+Married Filing Jointly,266000,179.80,35.30,Second tier
+Married Filing Jointly,334000,287.80,57.00,Third tier
+Married Filing Jointly,400000,396.00,78.60,Fourth tier
+Married Filing Jointly,750000,431.00,85.80,Highest tier
+Married Filing Separately,0,221.90,0,Base surcharge for MFS
+Married Filing Separately,106000,258.90,78.60,Higher tier for MFS
+Married Filing Separately,394000,258.90,85.80,Highest tier for MFS
