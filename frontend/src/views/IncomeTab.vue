@@ -837,32 +837,39 @@ export default {
         (this.client?.spouse?.first_name || 'Spouse') : 
         (this.client?.first_name || 'Primary');
       
-      // Special formatting for different asset types
-      let typeLabel = '';
-      switch(type) {
-        case 'social_security':
-          typeLabel = 'SSI';
-          break;
-        case 'pension':
-          typeLabel = 'Pension';
-          break;
-        case 'annuity':
-          typeLabel = 'Annuity';
-          break;
-        case 'qualified':
-          typeLabel = '401k/IRA';
-          break;
-        case 'non_qualified':
-          typeLabel = 'Non-Qual';
-          break;
-        case 'rental_income':
-          typeLabel = 'Rental';
-          break;
-        default:
-          typeLabel = asset.income_type.replace(/_/g, ' ');
+      // Use actual asset name if available, otherwise use type-specific labels
+      let displayName = '';
+      
+      // For investment accounts, use the income_name if available
+      if ((type === 'qualified' || type === 'non_qualified' || type === 'roth') && asset.income_name) {
+        displayName = asset.income_name;
+      } else {
+        // Special formatting for different asset types
+        switch(type) {
+          case 'social_security':
+            displayName = 'SSI';
+            break;
+          case 'pension':
+            displayName = asset.income_name || 'Pension';
+            break;
+          case 'annuity':
+            displayName = asset.income_name || 'Annuity';
+            break;
+          case 'qualified':
+            displayName = '401k/IRA';
+            break;
+          case 'non_qualified':
+            displayName = 'Non-Qual';
+            break;
+          case 'rental_income':
+            displayName = asset.income_name || 'Rental';
+            break;
+          default:
+            displayName = asset.income_name || asset.income_type.replace(/_/g, ' ');
+        }
       }
       
-      return `${typeLabel} (${ownerName})`;
+      return `${displayName} (${ownerName})`;
     },
     formatCurrency(value) {
       if (value === 0 || value === null || value === undefined) return '-';

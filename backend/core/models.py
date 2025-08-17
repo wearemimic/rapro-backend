@@ -176,6 +176,10 @@ class IncomeSource(models.Model):
     exclusion_ratio = models.FloatField(default=0)
     tax_rate = models.FloatField(default=0)
     max_to_convert = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Maximum amount to convert to Roth")
+    age_established = models.PositiveIntegerField(null=True, blank=True, help_text="Age when the asset was established")
+    is_contributing = models.BooleanField(default=False, help_text="Currently contributing to this investment")
+    employer_match = models.FloatField(default=0, help_text="Employer contribution match percentage")
+    age_last_contribution = models.PositiveIntegerField(null=True, blank=True, help_text="Age when contributions will end")
 
     def __str__(self):
         return f"{self.income_type} for {self.scenario.name}"

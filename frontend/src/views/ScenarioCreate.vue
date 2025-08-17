@@ -643,7 +643,7 @@ async function submitScenario() {
       sanitized.income_type = row.income_type;
       sanitized.income_name = row.income_name;
       sanitized.current_asset_balance = parseFloat(row.current_balance || 0).toFixed(2);
-      sanitized.monthly_amount = 0; // Calculated withdrawal amount
+      sanitized.monthly_amount = parseFloat(row.withdrawal_amount || 0).toFixed(2); // Monthly withdrawal amount
       sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
