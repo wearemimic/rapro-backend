@@ -1,10 +1,7 @@
 <template>
-  <div class="card h-100">
-    <div class="card-header">
-      <h5 class="mb-0">Asset Selection Panel</h5>
-    </div>
-    <div class="card-body">
-      <div class="table-responsive">
+  <div>
+    <p class="text-muted mb-3">Select which assets to convert and specify the maximum amount to convert from each:</p>
+    <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
           <thead class="thead-light">
             <tr>
@@ -39,7 +36,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
     </div>
   </div>
 </template>
