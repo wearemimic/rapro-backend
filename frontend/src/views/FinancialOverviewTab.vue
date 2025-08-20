@@ -600,12 +600,15 @@ export default {
     },
     initializeCircles() {
       this.$nextTick(() => {
+        console.log('🔵 Initializing circles chart...');
         const maxRetries = 20;
         let retryCount = 0;
         const tryInit = () => {
           const CirclesGlobal = window.Circles;
+          console.log('🔵 Circles library status:', typeof CirclesGlobal, CirclesGlobal);
           if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
             const circleElement = document.getElementById('circle-financial');
+            console.log('🔵 Circle element found:', !!circleElement);
             if (circleElement) {
               // Clear previous SVG if any
               circleElement.innerHTML = '';
@@ -613,6 +616,7 @@ export default {
               const tax = this.totalTax;
               const medicare = this.totalMedicare;
               const percent = total > 0 ? Math.round(((tax + medicare) / total) * 100) : 0;
+              console.log('🔵 Circle data:', { total, tax, medicare, percent });
               let circleColor = '#377dff';
               if (percent > 50) {
                 circleColor = '#ff0000';
@@ -623,7 +627,7 @@ export default {
               } else {
                 circleColor = '#00ff00';
               }
-              CirclesGlobal.create({
+              const circleInstance = CirclesGlobal.create({
                 id: 'circle-financial',
                 value: percent,
                 maxValue: 100,
@@ -637,9 +641,11 @@ export default {
                 styleWrapper: true,
                 styleText: true
               });
+              console.log('🔵 Circle created successfully:', circleInstance);
             }
           } else if (retryCount < maxRetries) {
             retryCount++;
+            console.log(`🔵 Circles library not ready, retrying... (${retryCount}/${maxRetries})`);
             setTimeout(tryInit, 100);
           }
         };
