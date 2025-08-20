@@ -108,7 +108,7 @@
                   <input type="number" id="rothGrowthRate" v-model="rothGrowthRate" class="form-control" />
                 </div>
                 <div class="col-md-6 mt-3">
-                  <label for="rothWithdrawalAmount">Roth Withdrawal Amount</label>
+                  <label for="rothWithdrawalAmount">Yearly Roth Withdrawal Amount</label>
                   <input
                     type="text"
                     id="rothWithdrawalAmount"
@@ -163,7 +163,7 @@
           <div class="card-body">
             <!-- Asset Summary -->
             <div v-if="currentStep >= 1">
-              <strong>Selected Assets:</strong>
+              <strong>Select Assets to Convert:</strong>
               <ul class="list-unstyled mt-2 mb-3">
                 <li v-for="asset in selectedAssetList" :key="asset.id || asset.income_type" class="small">
                   {{ asset.income_name || asset.investment_name || asset.income_type }}: {{ formatCurrency(maxToConvert[asset.id || asset.income_type] || 0) }}
@@ -178,7 +178,7 @@
             <!-- Schedule Summary -->
             <div v-if="currentStep >= 2" class="mt-3">
               <hr>
-              <strong>Schedule:</strong>
+              <strong>Conversion Schedule:</strong>
               <ul class="list-unstyled mt-2 mb-0 small">
                 <li>Start: {{ conversionStartYear }}</li>
                 <li>Duration: {{ yearsToConvert }} years</li>
@@ -225,7 +225,7 @@
     
     <div v-if="hasScenarioBeenRun" class="scenario-results">
     <!-- Combined Expense Summary Chart -->
-    <h3>Expense Summary</h3>
+    <h3 id="expense-summary">Expense Summary</h3>
     <div class="row mb-3">
       <div class="col-md-12">
         <div class="card h-100">
@@ -295,6 +295,20 @@
                 :style="{ left: calculateWithdrawalYearPosition() + '%' }"
               >
                 <span class="withdrawal-year-label">Withdrawals Begin</span>
+              </div>
+              <div 
+                v-if="conversionStartYear" 
+                class="conversion-start-marker" 
+                :style="{ left: calculateConversionStartPosition() + '%' }"
+              >
+                <span class="conversion-start-label">Conversions Begin</span>
+              </div>
+              <div 
+                v-if="conversionStartYear && yearsToConvert" 
+                class="conversion-end-marker" 
+                :style="{ left: calculateConversionEndPosition() + '%' }"
+              >
+                <span class="conversion-end-label">Conversions End</span>
               </div>
             </div>
             
@@ -368,7 +382,8 @@
             <thead>
               <tr>
                 <th>Year</th>
-                <th>Client/Spouse Ages</th>
+                <th>Primary Age</th>
+                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
                 <th>Income Before Conversion</th>
                 <th>Conversion Amount</th>
                 <th>Total Taxable Income</th>
@@ -380,7 +395,8 @@
             <tbody>
               <tr v-for="(row, index) in filteredScenarioResults" :key="row.year">
                 <td>{{ row.year }}</td>
-                <td>{{ row.primary_age }} / {{ row.spouse_age }}</td>
+                <td>{{ row.primary_age || '' }}</td>
+                <td v-if="client?.tax_status?.toLowerCase() !== 'single'">{{ row.spouse_age || '' }}</td>
                 <td>
                   ${{ 
                     // If we have baseline data, use it for the income before conversion
@@ -517,9 +533,13 @@ export default {
   components: { Graph, AssetSelectionPanel },
   mounted() {
     // Initialize our component's chart data without affecting other components
+    console.log('🚀 RothConversionTab mounted, initializing asset line data...');
     const assetLineData = this.generateAssetLineData();
     if (assetLineData) {
+      console.log('📊 Initial assetLineData generated:', assetLineData);
       this.assetLineData = JSON.parse(JSON.stringify(assetLineData)); // Deep clone to avoid reference issues
+    } else {
+      console.warn('⚠️ Failed to generate initial asset line data');
     }
     
     const expenseSummaryData = this.generateExpenseSummaryData();
@@ -591,7 +611,10 @@ export default {
       // Asset data from API
       assetBalanceData: null,
       // Initialize assetLineData as null, will be set in mounted
-      assetLineData: null,
+      assetLineData: {
+        labels: [],
+        datasets: []
+      },
       // Initialize expenseSummaryData as null, will be set in mounted
       expenseSummaryData: null,
       // Keep the original data for backward compatibility
@@ -680,7 +703,7 @@ export default {
         maintainAspectRatio: false
       },
       lineOptions: {
-        plugins: { legend: { display: true } },
+        plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true } }
       },
     };
@@ -991,6 +1014,26 @@ export default {
       const position = ((withdrawalYear - currentYear) / totalYears) * 100;
       return Math.min(Math.max(position, 0), 100); // Clamp between 0-100%
     },
+    calculateConversionStartPosition() {
+      // Calculate the position of the conversion start year marker on the timeline
+      const currentYear = new Date().getFullYear();
+      const totalYears = 30; // Total years shown in the timeline
+      const conversionYear = parseInt(this.conversionStartYear) || currentYear;
+      
+      // Calculate position as percentage of timeline width
+      const position = ((conversionYear - currentYear) / totalYears) * 100;
+      return Math.min(Math.max(position, 0), 100); // Clamp between 0-100%
+    },
+    calculateConversionEndPosition() {
+      // Calculate the position of the conversion end year marker on the timeline
+      const currentYear = new Date().getFullYear();
+      const totalYears = 30; // Total years shown in the timeline
+      const conversionEndYear = parseInt(this.conversionStartYear) + parseInt(this.yearsToConvert) || currentYear;
+      
+      // Calculate position as percentage of timeline width
+      const position = ((conversionEndYear - currentYear) / totalYears) * 100;
+      return Math.min(Math.max(position, 0), 100); // Clamp between 0-100%
+    },
     updateAssetLineData() {
       try {
         // Generate years for x-axis
@@ -1043,6 +1086,7 @@ export default {
         this.selectedAssetList.forEach(asset => {
           const initialValue = parseFloat(asset.current_asset_balance) || 0;
           const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
+          console.log(`🔍 Asset ${asset.income_type}: initial=${initialValue}, conversion=${conversionAmount}`);
           const growthRate = parseFloat(asset.growth_rate) || 5.0;
           const yearsToConvert = parseInt(this.yearsToConvert) || 1;
           const annualConversion = conversionAmount / yearsToConvert;
@@ -1052,13 +1096,14 @@ export default {
           let balance = initialValue;
           
           for (let i = 0; i < years.length; i++) {
-            // Apply conversion for the conversion years
-            if (i < yearsToConvert && years[i] >= this.conversionStartYear) {
+            const year = years[i];
+            // Apply growth first (start of year)
+            balance = balance * (1 + (growthRate / 100));
+            
+            // Apply conversion during conversion years (reduce balance)
+            if (year >= this.conversionStartYear && year < (this.conversionStartYear + yearsToConvert)) {
               balance -= annualConversion;
             }
-            
-            // Apply growth
-            balance = balance * (1 + (growthRate / 100));
             
             // Ensure balance doesn't go below zero
             balance = Math.max(0, balance);
@@ -1085,6 +1130,7 @@ export default {
           let balance = initialValue;
           
           for (let i = 0; i < years.length; i++) {
+            const year = years[i];
             // Apply growth
             balance = balance * (1 + (growthRate / 100));
             data.push(balance);
@@ -1105,19 +1151,27 @@ export default {
         let rothBalance = 0;
         const rothGrowthRate = parseFloat(this.rothGrowthRate) || 5.0;
         const withdrawalAmount = parseFloat(this.rothWithdrawalAmount) || 0;
+        const annualConversion = this.totalConversionAmount / this.yearsToConvert;
         
         for (let i = 0; i < years.length; i++) {
           const year = years[i];
           
-          // Add conversion amounts during conversion years
-          if (i < this.yearsToConvert && year >= this.conversionStartYear) {
-            rothBalance += this.totalConversionAmount / this.yearsToConvert;
+          // Add conversion amounts during conversion years (at start of year)
+          if (year >= this.conversionStartYear && year < (this.conversionStartYear + this.yearsToConvert)) {
+            const annualConversion = this.totalConversionAmount / this.yearsToConvert;
+            rothBalance += annualConversion;
+            console.log(`💰 Year ${year}: Adding conversion ${annualConversion}, balance now: ${rothBalance}`);
           }
           
-          // Apply growth
-          rothBalance = rothBalance * (1 + (rothGrowthRate / 100));
+          // Apply growth to the entire balance (including new conversions)
+          const growthMultiplier = (1 + (rothGrowthRate / 100));
+          const balanceBeforeGrowth = rothBalance;
+          rothBalance = rothBalance * growthMultiplier;
+          if (year >= 2030 && year <= 2037) { // Only log conversion and post-conversion years to avoid spam
+            console.log(`🔍 Year ${year}: Roth balance ${balanceBeforeGrowth} * ${growthMultiplier} = ${rothBalance}`);
+          }
           
-          // Apply withdrawals if past withdrawal start year
+          // Apply withdrawals if past withdrawal start year (at end of year)
           if (year >= this.rothWithdrawalStartYear && withdrawalAmount > 0) {
             rothBalance -= withdrawalAmount;
             rothBalance = Math.max(0, rothBalance); // Ensure balance doesn't go below zero
@@ -1133,7 +1187,9 @@ export default {
             borderColor: '#6f42c1', // Purple for Roth
             backgroundColor: 'rgba(111,66,193,0.1)',
             data: rothData,
-            fill: false
+            fill: false,
+            borderWidth: 2,
+            tension: 0.1
           });
         }
         
@@ -1352,15 +1408,21 @@ export default {
             this.baselineMetrics = data.baseline || {};
           }
           
-          // Use asset balances from API if available
-          if (data.asset_balances) {
-            this.assetBalanceData = data.asset_balances;
-            // Generate asset line data using the API-provided asset balances
-            this.assetLineData = this.generateAssetLineDataFromAPI(data.asset_balances);
+          // Generate asset line data from the year-by-year results which contain asset balances
+          if (this.scenarioResults && this.scenarioResults.length > 0) {
+            console.log('📊 Generating asset line data from API results...');
+            // Extract asset balance data from year-by-year results
+            const assetLineData = this.generateAssetLineDataFromYearByYear(this.scenarioResults);
+            if (assetLineData) {
+              console.log('📊 Setting assetLineData from API:', assetLineData);
+              this.assetLineData = assetLineData;
+            }
           } else {
+            console.log('📊 No API results, using local generation...');
             // Fallback to generating asset line data locally
             const newAssetLineData = this.generateAssetLineData();
             if (newAssetLineData) {
+              console.log('📊 Setting assetLineData from local:', newAssetLineData);
               this.assetLineData = JSON.parse(JSON.stringify(newAssetLineData));
             }
           }
@@ -1373,6 +1435,26 @@ export default {
           
           // Set flag that we have run a scenario
           this.hasScenarioBeenRun = true;
+          
+          // Scroll to the Expense Summary section
+          this.$nextTick(() => {
+            const expenseSummaryElement = document.getElementById('expense-summary');
+            if (expenseSummaryElement) {
+              // First scroll to center, then adjust with a small offset
+              expenseSummaryElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center'
+              });
+              
+              // Add a small delay then scroll a bit more to show more content below
+              setTimeout(() => {
+                window.scrollBy({
+                  top: 100, // Scroll down an additional 100px
+                  behavior: 'smooth'
+                });
+              }, 500); // Wait for first scroll to complete
+            }
+          });
         } else {
           console.error('Invalid response data structure');
         }
@@ -1694,10 +1776,13 @@ export default {
         }
         
         // Add datasets for affected assets (with declining balances due to conversion)
+        console.log('🔍 selectedAssetList for graph:', this.selectedAssetList);
+        console.log('🔍 maxToConvert values:', this.maxToConvert);
         this.selectedAssetList.forEach(asset => {
           const initialValue = parseFloat(asset.current_asset_balance) || 0;
           const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
-          const growthRate = parseFloat(asset.growth_rate) || 5.0;
+          console.log(`🔍 Asset ${asset.income_type}: initial=${initialValue}, conversion=${conversionAmount}`);
+          const growthRate = (parseFloat(asset.rate_of_return) || 0.06) * 100; // Convert from decimal to percentage
           const yearsToConvert = parseInt(this.yearsToConvert) || 1;
           const annualConversion = conversionAmount / yearsToConvert;
           
@@ -1706,26 +1791,31 @@ export default {
           let balance = initialValue;
           
           for (let i = 0; i < years.length; i++) {
-            // Apply conversion for the conversion years
-            if (i < yearsToConvert && years[i] >= this.conversionStartYear) {
+            const year = years[i];
+            
+            // Apply conversion during conversion years FIRST (reduce balance at start of year)
+            if (year >= this.conversionStartYear && year < (this.conversionStartYear + yearsToConvert)) {
               balance -= annualConversion;
+              balance = Math.max(0, balance);
             }
             
-            // Apply growth
-            balance = balance * (1 + (growthRate / 100));
+            // Then apply growth on remaining balance
+            if (balance > 0) {
+              balance = balance * (1 + (growthRate / 100));
+            }
             
-            // Ensure balance doesn't go below zero
-            balance = Math.max(0, balance);
-            data.push(balance);
+            data.push(Math.round(balance)); // Round for cleaner display
           }
           
           // Add to datasets
           datasets.push({
             label: asset.income_type || 'Asset',
-            borderColor: this.getRandomColor(),
-            backgroundColor: 'rgba(0,0,0,0.1)',
+            borderColor: '#28a745', // Green for Qualified
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
             data: data,
-            fill: false
+            fill: false,
+            borderWidth: 2,
+            tension: 0.1
           });
         });
         
@@ -1739,6 +1829,7 @@ export default {
           let balance = initialValue;
           
           for (let i = 0; i < years.length; i++) {
+            const year = years[i];
             // Apply growth
             balance = balance * (1 + (growthRate / 100));
             data.push(balance);
@@ -1759,19 +1850,27 @@ export default {
         let rothBalance = 0;
         const rothGrowthRate = parseFloat(this.rothGrowthRate) || 5.0;
         const withdrawalAmount = parseFloat(this.rothWithdrawalAmount) || 0;
+        const annualConversion = this.totalConversionAmount / this.yearsToConvert;
         
         for (let i = 0; i < years.length; i++) {
           const year = years[i];
           
-          // Add conversion amounts during conversion years
-          if (i < this.yearsToConvert && year >= this.conversionStartYear) {
-            rothBalance += this.totalConversionAmount / this.yearsToConvert;
+          // Add conversion amounts during conversion years (at start of year)
+          if (year >= this.conversionStartYear && year < (this.conversionStartYear + this.yearsToConvert)) {
+            const annualConversion = this.totalConversionAmount / this.yearsToConvert;
+            rothBalance += annualConversion;
+            console.log(`💰 Year ${year}: Adding conversion ${annualConversion}, balance now: ${rothBalance}`);
           }
           
-          // Apply growth
-          rothBalance = rothBalance * (1 + (rothGrowthRate / 100));
+          // Apply growth to the entire balance (including new conversions)
+          const growthMultiplier = (1 + (rothGrowthRate / 100));
+          const balanceBeforeGrowth = rothBalance;
+          rothBalance = rothBalance * growthMultiplier;
+          if (year >= 2030 && year <= 2037) { // Only log conversion and post-conversion years to avoid spam
+            console.log(`🔍 Year ${year}: Roth balance ${balanceBeforeGrowth} * ${growthMultiplier} = ${rothBalance}`);
+          }
           
-          // Apply withdrawals if past withdrawal start year
+          // Apply withdrawals if past withdrawal start year (at end of year)
           if (year >= this.rothWithdrawalStartYear && withdrawalAmount > 0) {
             rothBalance -= withdrawalAmount;
             rothBalance = Math.max(0, rothBalance); // Ensure balance doesn't go below zero
@@ -1787,7 +1886,9 @@ export default {
             borderColor: '#6f42c1', // Purple for Roth
             backgroundColor: 'rgba(111,66,193,0.1)',
             data: rothData,
-            fill: false
+            fill: false,
+            borderWidth: 2,
+            tension: 0.1
           });
         }
         
@@ -1822,6 +1923,81 @@ export default {
             }
           ]
         };
+      }
+    },
+    generateAssetLineDataFromYearByYear(yearByYearData) {
+      try {
+        if (!yearByYearData || yearByYearData.length === 0) {
+          console.error('No year-by-year data available');
+          return this.generateAssetLineData(); // Fallback
+        }
+        
+        // Extract years and initialize asset data
+        const years = yearByYearData.map(row => row.year);
+        const qualifiedBalances = [];
+        const rothBalances = [];
+        
+        // Process each year's data
+        yearByYearData.forEach(row => {
+          // Get asset balances from the row
+          const assetBalances = row.asset_balances || {};
+          
+          // Extract Qualified balance (401k)
+          const qualifiedBalance = parseFloat(assetBalances.Qualified_balance || 0);
+          qualifiedBalances.push(qualifiedBalance);
+          
+          // Extract Roth IRA balance
+          const rothBalance = parseFloat(assetBalances.roth_ira_balance || 0);
+          rothBalances.push(rothBalance);
+        });
+        
+        // Create datasets for the chart
+        const datasets = [];
+        
+        // Add Qualified asset line
+        if (qualifiedBalances.some(v => v > 0)) {
+          datasets.push({
+            label: 'Qualified',
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            data: qualifiedBalances,
+            fill: false,
+            borderWidth: 2
+          });
+        }
+        
+        // Add Roth IRA line
+        if (rothBalances.some(v => v > 0)) {
+          datasets.push({
+            label: 'Roth IRA',
+            borderColor: '#6f42c1',
+            backgroundColor: 'rgba(111, 66, 193, 0.1)',
+            data: rothBalances,
+            fill: false,
+            borderWidth: 2
+          });
+        }
+        
+        console.log('📊 Asset line data generated from year-by-year:', {
+          years: years.length,
+          qualifiedSample: qualifiedBalances.slice(0, 5),
+          rothSample: rothBalances.slice(0, 5),
+          datasets: datasets
+        });
+        
+        // If no valid datasets, fallback to local generation
+        if (datasets.length === 0) {
+          console.warn('No valid datasets from API data, falling back to local generation');
+          return this.generateAssetLineData();
+        }
+        
+        return {
+          labels: years.map(y => y.toString()),
+          datasets: datasets
+        };
+      } catch (error) {
+        console.error('Error generating asset line data from year-by-year:', error);
+        return this.generateAssetLineData(); // Fallback
       }
     },
     generateAssetLineDataFromAPI(assetBalances) {
