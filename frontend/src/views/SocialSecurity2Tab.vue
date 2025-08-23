@@ -32,26 +32,17 @@
       <div class="col-xl-3 col-lg-4">
         <div class="smart-tools-panel">
           <div class="card border-0 shadow-sm">
-            <div class="card-header bg-light border-0">
-              <h6 class="mb-0 fw-bold">
-                <i class="bi bi-tools me-2"></i>Smart Tools
-                <button class="btn btn-sm btn-outline-secondary ms-auto" @click="toggleSmartTools">
-                  <i class="bi" :class="smartToolsExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-                </button>
-              </h6>
-            </div>
-            
-            <div class="card-body" v-show="smartToolsExpanded">
+            <div class="card-body">
               <!-- Life Expectancy Section -->
               <div class="tool-section mb-4">
                 <h6 class="section-title">Life Expectancy</h6>
                 <div class="life-expectancy-inputs">
                   <div class="expectancy-row mb-3">
-                    <label class="form-label small">{{ client?.first_name }}'s Life Expectancy</label>
+                    <label class="form-label small">{{ client?.first_name || 'Primary' }}'s Life Expectancy</label>
                     <div class="input-group input-group-sm">
                       <span class="input-group-text"><i class="bi bi-person-fill text-primary"></i></span>
-                      <input type="number" v-model="primaryLifeExpectancy" class="form-control" min="60" max="100">
-                      <span class="input-group-text">{{ currentYear + primaryLifeExpectancy - currentAge }}</span>
+                      <input type="number" v-model="primaryLifeExpectancy" class="form-control" min="60" max="100" @input="updateCalculations">
+                      <span class="input-group-text">{{ getPrimaryLifeExpectancyYear }}</span>
                     </div>
                   </div>
                   
@@ -59,8 +50,8 @@
                     <label class="form-label small">{{ client?.spouse?.first_name || 'Spouse' }}'s Life Expectancy</label>
                     <div class="input-group input-group-sm">
                       <span class="input-group-text"><i class="bi bi-person-fill text-info"></i></span>
-                      <input type="number" v-model="spouseLifeExpectancy" class="form-control" min="60" max="100">
-                      <span class="input-group-text">{{ currentYear + spouseLifeExpectancy - spouseCurrentAge }}</span>
+                      <input type="number" v-model="spouseLifeExpectancy" class="form-control" min="60" max="100" @input="updateCalculations">
+                      <span class="input-group-text">{{ getSpouseLifeExpectancyYear }}</span>
                     </div>
                   </div>
                 </div>
@@ -157,7 +148,7 @@
                 </div>
               </div>
 
-              <!-- Social Security Stress Test -->
+              <!-- IRMAA Stress Test -->
               <div class="tool-section mb-4">
                 <div class="form-check form-switch">
                   <input 
@@ -167,50 +158,13 @@
                     id="stressTestSwitch"
                   >
                   <label class="form-check-label fw-bold" for="stressTestSwitch">
-                    Social Security Stress Test
+                    IRMAA Stress Test
                   </label>
                 </div>
-                <p class="small text-muted mb-3">Include a future reduction in benefits</p>
+                <p class="small text-muted mb-3">Show Reduction in benefit due to IRMAA</p>
                 
-                <div v-if="includeStressTest">
-                  <div class="row g-2 mb-2">
-                    <div class="col-6">
-                      <label class="form-label small">Reduction Date</label>
-                      <input type="number" v-model="stressTestYear" class="form-control form-control-sm" placeholder="2034">
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label small">Reduction</label>
-                      <div class="input-group input-group-sm">
-                        <input type="number" v-model="stressTestReduction" class="form-control" placeholder="23">
-                        <span class="input-group-text">%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              <!-- Opportunity Cost -->
-              <div class="tool-section mb-4">
-                <div class="form-check form-switch">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    v-model="includeOpportunityCost" 
-                    id="opportunityCostSwitch"
-                  >
-                  <label class="form-check-label fw-bold" for="opportunityCostSwitch">
-                    Opportunity Cost
-                  </label>
-                </div>
-                
-                <div v-if="includeOpportunityCost" class="mt-2">
-                  <label class="form-label small">Interest Rate</label>
-                  <div class="input-group input-group-sm">
-                    <input type="number" v-model="opportunityRate" class="form-control" step="0.1" placeholder="1.0">
-                    <span class="input-group-text">%</span>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <!-- Action Buttons -->
@@ -473,7 +427,6 @@ export default {
   data() {
     return {
       // UI State
-      smartToolsExpanded: true,
       activeChartTab: 'lifetime',
       showTradeoffs: false,
       
@@ -482,15 +435,11 @@ export default {
       spouseClaimingAge: 67,
       
       // Life expectancy
-      primaryLifeExpectancy: 85,
-      spouseLifeExpectancy: 85,
+      primaryLifeExpectancy: null,
+      spouseLifeExpectancy: null,
       
       // Advanced options
       includeStressTest: false,
-      stressTestYear: 2034,
-      stressTestReduction: 23,
-      includeOpportunityCost: false,
-      opportunityRate: 1.0,
       
       // Social Security data
       ssData: {
@@ -568,13 +517,36 @@ export default {
     },
     optimalStrategy() {
       return `Claim at ${this.primaryFRA}`;
+    },
+    getPrimaryLifeExpectancyYear() {
+      if (!this.client?.birthdate || !this.primaryLifeExpectancy) return '';
+      const birthDate = new Date(this.client.birthdate);
+      const lifeExpectancyYear = birthDate.getFullYear() + this.primaryLifeExpectancy;
+      return lifeExpectancyYear.toString();
+    },
+    getSpouseLifeExpectancyYear() {
+      if (!this.client?.spouse?.birthdate || !this.spouseLifeExpectancy) return '';
+      const birthDate = new Date(this.client.spouse.birthdate);
+      const lifeExpectancyYear = birthDate.getFullYear() + this.spouseLifeExpectancy;
+      return lifeExpectancyYear.toString();
     }
   },
   mounted() {
+    console.log('🔄 SocialSecurity2Tab mounted - initializing...');
     this.initializeData();
     this.$nextTick(() => {
       this.initializeCharts();
     });
+  },
+  watch: {
+    scenario: {
+      handler() {
+        if (this.$el) { // Only reinitialize if component is already mounted
+          this.initializeData();
+        }
+      },
+      deep: true
+    }
   },
   beforeUnmount() {
     if (this.lifetimeChart) {
@@ -582,23 +554,55 @@ export default {
     }
   },
   methods: {
-    toggleSmartTools() {
-      this.smartToolsExpanded = !this.smartToolsExpanded;
-    },
     toggleTradeoffs() {
       this.showTradeoffs = !this.showTradeoffs;
     },
     initializeData() {
+      console.log('🔍 SS2_DEBUG: initializeData called');
+      console.log('🔍 SS2_DEBUG: scenario in initializeData:', this.scenario?.id);
+      console.log('🔍 SS2_DEBUG: scenario.income_sources in initializeData:', this.scenario?.income_sources);
+      
       // Set life expectancy from scenario
       if (this.scenario?.mortality_age) {
         this.primaryLifeExpectancy = Number(this.scenario.mortality_age);
+      } else {
+        // Default to 85 if not set
+        this.primaryLifeExpectancy = 85;
       }
       
-      if (this.scenario?.spouse_mortality_age) {
+      if (this.hasSpouse && this.scenario?.spouse_mortality_age) {
         this.spouseLifeExpectancy = Number(this.scenario.spouse_mortality_age);
+      } else if (this.hasSpouse) {
+        // Default to 85 if not set
+        this.spouseLifeExpectancy = 85;
       }
       
-      // Load saved settings
+      // Extract Social Security data first
+      this.extractSocialSecurityData();
+      
+      // Set FRA and default claiming ages from Social Security data
+      if (this.ssData.primary) {
+        // Set FRA from Social Security data if available
+        if (this.ssData.primary.startAge) {
+          this.primaryFRA = this.ssData.primary.startAge;
+          // Default claiming age to FRA unless already saved
+          if (!this.scenario?.primary_ss_claiming_age) {
+            this.primaryClaimingAge = this.primaryFRA;
+          }
+        }
+      }
+      
+      if (this.hasSpouse && this.ssData.spouse) {
+        if (this.ssData.spouse.startAge) {
+          this.spouseFRA = this.ssData.spouse.startAge;
+          // Default claiming age to FRA unless already saved
+          if (!this.scenario?.spouse_ss_claiming_age) {
+            this.spouseClaimingAge = this.spouseFRA;
+          }
+        }
+      }
+      
+      // Load saved settings (override defaults if they exist)
       if (this.scenario?.primary_ss_claiming_age) {
         this.primaryClaimingAge = this.scenario.primary_ss_claiming_age;
       }
@@ -607,15 +611,33 @@ export default {
         this.spouseClaimingAge = this.scenario.spouse_ss_claiming_age;
       }
       
-      // Extract Social Security data
-      this.extractSocialSecurityData();
-      
       // Calculate initial benefits
       this.updateCalculations();
     },
     extractSocialSecurityData() {
+      console.log('🔍 SS2_DEBUG: extractSocialSecurityData called');
+      console.log('🔍 SS2_DEBUG: scenario.income_sources:', this.scenario?.income_sources);
+      
       if (!this.scenario?.income_sources) {
-        console.warn('No income sources found in scenario');
+        console.log('🔍 SS2_DEBUG: No income_sources, using fallback data');
+        // Use fallback data for demonstration purposes
+        this.ssData.primary = {
+          amountAtFRA: 2800, // Sample benefit amount at FRA
+          startAge: 67,      // Full Retirement Age
+          endAge: 100,
+          ownedBy: 'primary',
+          cola: 0.02
+        };
+        
+        if (this.hasSpouse) {
+          this.ssData.spouse = {
+            amountAtFRA: 2200, // Sample spouse benefit amount at FRA
+            startAge: 67,      // Full Retirement Age
+            endAge: 100,
+            ownedBy: 'spouse',
+            cola: 0.02
+          };
+        }
         return;
       }
       
@@ -623,14 +645,22 @@ export default {
         income.income_type === 'Social Security' || income.income_type === 'social_security'
       );
       
+      console.log('🔍 SS2_DEBUG: Found SS income sources:', ssIncomeSources);
+      
       ssIncomeSources.forEach(income => {
+        console.log('🔍 SS2_DEBUG: Processing SS income:', income);
+        console.log('🔍 SS2_DEBUG: amount_at_fra:', income.amount_at_fra);
+        console.log('🔍 SS2_DEBUG: monthly_amount:', income.monthly_amount);
+        
         const data = {
-          amountAtFRA: parseFloat(income.amount_at_fra || income.monthly_amount || 0),
-          startAge: parseInt(income.age_to_begin_withdrawal) || this.primaryFRA,
+          amountAtFRA: parseFloat(income.amount_at_fra || income.monthly_amount || 2800),
+          startAge: parseInt(income.age_to_begin_withdrawal) || 67,
           endAge: parseInt(income.age_to_end_withdrawal) || 100,
           ownedBy: income.owned_by,
           cola: parseFloat(income.cola) || 0.02
         };
+        
+        console.log('🔍 SS2_DEBUG: Extracted SS data:', data);
         
         if (income.owned_by === 'primary') {
           this.ssData.primary = data;
@@ -638,6 +668,17 @@ export default {
           this.ssData.spouse = data;
         }
       });
+      
+      // Ensure we have at least primary data
+      if (!this.ssData.primary) {
+        this.ssData.primary = {
+          amountAtFRA: 2800,
+          startAge: 67,
+          endAge: 100,
+          ownedBy: 'primary',
+          cola: 0.02
+        };
+      }
     },
     updateCalculations() {
       this.calculateMonthlyBenefits();
@@ -906,7 +947,6 @@ export default {
       }
       
       this.includeStressTest = false;
-      this.includeOpportunityCost = false;
       this.updateCalculations();
     },
     applyChanges() {

@@ -155,21 +155,6 @@
             <h6 class="text-muted mb-3">Tax Settings</h6>
             
             <div class="mb-3">
-              <label class="form-label">Model Change in Taxes</label>
-              <select 
-                v-model="localScenario.model_tax_change" 
-                class="form-select"
-                @change="$emit('update:scenario', localScenario)"
-              >
-                <option value="">No Change</option>
-                <option value="sunset_tcja">Sunset of TCJA (2026)</option>
-                <option value="raise_top_bracket">Raise Top Bracket to 39.6%</option>
-                <option value="lower_standard_deduction">Lower Standard Deduction</option>
-                <option value="cap_itemized_deductions">Cap on Itemized Deductions</option>
-              </select>
-            </div>
-
-            <div class="mb-3">
               <div class="form-check form-switch">
                 <input 
                   class="form-check-input" 
@@ -181,6 +166,74 @@
               </div>
             </div>
 
+            <!-- Deduction Fields (shown when Apply Standard Deductions is checked) -->
+            <div v-show="localScenario.apply_standard_deduction">
+              <div class="mb-3">
+                <label class="form-label">
+                  Federal Standard Deduction ($)
+                  <i class="bi bi-info-circle ms-1" 
+                     data-bs-toggle="tooltip" 
+                     data-bs-placement="top" 
+                     title="Auto-populated based on filing status, can be overridden"></i>
+                </label>
+                <input 
+                  :value="formatCurrencyDisplay(localScenario.federal_standard_deduction || 0)"
+                  @input="handleCurrencyInput($event, 'federal_standard_deduction')"
+                  type="text"
+                  class="form-control"
+                  placeholder="Auto-populated from IRS table"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">
+                  State Standard Deduction ($)
+                  <i class="bi bi-info-circle ms-1" 
+                     data-bs-toggle="tooltip" 
+                     data-bs-placement="top" 
+                     title="Additional state-level standard deduction"></i>
+                </label>
+                <input 
+                  :value="formatCurrencyDisplay(localScenario.state_standard_deduction || 0)"
+                  @input="handleCurrencyInput($event, 'state_standard_deduction')"
+                  type="text"
+                  class="form-control"
+                  placeholder="Enter state deduction amount"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">
+                  Custom Annual Deduction ($)
+                  <i class="bi bi-info-circle ms-1" 
+                     data-bs-toggle="tooltip" 
+                     data-bs-placement="top" 
+                     title="Optional: Itemized deductions, business expenses, etc."></i>
+                </label>
+                <input 
+                  :value="formatCurrencyDisplay(localScenario.custom_annual_deduction || 0)"
+                  @input="handleCurrencyInput($event, 'custom_annual_deduction')"
+                  type="text"
+                  class="form-control"
+                  placeholder="Additional itemized or special deductions"
+                />
+              </div>
+              
+              <div class="alert alert-info py-2 px-3">
+                <small>
+                  <strong>Total Deduction: {{ formatCurrencyDisplay(totalDeductions) }}</strong>
+                  <br>
+                  This amount will be subtracted from taxable income in calculations.
+                </small>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Social Security Settings -->
+          <div class="col-md-6">
+            <h6 class="text-muted mb-3">Social Security Settings</h6>
+            
             <div class="mb-3">
               <div class="form-check form-switch">
                 <input 
@@ -189,37 +242,67 @@
                   v-model="localScenario.reduction_2030_ss"
                   @change="$emit('update:scenario', localScenario)"
                 />
-                <label class="form-check-label">2030 Reduction in SS</label>
+                <label class="form-check-label">2030 Social Security Adjustment</label>
               </div>
             </div>
-          </div>
-
-          <!-- Medicare Settings -->
-          <div class="col-md-6">
-            <h6 class="text-muted mb-3">Medicare Settings</h6>
             
-            <div class="mb-3">
-              <label class="form-label">Medicare Part B Inflation Rate</label>
-              <select 
-                v-model="localScenario.part_b_inflation_rate" 
-                class="form-select"
-                @change="$emit('update:scenario', localScenario)"
-              >
-                <option value="6">6%</option>
-                <option value="7">7%</option>
-              </select>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Medicare Part D Inflation Rate</label>
-              <select 
-                v-model="localScenario.part_d_inflation_rate" 
-                class="form-select"
-                @change="$emit('update:scenario', localScenario)"
-              >
-                <option value="6">6%</option>
-                <option value="7">7%</option>
-              </select>
+            <!-- SS Adjustment Options (shown when toggle is checked) -->
+            <div v-show="localScenario.reduction_2030_ss">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-12 mb-2">
+                  <small class="text-muted">
+                    <strong>Decrease</strong> Social Security benefits starting in 2030 by:
+                  </small>
+                </div>
+                
+                <div class="col-md-6">
+                  <label class="form-label small">Type</label>
+                  <select 
+                    v-model="localScenario.ss_adjustment_type" 
+                    class="form-select form-select-sm"
+                    @change="$emit('update:scenario', localScenario)"
+                  >
+                    <option value="percentage">Percentage</option>
+                    <option value="flat">Flat Amount</option>
+                  </select>
+                </div>
+                
+                <div class="col-md-6">
+                  <label class="form-label small">
+                    {{ localScenario.ss_adjustment_type === 'percentage' ? 'Percent (%)' : 'Amount ($)' }}
+                  </label>
+                  <input 
+                    v-if="localScenario.ss_adjustment_type === 'percentage'"
+                    v-model.number="localScenario.ss_adjustment_amount" 
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    class="form-control form-control-sm"
+                    placeholder="e.g., 23"
+                    @input="$emit('update:scenario', localScenario)"
+                  />
+                  <input 
+                    v-else
+                    :value="formatCurrencyDisplay(localScenario.ss_adjustment_amount || 0)"
+                    @input="handleCurrencyInput($event, 'ss_adjustment_amount')"
+                    type="text"
+                    class="form-control form-control-sm"
+                    placeholder="e.g., 5000"
+                  />
+                </div>
+              </div>
+              
+              <div class="alert alert-warning py-1 px-2 mt-2">
+                <small>
+                  <strong>Summary:</strong> 
+                  Decrease SS benefits by 
+                  {{ localScenario.ss_adjustment_type === 'percentage' 
+                    ? localScenario.ss_adjustment_amount + '%' 
+                    : formatCurrencyDisplay(localScenario.ss_adjustment_amount || 0) }}
+                  starting in 2030
+                </small>
+              </div>
             </div>
           </div>
         </div>
@@ -229,8 +312,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import axios from 'axios'
+import { formatCurrencyDisplay } from '../utils/currencyFormatter'
 
 const props = defineProps({
   scenario: {
@@ -254,11 +339,31 @@ const props = defineProps({
 const emit = defineEmits(['update:scenario', 'save'])
 
 const showAdvanced = ref(false)
-const localScenario = ref({ ...props.scenario })
+const localScenario = ref({ 
+  ...props.scenario,
+  // Set defaults for SS adjustment fields if not present
+  ss_adjustment_direction: props.scenario.ss_adjustment_direction || 'decrease',
+  ss_adjustment_type: props.scenario.ss_adjustment_type || 'percentage',
+  ss_adjustment_amount: props.scenario.ss_adjustment_amount || 23
+})
+
+// Computed property for total deductions
+const totalDeductions = computed(() => {
+  const federal = localScenario.value.federal_standard_deduction || 0
+  const state = localScenario.value.state_standard_deduction || 0
+  const custom = localScenario.value.custom_annual_deduction || 0
+  return federal + state + custom
+})
 
 // Watch for external changes to scenario
 watch(() => props.scenario, (newVal) => {
-  localScenario.value = { ...newVal }
+  localScenario.value = { 
+    ...newVal,
+    // Set defaults for SS adjustment fields if not present
+    ss_adjustment_direction: newVal.ss_adjustment_direction || 'decrease',
+    ss_adjustment_type: newVal.ss_adjustment_type || 'percentage',
+    ss_adjustment_amount: newVal.ss_adjustment_amount || 23
+  }
 }, { deep: true })
 
 const states = [
@@ -317,6 +422,81 @@ const states = [
 const ageRange = (start, end) => {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i)
 }
+
+// Currency input handler
+const handleCurrencyInput = (event, field) => {
+  let value = event.target.value.replace(/[^0-9.]/g, '') // Remove non-numeric characters except decimal
+  
+  // Handle multiple decimals - only allow one
+  const parts = value.split('.')
+  if (parts.length > 2) {
+    value = parts[0] + '.' + parts[1]
+  }
+  
+  // Limit decimal places to 2
+  if (parts[1] && parts[1].length > 2) {
+    value = parts[0] + '.' + parts[1].slice(0, 2)
+  }
+  
+  // Convert to number and update the scenario
+  const numericValue = parseFloat(value) || 0
+  localScenario.value[field] = numericValue
+  
+  // Update display with formatted currency
+  event.target.value = formatCurrencyDisplay(numericValue)
+  
+  // Emit update
+  emit('update:scenario', localScenario.value)
+}
+
+// Fetch federal standard deduction based on client tax status
+const fetchFederalStandardDeduction = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    const headers = token ? { Authorization: `Bearer ${token}` } : {}
+    
+    const response = await axios.get('http://localhost:8000/api/tax/federal-standard-deduction/', {
+      params: {
+        filing_status: props.clientTaxStatus
+      },
+      headers
+    })
+    
+    if (response.data && response.data.deduction_amount) {
+      localScenario.value.federal_standard_deduction = response.data.deduction_amount
+      emit('update:scenario', localScenario.value)
+    }
+  } catch (error) {
+    console.error('Error fetching federal standard deduction:', error.response?.data || error)
+  }
+}
+
+// Watch for changes in client tax status to update standard deduction
+watch(() => props.clientTaxStatus, () => {
+  if (localScenario.value.apply_standard_deduction) {
+    fetchFederalStandardDeduction()
+  }
+})
+
+// Watch for changes in apply_standard_deduction toggle
+watch(() => localScenario.value.apply_standard_deduction, (newValue) => {
+  if (newValue) {
+    fetchFederalStandardDeduction()
+  }
+})
+
+// Fetch deduction when component mounts if apply_standard_deduction is already enabled
+onMounted(() => {
+  if (localScenario.value.apply_standard_deduction) {
+    fetchFederalStandardDeduction()
+  }
+  
+  // Initialize Bootstrap tooltips
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+  })
+})
 
 // Removed headerColor computed property - using consistent light grey headers
 </script>

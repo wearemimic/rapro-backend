@@ -108,15 +108,17 @@
               </select>
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-bold">Monthly Withdrawal Amount</label>
+              <label class="form-label fw-bold">Minimum Monthly Withdrawal</label>
               <div class="input-group">
                 <span class="input-group-text">$</span>
                 <input 
-                  v-model.number="investment.monthly_withdrawal_amount" 
-                  type="number" 
+                  :value="monthlyWithdrawalDisplay"
+                  @input="onMonthlyWithdrawalInput"
+                  @focus="onMonthlyWithdrawalFocus"
+                  @blur="onMonthlyWithdrawalBlur"
+                  type="text" 
                   class="form-control" 
-                  placeholder="0"
-                  step="0.01"
+                  placeholder="2,500"
                 />
               </div>
             </div>
@@ -147,10 +149,13 @@
                 <div class="input-group">
                   <span class="input-group-text">$</span>
                   <input 
-                    v-model.number="investment.annual_contribution_amount" 
-                    type="number" 
+                    :value="annualContributionDisplay"
+                    @input="onAnnualContributionInput"
+                    @focus="onAnnualContributionFocus"
+                    @blur="onAnnualContributionBlur"
+                    type="text" 
                     class="form-control" 
-                    placeholder=""
+                    placeholder="25,000"
                   />
                 </div>
               </div>
@@ -164,7 +169,7 @@
                     v-model.number="investment.employer_match" 
                     type="number" 
                     class="form-control" 
-                    placeholder="4"
+                    placeholder="0"
                     step="0.1"
                   />
                   <span class="input-group-text">%</span>
@@ -238,6 +243,8 @@ const investment = ref({
 
 // For formatted display
 const currentBalanceDisplay = ref('')
+const monthlyWithdrawalDisplay = ref('')
+const annualContributionDisplay = ref('')
 
 // Computed properties for age ranges
 const currentLifespan = computed(() => {
@@ -299,6 +306,8 @@ const resetForm = () => {
     age_last_contribution: null
   }
   currentBalanceDisplay.value = ''
+  monthlyWithdrawalDisplay.value = ''
+  annualContributionDisplay.value = ''
 }
 
 // Currency formatting functions
@@ -360,6 +369,90 @@ const onCurrentBalanceBlur = () => {
   // Format as currency on blur
   if (investment.value.current_balance) {
     currentBalanceDisplay.value = formatCurrency(investment.value.current_balance)
+  }
+}
+
+// Monthly Withdrawal Amount formatting
+const onMonthlyWithdrawalFocus = () => {
+  monthlyWithdrawalDisplay.value = investment.value.monthly_withdrawal_amount ? investment.value.monthly_withdrawal_amount.toString() : ''
+}
+
+const onMonthlyWithdrawalInput = (event) => {
+  let raw = event.target.value.replace(/[^0-9.]/g, '')
+  const parts = raw.split('.')
+  if (parts.length > 2) raw = parts[0] + '.' + parts[1]
+  if (parts[1]) raw = parts[0] + '.' + parts[1].slice(0, 2)
+  
+  if (raw === '.') {
+    monthlyWithdrawalDisplay.value = '0.'
+    investment.value.monthly_withdrawal_amount = 0
+    return
+  }
+  
+  if (raw === '') {
+    monthlyWithdrawalDisplay.value = ''
+    investment.value.monthly_withdrawal_amount = null
+    return
+  }
+  
+  let numeric = parseFloat(raw)
+  if (isNaN(numeric)) numeric = 0
+  
+  const [intPart, decPart] = numeric.toString().split('.')
+  let formatted = parseInt(intPart, 10).toLocaleString()
+  if (decPart !== undefined) {
+    formatted += '.' + decPart
+  }
+  
+  monthlyWithdrawalDisplay.value = formatted
+  investment.value.monthly_withdrawal_amount = numeric
+}
+
+const onMonthlyWithdrawalBlur = () => {
+  if (investment.value.monthly_withdrawal_amount) {
+    monthlyWithdrawalDisplay.value = new Intl.NumberFormat('en-US').format(investment.value.monthly_withdrawal_amount)
+  }
+}
+
+// Annual Contribution Amount formatting
+const onAnnualContributionFocus = () => {
+  annualContributionDisplay.value = investment.value.annual_contribution_amount ? investment.value.annual_contribution_amount.toString() : ''
+}
+
+const onAnnualContributionInput = (event) => {
+  let raw = event.target.value.replace(/[^0-9.]/g, '')
+  const parts = raw.split('.')
+  if (parts.length > 2) raw = parts[0] + '.' + parts[1]
+  if (parts[1]) raw = parts[0] + '.' + parts[1].slice(0, 2)
+  
+  if (raw === '.') {
+    annualContributionDisplay.value = '0.'
+    investment.value.annual_contribution_amount = 0
+    return
+  }
+  
+  if (raw === '') {
+    annualContributionDisplay.value = ''
+    investment.value.annual_contribution_amount = null
+    return
+  }
+  
+  let numeric = parseFloat(raw)
+  if (isNaN(numeric)) numeric = 0
+  
+  const [intPart, decPart] = numeric.toString().split('.')
+  let formatted = parseInt(intPart, 10).toLocaleString()
+  if (decPart !== undefined) {
+    formatted += '.' + decPart
+  }
+  
+  annualContributionDisplay.value = formatted
+  investment.value.annual_contribution_amount = numeric
+}
+
+const onAnnualContributionBlur = () => {
+  if (investment.value.annual_contribution_amount) {
+    annualContributionDisplay.value = new Intl.NumberFormat('en-US').format(investment.value.annual_contribution_amount)
   }
 }
 
