@@ -96,6 +96,10 @@
                           Social Security Details
                         </router-link>
                         <router-link class="nav-link ps-4" 
+                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'socialSecurity2' }}">
+                          Social Security 2
+                        </router-link>
+                        <router-link class="nav-link ps-4" 
                           :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'medicare' }}">
                           Medicare Details
                         </router-link>

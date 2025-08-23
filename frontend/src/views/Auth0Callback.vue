@@ -26,12 +26,19 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuth0 } from '@auth0/auth0-vue';
+// import { useAuth0 } from '@auth0/auth0-vue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
-const { getAccessTokenSilently, user, isAuthenticated, isLoading, error: auth0Error } = useAuth0();
+// Auth0 Vue plugin is temporarily disabled for debugging
+// const { getAccessTokenSilently, user, isAuthenticated, isLoading, error: auth0Error } = useAuth0();
 const authStore = useAuthStore();
+
+// Mock the Auth0 values for now
+const isLoading = ref(false);
+const isAuthenticated = ref(false);
+const user = ref(null);
+const auth0Error = ref(null);
 
 const error = ref(null);
 const debug = ref(false);
@@ -39,13 +46,20 @@ const debugInfo = ref({});
 const showSignupLink = ref(false);
 
 onMounted(async () => {
+  console.log('🚀 Auth0Callback component mounted');
+  console.log('🚀 Current URL:', window.location.href);
+  console.log('🚀 URL params:', window.location.search);
+  
   // Wait for Auth0 to finish loading
   if (!isLoading.value) {
+    console.log('🚀 Auth0 not loading, handling authentication immediately');
     await handleAuth0Authentication();
   } else {
+    console.log('🚀 Auth0 is loading, waiting...');
     // Set up a watcher for isLoading
     const checkAuth = setInterval(() => {
       if (!isLoading.value) {
+        console.log('🚀 Auth0 finished loading, handling authentication');
         handleAuth0Authentication();
         clearInterval(checkAuth);
       }
@@ -62,6 +76,40 @@ const handleAuth0Authentication = async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
     const state = urlParams.get('state');
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+    
+    // Check for Auth0 errors in URL parameters
+    if (error) {
+      throw new Error(`Auth0 Error: ${error} - ${errorDescription || 'Unknown error'}`);
+    }
+    
+    // Verify state parameter for CSRF protection
+    const storedState = sessionStorage.getItem('auth0_state');
+    
+    // Only validate state if we have both state in URL and stored state
+    if (authCode && state && storedState) {
+      if (state !== storedState) {
+        console.error('❌ State parameter mismatch - possible CSRF attack');
+        console.error('URL state:', state);
+        console.error('Stored state:', storedState);
+        sessionStorage.removeItem('auth0_state');
+        sessionStorage.removeItem('auth0_nonce');
+        throw new Error('Authentication failed: Invalid state parameter. Please try logging in again.');
+      } else {
+        console.log('✅ State parameter verified successfully');
+        sessionStorage.removeItem('auth0_state');
+        sessionStorage.removeItem('auth0_nonce');
+      }
+    } else if (authCode && !state && storedState) {
+      // Auth0 didn't return a state, but we have one stored - might be an issue
+      console.warn('⚠️ No state parameter in callback but expected one');
+      sessionStorage.removeItem('auth0_state');
+      sessionStorage.removeItem('auth0_nonce');
+    } else if (authCode && !state && !storedState) {
+      // No state validation needed - might be a direct Auth0 redirect
+      console.log('ℹ️ No state parameter validation (direct Auth0 redirect)');
+    }
     
     debugInfo.value = {
       isLoading: isLoading.value,
@@ -72,12 +120,14 @@ const handleAuth0Authentication = async () => {
       emailVerified: user.value?.email_verified,
       authCode: authCode ? `${authCode.substring(0, 10)}...` : null,
       hasState: !!state,
+      hasStoredState: !!storedState,
+      stateValid: state === storedState,
       timestamp: new Date().toISOString()
     };
 
     console.log('Auth0 Debug Info:', debugInfo.value);
 
-    // Check for Auth0 errors first
+    // Check for Auth0 errors from the SDK
     if (auth0Error.value) {
       throw new Error(`Auth0 Error: ${auth0Error.value.message || auth0Error.value}`);
     }
@@ -87,14 +137,17 @@ const handleAuth0Authentication = async () => {
       console.log('🔄 Found authorization code, processing manually...');
       
       // Exchange authorization code via our backend (secure)
-      const tokenResponse = await fetch(`http://localhost:8000/api/auth0/exchange-code/`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
+      
+      const tokenResponse = await fetch(`${apiUrl}/auth0/exchange-code/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           code: authCode,
-          redirect_uri: 'http://localhost:3000/auth/callback'
+          redirect_uri: callbackUrl
         })
       });
       
@@ -146,29 +199,46 @@ const handleAuth0Authentication = async () => {
       }
     }
 
-    // Check if user is authenticated with Auth0 Vue plugin
-    if (isAuthenticated.value && user.value) {
-      console.log('User authenticated via Auth0 Vue plugin, getting access token...');
+    // Skip Auth0 Vue plugin check since it's disabled
+    // if (isAuthenticated.value && user.value) {
+    //   console.log('User authenticated via Auth0 Vue plugin, getting access token...');
+    //   
+    //   // Get the access token
+    //   const accessToken = await getAccessTokenSilently();
+    //   console.log('Access token obtained, length:', accessToken?.length);
+    //   
+    //   // Exchange Auth0 token for our backend token
+    //   console.log('Attempting backend token exchange...');
+    //   const success = await authStore.loginWithAuth0(accessToken);
+    //   
+    //   if (success) {
+    //     console.log('Backend token exchange successful');
+    //     router.push('/dashboard');
+    //   } else {
+    //     throw new Error('Backend token exchange failed');
+    //   }
+    // } else 
+    if (!authCode) {
+      // No auth code means we might be coming back from Auth0 without proper params
+      console.warn('⚠️ No authorization code in callback URL');
+      console.log('URL params:', window.location.search);
       
-      // Get the access token
-      const accessToken = await getAccessTokenSilently();
-      console.log('Access token obtained, length:', accessToken?.length);
-      
-      // Exchange Auth0 token for our backend token
-      console.log('Attempting backend token exchange...');
-      const success = await authStore.loginWithAuth0(accessToken);
-      
-      if (success) {
-        console.log('Backend token exchange successful');
-        router.push('/dashboard');
-      } else {
-        throw new Error('Backend token exchange failed');
+      // Check if this is just a page refresh or direct access
+      if (!window.location.search || window.location.search === '?') {
+        console.log('Direct access to callback page, redirecting to login');
+        router.push('/login');
+        return;
       }
-    } else if (!authCode) {
+      
       throw new Error(`No authentication data found: isAuthenticated=${isAuthenticated.value}, hasUser=${!!user.value}, authCode=${!!authCode}`);
     }
   } catch (err) {
-    console.error('Error handling Auth0 authentication:', err);
+    console.error('❌ Error handling Auth0 authentication:', err);
+    console.error('❌ Full error details:', {
+      message: err.message,
+      stack: err.stack,
+      debugInfo: debugInfo.value
+    });
     error.value = err.message || 'Authentication failed';
     
     // Show error for a few seconds, then redirect
