@@ -52,9 +52,22 @@ app.use(pinia);
 
 router.beforeEach((to, _, next) => {
   const authStore = useAuthStore();
+  
+  console.log('🔍 Router navigation to:', to.path);
+  console.log('🔍 Router query params:', to.query);
+  
+  // Special handling for Auth0 callback
+  if (to.path === '/auth/callback') {
+    console.log('🎯 Auth0 callback route detected!');
+    console.log('🎯 Full URL:', window.location.href);
+    // Don't interfere with the callback
+    next();
+    return;
+  }
 
   // Check if route requires auth
   if (to.meta.requiresAuth && !authStore.token) {
+    console.log('⚠️ Route requires auth but no token, redirecting to login');
     next('/login');
   } else {
     next();

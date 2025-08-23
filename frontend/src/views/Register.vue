@@ -868,11 +868,27 @@ const signupWithAuth0 = async (connection) => {
     // Store registration flow in localStorage
     localStorage.setItem('auth0_flow', 'registration');
     
-    let authUrl = `https://genai-030069804226358743.us.auth0.com/authorize?` +
-      `client_id=MS2O3usgLl8btDkPNwO6i0ZzC4LxR0Jw&` +
+    // Generate a random state parameter for CSRF protection
+    const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    // Store state in sessionStorage for verification on callback
+    sessionStorage.setItem('auth0_state', state);
+    console.log('🔐 Generated and stored state parameter');
+    
+    // Generate a nonce for additional security
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    sessionStorage.setItem('auth0_nonce', nonce);
+    
+    const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+    const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
+    
+    let authUrl = `https://${domain}/authorize?` +
+      `client_id=${clientId}&` +
       `response_type=code&` +
-      `redirect_uri=http://localhost:3000/auth/callback&` +
+      `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
       `scope=openid profile email&` +
+      `state=${state}&` +
+      `nonce=${nonce}&` +
       `screen_hint=signup`;
     
     // Add connection if specified

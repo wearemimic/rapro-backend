@@ -151,6 +151,11 @@ class Scenario(models.Model):
     income_vs_cost_percent = models.IntegerField(default=0, help_text="Percentage of federal tax + medicare to gross income")
     medicare_irmaa_percent = models.IntegerField(default=0, help_text="Percentage of IRMAA surcharges to total medicare costs")
     primary_state = models.CharField(max_length=50, blank=True, default='', help_text="Primary tax state for this scenario")
+    
+    # Social Security claiming strategy fields
+    primary_ss_claiming_age = models.FloatField(null=True, blank=True, help_text="Primary client's Social Security claiming age")
+    spouse_ss_claiming_age = models.FloatField(null=True, blank=True, help_text="Spouse's Social Security claiming age")
+    ss_include_irmaa = models.BooleanField(default=False, help_text="Include IRMAA impact in Social Security analysis")
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

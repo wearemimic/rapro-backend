@@ -105,11 +105,17 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { useAuth0 } from '@auth0/auth0-vue';
+// import { useAuth0 } from '@auth0/auth0-vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
-const { loginWithRedirect, getAccessTokenSilently, user, isAuthenticated, isLoading } = useAuth0();
+// const { loginWithRedirect, getAccessTokenSilently, user, isAuthenticated, isLoading } = useAuth0();
+// Auth0 Vue plugin is disabled for debugging
+const loginWithRedirect = null;
+const isAuthenticated = ref(false);
+const isLoading = ref(false);
+const user = ref(null);
+const getAccessTokenSilently = null;
 
 const email = ref('');
 const password = ref('');
@@ -173,11 +179,24 @@ const handleLegacyLogin = async () => {
 const testAuth0Direct = () => {
   console.log('🔬 Testing Auth0 direct redirect...');
   
-  const authUrl = `https://genai-030069804226358743.us.auth0.com/authorize?` +
-    `client_id=MS2O3usgLl8btDkPNwO6i0ZzC4LxR0Jw&` +
+  // Generate state and nonce for security
+  const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+  sessionStorage.setItem('auth0_state', state);
+  sessionStorage.setItem('auth0_nonce', nonce);
+  localStorage.setItem('auth0_flow', 'login');
+  
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+  const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
+  
+  const authUrl = `https://${domain}/authorize?` +
+    `client_id=${clientId}&` +
     `response_type=code&` +
-    `redirect_uri=http://localhost:3000/auth/callback&` +
+    `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
     `scope=openid profile email&` +
+    `state=${state}&` +
+    `nonce=${nonce}&` +
     `connection=google-oauth2`;
   
   console.log('🔬 Redirecting to:', authUrl);
@@ -195,6 +214,16 @@ const loginWithAuth0 = async (connection) => {
     // For now, use the direct method since Auth0 Vue plugin has issues
     console.log('🔄 Using direct Auth0 redirect method...');
     
+    // Generate a random state parameter for CSRF protection
+    const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    // Store state in sessionStorage for verification on callback
+    sessionStorage.setItem('auth0_state', state);
+    console.log('🔐 Generated and stored state parameter');
+    
+    // Generate a nonce for additional security
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    sessionStorage.setItem('auth0_nonce', nonce);
+    
     // Map common connection names to Auth0 connection names
     const connectionMap = {
       'google': 'google-oauth2',
@@ -205,11 +234,17 @@ const loginWithAuth0 = async (connection) => {
     const actualConnection = connectionMap[connection] || connection;
     console.log(`🔵 Using connection: ${connection} -> ${actualConnection}`);
     
-    let authUrl = `https://genai-030069804226358743.us.auth0.com/authorize?` +
-      `client_id=MS2O3usgLl8btDkPNwO6i0ZzC4LxR0Jw&` +
+    const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+    const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
+    
+    let authUrl = `https://${domain}/authorize?` +
+      `client_id=${clientId}&` +
       `response_type=code&` +
-      `redirect_uri=http://localhost:3000/auth/callback&` +
-      `scope=openid profile email`;
+      `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
+      `scope=openid profile email&` +
+      `state=${state}&` +
+      `nonce=${nonce}`;
     
     // Add connection if specified
     if (actualConnection) {

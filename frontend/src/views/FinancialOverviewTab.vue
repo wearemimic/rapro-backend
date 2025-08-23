@@ -52,11 +52,25 @@
             <div class="circles-chart d-flex justify-content-center" style="padding-top:20px; min-height: 180px;">
               <div class="js-circle" id="circle-financial"></div>
             </div>
-            <div class="card-body p-0 mt-4">
-              <h4 class="text-center">Total Gross Income: {{ formatCurrency(totalGrossIncome) }}</h4>
-              <h4 class="text-center">Total Taxes: {{ formatCurrency(totalTax) }}</h4>
-              <h4 class="text-center">Total Medicare: {{ formatCurrency(totalMedicare) }}</h4>
-              <h4 class="text-center">Net Income: {{ formatCurrency(netIncome) }}</h4>
+            <div class="mt-4">
+              <div class="row text-center">
+                <div class="col-6 mb-2">
+                  <small class="text-muted d-block">Total Gross Income</small>
+                  <strong class="text-primary">{{ formatCurrency(totalGrossIncome) }}</strong>
+                </div>
+                <div class="col-6 mb-2">
+                  <small class="text-muted d-block">Total Taxes</small>
+                  <strong class="text-danger">{{ formatCurrency(totalTax) }}</strong>
+                </div>
+                <div class="col-6 mb-2">
+                  <small class="text-muted d-block">Total Medicare</small>
+                  <strong class="text-warning">{{ formatCurrency(totalMedicare) }}</strong>
+                </div>
+                <div class="col-6 mb-2">
+                  <small class="text-muted d-block">Net Income</small>
+                  <strong class="text-success">{{ formatCurrency(netIncome) }}</strong>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -275,7 +289,11 @@ export default {
       }, 0);
     },
     chartData() {
-      console.log('🔍 FinancialOverview chartData computed with filteredResults:', this.filteredResults);
+      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: filteredResults length:', this.filteredResults?.length);
+      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: scenarioResults length:', this.scenarioResults?.length);
+      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: totalGrossIncome:', this.totalGrossIncome);
+      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: totalTax:', this.totalTax);
+      
       if (!this.filteredResults || !this.filteredResults.length) {
         console.warn('⚠️ FinancialOverview: No filtered results, returning empty chart data');
         return { labels: [], datasets: [] };
@@ -600,15 +618,12 @@ export default {
     },
     initializeCircles() {
       this.$nextTick(() => {
-        console.log('🔵 Initializing circles chart...');
         const maxRetries = 20;
         let retryCount = 0;
         const tryInit = () => {
           const CirclesGlobal = window.Circles;
-          console.log('🔵 Circles library status:', typeof CirclesGlobal, CirclesGlobal);
           if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
             const circleElement = document.getElementById('circle-financial');
-            console.log('🔵 Circle element found:', !!circleElement);
             if (circleElement) {
               // Clear previous SVG if any
               circleElement.innerHTML = '';
@@ -616,7 +631,6 @@ export default {
               const tax = this.totalTax;
               const medicare = this.totalMedicare;
               const percent = total > 0 ? Math.round(((tax + medicare) / total) * 100) : 0;
-              console.log('🔵 Circle data:', { total, tax, medicare, percent });
               let circleColor = '#377dff';
               if (percent > 50) {
                 circleColor = '#ff0000';
@@ -627,7 +641,7 @@ export default {
               } else {
                 circleColor = '#00ff00';
               }
-              const circleInstance = CirclesGlobal.create({
+              CirclesGlobal.create({
                 id: 'circle-financial',
                 value: percent,
                 maxValue: 100,
@@ -641,11 +655,9 @@ export default {
                 styleWrapper: true,
                 styleText: true
               });
-              console.log('🔵 Circle created successfully:', circleInstance);
             }
           } else if (retryCount < maxRetries) {
             retryCount++;
-            console.log(`🔵 Circles library not ready, retrying... (${retryCount}/${maxRetries})`);
             setTimeout(tryInit, 100);
           }
         };
@@ -654,17 +666,22 @@ export default {
     }
   },
   mounted() {
+    this.initializeCircles();
     document.addEventListener('click', this.handleClickOutside);
-    if (this.filteredResults && this.filteredResults.length) {
-      this.renderFlowChart(this.filteredResults);
-      this.initializeCircles();
-    }
   },
   beforeUnmount() {
     document.removeEventListener('click', this.handleClickOutside);
-    // Chart cleanup is now handled by Graph component
-    // D3 SVG cleanup is handled by d3.select('#financialFlowChart').selectAll('*').remove() in renderFlowChart
   },
+  watch: {
+    scenarioResults: {
+      handler() {
+        this.$nextTick(() => {
+          this.initializeCircles();
+        });
+      },
+      deep: true
+    }
+  }
 };
 </script>
 

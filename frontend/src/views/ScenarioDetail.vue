@@ -12,6 +12,7 @@
                   <span v-if="activeTab === 'overview'">Scenario Overview</span>
                   <span v-if="activeTab === 'financial'">Financial Overview</span>
                   <span v-if="activeTab === 'socialSecurity'">Social Security Overview</span>
+                  <span v-if="activeTab === 'socialSecurity2'">Social Security 2</span>
                   <span v-if="activeTab === 'medicare'">Medicare Overview</span>
                   <span v-if="activeTab === 'income'">Income</span>
                   <span v-if="activeTab === 'rothConversion'">Roth Conversion</span>
@@ -49,23 +50,16 @@
                     <option v-for="s in scenarios" :value="s.id" :key="s.id">{{ s.name }}</option>
                   </select>
                 </div>
-                <!-- Action Buttons -->
-                <div class="d-flex align-items-center gap-2">
-                  <!-- Edit Scenario Button -->
-                  <button class="btn btn-outline-primary" type="button" @click="editScenario">
-                    <i class="bi-pencil me-1"></i> Edit Scenario
+                <!-- Actions Dropdown -->
+                <div class="dropdown">
+                  <button class="btn btn-primary dropdown-toggle" type="button" id="actionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Actions
                   </button>
-                  
-                  <!-- New Scenario Dropdown -->
-                  <div class="dropdown">
-                    <button class="btn btn-primary dropdown-toggle" type="button" id="newScenarioDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                      New Scenario
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="newScenarioDropdown">
-                      <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')">From Scratch</a></li>
-                      <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')">Duplicate This Scenario</a></li>
-                    </ul>
-                  </div>
+                  <ul class="dropdown-menu" aria-labelledby="actionsDropdown">
+                    <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')"><i class="bi-plus-circle me-2"></i>New Scenario</a></li>
+                    <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')"><i class="bi-files me-2"></i>Duplicate Scenario</a></li>
+                    <li><a class="dropdown-item" href="#" @click.prevent="editScenario"><i class="bi-pencil me-2"></i>Edit Scenario</a></li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -94,48 +88,152 @@
           <div class="tab-content mt-4">
             <div v-show="activeTab === 'overview'" class="tab-pane active" style="margin-top:50px;">
               <div class="row">
-                <div class="col-lg-12 mb-3 mb-lg-5">
-                  <div class="card h-100">
-                                      <div class="card-header">
-                    <h4 class="card-header-title">Overview Summary</h4>
-                  </div>
-                  <div class="card-body">
-                    <!-- Metrics Cards -->
-                    <ScenarioMetrics :total-federal-taxes="totalFederalTaxes" :total-medicare-costs="totalMedicareCosts" :total-irmaa-surcharge="totalIrmaaSurcharge" :total-medicare-cost="totalMedicareCost" />
-                    
-                    <div class="row mt-4">
-                      <div class="col-sm-6 mb-4">
-                        <h5>Client Information</h5>
-                        <p><strong>Name:</strong> {{ formatClientName(client) }}</p>
-                        <p><strong>Tax Status:</strong> {{ client?.tax_status || 'Not specified' }}</p>
-                        <p><strong>Current Age:</strong> {{ currentAge || 'Not specified' }}</p>
-                        <p v-if="client?.tax_status?.toLowerCase() !== 'single'"><strong>Spouse Age:</strong> {{ spouseAge || 'Not specified' }}</p>
-                      </div>
-                      <div class="col-sm-6 mb-4">
-                        <h5>Scenario Details</h5>
-                        <p><strong>Name:</strong> {{ scenario?.name || 'Not specified' }}</p>
-                        <p><strong>Retirement Year:</strong> {{ scenario?.retirement_year || 'Not specified' }}</p>
-                        <p><strong>Mortality Age:</strong> {{ scenario?.mortality_age || 'Not specified' }}</p>
-                        <p v-if="client?.tax_status?.toLowerCase() !== 'single'"><strong>Spouse Mortality Age:</strong> {{ scenario?.spouse_mortality_age || 'Not specified' }}</p>
-                      </div>
+                <!-- Left Card - 1/4 Width for Metrics -->
+                <div class="col-lg-3 d-flex">
+                  <div class="card flex-fill">
+                    <div class="card-header">
+                      <h4 class="card-header-title">Key Metrics</h4>
                     </div>
-                      <div class="row mt-3">
-                        <div class="col-12">
-                          <div class="alert alert-soft-primary">
-                            <p class="mb-0">Use the sidebar navigation under "Current Client" to explore detailed views of this scenario.</p>
+                    <div class="card-body d-flex flex-column">
+                      <!-- Vertical Metrics Cards -->
+                      <div class="row flex-fill">
+                        <div class="col-12 mb-3">
+                          <div class="card card-sm">
+                            <div class="card-body">
+                              <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                  <i class="bi-receipt nav-icon"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                  <h6 class="mb-1">Federal and State Taxes</h6>
+                                  <span class="d-block fw-bold text-primary fs-2">{{ formatCurrency(totalFederalTaxes) }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div class="col-12 mb-3">
+                          <div class="card card-sm">
+                            <div class="card-body">
+                              <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                  <i class="bi-bar-chart nav-icon"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                  <h6 class="mb-1">Medicare Costs</h6>
+                                  <span class="d-block fw-bold text-primary fs-2">{{ formatCurrency(totalMedicareCosts) }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div class="col-12 mb-3">
+                          <div class="card card-sm">
+                            <div class="card-body">
+                              <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                  <i class="bi-check2-circle nav-icon"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                  <h6 class="mb-1">Medicare Out Of Pocket</h6>
+                                  <span class="d-block fw-bold text-primary fs-2">$50,000</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div class="col-12 mb-0">
+                          <div class="card card-sm">
+                            <div class="card-body">
+                              <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                  <i class="bi-check2-circle nav-icon"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                  <h6 class="mb-1">IRMAA Status</h6>
+                                  <div :style="{width: '100%', height: '20px', backgroundColor: irmaaColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', color: 'white', borderRadius: '3px'}">
+                                    {{ irmaaPercentage }}%
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
+                
+                <!-- Right Card - 3/4 Width for Other Information -->
+                <div class="col-lg-9">
+                  <div class="card mb-4">
+                    <div class="card-body">
+                      <div class="row">
+                        <div class="col-sm-6 mb-0">
+                          <h5>Client Information</h5>
+                          <p><strong>Name:</strong> {{ formatClientName(client) }}</p>
+                          <p><strong>Tax Status:</strong> {{ client?.tax_status || 'Not specified' }}</p>
+                          <p class="mb-0"><strong>Current Age:</strong> {{ currentAge || 'Not specified' }}</p>
+                          <p v-if="client?.tax_status?.toLowerCase() !== 'single'" class="mb-0"><strong>Spouse Age:</strong> {{ spouseAge || 'Not specified' }}</p>
+                        </div>
+                        <div class="col-sm-6 mb-0">
+                          <h5>Scenario Details</h5>
+                          <p><strong>Name:</strong> {{ scenario?.name || 'Not specified' }}</p>
+                          <p><strong>Retirement Year:</strong> {{ scenario?.retirement_year || 'Not specified' }}</p>
+                          <p class="mb-0"><strong>Mortality Age:</strong> {{ scenario?.mortality_age || 'Not specified' }}</p>
+                          <p v-if="client?.tax_status?.toLowerCase() !== 'single'" class="mb-0"><strong>Spouse Mortality Age:</strong> {{ scenario?.spouse_mortality_age || 'Not specified' }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Financial Charts in Same Column -->
+                  <!-- Row for Chart and Circle Card -->
+                  <div class="row">
+                    <!-- Financial Chart Card (2/3 width) -->
+                    <div class="col-lg-8 col-md-7 mb-3 mb-lg-0">
+                      <div class="card h-100">
+                        <div class="card-body">
+                          <div class="financial-chart-container">
+                            <Graph 
+                              :data="overviewChartData" 
+                              :options="overviewChartOptions"
+                              :height="300"
+                              type="line"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Circle Card (1/3 width) -->
+                    <div class="col-lg-4 col-md-5 mb-3 mb-lg-0">
+                      <div class="card h-100 d-flex flex-column justify-content-center align-items-center">
+                        <div class="card-body w-100">
+                          <h5 class="mb-4 text-center">Taxes & Medicare as % of Gross Income</h5>
+                          <div class="circles-chart d-flex justify-content-center" style="padding-top:20px; min-height: 180px;">
+                            <div class="js-circle" id="circle-overview"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- End Charts Row -->
+                </div>
+                <!-- End Right Column -->
               </div>
+              <!-- End Main Row -->
             </div>
             <div v-show="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
               <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
               <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
+            </div>
+            <div v-show="activeTab === 'socialSecurity2'" class="tab-pane active" style="margin-top:50px;">
+              <SocialSecurity2Tab :scenario="scenario" :scenario-results="scenarioResults" :client="client" @update-scenario="handleScenarioUpdate" />
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
               <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
@@ -210,12 +308,14 @@ import Chart from 'chart.js/auto';
 
 import FinancialOverviewTab from './FinancialOverviewTab.vue';
 import SocialSecurityOverviewTab from './SocialSecurityOverviewTab.vue';
+import SocialSecurity2Tab from './SocialSecurity2Tab.vue';
 import MedicareOverviewTab from './MedicareOverviewTab.vue';
 import IncomeTab from './IncomeTab.vue';
 import RothConversionTab from './RothConversionTab.vue';
 import WorksheetsTab from './WorksheetsTab.vue';
 import ScenarioMetrics from './ScenarioMetrics.vue';
 import NextStepsTab from './NextStepsTab.vue';
+import Graph from '../components/Graph.vue';
 
 // Chart.js registration moved to Graph.vue to avoid conflicts
 
@@ -229,12 +329,14 @@ export default {
   components: {
     FinancialOverviewTab,
     SocialSecurityOverviewTab,
+    SocialSecurity2Tab,
     MedicareOverviewTab,
     IncomeTab,
     RothConversionTab,
     WorksheetsTab,
     ScenarioMetrics,
-    NextStepsTab
+    NextStepsTab,
+    Graph
   },
   data() {
     return {
@@ -263,7 +365,9 @@ export default {
         financial: false,
         socialSecurity: false,
         medicare: false,
-        worksheets: false
+        worksheets: false,
+        overviewFinancial: false,
+        overviewFlow: false
       },
       preRetirementIncome: 0,
       availableYears: [],
@@ -324,6 +428,52 @@ export default {
     ...mapActions(['fetchScenarioData']),
     formatCurrency(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    },
+    async handleScenarioUpdate(updateData) {
+      // Handle scenario updates from Social Security 2 tab
+      console.log('Updating scenario with Social Security 2 data:', updateData);
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No auth token found');
+          return;
+        }
+        
+        const response = await fetch(`http://localhost:8000/api/scenarios/${this.scenario.id}/update/`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updateData)
+        });
+        
+        if (response.ok) {
+          const updatedScenario = await response.json();
+          console.log('Scenario updated successfully:', updatedScenario);
+          
+          // Update local scenario data
+          Object.assign(this.scenario, updatedScenario);
+          
+          // Refresh scenario results to reflect the changes
+          this.loadScenarioData();
+          
+          // Show success message
+          this.$toast?.success?.('Social Security claiming strategy saved successfully!') || 
+          console.log('Social Security claiming strategy saved successfully!');
+          
+        } else {
+          const error = await response.json();
+          console.error('Error updating scenario:', error);
+          this.$toast?.error?.('Failed to save Social Security claiming strategy') || 
+          console.error('Failed to save Social Security claiming strategy');
+        }
+      } catch (error) {
+        console.error('Network error updating scenario:', error);
+        this.$toast?.error?.('Network error while saving changes') || 
+        console.error('Network error while saving changes');
+      }
     },
     downloadTable(format) {
       const rows = this.scenarioResults;
@@ -459,36 +609,62 @@ export default {
             document.querySelectorAll('.js-circle').forEach((el) => {
               console.log('Found circle element:', el);
               if (!el.dataset.initialized) {
-                const irmaaPercentage = Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
-                let circleColor = '#377dff'; // Default color
-
-                // Determine color based on IRMAA percentage
-                if (irmaaPercentage > 50) {
-                  circleColor = '#ff0000'; // Red for percentages above 50
-                } else if (irmaaPercentage > 25) {
-                  circleColor = '#ffa500'; // Orange for percentages between 25 and 50
-                } else if (irmaaPercentage > 15) {
-                  circleColor = '#ffff00'; // Yellow for percentages between 15 and 25
+                if (el.id === 'circle-overview') {
+                  // Handle overview financial circle
+                  const totalTaxAndMedicare = this.overviewTotalTax + this.overviewTotalMedicare;
+                  const percentage = this.overviewTotalGrossIncome > 0 ? 
+                    Math.round((totalTaxAndMedicare / this.overviewTotalGrossIncome) * 100) : 0;
+                  
+                  CirclesGlobal.create({
+                    id: el.id,
+                    value: percentage,
+                    maxValue: 100,
+                    width: 20,
+                    radius: 70,
+                    text: function(value) { return value + '%'; },
+                    colors: ['#f0f0f0', '#377dff'],
+                    duration: 400,
+                    wrpClass: 'circles-wrp',
+                    textClass: 'circles-text',
+                    styleWrapper: true,
+                    styleText: true
+                  });
+                } else if (el.id === 'circle-financial') {
+                  // Skip financial circle - let FinancialOverviewTab handle it
+                  return;
                 } else {
-                  circleColor = '#00ff00'; // Green for percentages below 15
+                  // Handle IRMAA circles
+                  const irmaaPercentage = Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
+                  let circleColor = '#377dff'; // Default color
+
+                  // Determine color based on IRMAA percentage
+                  if (irmaaPercentage > 50) {
+                    circleColor = '#ff0000'; // Red for percentages above 50
+                  } else if (irmaaPercentage > 25) {
+                    circleColor = '#ffa500'; // Orange for percentages between 25 and 50
+                  } else if (irmaaPercentage > 15) {
+                    circleColor = '#ffff00'; // Yellow for percentages between 15 and 25
+                  } else {
+                    circleColor = '#00ff00'; // Green for percentages below 15
+                  }
+
+                  console.log('IRMAA Percentage:', irmaaPercentage, 'Circle Color:', circleColor);
+
+                  CirclesGlobal.create({
+                    id: el.id,
+                    value: irmaaPercentage,
+                    maxValue: 100,
+                    width: 20,
+                    radius: 70,
+                    text: function(value) { return value + '%'; },
+                    colors: ['#f0f0f0', circleColor],
+                    duration: 400,
+                    wrpClass: 'circles-wrp',
+                    textClass: 'circles-text',
+                    styleWrapper: true,
+                    styleText: true
+                  });
                 }
-
-                console.log('IRMAA Percentage:', irmaaPercentage, 'Circle Color:', circleColor);
-
-                CirclesGlobal.create({
-                  id: el.id,
-                  value: irmaaPercentage,
-                  maxValue: 100,
-                  width: 20,
-                  radius: 70,
-                  text: function(value) { return value + '%'; },
-                  colors: ['#f0f0f0', circleColor],
-                  duration: 400,
-                  wrpClass: 'circles-wrp',
-                  textClass: 'circles-text',
-                  styleWrapper: true,
-                  styleText: true
-                });
                 el.dataset.initialized = true;
               }
             });
@@ -535,9 +711,11 @@ export default {
       
       axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/calculate/`, { headers })
         .then(response => {
+          console.log('🎯 SCENARIO_DEBUG [SCENARIO_DETAIL]: API response length:', response.data?.length);
           if (response.data && response.data.length) {
             this.scenarioResults = response.data;
-            console.log('API Response:', response.data);
+            console.log('🎯 SCENARIO_DEBUG [SCENARIO_DETAIL]: scenarioResults set, length:', this.scenarioResults.length);
+            console.log('🎯 SCENARIO_DEBUG [SCENARIO_DETAIL]: filteredScenarioResults length:', this.filteredScenarioResults.length);
             
             // Re-initialize chart with new data
             this.initializeChartJS();
@@ -545,7 +723,7 @@ export default {
             // Calculate and update the percentage metrics
             this.updateScenarioPercentages();
           } else {
-            console.warn('No data received for scenarioResults');
+            console.log('🎯 SCENARIO_DEBUG: No data received from API');
           }
         })
         .catch(error => {
@@ -835,6 +1013,141 @@ export default {
         age--;
       }
       return age;
+    },
+    irmaaPercentage() {
+      if (!this.totalMedicareCost) return 0;
+      return Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
+    },
+    irmaaColor() {
+      const pct = this.irmaaPercentage;
+      if (pct > 50) {
+        return '#ff0000'; // Red
+      } else if (pct > 25) {
+        return '#ffa500'; // Orange
+      } else if (pct > 15) {
+        return '#ffff00'; // Yellow
+      } else {
+        return '#00ff00'; // Green
+      }
+    },
+    overviewChartData() {
+      if (!this.filteredScenarioResults || !this.filteredScenarioResults.length) {
+        return { labels: [], datasets: [] };
+      }
+
+      const labels = this.filteredScenarioResults.map(row => row.year.toString());
+      const datasets = [
+        {
+          type: 'line',
+          label: 'Gross Income',
+          data: this.filteredScenarioResults.map(row => parseFloat(row.gross_income) || 0),
+          borderColor: '#4285f4',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          tension: 0.3,
+          yAxisID: 'y',
+          pointRadius: 3,
+          pointBackgroundColor: '#4285f4',
+          order: 1,
+          fill: false
+        },
+        {
+          type: 'line',
+          label: 'Net Income',
+          data: this.filteredScenarioResults.map(row => {
+            const gross = parseFloat(row.gross_income) || 0;
+            const tax = parseFloat(row.federal_tax) || 0;
+            const medicare = parseFloat(row.total_medicare) || 0;
+            return gross - tax - medicare;
+          }),
+          borderColor: '#34a853',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          tension: 0.3,
+          yAxisID: 'y',
+          pointRadius: 3,
+          pointBackgroundColor: '#34a853',
+          order: 1,
+          fill: false
+        },
+        {
+          type: 'bar',
+          label: 'Federal Tax',
+          data: this.filteredScenarioResults.map(row => parseFloat(row.federal_tax) || 0),
+          backgroundColor: '#ea4335',
+          stack: 'Stack 0',
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          type: 'bar',
+          label: 'Medicare',
+          data: this.filteredScenarioResults.map(row => parseFloat(row.total_medicare) || 0),
+          backgroundColor: '#fbbc05',
+          stack: 'Stack 0',
+          yAxisID: 'y',
+          order: 2
+        }
+      ];
+
+      return { labels, datasets };
+    },
+    overviewChartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Year'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Amount ($)'
+            },
+            ticks: {
+              beginAtZero: true,
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom'
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        interaction: {
+          mode: 'index',
+          intersect: false
+        }
+      };
+    },
+    overviewTotalGrossIncome() {
+      return this.filteredScenarioResults.reduce((total, row) => total + parseFloat(row.gross_income || 0), 0);
+    },
+    overviewTotalTax() {
+      return this.filteredScenarioResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0);
+    },
+    overviewTotalMedicare() {
+      return this.filteredScenarioResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0);
+    },
+    overviewNetIncome() {
+      return this.filteredScenarioResults.reduce((total, row) => {
+        const gross = parseFloat(row.gross_income || 0);
+        const tax = parseFloat(row.federal_tax || 0);
+        const medicare = parseFloat(row.total_medicare || 0);
+        return total + (gross - tax - medicare);
+      }, 0);
     },
   },
   watch: {

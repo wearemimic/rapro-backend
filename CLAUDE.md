@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+## IMPORTANT: NO HARDCODING URLS OR SENSITIVE DATA
+- NEVER hardcode URLs, API keys, client secrets, or any sensitive information in code
+- Always use environment variables or configuration files for sensitive data
+- Use .env files for local development and proper secrets management for production
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -245,6 +250,8 @@ STRIPE_ANNUAL_PRICE_ID=your-annual-price-id
 2. Check browser console for Auth0 redirect URLs
 3. Verify tokens in browser DevTools → Application → Local Storage
 4. Test social logins in incognito mode to avoid session conflicts
+5. **IMPORTANT**: Ensure Auth0 Dashboard callback URLs match your local development URLs (http vs https)
+6. **CRITICAL**: Backend MUST have Auth0 client secret configured via .env file for token exchange
 
 ## Latest Development Session (2025-01-19)
 
@@ -781,3 +788,197 @@ Pre-retirement years (2035-2039) were only calculating taxes on `self.pre_retire
 - `/frontend/src/views/RothConversionTab.css` - Step indicator color updates and cleanup
 
 The Roth conversion interface now provides enterprise-grade accuracy in tax calculations combined with a polished, professional user interface that guides advisors through complex conversion analysis with confidence.
+
+## ScenarioDetail Component Architecture - CRITICAL REFERENCE ⚠️
+
+**IMPORTANT:** This section documents the exact data flow patterns that ALL scenario tab components must follow. Deviation from these patterns will break navigation and data loading.
+
+### Data Flow Pattern (Navigation: `/clients/5` → `/clients/5/scenarios/detail/123?tab=socialSecurity2`)
+
+#### 1. ScenarioDetail.vue Lifecycle
+```javascript
+mounted() {
+  // 1. Extract route parameters
+  const clientId = this.$route.params.id;
+  const scenarioId = this.$route.params.scenarioid;
+  const tabFromQuery = this.$route.query.tab;
+  this.activeTab = tabFromQuery || 'overview';
+  
+  // 2. Load client data with scenarios
+  axios.get(`/api/clients/${clientId}/`).then(response => {
+    this.client = response.data;
+    this.scenarios = response.data.scenarios || [];
+    this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
+    
+    // 3. Load scenario-specific calculation data
+    this.fetchScenarioData();    // GET /api/scenarios/{id}/calculate/
+    this.fetchAssetDetails();    // GET /api/scenarios/{id}/assets/
+  });
+}
+```
+
+#### 2. Core Data Properties (ScenarioDetail.vue)
+```javascript
+data() {
+  return {
+    scenario: null,          // Scenario object with settings (mortality_age, spouse_mortality_age, etc.)
+    scenarioResults: [],     // Yearly calculation results from backend
+    client: null,           // Client object with personal info
+    scenarios: [],          // All scenarios for this client
+    activeTab: 'overview',  // Current active tab
+    assetDetails: []        // Investment/asset details
+  };
+}
+```
+
+#### 3. Standard Tab Component Props Pattern
+```javascript
+// REQUIRED: All tab components must accept these props
+<TabComponent 
+  :scenario="scenario"                       // Full scenario object
+  :scenario-results="scenarioResults"       // Calculation results array
+  :client="client"                          // Client information
+  :mortality-age="scenario?.mortality_age"   // Optional: Primary mortality age
+  :spouse-mortality-age="scenario?.spouse_mortality_age" // Optional: Spouse mortality age
+  @update-scenario="handleScenarioUpdate" /> // Optional: For updating scenario
+```
+
+#### 4. Tab Component Implementation Pattern
+```javascript
+// Child tab components MUST follow this structure
+export default {
+  props: {
+    scenario: { type: Object, required: true },
+    scenarioResults: { type: Array, required: true },
+    client: { type: Object, required: true }
+  },
+  computed: {
+    // Always filter results using mortality ages from scenario
+    filteredResults() {
+      const mortalityAge = Number(this.scenario?.mortality_age) || 90;
+      const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;
+      return this.scenarioResults.filter(/* age-based filtering */);
+    }
+  },
+  mounted() {
+    // SIMPLE initialization only - no complex watchers or async loading
+    // Data is already available via props when component mounts
+    this.initializeComponent();
+  }
+}
+```
+
+#### 5. Navigation and Tab Switching
+- **URL Pattern:** `/clients/{id}/scenarios/detail/{scenarioId}?tab={tabName}`
+- **Route Watcher:** ScenarioDetail.vue watches `$route.query.tab` to switch activeTab
+- **Sidebar Links:** Generate router-links with proper params and query
+- **Tab Rendering:** Uses `v-show="activeTab === 'tabName'"` for visibility control
+
+#### 6. Critical Rules for Tab Components
+
+**❌ DO NOT:**
+- Add complex watchers with `immediate: true` (causes infinite loops)
+- Load data asynchronously in mounted() - data comes via props
+- Use `$nextTick` unless absolutely necessary
+- Create reactive watchers that trigger updateCalculations() repeatedly
+
+**✅ DO:**
+- Accept standard props: `scenario`, `scenarioResults`, `client`
+- Use simple mounted() lifecycle for initialization
+- Access life expectancy via `Number(this.scenario.mortality_age)`
+- Filter scenarioResults using mortality ages for data display
+- Emit `update-scenario` events for scenario changes
+
+#### 7. Data Structures Reference
+```javascript
+// scenario object structure
+{
+  id: 123,
+  name: "Scenario Name",
+  mortality_age: 87,              // Primary life expectancy
+  spouse_mortality_age: 85,       // Spouse life expectancy  
+  retirement_year: 2030,
+  // ... other scenario settings
+}
+
+// scenarioResults array structure (yearly data)
+[
+  {
+    year: 2024,
+    primary_age: 65,
+    spouse_age: 62,
+    gross_income: 85000,
+    federal_tax: 12500,
+    ss_income_primary: 32000,
+    ss_income_spouse: 18000,
+    total_medicare: 3200,
+    // ... one object per year
+  }
+]
+```
+
+This pattern ensures consistent data flow, prevents navigation issues, and maintains compatibility with existing tab components.
+
+## Latest Development Session (2025-08-23)
+
+### Auth0 Authentication Flow Fix - COMPLETED ✅
+
+**Problem Identified:**
+Auth0 Google login was redirecting back to login page instead of completing authentication. The callback URL was never reached.
+
+**Root Causes:**
+1. **Auth0 Vue Plugin Conflict**: The Auth0 Vue plugin was intercepting callbacks before custom handler could process
+2. **Missing Backend Configuration**: Backend docker container wasn't loading Auth0 environment variables
+3. **State Parameter Security**: Missing state parameter for CSRF protection in Auth0 redirects
+
+**Solution Implemented:**
+
+**1. Backend Configuration:**
+- ✅ Added `env_file: - ../backend/.env` to docker-compose.yml
+- ✅ Backend .env already had Auth0 client secret configured
+- ✅ Verified with `/api/auth0/debug/` endpoint showing `has_secret: true`
+
+**2. Frontend Security Enhancements:**
+- ✅ Added state parameter generation using crypto.getRandomValues()
+- ✅ State stored in sessionStorage for verification on callback
+- ✅ Added nonce parameter for additional security
+- ✅ State validation in Auth0Callback.vue to prevent CSRF attacks
+
+**3. Removed Hardcoded URLs:**
+- ✅ All Auth0 URLs now use environment variables
+- ✅ Login.vue uses `import.meta.env.VITE_AUTH0_DOMAIN` etc.
+- ✅ Register.vue uses environment variables
+- ✅ Auth0Callback.vue uses environment variables for API calls
+
+**4. Auth0 Vue Plugin Disabled (Temporary):**
+- ✅ Commented out Auth0 Vue plugin initialization in main.js
+- ✅ Using direct Auth0 redirect method for more control
+- ✅ Manual authorization code exchange via backend
+
+**Files Modified:**
+- `/docker/docker-compose.yml` - Added env_file configuration
+- `/frontend/src/views/Login.vue` - Added state/nonce, removed hardcoded URLs
+- `/frontend/src/views/Register.vue` - Added state/nonce, removed hardcoded URLs  
+- `/frontend/src/views/Auth0Callback.vue` - Enhanced state validation, better error handling
+- `/frontend/src/router/index.js` - Added debug logging for route navigation
+- `/frontend/src/main.js` - Temporarily disabled Auth0 Vue plugin
+
+**Key Learnings:**
+1. **Backend Needs Client Secret**: The authorization code flow requires backend to have Auth0 client secret for secure token exchange
+2. **State Parameter is Critical**: Prevents CSRF attacks and maintains authentication context
+3. **Plugin vs Manual Control**: Auth0 Vue plugin can interfere with custom authentication flows
+4. **Environment Variables**: Never hardcode Auth0 configuration - always use environment variables
+5. **Docker Configuration**: Ensure docker-compose loads .env files for proper configuration
+
+**Authentication Flow (Working):**
+1. User clicks Google login → Generates state/nonce → Redirects to Auth0
+2. User authenticates with Google → Auth0 redirects to callback with code + state
+3. Callback verifies state matches → Sends code to backend
+4. Backend exchanges code + client_secret for tokens → Returns Django JWT
+5. Frontend stores JWT → User redirected to dashboard
+
+**Environment Requirements:**
+- Frontend .env must have Auth0 public configuration
+- Backend .env MUST have Auth0 client secret
+- Docker-compose must load backend .env file
+- Auth0 Dashboard must have correct callback URLs configured
