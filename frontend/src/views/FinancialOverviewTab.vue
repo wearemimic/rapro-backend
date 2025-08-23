@@ -5,33 +5,6 @@
       <!-- Financial Chart Card (2/3 width) -->
       <div class="col-lg-8 col-md-7 mb-3 mb-lg-0">
         <div class="card h-100">
-          <div class="card-header card-header-content-between">
-            <!-- Dropdown -->
-            <div class="dropdown">
-              <button type="button" class="btn btn-white btn-sm dropdown-toggle" @click="toggleDropdown('financial')" :aria-expanded="isDropdownOpen.financial">
-                <i class="bi-download me-2"></i> Export
-              </button>
-              <div class="dropdown-menu dropdown-menu-sm-end" :class="{ show: isDropdownOpen.financial }" aria-labelledby="usersExportDropdown">
-                <span class="dropdown-header">Export Options</span>
-                <a id="export-excel" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToExcel">
-                  <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/excel-icon.svg" alt="Image Description">
-                  Export graph and table to Excel
-                </a>
-                <a id="export-pdf" class="dropdown-item" href="javascript:;" @click="exportGraphAndDataToPDF">
-                  <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/brands/pdf-icon.svg" alt="Image Description">
-                  Export graph and data to PDF
-                </a>
-                <a id="export-graph" class="dropdown-item" href="javascript:;">
-                  Export graph only
-                </a>
-                <a id="export-csv" class="dropdown-item" href="javascript:;" @click="exportTableToCSV">
-                  <img class="avatar avatar-xss avatar-4x3 me-2" src="/assets/svg/components/placeholder-csv-format.svg" alt="Image Description">
-                  Export table only as CSV
-                </a>
-              </div>
-            </div>
-            <!-- End Dropdown -->
-          </div>
           <div class="card-body">
             <div class="financial-chart-container">
               <Graph 
@@ -289,11 +262,6 @@ export default {
       }, 0);
     },
     chartData() {
-      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: filteredResults length:', this.filteredResults?.length);
-      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: scenarioResults length:', this.scenarioResults?.length);
-      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: totalGrossIncome:', this.totalGrossIncome);
-      console.log('🎯 DATA_DEBUG [FINANCIAL_TAB]: totalTax:', this.totalTax);
-      
       if (!this.filteredResults || !this.filteredResults.length) {
         console.warn('⚠️ FinancialOverview: No filtered results, returning empty chart data');
         return { labels: [], datasets: [] };

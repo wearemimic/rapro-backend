@@ -10,7 +10,7 @@
 
     <div class="card">
       <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
-        <h5 class="mb-0">
+        <h5 class="mb-0" style="color: #000000 !important;">
           <i class="bi bi-cash-coin me-2"></i>Retirement Income Information
         </h5>
       </div>
@@ -119,7 +119,16 @@
                         <option value="primary">{{ primaryFirstName }}</option>
                         <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
-                      <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
+                      <td>
+                        <input 
+                          :value="formatCurrencyInput(income.amount_per_month)"
+                          @input="onCurrencyInput($event, income, 'amount_per_month')"
+                          @blur="onCurrencyBlur($event, income, 'amount_per_month')"
+                          type="text" 
+                          class="form-control"
+                          placeholder="5,000"
+                        />
+                      </td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
                           <option v-for="age in Array.from({ length: 39 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
@@ -145,7 +154,16 @@
                         <option value="primary">{{ primaryFirstName }}</option>
                         <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
                       </select></td>
-                      <td><input v-model.number="income.amount_at_fra" type="number" class="form-control" placeholder="Amount at FRA" /></td>
+                      <td>
+                        <input 
+                          :value="formatCurrencyInput(income.amount_at_fra)"
+                          @input="onCurrencyInput($event, income, 'amount_at_fra')"
+                          @blur="onCurrencyBlur($event, income, 'amount_at_fra')"
+                          type="text" 
+                          class="form-control"
+                          placeholder="3,500"
+                        />
+                      </td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control" placeholder="Start Age" @change="checkMedicareAdjustment(income)">
                           <option v-for="age in Array.from({ length: 9 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
@@ -234,10 +252,24 @@
                         </select>
                       </td>
                       <td>
-                        <input v-model.number="income.current_balance" type="number" class="form-control" />
+                        <input 
+                          :value="formatCurrencyInput(income.current_balance)"
+                          @input="onCurrencyInput($event, income, 'current_balance')"
+                          @blur="onCurrencyBlur($event, income, 'current_balance')"
+                          type="text" 
+                          class="form-control"
+                          placeholder="500,000"
+                        />
                       </td>
                       <td>
-                        <input v-model.number="income.monthly_contribution" type="number" class="form-control" />
+                        <input 
+                          :value="formatCurrencyInput(income.monthly_contribution)"
+                          @input="onCurrencyInput($event, income, 'monthly_contribution')"
+                          @blur="onCurrencyBlur($event, income, 'monthly_contribution')"
+                          type="text" 
+                          class="form-control"
+                          placeholder="2,500"
+                        />
                       </td>
                       <td>
                         <input v-model.number="income.growth_rate" type="number" class="form-control" />
@@ -346,7 +378,7 @@
     <!-- Investment Accounts Section -->
     <div class="card" style="margin-top:40px;">
       <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
-        <h5 class="mb-0">
+        <h5 class="mb-0" style="color: #000000 !important;">
           <i class="bi bi-piggy-bank me-2"></i>Investment Accounts
         </h5>
       </div>
@@ -416,7 +448,7 @@
 
         <div class="card" style="margin-top:40px;">
       <div class="card-header" style="background-color: #f8f9fa !important; color: #000000 !important; border-bottom: 1px solid #dee2e6;">
-        <h5 class="mb-0">
+        <h5 class="mb-0" style="color: #000000 !important;">
           <i class="bi bi-shield-plus me-2"></i>Coverage Information (Cost per Individual)
         </h5>
       </div>
@@ -509,6 +541,7 @@ import { v4 as uuidv4 } from 'uuid';
 import InvestmentModal from '../components/InvestmentModal.vue';
 import ScenarioHeader from '../components/ScenarioHeader.vue';
 import { useAuthStore } from '../stores/auth';
+import { createCurrencyHandlers, formatCurrency } from '../utils/currencyFormatter';
 
 const route = useRoute();
 const router = useRouter();
@@ -531,7 +564,7 @@ const scenario = ref({
   investments: [],
   model_tax_change: '',
   reduction_2030_ss: false,
-  apply_standard_deduction: true,
+  apply_standard_deduction: false,
   primary_blind: false,
   spouse_blind: false,
   is_dependent: false,
@@ -575,6 +608,48 @@ const isSingle = computed(() => {
   return clientTaxStatus.value === 'single';
 });
 
+// Currency formatting methods
+const formatCurrencyInput = (value) => {
+  if (!value || value === 0) return '';
+  return new Intl.NumberFormat('en-US').format(value);
+};
+
+const parseCurrencyInput = (value) => {
+  if (!value) return 0;
+  return parseFloat(value.toString().replace(/,/g, '')) || 0;
+};
+
+const onCurrencyInput = (event, object, field) => {
+  // Remove non-numeric characters except decimal
+  let raw = event.target.value.replace(/[^0-9.]/g, '');
+  
+  // Handle multiple decimals
+  const parts = raw.split('.');
+  if (parts.length > 2) raw = parts[0] + '.' + parts[1];
+  
+  // Limit decimal places to 2
+  if (parts[1] && parts[1].length > 2) {
+    raw = parts[0] + '.' + parts[1].slice(0, 2);
+  }
+  
+  if (raw === '') {
+    object[field] = 0;
+    event.target.value = '';
+    return;
+  }
+  
+  const numericValue = parseFloat(raw) || 0;
+  object[field] = numericValue;
+  
+  // Format display with commas
+  event.target.value = formatCurrencyInput(numericValue);
+};
+
+const onCurrencyBlur = (event, object, field) => {
+  const value = object[field] || 0;
+  event.target.value = formatCurrencyInput(value);
+};
+
 // Group income products by type
 const groupedIncome = computed(() => {
   return scenario.value.income.reduce((acc, item) => {
@@ -608,6 +683,10 @@ const groupedInvestments = computed(() => {
 
 async function submitScenario() {
   try {
+    console.log('💰 INCOME_EDIT: submitScenario called');
+    console.log('💰 INCOME_EDIT: scenario.value.income:', scenario.value.income);
+    console.log('💰 INCOME_EDIT: route.query:', route.query);
+    
     // Validate scenario name and provide fallback if blank
     if (!scenario.value.name || scenario.value.name.trim() === "") {
       const timestamp = new Date().getTime();
@@ -688,11 +767,21 @@ async function submitScenario() {
     
     if (isEditMode) {
       // Update existing scenario - only in edit mode
-      console.log("📝 Updating existing scenario with ID:", isEditMode);
-      response = await axios.put(
-        `http://localhost:8000/api/scenarios/${isEditMode}/update/`,
-        payload
-      );
+      console.log("💰 INCOME_EDIT: Updating existing scenario with ID:", isEditMode);
+      console.log("💰 INCOME_EDIT: About to make PUT request with payload:", payload);
+      console.log("💰 INCOME_EDIT: URL:", `http://localhost:8000/api/scenarios/${isEditMode}/update/`);
+      
+      try {
+        response = await axios.put(
+          `http://localhost:8000/api/scenarios/${isEditMode}/update/`,
+          payload
+        );
+        console.log("💰 INCOME_EDIT: ✅ PUT request successful:", response.data);
+      } catch (error) {
+        console.error("💰 INCOME_EDIT: ❌ PUT request failed:", error);
+        console.error("💰 INCOME_EDIT: ❌ Error response:", error.response?.data);
+        throw error;
+      }
     } else {
       // Create new scenario - for both new creation and duplicate mode
       if (isDuplicateMode) {

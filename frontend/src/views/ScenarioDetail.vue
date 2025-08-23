@@ -233,7 +233,7 @@
               <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity2'" class="tab-pane active" style="margin-top:50px;">
-              <SocialSecurity2Tab :scenario="scenario" :scenario-results="scenarioResults" :client="client" @update-scenario="handleScenarioUpdate" />
+              <SocialSecurity2Tab :key="`ss2-${scenario?.id}-${activeTab}`" :scenario="scenario" :scenario-results="scenarioResults" :client="client" @update-scenario="handleScenarioUpdate" />
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
               <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
@@ -267,27 +267,6 @@
         <!-- End Col -->
 
         <div class="col-auto">
-          <div class="d-flex justify-content-end">
-            <!-- List Separator -->
-            <ul class="list-inline list-separator">
-              <li class="list-inline-item">
-                <a class="list-separator-link" href="#">FAQ</a>
-              </li>
-
-              <li class="list-inline-item">
-                <a class="list-separator-link" href="#">License</a>
-              </li>
-
-              <li class="list-inline-item">
-                <!-- Keyboard Shortcuts Toggle -->
-                <button class="btn btn-ghost-secondary btn btn-icon btn-ghost-secondary rounded-circle" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasKeyboardShortcuts" aria-controls="offcanvasKeyboardShortcuts">
-                  <i class="bi-command"></i>
-                </button>
-                <!-- End Keyboard Shortcuts Toggle -->
-              </li>
-            </ul>
-            <!-- End List Separator -->
-          </div>
         </div>
         <!-- End Col -->
       </div>
@@ -403,6 +382,10 @@ export default {
         this.initializeCircles();
         this.fetchScenarioData();
         this.fetchAssetDetails();
+        // Load detailed scenario data with income_sources after scenario is set
+        if (this.scenario?.id) {
+          this.fetchScenarioDetails();
+        }
         console.log('Client Tax Status:', this.client?.tax_status);
         console.log('Scenarios:', this.scenarios);
         console.log('Selected Scenario:', this.scenario);
@@ -597,17 +580,12 @@ export default {
     },
     initializeCircles() {
       this.$nextTick(() => {
-        console.log('Initializing Circles...');
-        console.log('Total IRMAA Surcharge:', this.totalIrmaaSurcharge);
-        console.log('Total Medicare Cost:', this.totalMedicareCost);
         const maxRetries = 20;
         let retryCount = 0;
         const tryInit = () => {
           const CirclesGlobal = window.Circles;
           if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
-            console.log('Circles.js is ready.');
             document.querySelectorAll('.js-circle').forEach((el) => {
-              console.log('Found circle element:', el);
               if (!el.dataset.initialized) {
                 if (el.id === 'circle-overview') {
                   // Handle overview financial circle
@@ -728,6 +706,42 @@ export default {
         })
         .catch(error => {
           console.error("Error loading scenario data:", error);
+        });
+    },
+    
+    fetchScenarioDetails() {
+      const scenarioId = this.$route.params.scenarioid;
+      if (!scenarioId || !this.scenario) {
+        return;
+      }
+      
+      console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: fetchScenarioDetails called for scenario:', scenarioId);
+      
+      axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers })
+        .then(response => {
+          console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Detailed scenario data received:', response.data);
+          console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Income sources in response:', response.data?.income_sources?.length || 0);
+          
+          // Carefully merge only the income_sources to avoid breaking reactivity
+          if (response.data && response.data.income_sources) {
+            // Use Vue.set or direct assignment to maintain reactivity
+            this.$set ? this.$set(this.scenario, 'income_sources', response.data.income_sources) : 
+                        (this.scenario.income_sources = response.data.income_sources);
+            
+            console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Updated scenario with income_sources:', this.scenario.income_sources?.length || 0);
+            
+            // Log social security specific data
+            const socialSecurityIncomes = this.scenario.income_sources?.filter(income => income.income_type === 'social_security');
+            console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Social Security income sources:', socialSecurityIncomes?.length || 0);
+            if (socialSecurityIncomes?.length) {
+              socialSecurityIncomes.forEach(ss => {
+                console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: SS Income - Owner:', ss.owned_by, 'Amount at FRA:', ss.amount_at_fra, 'Monthly Amount:', ss.monthly_amount);
+              });
+            }
+          }
+        })
+        .catch(error => {
+          console.error("🔍 SS2_DEBUG [SCENARIO_DETAIL]: Error loading detailed scenario data:", error);
         });
     },
     
@@ -1187,6 +1201,10 @@ export default {
         this.selectedScenarioId = scenarioId;
         this.fetchScenarioData();
         this.fetchAssetDetails();
+        // Only fetch detailed scenario data if scenarios are loaded
+        if (this.scenarios.length > 0 && this.scenario?.id) {
+          this.fetchScenarioDetails();
+        }
       }
     },
   }

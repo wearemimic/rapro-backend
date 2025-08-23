@@ -462,6 +462,7 @@ def update_scenario(request, scenario_id):
     """
     Update a scenario with Roth conversion parameters and income sources
     """
+    print(f"💰 INCOME_EDIT: *** UPDATE_SCENARIO FUNCTION CALLED *** scenario_id={scenario_id}")
     try:
         scenario = Scenario.objects.get(id=scenario_id)
         # Check if the user owns the client associated with this scenario
@@ -470,6 +471,14 @@ def update_scenario(request, scenario_id):
         
         # Extract income sources from request data
         income_sources_data = request.data.pop('income_sources', None)
+        
+        # DEBUG: Log the income sources data
+        print(f"💰 INCOME_EDIT: Received {len(income_sources_data) if income_sources_data else 0} income sources")
+        if income_sources_data:
+            for i, income_data in enumerate(income_sources_data):
+                print(f"💰 INCOME_EDIT: Source {i}: Type={income_data.get('income_type')}, Name={income_data.get('income_name')}")
+                print(f"💰 INCOME_EDIT: Source {i}: monthly_amount={income_data.get('monthly_amount')}, amount_at_fra={income_data.get('amount_at_fra')}")
+                print(f"💰 INCOME_EDIT: Source {i}: Raw data: {income_data}")
         
         # Update scenario fields
         serializer = ScenarioUpdateSerializer(scenario, data=request.data, partial=True)
@@ -487,12 +496,21 @@ def update_scenario(request, scenario_id):
                     income_data.pop('id', None)  # Remove frontend ID
                     
                     # Map frontend field names to backend model field names
+                    # Special handling for social security - prioritize amount_at_fra
+                    if income_data.get('income_type') == 'social_security':
+                        mapped_monthly_amount = income_data.get('amount_at_fra') or income_data.get('monthly_amount') or income_data.get('withdrawal_amount', 0)
+                    else:
+                        mapped_monthly_amount = income_data.get('monthly_amount') or income_data.get('withdrawal_amount') or income_data.get('amount_at_fra', 0)
+                    
+                    print(f"💰 INCOME_EDIT: Mapping {income_data.get('income_type', 'unknown')} - mapped_monthly_amount={mapped_monthly_amount}")
+                    print(f"💰 INCOME_EDIT: Source values - monthly_amount={income_data.get('monthly_amount')}, withdrawal_amount={income_data.get('withdrawal_amount')}, amount_at_fra={income_data.get('amount_at_fra')}")
+                    
                     mapped_data = {
                         'owned_by': income_data.get('owned_by'),
                         'income_type': income_data.get('income_type'),
                         'income_name': income_data.get('income_name', ''),
                         'current_asset_balance': income_data.get('current_asset_balance') or income_data.get('current_balance', 0),
-                        'monthly_amount': income_data.get('monthly_amount') or income_data.get('withdrawal_amount', 0),
+                        'monthly_amount': mapped_monthly_amount,
                         'monthly_contribution': income_data.get('monthly_contribution', 0),
                         'age_to_begin_withdrawal': income_data.get('age_to_begin_withdrawal') or income_data.get('start_age'),
                         'age_to_end_withdrawal': income_data.get('age_to_end_withdrawal') or income_data.get('end_age'),
@@ -1509,4 +1527,25 @@ def comparison_preferences(request, client_id):
             'scenario1': preference.scenario1.id if preference.scenario1 else None,
             'scenario2': preference.scenario2.id if preference.scenario2 else None
         }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_federal_standard_deduction(request):
+    """Get federal standard deduction amount based on filing status"""
+    from .tax_csv_loader import get_tax_loader
+    
+    filing_status = request.GET.get('filing_status', 'Single')
+    
+    try:
+        loader = get_tax_loader()
+        deduction_amount = loader.get_standard_deduction(filing_status)
+        
+        return Response({
+            'filing_status': filing_status,
+            'deduction_amount': float(deduction_amount)
+        })
+    except Exception as e:
+        return Response({
+            'error': f'Error retrieving standard deduction: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
