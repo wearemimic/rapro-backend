@@ -5,8 +5,8 @@
       <div class="card-body">
         <h5 class="mb-4">Income Projection Table</h5>
         <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
-          <table class="table table-bordered table-sm" style="min-width: 800px;">
-            <thead class="table-light">
+          <table class="table table-hover" style="min-width: 800px;">
+            <thead class="thead-light">
               <tr>
                 <th :style="`position: sticky; left: ${stickyPositions.year.left}; background-color: #f8f9fa; z-index: 10; min-width: ${stickyPositions.year.width};`">Year</th>
                 <th :style="`position: sticky; left: ${stickyPositions.primaryAge.left}; background-color: #f8f9fa; z-index: 10; min-width: ${stickyPositions.primaryAge.width};`">{{ client?.first_name || 'Primary' }} Age</th>
@@ -23,7 +23,7 @@
                     </button>
                   </div>
                 </th>
-                <th class="table-dark" style="position: sticky; right: 0; background-color: #343a40; z-index: 10; min-width: 120px;">TOTAL</th>
+                <th style="position: sticky; right: 0; background-color: #f8f9fa; z-index: 10; min-width: 120px;">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -34,7 +34,7 @@
                 <td v-for="asset in assetDetails" :key="'data-' + asset.id + '-' + row.year">
                   {{ formatCurrency(row.incomes[asset.id] || 0) }}
                 </td>
-                <td class="table-info" style="position: sticky; right: 0; background-color: #d1ecf1; z-index: 5; min-width: 120px;"><strong>{{ formatCurrency(row.total) }}</strong></td>
+                <td style="position: sticky; right: 0; background-color: #f8f9fa; z-index: 5; min-width: 120px; font-weight: 600;">{{ formatCurrency(row.total) }}</td>
               </tr>
             </tbody>
           </table>
@@ -58,8 +58,8 @@
               <h6 class="mb-3">Asset Information</h6>
               
               <!-- Table for Social Security -->
-              <table v-if="getAssetType(selectedAsset) === 'social_security'" class="table table-bordered table-sm mb-3">
-                <thead class="table-light">
+              <table v-if="getAssetType(selectedAsset) === 'social_security'" class="table table-hover mb-3">
+                <thead class="thead-light">
                   <tr>
                     <th>Owner</th>
                     <th>Amount at FRA</th>
@@ -78,8 +78,8 @@
               </table>
               
               <!-- Table for Pension -->
-              <table v-else-if="getAssetType(selectedAsset) === 'pension'" class="table table-bordered table-sm mb-3">
-                <thead class="table-light">
+              <table v-else-if="getAssetType(selectedAsset) === 'pension'" class="table table-hover mb-3">
+                <thead class="thead-light">
                   <tr>
                     <th>Owner</th>
                     <th>Monthly Income</th>
@@ -98,8 +98,8 @@
               </table>
               
               <!-- Table for Qualified/Non-Qualified Assets -->
-              <table v-else-if="['qualified', 'non_qualified'].includes(getAssetType(selectedAsset))" class="table table-bordered table-sm mb-3">
-                <thead class="table-light">
+              <table v-else-if="['qualified', 'non_qualified'].includes(getAssetType(selectedAsset))" class="table table-hover mb-3">
+                <thead class="thead-light">
                   <tr>
                     <th>Owner</th>
                     <th>Asset Type</th>
@@ -126,8 +126,8 @@
               </table>
               
               <!-- Default table for other asset types -->
-              <table v-else class="table table-bordered table-sm mb-3">
-                <thead class="table-light">
+              <table v-else class="table table-hover mb-3">
+                <thead class="thead-light">
                   <tr>
                     <th>Owner</th>
                     <th>Monthly Amount</th>
@@ -158,16 +158,21 @@
         </div>
       </div>
     </div>
+    
+    <!-- Disclosures Card -->
+    <DisclosuresCard />
 
   </div>
 </template>
 
 <script>
 import Graph from '../components/Graph.vue';
+import DisclosuresCard from '../components/DisclosuresCard.vue';
 
 export default {
   components: {
-    Graph
+    Graph,
+    DisclosuresCard
   },
   props: {
     scenario: {

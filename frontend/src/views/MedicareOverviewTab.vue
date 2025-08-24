@@ -112,6 +112,9 @@
         </div>
       </div>
     </div>
+    
+    <!-- Disclosures Card -->
+    <DisclosuresCard />
   </div>
 </template>
 
@@ -120,6 +123,7 @@ import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Graph from '../components/Graph.vue';
+import DisclosuresCard from '../components/DisclosuresCard.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -161,7 +165,8 @@ const IRMAA_LABELS = {
 
 export default {
   components: {
-    Graph
+    Graph,
+    DisclosuresCard
   },
   props: {
     scenarioResults: {

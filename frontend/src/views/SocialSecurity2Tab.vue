@@ -401,15 +401,22 @@
         </div>
       </div>
     </div>
+    
+    <!-- Disclosures Card -->
+    <DisclosuresCard />
   </div>
 </template>
 
 <script>
 import { socialSecurityService } from '@/services/socialSecurityService';
 import Chart from 'chart.js/auto';
+import DisclosuresCard from '@/components/DisclosuresCard.vue';
 
 export default {
   name: 'SocialSecurity2Tab',
+  components: {
+    DisclosuresCard
+  },
   props: {
     client: {
       type: Object,

@@ -48,6 +48,7 @@ class CustomUser(AbstractUser):
     white_label_support_email = models.EmailField(blank=True)
     primary_color = models.CharField(max_length=20, blank=True)
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
+    custom_disclosure = models.TextField(blank=True, help_text="Custom disclosure text to appear on scenario reports")
 
     # Stripe related fields
     stripe_customer_id = models.CharField(max_length=100, blank=True)
@@ -156,6 +157,13 @@ class Scenario(models.Model):
     primary_ss_claiming_age = models.FloatField(null=True, blank=True, help_text="Primary client's Social Security claiming age")
     spouse_ss_claiming_age = models.FloatField(null=True, blank=True, help_text="Spouse's Social Security claiming age")
     ss_include_irmaa = models.BooleanField(default=False, help_text="Include IRMAA impact in Social Security analysis")
+    
+    # Social Security adjustment fields
+    reduction_2030_ss = models.BooleanField(default=False, help_text="Apply Social Security benefit reduction")
+    ss_adjustment_year = models.PositiveIntegerField(default=2030, help_text="Year to start Social Security adjustment")
+    ss_adjustment_direction = models.CharField(max_length=20, default='decrease', help_text="Direction of SS adjustment")
+    ss_adjustment_type = models.CharField(max_length=20, default='percentage', help_text="Type of SS adjustment")
+    ss_adjustment_amount = models.FloatField(default=23.0, help_text="Amount of SS adjustment")
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

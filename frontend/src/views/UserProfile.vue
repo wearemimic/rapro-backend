@@ -148,6 +148,25 @@
                     />
                   </div>
                 </div>
+                
+                <h5 class="mt-4 mb-3">Custom Disclosure</h5>
+                <div class="row">
+                  <div class="col-12 mb-4">
+                    <label for="customDisclosure" class="form-label">
+                      Custom Disclosure Text
+                      <small class="text-muted ms-2">(Optional - will appear above default RetirementAdvisorPro disclosure)</small>
+                    </label>
+                    <textarea 
+                      id="customDisclosure" 
+                      class="form-control" 
+                      v-model="form.custom_disclosure"
+                      rows="5"
+                      placeholder="Enter your custom disclosure text here. This will appear on all scenario pages above the default RetirementAdvisorPro disclosure."
+                    ></textarea>
+                    <small class="text-muted">This disclosure will be displayed on all client scenario reports and pages.</small>
+                  </div>
+                </div>
+                
                 <div class="mt-3">
                   <button class="btn btn-primary" @click="updateProfile" :disabled="saving">
                     <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -196,7 +215,8 @@ const form = ref({
   white_label_company_name: '',
   white_label_support_email: '',
   primary_color: '',
-  logo: ''
+  logo: '',
+  custom_disclosure: ''
 })
 
 const logoFile = ref(null)

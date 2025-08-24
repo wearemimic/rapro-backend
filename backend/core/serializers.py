@@ -37,7 +37,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'phone_number', 'company_name', 'website_url', 'address', 'city', 'state',
             'zip_code', 'white_label_company_name', 'white_label_support_email',
-            'primary_color', 'logo'
+            'primary_color', 'logo', 'custom_disclosure'
         ]
         read_only_fields = ['id', 'username', 'email']
 
@@ -201,7 +201,9 @@ class ScenarioCreateSerializer(serializers.ModelSerializer):
             'id', 'client', 'name', 'description', 'retirement_age', 'medicare_age',
             'spouse_retirement_age', 'spouse_medicare_age', 'mortality_age',
             'spouse_mortality_age', 'retirement_year', 'share_with_client', 'income_sources',
-            'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction', 'primary_state'
+            'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction', 'primary_state',
+            'reduction_2030_ss', 'ss_adjustment_year', 'ss_adjustment_direction', 
+            'ss_adjustment_type', 'ss_adjustment_amount'
         ]
 
     def create(self, validated_data):
@@ -220,7 +222,9 @@ class ScenarioUpdateSerializer(serializers.ModelSerializer):
             'spouse_mortality_age', 'retirement_year', 'share_with_client',
             'part_b_inflation_rate', 'part_d_inflation_rate', 'apply_standard_deduction',
             'roth_conversion_start_year', 'roth_conversion_duration', 'roth_conversion_annual_amount',
-            'income_vs_cost_percent', 'medicare_irmaa_percent', 'primary_state'
+            'income_vs_cost_percent', 'medicare_irmaa_percent', 'primary_state',
+            'reduction_2030_ss', 'ss_adjustment_year', 'ss_adjustment_direction', 
+            'ss_adjustment_type', 'ss_adjustment_amount'
         ]
 
 class IncomeSourceUpdateSerializer(serializers.ModelSerializer):
