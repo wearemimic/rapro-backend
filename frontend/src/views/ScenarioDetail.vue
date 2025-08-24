@@ -225,6 +225,9 @@
                 <!-- End Right Column -->
               </div>
               <!-- End Main Row -->
+              
+              <!-- Disclosures Card -->
+              <DisclosuresCard />
             </div>
             <div v-show="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
               <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
@@ -295,6 +298,7 @@ import WorksheetsTab from './WorksheetsTab.vue';
 import ScenarioMetrics from './ScenarioMetrics.vue';
 import NextStepsTab from './NextStepsTab.vue';
 import Graph from '../components/Graph.vue';
+import DisclosuresCard from '../components/DisclosuresCard.vue';
 
 // Chart.js registration moved to Graph.vue to avoid conflicts
 
@@ -315,7 +319,8 @@ export default {
     WorksheetsTab,
     ScenarioMetrics,
     NextStepsTab,
-    Graph
+    Graph,
+    DisclosuresCard
   },
   data() {
     return {
@@ -409,6 +414,20 @@ export default {
   },
   methods: {
     ...mapActions(['fetchScenarioData']),
+    scrollToTop() {
+      console.log('Forcing scroll to top');
+      // The main scrollable container in the layout is .main-content
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        console.log('Scrolling .main-content container to top');
+        mainContent.scrollTop = 0;
+        mainContent.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+      // Also try other containers as fallback
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    },
     formatCurrency(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
     },
@@ -1173,8 +1192,14 @@ export default {
       },
       deep: true
     },
-    activeTab(newVal) {
-      console.log('Active tab changed to:', newVal);
+    activeTab(newVal, oldVal) {
+      console.log('Active tab changed from', oldVal, 'to:', newVal);
+      // Scroll to top when changing tabs
+      if (oldVal && newVal !== oldVal) {
+        this.$nextTick(() => {
+          this.scrollToTop();
+        });
+      }
       // Only worksheets tab needs chart initialization from ScenarioDetail
       if (newVal === 'worksheets') {
         if (this.scenarioResults.length) {
@@ -1186,9 +1211,16 @@ export default {
     },
     // Watch for route query parameter changes
     '$route.query.tab': {
-      handler(newTab) {
+      handler(newTab, oldTab) {
+        console.log('Route tab changed from', oldTab, 'to', newTab);
         if (newTab) {
           this.activeTab = newTab;
+          // Scroll to top when navigating directly via URL/sidebar links
+          if (oldTab && newTab !== oldTab) {
+            this.$nextTick(() => {
+              this.scrollToTop();
+            });
+          }
         }
       },
       immediate: true

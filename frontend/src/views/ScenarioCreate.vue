@@ -5,6 +5,7 @@
       :primary-first-name="primaryFirstName"
       :spouse-first-name="spouseFirstName"
       :client-tax-status="clientTaxStatus"
+      :is-edit-mode="isEditMode"
       @save="submitScenario"
     />
 
@@ -493,7 +494,7 @@
 
     <!-- Submit -->
     <button class="btn btn-primary" @click="submitScenario" style="margin:10px 10px 0px 0px;">
-      {{ scenario.id ? 'Update Scenario' : 'Create Scenario' }}
+      {{ isEditMode ? 'Save Scenario' : 'Create Scenario' }}
     </button>
     <button class="btn btn-secondary" @click="handleCancel" style="margin-top:10px;">Cancel</button>
   </div>
@@ -528,6 +529,8 @@
   :primary-lifespan="scenario.primary_lifespan"
   :spouse-lifespan="scenario.spouse_lifespan"
   :is-single="isSingle"
+  :primary-current-age="primaryCurrentAge"
+  :spouse-current-age="spouseCurrentAge"
   @save="addInvestment"
 />
 
@@ -547,9 +550,13 @@ const route = useRoute();
 const router = useRouter();
 const clientId = route.params.id;
 
+// Check if we're in edit mode
+const isEditMode = computed(() => !!route.query.edit);
+
 const primaryFirstName = ref('Primary');
 const spouseFirstName = ref('Spouse');
 const clientTaxStatus = ref('single');
+const clientData = ref(null);
 
 const scenario = ref({
   name: '',
@@ -564,6 +571,10 @@ const scenario = ref({
   investments: [],
   model_tax_change: '',
   reduction_2030_ss: false,
+  ss_adjustment_year: 2030,
+  ss_adjustment_direction: 'decrease',
+  ss_adjustment_type: 'percentage', 
+  ss_adjustment_amount: 23,
   apply_standard_deduction: false,
   primary_blind: false,
   spouse_blind: false,
@@ -606,6 +617,27 @@ function removeIncomeById(id) {
 // Check if client is single
 const isSingle = computed(() => {
   return clientTaxStatus.value === 'single';
+});
+
+// Calculate current ages from birthdates
+const calculateAge = (birthdate) => {
+  if (!birthdate) return 65; // Default age
+  const today = new Date();
+  const birth = new Date(birthdate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const primaryCurrentAge = computed(() => {
+  return clientData.value?.birthdate ? calculateAge(clientData.value.birthdate) : 65;
+});
+
+const spouseCurrentAge = computed(() => {
+  return clientData.value?.spouse?.birthdate ? calculateAge(clientData.value.spouse.birthdate) : 65;
 });
 
 // Currency formatting methods
@@ -750,6 +782,10 @@ async function submitScenario() {
       income_sources: allIncomeSources,
       model_tax_change: scenario.value.model_tax_change,
       reduction_2030_ss: scenario.value.reduction_2030_ss,
+      ss_adjustment_year: scenario.value.ss_adjustment_year,
+      ss_adjustment_direction: scenario.value.ss_adjustment_direction,
+      ss_adjustment_type: scenario.value.ss_adjustment_type,
+      ss_adjustment_amount: scenario.value.ss_adjustment_amount,
       apply_standard_deduction: scenario.value.apply_standard_deduction,
       primary_blind: scenario.value.primary_blind,
       spouse_blind: scenario.value.spouse_blind,
@@ -831,6 +867,7 @@ onMounted(async () => {
   try {
     const response = await axios.get(`http://localhost:8000/api/clients/${clientId}/`);
     const client = response.data;
+    clientData.value = client; // Store client data for age calculations
     if (!client || !client.first_name) {
       console.warn('Client data missing or incomplete:', client);
     }

@@ -145,6 +145,9 @@
         </div>
       </div>
     </div>
+    
+    <!-- Disclosures Card -->
+    <DisclosuresCard />
   </div>
 </template>
 
@@ -155,6 +158,7 @@ import * as XLSX from 'xlsx';
 import * as d3 from 'd3';
 import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 import Graph from '../components/Graph.vue';
+import DisclosuresCard from '../components/DisclosuresCard.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -196,7 +200,8 @@ const IRMAA_LABELS = {
 
 export default {
   components: {
-    Graph
+    Graph,
+    DisclosuresCard
   },
   props: {
     scenarioResults: {

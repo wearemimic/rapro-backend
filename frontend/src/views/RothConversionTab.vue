@@ -518,19 +518,23 @@
       </div>
     </div>
     </div> <!-- End of scenario-results div -->
+    
+    <!-- Disclosures Card -->
+    <DisclosuresCard />
   </div>
 </template>
 
 <script>
 import Graph from '../components/Graph.vue';
 import AssetSelectionPanel from '../components/RothConversion/AssetSelectionPanel.vue';
+import DisclosuresCard from '../components/DisclosuresCard.vue';
 import { useAuthStore } from '@/stores/auth';
 import { computed } from 'vue';
 import './RothConversionTab.css';
 import { apiService } from '@/services/api';
 
 export default {
-  components: { Graph, AssetSelectionPanel },
+  components: { Graph, AssetSelectionPanel, DisclosuresCard },
   mounted() {
     // Initialize our component's chart data without affecting other components
     console.log('🚀 RothConversionTab mounted, initializing asset line data...');

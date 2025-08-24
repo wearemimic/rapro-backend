@@ -4,12 +4,12 @@
     <div class="header-main">
       <div class="row align-items-center mb-4">
         <div class="col-md-8">
-          <h1 class="page-title">Create New Scenario</h1>
+          <h1 class="page-title">{{ isEditMode ? 'Edit Scenario' : 'Create New Scenario' }}</h1>
           <p class="page-subtitle">Configure retirement planning parameters for your client</p>
         </div>
         <div class="col-md-4 text-end">
           <button type="button" class="btn btn-primary" @click="$emit('save')">
-            <i class="bi bi-check-circle me-2"></i>Save Scenario
+            <i class="bi bi-check-circle me-2"></i>{{ isEditMode ? 'Save Scenario' : 'Create Scenario' }}
           </button>
         </div>
       </div>
@@ -242,7 +242,7 @@
                   v-model="localScenario.reduction_2030_ss"
                   @change="$emit('update:scenario', localScenario)"
                 />
-                <label class="form-check-label">2030 Social Security Adjustment</label>
+                <label class="form-check-label">Social Security Adjustment</label>
               </div>
             </div>
             
@@ -251,8 +251,21 @@
               <div class="row g-2 align-items-end">
                 <div class="col-md-12 mb-2">
                   <small class="text-muted">
-                    <strong>Decrease</strong> Social Security benefits starting in 2030 by:
+                    <strong>Decrease</strong> Social Security benefits starting in {{ localScenario.ss_adjustment_year || 2030 }} by:
                   </small>
+                </div>
+                
+                <div class="col-md-12 mb-2">
+                  <label class="form-label small">Adjustment Start Year</label>
+                  <select 
+                    v-model="localScenario.ss_adjustment_year" 
+                    class="form-select form-select-sm"
+                    @change="$emit('update:scenario', localScenario)"
+                  >
+                    <option v-for="year in adjustmentYears" :key="year" :value="year">
+                      {{ year }}
+                    </option>
+                  </select>
                 </div>
                 
                 <div class="col-md-6">
@@ -333,6 +346,10 @@ const props = defineProps({
   clientTaxStatus: {
     type: String,
     default: 'single'
+  },
+  isEditMode: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -344,7 +361,8 @@ const localScenario = ref({
   // Set defaults for SS adjustment fields if not present
   ss_adjustment_direction: props.scenario.ss_adjustment_direction || 'decrease',
   ss_adjustment_type: props.scenario.ss_adjustment_type || 'percentage',
-  ss_adjustment_amount: props.scenario.ss_adjustment_amount || 23
+  ss_adjustment_amount: props.scenario.ss_adjustment_amount || 23,
+  ss_adjustment_year: props.scenario.ss_adjustment_year || 2030
 })
 
 // Computed property for total deductions
@@ -362,9 +380,20 @@ watch(() => props.scenario, (newVal) => {
     // Set defaults for SS adjustment fields if not present
     ss_adjustment_direction: newVal.ss_adjustment_direction || 'decrease',
     ss_adjustment_type: newVal.ss_adjustment_type || 'percentage',
-    ss_adjustment_amount: newVal.ss_adjustment_amount || 23
+    ss_adjustment_amount: newVal.ss_adjustment_amount || 23,
+    ss_adjustment_year: newVal.ss_adjustment_year || 2030
   }
 }, { deep: true })
+
+// Computed property for adjustment years (next 20 years starting from current year)
+const adjustmentYears = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const years = []
+  for (let i = 0; i < 20; i++) {
+    years.push(currentYear + i)
+  }
+  return years
+})
 
 const states = [
   { code: 'AL', name: 'Alabama' },

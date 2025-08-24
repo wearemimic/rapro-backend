@@ -219,6 +219,14 @@ const props = defineProps({
   isSingle: {
     type: Boolean,
     default: false
+  },
+  primaryCurrentAge: {
+    type: Number,
+    default: 65
+  },
+  spouseCurrentAge: {
+    type: Number,
+    default: 65
   }
 })
 
@@ -282,7 +290,8 @@ const availableEndAges = computed(() => {
 const availableContributionEndAges = computed(() => {
   // Contribution end ages from current age to retirement age (typically 65-70)
   const ages = []
-  for (let age = 30; age <= Math.min(currentLifespan.value, 70); age++) {
+  const currentAge = investment.value.owned_by === 'spouse' ? props.spouseCurrentAge : props.primaryCurrentAge
+  for (let age = currentAge; age <= Math.min(currentLifespan.value, 70); age++) {
     ages.push(age)
   }
   return ages
