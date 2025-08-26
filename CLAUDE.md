@@ -323,3 +323,61 @@ props: {
 - **Authentication**: Token refresh logic for long editing sessions
 - **Data Persistence**: Tax settings and Social Security toggles now save properly
 - **Navigation**: Cancel button correctly routes back to scenario overview
+
+### Roth Conversion Tab (RothConversionTab.vue) - Major Fixes August 2025
+
+#### **Root Issue: Prop/Data Collision**
+The component had both `scenarioResults` as a prop (from parent) and as internal data, causing data shadowing and broken functionality.
+
+**Core Fixes:**
+1. **Separated Data Concerns:**
+   - `scenarioResults` (prop): General scenario results from parent ScenarioDetail component
+   - `rothConversionResults` (data): Roth-specific results from optimizer API
+   - Updated `filteredScenarioResults` computed property to use `rothConversionResults`
+
+2. **Fixed Backend AttributeError:**
+   - Issue: `scenario_processor.py` missing Social Security reduction fields in `from_dicts()` method
+   - Location: `/backend/core/scenario_processor.py` line 847
+   - Fix: Added default values for missing scenario fields:
+     ```python
+     required_scenario_fields = {
+         'reduction_2030_ss': False,
+         'ss_adjustment_year': 2030,
+         'ss_adjustment_direction': 'decrease',
+         'ss_adjustment_type': 'percentage',
+         'ss_adjustment_amount': 23.0,
+         'apply_standard_deduction': True,
+     }
+     ```
+
+3. **Fixed Database Limit Validation:**
+   - Issue: `roth_conversion_annual_amount` exceeded 12-digit database limit
+   - Fix: Added validation and capping in API payload preparation
+   - Added user-friendly UI warnings when amounts too large
+
+4. **Enhanced Asset Timeline Graph:**
+   - Fixed legend labels to show actual asset names instead of "qualified"
+   - Updated all three data generation methods to use `asset.income_name || asset.investment_name`
+
+5. **Improved UI/UX:**
+   - Added helpful messages in Conversion Impact Table when no data
+   - Fixed Roth Withdrawal Start Year validation to only show after "Calculate conversion"
+   - Enhanced error logging and debugging throughout
+
+#### **Key Technical Changes:**
+- **Frontend:** Separated `scenarioResults` prop from `rothConversionResults` internal data
+- **Backend:** Added missing scenario field defaults in `ScenarioProcessor.from_dicts()`
+- **Validation:** Added database limit checking for annual conversion amounts
+- **Error Handling:** Comprehensive logging and user-friendly error messages
+
+#### **Files Modified:**
+- `frontend/src/views/RothConversionTab.vue` - Core component fixes
+- `backend/core/scenario_processor.py` - Missing field defaults
+- Various computed properties and API response handling
+
+#### **Testing Status:**
+- Backend AttributeError resolved ✓
+- 400 Bad Request errors fixed ✓
+- Prop/data collision resolved ✓
+- Asset graph legends showing correct names ✓
+- Conversion Impact Table functionality restored ✓

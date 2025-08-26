@@ -126,11 +126,11 @@
                     id="rothWithdrawalStartYear" 
                     v-model="rothWithdrawalStartYear" 
                     class="form-control"
-                    :class="{ 'is-invalid': !isRothWithdrawalYearValid }"
+                    :class="{ 'is-invalid': shouldShowRothWithdrawalValidationError }"
                   >
                     <option v-for="year in availableWithdrawalYears" :key="year" :value="year">{{ year }}</option>
                   </select>
-                  <div v-if="!isRothWithdrawalYearValid" class="invalid-feedback">
+                  <div v-if="shouldShowRothWithdrawalValidationError" class="invalid-feedback">
                     Withdrawal start year must be after conversion start year ({{ conversionStartYear }})
                   </div>
                 </div>
@@ -172,6 +172,10 @@
               </ul>
               <div class="border-top pt-2">
                 <strong>Total: {{ formatCurrency(totalConversionAmount) }}</strong>
+                <div v-if="!isConversionAmountValid" class="text-danger small mt-1">
+                  <i class="fas fa-exclamation-triangle me-1"></i>
+                  Annual conversion amount exceeds database limit. Please reduce total amount or increase conversion years.
+                </div>
               </div>
             </div>
 
@@ -393,6 +397,18 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="filteredScenarioResults.length === 0">
+                <td :colspan="client?.tax_status?.toLowerCase() !== 'single' ? 9 : 8" class="text-center text-muted py-4">
+                  <div v-if="!hasScenarioBeenRun">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Click "Calculate conversion" to populate this table with conversion impact data
+                  </div>
+                  <div v-else>
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    No conversion impact data available. Please check your conversion settings and try again.
+                  </div>
+                </td>
+              </tr>
               <tr v-for="(row, index) in filteredScenarioResults" :key="row.year">
                 <td>{{ row.year }}</td>
                 <td>{{ row.primary_age || '' }}</td>
@@ -584,13 +600,15 @@ export default {
       _isRecalculating: false,
       // Flag to track if a scenario has been run
       hasScenarioBeenRun: false,
+      // Flag to track if validation has been attempted (for better UX)
+      validationAttempted: false,
       preRetirementIncome: 0,
       preRetirementIncomeRaw: '',
       availableYears: this.generateAvailableYears(),
       conversionStartYear: currentYear,
       yearsToConvert: 1,
       rothGrowthRate: 5.0,
-      scenarioResults: [],
+      rothConversionResults: [], // Roth optimizer API results (separate from scenarioResults prop)
       baselineMetrics: {},
       comparisonMetrics: {},
       optimalSchedule: {},
@@ -714,8 +732,12 @@ export default {
   },
   computed: {
     filteredScenarioResults() {
-      // Filter scenario results to start at the conversion start year
-      if (!this.scenarioResults || this.scenarioResults.length === 0) {
+      // Filter Roth conversion results to start at the conversion start year
+      console.log('🔍 filteredScenarioResults - rothConversionResults:', this.rothConversionResults);
+      console.log('🔍 filteredScenarioResults - rothConversionResults length:', this.rothConversionResults ? this.rothConversionResults.length : 'null');
+      
+      if (!this.rothConversionResults || this.rothConversionResults.length === 0) {
+        console.warn('⚠️ filteredScenarioResults: No Roth conversion results available');
         return [];
       }
       
@@ -728,10 +750,11 @@ export default {
       const tableStartYear = conversionStartYr;
       
       // Log for debugging
-      console.log(`Filtering scenario results to start from year ${tableStartYear}`);
+      console.log(`🔍 Filtering Roth conversion results to start from year ${tableStartYear}`);
       
-      // Filter scenario results
-      const filtered = this.scenarioResults.filter(row => parseInt(row.year) >= tableStartYear);
+      // Filter Roth conversion results
+      const filtered = this.rothConversionResults.filter(row => parseInt(row.year) >= tableStartYear);
+      console.log('🔍 filteredScenarioResults - filtered result:', filtered);
       return filtered;
     },
     eligibleAssets() {
@@ -772,6 +795,13 @@ export default {
         return sum + (parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0);
       }, 0);
     },
+    isConversionAmountValid() {
+      // Check if the annual conversion amount would exceed database limits
+      const yearsToConvertNum = parseInt(this.yearsToConvert) || 1;
+      const annualAmount = this.totalConversionAmount / yearsToConvertNum;
+      const maxAllowedAmount = 999999999.99;
+      return annualAmount <= maxAllowedAmount;
+    },
     unaffectedAssets() {
       // Filter out assets that have no conversion amount
       return this.eligibleAssets.filter(asset => {
@@ -790,7 +820,7 @@ export default {
     hasScenarioBeenRun() {
       // Check if we have scenario results or baseline metrics
       return (
-        (this.scenarioResults && this.scenarioResults.length > 0) || 
+        (this.rothConversionResults && this.rothConversionResults.length > 0) || 
         (this.baselineMetrics && Object.keys(this.baselineMetrics).length > 0) ||
         (this.optimalSchedule && Object.keys(this.optimalSchedule).length > 0)
       );
@@ -804,6 +834,10 @@ export default {
       const conversionYear = parseInt(this.conversionStartYear) || 0;
       const withdrawalYear = parseInt(this.rothWithdrawalStartYear) || 0;
       return withdrawalYear > conversionYear;
+    },
+    shouldShowRothWithdrawalValidationError() {
+      // Only show validation error if user has attempted to calculate
+      return this.validationAttempted && !this.isRothWithdrawalYearValid;
     },
     availableWithdrawalYears() {
       // Filter years to only show those after the conversion start year
@@ -1116,7 +1150,7 @@ export default {
           
           // Add to datasets
           datasets.push({
-            label: asset.income_type || 'Asset',
+            label: asset.income_name || asset.investment_name || asset.income_type || 'Asset',
             borderColor: this.getRandomColor(),
             backgroundColor: 'rgba(0,0,0,0.1)',
             data: data,
@@ -1142,7 +1176,7 @@ export default {
           
           // Add to datasets
           datasets.push({
-            label: asset.income_type || 'Asset',
+            label: asset.income_name || asset.investment_name || asset.income_type || 'Asset',
             borderColor: this.getRandomColor(),
             backgroundColor: 'rgba(0,0,0,0.1)',
             data: data,
@@ -1249,6 +1283,23 @@ export default {
     async recalculateConversion() {
       // Flag to track recalculation state
       this._isRecalculating = true;
+      // Set validation attempted flag for better UX
+      this.validationAttempted = true;
+      
+      // Check if Roth Withdrawal Start Year is valid before proceeding
+      if (!this.isRothWithdrawalYearValid) {
+        console.warn('Roth Withdrawal Start Year validation failed');
+        this._isRecalculating = false;
+        return;
+      }
+      
+      // Check if conversion amount is valid for database storage
+      if (!this.isConversionAmountValid) {
+        console.error('Conversion amount exceeds database limit');
+        alert('The annual conversion amount is too large for the database. Please reduce the total conversion amount or increase the number of conversion years.');
+        this._isRecalculating = false;
+        return;
+      }
       
       // Check if client exists
       if (!this.client) {
@@ -1361,7 +1412,8 @@ export default {
         // Create a loading indicator for the user
         console.log('Calculating Roth conversion...');
         
-        console.log('Sending request with token:', token);
+        console.log('🔍 Sending request with token:', token ? 'Present' : 'Missing');
+        console.log('🔍 Request payload to /api/roth-optimize/:', JSON.stringify(payload, null, 2));
         const response = await fetch(apiService.getUrl('/api/roth-optimize/'), {
           method: 'POST',
           headers: { 
@@ -1380,19 +1432,30 @@ export default {
           return;
         }
         
-        console.log('API response:', data);
+        console.log('🔍 Complete API response:', data);
+        console.log('🔍 API response keys:', Object.keys(data || {}));
+        console.log('🔍 API response type:', typeof data);
         
         // Only update our specific data if we have valid response data
         if (data) {
+          console.log('🔍 API Response data structure:', JSON.stringify(data, null, 2));
+          console.log('🔍 API Response data.conversion:', data.conversion);
+          console.log('🔍 API Response data.year_by_year:', data.year_by_year);
+          console.log('🔍 API Response data.baseline:', data.baseline);
+          console.log('🔍 API Response data.optimal_schedule:', data.optimal_schedule);
+          
           // Store the API response data in component properties
           // Handle the new response structure with baseline and conversion data
           if (data.conversion && data.conversion.year_by_year) {
-            this.scenarioResults = data.conversion.year_by_year || [];
+            this.rothConversionResults = data.conversion.year_by_year || [];
+            console.log('🔍 Set rothConversionResults from data.conversion.year_by_year:', this.rothConversionResults.length);
           } else if (data.year_by_year) {
             // Fallback to old API structure
-            this.scenarioResults = data.year_by_year || [];
+            this.rothConversionResults = data.year_by_year || [];
+            console.log('🔍 Set rothConversionResults from data.year_by_year:', this.rothConversionResults.length);
           } else {
-            this.scenarioResults = [];
+            this.rothConversionResults = [];
+            console.warn('⚠️ No year_by_year data found in API response, setting empty rothConversionResults');
           }
           
           this.comparisonMetrics = data.comparison || {};
@@ -1413,10 +1476,10 @@ export default {
           }
           
           // Generate asset line data from the year-by-year results which contain asset balances
-          if (this.scenarioResults && this.scenarioResults.length > 0) {
-            console.log('📊 Generating asset line data from API results...');
+          if (this.rothConversionResults && this.rothConversionResults.length > 0) {
+            console.log('📊 Generating asset line data from Roth conversion results...');
             // Extract asset balance data from year-by-year results
-            const assetLineData = this.generateAssetLineDataFromYearByYear(this.scenarioResults);
+            const assetLineData = this.generateAssetLineDataFromYearByYear(this.rothConversionResults);
             if (assetLineData) {
               console.log('📊 Setting assetLineData from API:', assetLineData);
               this.assetLineData = assetLineData;
@@ -1472,9 +1535,9 @@ export default {
         }
         
         // Debug: log income fields for each year
-        if (this.scenarioResults && this.scenarioResults.length) {
+        if (this.rothConversionResults && this.rothConversionResults.length) {
           console.log('--- Roth ConversionTab: Income Data by Year ---');
-          this.scenarioResults.forEach(row => {
+          this.rothConversionResults.forEach(row => {
             const assetBalances = Object.fromEntries(Object.entries(row).filter(([k]) => k.endsWith('_balance')));
             const assetWithdrawals = Object.fromEntries(Object.entries(row).filter(([k]) => k.endsWith('_withdrawal') || k.endsWith('_conversion') || k.endsWith('_rmd') || k.endsWith('_distribution')));
             console.log(`Year: ${row.year}`);
@@ -1486,7 +1549,7 @@ export default {
             console.log(`  Gross Income: ${row.gross_income}, SS Income: ${row.ss_income}, Taxable SS: ${row.taxable_ss}, Taxable Income: ${row.taxable_income}`);
           });
         } else {
-          console.warn('No scenarioResults returned from backend.');
+          console.warn('No rothConversionResults returned from backend.');
         }
       } catch (err) {
         console.error('Error running optimizer:', err);
@@ -1516,14 +1579,25 @@ export default {
           throw new Error('No authentication token available');
         }
         
+        // Calculate annual conversion amount with validation for 12-digit database limit
+        const yearsToConvertNum = parseInt(this.yearsToConvert) || 1;
+        const rawAnnualAmount = this.totalConversionAmount / yearsToConvertNum;
+        // Limit to 12 digits total (including decimals) - max value around 999,999,999.99
+        const maxAllowedAmount = 999999999.99;
+        const annualAmount = Math.min(rawAnnualAmount, maxAllowedAmount);
+        
+        if (rawAnnualAmount > maxAllowedAmount) {
+          console.warn(`⚠️ Annual conversion amount (${rawAnnualAmount.toFixed(2)}) exceeds database limit, capping at ${maxAllowedAmount}`);
+        }
+
         // Prepare the scenario update data
         const scenarioUpdateData = {
           id: this.scenario.id,
           name: this.scenario.name,
           description: this.scenario.description || 'Roth Conversion Scenario',
           roth_conversion_start_year: parseInt(this.conversionStartYear) || new Date().getFullYear(),
-          roth_conversion_duration: parseInt(this.yearsToConvert) || 1,
-          roth_conversion_annual_amount: this.totalConversionAmount / (parseInt(this.yearsToConvert) || 1),
+          roth_conversion_duration: yearsToConvertNum,
+          roth_conversion_annual_amount: Math.round(annualAmount * 100) / 100, // Round to 2 decimal places
           retirement_age: this.scenario.retirement_age || 65,
           medicare_age: this.scenario.medicare_age || 65,
           spouse_retirement_age: this.scenario.spouse_retirement_age,
@@ -1534,6 +1608,10 @@ export default {
           part_d_inflation_rate: this.scenario.part_d_inflation_rate || 3.0,
           apply_standard_deduction: this.scenario.apply_standard_deduction !== undefined ? this.scenario.apply_standard_deduction : true
         };
+        
+        console.log('🔍 Scenario update data being sent:', scenarioUpdateData);
+        console.log('🔍 Total conversion amount:', this.totalConversionAmount);
+        console.log('🔍 Years to convert:', this.yearsToConvert);
         
         // Update the scenario with Roth conversion parameters
         try {
@@ -1549,8 +1627,10 @@ export default {
           const data = await response.json();
           
           if (!response.ok) {
-            console.error('API error:', data);
-            throw new Error(`Error: ${data.error || 'Unknown error occurred'}`);
+            console.error('API error response status:', response.status);
+            console.error('API error response data:', data);
+            console.error('API error details:', JSON.stringify(data, null, 2));
+            throw new Error(`Error ${response.status}: ${data.error || data.detail || JSON.stringify(data) || 'Unknown error occurred'}`);
           }
         } catch (error) {
           console.error('Error updating scenario:', error);
@@ -1813,7 +1893,7 @@ export default {
           
           // Add to datasets
           datasets.push({
-            label: asset.income_type || 'Asset',
+            label: asset.income_name || asset.investment_name || asset.income_type || 'Asset',
             borderColor: '#28a745', // Green for Qualified
             backgroundColor: 'rgba(40, 167, 69, 0.1)',
             data: data,
@@ -1841,7 +1921,7 @@ export default {
           
           // Add to datasets
           datasets.push({
-            label: asset.income_type || 'Asset',
+            label: asset.income_name || asset.investment_name || asset.income_type || 'Asset',
             borderColor: this.getRandomColor(),
             backgroundColor: 'rgba(0,0,0,0.1)',
             data: data,
@@ -1960,8 +2040,16 @@ export default {
         
         // Add Qualified asset line
         if (qualifiedBalances.some(v => v > 0)) {
+          // Try to find the actual qualified asset name from eligibleAssets
+          const qualifiedAsset = (this.eligibleAssets || []).find(asset => 
+            asset.income_type === 'Qualified' || asset.income_type === 'qualified'
+          );
+          const assetLabel = qualifiedAsset ? 
+            (qualifiedAsset.income_name || qualifiedAsset.investment_name || 'Qualified') : 
+            'Qualified';
+            
           datasets.push({
-            label: 'Qualified',
+            label: assetLabel,
             borderColor: '#28a745',
             backgroundColor: 'rgba(40, 167, 69, 0.1)',
             data: qualifiedBalances,
