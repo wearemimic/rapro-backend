@@ -282,7 +282,7 @@
                 
                 <div class="col-md-6">
                   <label class="form-label small">
-                    {{ localScenario.ss_adjustment_type === 'percentage' ? 'Percent (%)' : 'Amount ($)' }}
+                    {{ localScenario.ss_adjustment_type === 'percentage' ? 'Percent (%)' : 'Monthly Amount ($)' }}
                   </label>
                   <input 
                     v-if="localScenario.ss_adjustment_type === 'percentage'"
@@ -382,6 +382,21 @@ watch(() => props.scenario, (newVal) => {
     ss_adjustment_type: newVal.ss_adjustment_type || 'percentage',
     ss_adjustment_amount: newVal.ss_adjustment_amount || 23,
     ss_adjustment_year: newVal.ss_adjustment_year || 2030
+  }
+  
+  // Auto-expand advanced section if any advanced settings have non-default values
+  const hasAdvancedSettings = 
+    newVal.reduction_2030_ss || 
+    newVal.apply_standard_deduction ||
+    newVal.federal_standard_deduction > 0 ||
+    newVal.state_standard_deduction > 0 ||
+    newVal.custom_annual_deduction > 0 ||
+    newVal.primary_blind ||
+    newVal.spouse_blind ||
+    newVal.is_dependent
+    
+  if (hasAdvancedSettings) {
+    showAdvanced.value = true
   }
 }, { deep: true })
 
@@ -518,6 +533,21 @@ watch(() => localScenario.value.apply_standard_deduction, (newValue) => {
 onMounted(() => {
   if (localScenario.value.apply_standard_deduction) {
     fetchFederalStandardDeduction()
+  }
+  
+  // Auto-expand advanced section if any advanced settings have non-default values
+  const hasAdvancedSettings = 
+    props.scenario.reduction_2030_ss || 
+    props.scenario.apply_standard_deduction ||
+    props.scenario.federal_standard_deduction > 0 ||
+    props.scenario.state_standard_deduction > 0 ||
+    props.scenario.custom_annual_deduction > 0 ||
+    props.scenario.primary_blind ||
+    props.scenario.spouse_blind ||
+    props.scenario.is_dependent
+    
+  if (hasAdvancedSettings) {
+    showAdvanced.value = true
   }
   
   // Initialize Bootstrap tooltips

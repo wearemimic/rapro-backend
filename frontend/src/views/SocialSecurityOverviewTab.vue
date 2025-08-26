@@ -22,9 +22,9 @@
         <div class="card h-100">
           <div class="card-body">
             <h5 class="card-title">Insights</h5>
-            <div>
-              <!-- Placeholder for insights content -->
-              <p>Add insights here...</p>
+            <div class="text-center">
+              <!-- Loading placeholder -->
+              <p class="text-muted mb-0">Loading...</p>
             </div>
           </div>
         </div>
@@ -46,6 +46,7 @@
                 <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
                 <th>Primary SSI Benefit</th>
                 <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse SSI Benefit</th>
+                <th v-if="hasSsDecrease">SS Decrease</th>
                 <th>Total Medicare</th>
                 <th>SSI Taxed</th>
                 <th>Remaining SSI</th>
@@ -59,10 +60,13 @@
                 <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
                 <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
                 <td>
-                  ${{ parseFloat(row.ss_income_primary || row.ss_income || 0).toFixed(2) }}
+                  ${{ parseFloat(row.ss_income_primary || 0).toFixed(2) }}
                 </td>
                 <td v-if="client?.tax_status?.toLowerCase() !== 'single'">
                   ${{ parseFloat(row.ss_income_spouse || 0).toFixed(2) }}
+                </td>
+                <td v-if="hasSsDecrease" class="text-danger">
+                  ${{ getSsDecreaseAmount(row).toFixed(2) }}
                 </td>
                 <td style="position: relative;">
                   ${{ parseFloat(row.total_medicare || 0).toFixed(2) }}
@@ -74,8 +78,8 @@
                   </div>
                 </td>
                 <td>${{ parseFloat(row.ssi_taxed || 0).toFixed(2) }}</td>
-                <td :class="{ 'cell-negative': ((parseFloat(row.ss_income_primary || 0) + parseFloat(row.ss_income_spouse || 0)) - parseFloat(row.total_medicare || 0)) < 0 }">
-                  ${{ ((parseFloat(row.ss_income_primary || 0) + parseFloat(row.ss_income_spouse || 0)) - parseFloat(row.total_medicare || 0)).toFixed(2) }}
+                <td :class="{ 'cell-negative': getRemainingSSI(row) < 0 }">
+                  ${{ getRemainingSSI(row).toFixed(2) }}
                 </td>
               </tr>
             </tbody>
@@ -224,12 +228,7 @@ export default {
           type: 'line',
           label: 'Remaining SSI Benefit',
           data: this.filteredResults.map(row => {
-            const primarySSI = parseFloat(row.ss_income_primary || 0);
-            const spouseSSI = parseFloat(row.ss_income_spouse || 0);
-            const totalSSI = primarySSI + spouseSSI;
-            const medicareExpense = parseFloat(row.total_medicare || 0);
-            const remainingSSI = totalSSI - medicareExpense;
-            return remainingSSI;
+            return this.getRemainingSSI(row);
           }),
           borderColor: "#00c9db",
           backgroundColor: "transparent",
@@ -309,6 +308,10 @@ export default {
           }
         }
       };
+    },
+    hasSsDecrease() {
+      // Check if any row has SS decrease applied
+      return this.filteredResults && this.filteredResults.some(row => row.ss_decrease_applied);
     }
   },
   methods: {
@@ -328,27 +331,48 @@ export default {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
     },
     isIrmaaBracketHit(row, idx) {
-      const magi = Number(row.magi);
-      const thresholds = this.irmaaThresholds;
-      if (idx === 0) {
-        return thresholds.some(t => magi >= t);
+      // Returns true if this row's MAGI crosses into a new IRMAA bracket
+      const currentBracket = row.irmaa_bracket_number || 0;
+      
+      if (currentBracket > 0) {
+        // We're in an IRMAA bracket
+        if (idx === 0) {
+          // First row - show if in any bracket
+          return true;
+        }
+        
+        // Check if bracket changed from previous row
+        const prevRow = this.filteredResults[idx - 1];
+        const prevBracket = prevRow?.irmaa_bracket_number || 0;
+        
+        // Show indicator if bracket number changed
+        return currentBracket !== prevBracket;
       }
-      const prevMagi = Number(this.filteredResults[idx - 1]?.magi);
-      const getBracket = (m) => thresholds.findIndex(t => m < t);
-      const currBracket = getBracket(magi);
-      const prevBracket = getBracket(prevMagi);
-      return currBracket !== prevBracket;
+      
+      return false;
     },
     getIrmaaBracketLabel(row) {
       const magi = Number(row.magi);
-      const thresholds = this.irmaaThresholds;
-      const labels = this.irmaaLabels;
-      for (let i = 0; i < thresholds.length; i++) {
-        if (magi <= thresholds[i]) {
-          return labels[i];
-        }
+      const bracketNum = row.irmaa_bracket_number || 0;
+      const bracketThreshold = Number(row.irmaa_bracket_threshold);
+      const year = row.year;
+      
+      const bracketLabels = {
+        0: 'No IRMAA',
+        1: 'IRMAA Bracket 1',
+        2: 'IRMAA Bracket 2', 
+        3: 'IRMAA Bracket 3',
+        4: 'IRMAA Bracket 4',
+        5: 'IRMAA Bracket 5 (Highest)'
+      };
+      
+      if (bracketNum > 0) {
+        return `${bracketLabels[bracketNum] || `IRMAA Bracket ${bracketNum}`}: MAGI (${this.formatCurrency(magi)}) exceeds ${this.formatCurrency(bracketThreshold)} in ${year}`;
+      } else {
+        const firstThreshold = Number(row.irmaa_threshold);
+        const difference = firstThreshold - magi;
+        return `No IRMAA: ${this.formatCurrency(difference)} below first threshold of ${this.formatCurrency(firstThreshold)} in ${year}`;
       }
-      return labels[labels.length - 1];
     },
     toggleIrmaaTooltip(idx) {
       this.openIrmaaTooltipIdx = this.openIrmaaTooltipIdx === idx ? null : idx;
@@ -360,6 +384,23 @@ export default {
       if (!event.target.closest('.irmaa-info-icon') && !event.target.closest('.irmaa-popover')) {
         this.closeIrmaaTooltip();
       }
+    },
+    getSsDecreaseAmount(row) {
+      if (!row.ss_decrease_applied) {
+        return 0;
+      }
+      
+      // Return the actual SS decrease amount from the backend
+      return parseFloat(row.ss_decrease_amount || 0);
+    },
+    getRemainingSSI(row) {
+      const primarySSI = parseFloat(row.ss_income_primary || 0);
+      const spouseSSI = parseFloat(row.ss_income_spouse || 0);
+      const totalSSI = primarySSI + spouseSSI;
+      const ssDecrease = this.getSsDecreaseAmount(row);
+      const medicare = parseFloat(row.total_medicare || 0);
+      
+      return totalSSI - ssDecrease - medicare;
     }
   },
   mounted() {

@@ -376,27 +376,48 @@ export default {
       });
     },
     isIrmaaBracketHit(row, idx) {
-      const magi = Number(row.magi);
-      const thresholds = this.irmaaThresholds;
-      if (idx === 0) {
-        return thresholds.some(t => magi >= t);
+      // Returns true if this row's MAGI crosses into a new IRMAA bracket
+      const currentBracket = row.irmaa_bracket_number || 0;
+      
+      if (currentBracket > 0) {
+        // We're in an IRMAA bracket
+        if (idx === 0) {
+          // First row - show if in any bracket
+          return true;
+        }
+        
+        // Check if bracket changed from previous row
+        const prevRow = this.filteredResults[idx - 1];
+        const prevBracket = prevRow?.irmaa_bracket_number || 0;
+        
+        // Show indicator if bracket number changed
+        return currentBracket !== prevBracket;
       }
-      const prevMagi = Number(this.filteredResults[idx - 1]?.magi);
-      const getBracket = (m) => thresholds.findIndex(t => m < t);
-      const currBracket = getBracket(magi);
-      const prevBracket = getBracket(prevMagi);
-      return currBracket !== prevBracket;
+      
+      return false;
     },
     getIrmaaBracketLabel(row) {
       const magi = Number(row.magi);
-      const thresholds = this.irmaaThresholds;
-      const labels = this.irmaaLabels;
-      for (let i = 0; i < thresholds.length; i++) {
-        if (magi <= thresholds[i]) {
-          return labels[i];
-        }
+      const bracketNum = row.irmaa_bracket_number || 0;
+      const bracketThreshold = Number(row.irmaa_bracket_threshold);
+      const year = row.year;
+      
+      const bracketLabels = {
+        0: 'No IRMAA',
+        1: 'IRMAA Bracket 1',
+        2: 'IRMAA Bracket 2', 
+        3: 'IRMAA Bracket 3',
+        4: 'IRMAA Bracket 4',
+        5: 'IRMAA Bracket 5 (Highest)'
+      };
+      
+      if (bracketNum > 0) {
+        return `${bracketLabels[bracketNum] || `IRMAA Bracket ${bracketNum}`}: MAGI (${this.formatCurrency(magi)}) exceeds ${this.formatCurrency(bracketThreshold)} in ${year}`;
+      } else {
+        const firstThreshold = Number(row.irmaa_threshold);
+        const difference = firstThreshold - magi;
+        return `No IRMAA: ${this.formatCurrency(difference)} below first threshold of ${this.formatCurrency(firstThreshold)} in ${year}`;
       }
-      return labels[labels.length - 1];
     },
     toggleIrmaaTooltip(idx) {
       this.openIrmaaTooltipIdx = this.openIrmaaTooltipIdx === idx ? null : idx;

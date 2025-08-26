@@ -125,6 +125,28 @@ class Spouse(models.Model):
     birthdate = models.DateField()
     gender = models.CharField(max_length=10, choices=[('Male', 'Male'), ('Female', 'Female'), ('Other', 'Other')])
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        from django.utils import timezone
+        import datetime
+        
+        if self.birthdate:
+            current_year = timezone.now().year
+            min_year = 1900
+            max_year = current_year
+            
+            if self.birthdate.year < min_year or self.birthdate.year > max_year:
+                raise ValidationError(f'Spouse birthdate year must be between {min_year} and {max_year}')
+                
+            # Check reasonable age range (18-120 years old)
+            age = current_year - self.birthdate.year
+            if age < 18 or age > 120:
+                raise ValidationError(f'Spouse age ({age}) must be between 18 and 120 years old')
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Spouse of {self.client.first_name} {self.client.last_name}"
     
@@ -164,6 +186,14 @@ class Scenario(models.Model):
     ss_adjustment_direction = models.CharField(max_length=20, default='decrease', help_text="Direction of SS adjustment")
     ss_adjustment_type = models.CharField(max_length=20, default='percentage', help_text="Type of SS adjustment")
     ss_adjustment_amount = models.FloatField(default=23.0, help_text="Amount of SS adjustment")
+    
+    # Tax Settings fields
+    federal_standard_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Federal standard deduction amount")
+    state_standard_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="State standard deduction amount")
+    custom_annual_deduction = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Custom annual deduction amount")
+    primary_blind = models.BooleanField(default=False, help_text="Primary client is blind (additional deduction)")
+    spouse_blind = models.BooleanField(default=False, help_text="Spouse is blind (additional deduction)")
+    is_dependent = models.BooleanField(default=False, help_text="Filed as dependent (affects deduction limits)")
 
     def __str__(self):
         return f"{self.name} ({self.client.first_name})"

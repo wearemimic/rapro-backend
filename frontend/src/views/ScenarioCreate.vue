@@ -132,7 +132,7 @@
                       </td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
-                          <option v-for="age in Array.from({ length: 39 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
+                          <option v-for="age in getAgeOptions(income.income_type)" :key="age" :value="age">{{ age }}</option>
                         </select>
                       </td>
                       <td>
@@ -323,7 +323,7 @@
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
-                          <option v-for="age in Array.from({ length: 39 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
+                          <option v-for="age in getAgeOptions(income.income_type)" :key="age" :value="age">{{ age }}</option>
                         </select>
                       </td>
                       <td>
@@ -351,7 +351,7 @@
                       <td><input v-model.number="income.amount_per_month" type="number" class="form-control" /></td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
-                          <option v-for="age in Array.from({ length: 39 }, (_, i) => 62 + i)" :key="age" :value="age">{{ age }}</option>
+                          <option v-for="age in getAgeOptions(income.income_type)" :key="age" :value="age">{{ age }}</option>
                         </select>
                       </td>
                       <td>
@@ -386,7 +386,7 @@
       <div class="card-body">
           <div class="row mb-3">
             <div class="col-auto">
-              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#investmentModal">
+              <button class="btn btn-primary" @click="addNewInvestment" data-bs-toggle="modal" data-bs-target="#investmentModal">
                 <i class="bi bi-plus-circle me-2"></i>Add Investment Account
               </button>
             </div>
@@ -404,40 +404,34 @@
                     <th>Rate of Return</th>
                     <th>Age Start Taking</th>
                     <th>Age Stop Taking</th>
-                    <th class="text-center" style="width: 90px;">Action</th>
+                    <th class="text-center" style="width: 140px;">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="investment in group" :key="investment.id">
-                    <td>
-                      <select v-model="investment.owned_by" class="form-control">
-                        <option value="primary">{{ primaryFirstName }}</option>
-                        <option v-if="!isSingle" value="spouse">{{ spouseFirstName }}</option>
-                      </select>
-                    </td>
-                    <td>
-                      <input v-model="investment.investment_name" type="text" class="form-control" />
-                    </td>
-                    <td>
-                      <div class="input-group">
-                        <span class="input-group-text">$</span>
-                        <input v-model.number="investment.current_balance" type="number" class="form-control" />
+                    <td>{{ investment.owned_by === 'primary' ? primaryFirstName : spouseFirstName }}</td>
+                    <td>{{ investment.investment_name || investment.income_name }}</td>
+                    <td>{{ formatCurrencyDisplay(investment.current_balance || 0) }}</td>
+                    <td>{{ investment.growth_rate ? (investment.growth_rate > 1 ? investment.growth_rate.toFixed(1) : (investment.growth_rate * 100).toFixed(1)) : '0' }}%</td>
+                    <td>{{ investment.start_age }}</td>
+                    <td>{{ investment.end_age }}</td>
+                    <td class="text-center">
+                      <div class="btn-group" role="group">
+                        <button 
+                          class="btn btn-sm btn-outline-primary" 
+                          @click="editInvestment(investment)"
+                          title="Edit Investment"
+                        >
+                          <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button 
+                          class="btn btn-sm btn-outline-danger" 
+                          @click="removeInvestmentById(investment.id)"
+                          title="Remove Investment"
+                        >
+                          <i class="bi bi-trash"></i> Remove
+                        </button>
                       </div>
-                    </td>
-                    <td>
-                      <div class="input-group">
-                        <input v-model.number="investment.growth_rate" type="number" class="form-control" step="0.01" />
-                        <span class="input-group-text">%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <input v-model.number="investment.start_age" type="number" class="form-control" />
-                    </td>
-                    <td>
-                      <input v-model.number="investment.end_age" type="number" class="form-control" />
-                    </td>
-                    <td class="text-end">
-                      <button class="btn btn-sm btn-danger" @click="removeInvestmentById(investment.id)">Remove</button>
                     </td>
                   </tr>
                 </tbody>
@@ -531,8 +525,11 @@
   :is-single="isSingle"
   :primary-current-age="primaryCurrentAge"
   :spouse-current-age="spouseCurrentAge"
-  @save="addInvestment"
+  :editing-investment="editingInvestment"
+  @save="handleInvestmentSave"
+  @cancel="cancelInvestmentEdit"
 />
+
 
 </template>
 
@@ -544,7 +541,7 @@ import { v4 as uuidv4 } from 'uuid';
 import InvestmentModal from '../components/InvestmentModal.vue';
 import ScenarioHeader from '../components/ScenarioHeader.vue';
 import { useAuthStore } from '../stores/auth';
-import { createCurrencyHandlers, formatCurrency } from '../utils/currencyFormatter';
+import { createCurrencyHandlers, formatCurrency, formatCurrencyDisplay } from '../utils/currencyFormatter';
 
 const route = useRoute();
 const router = useRouter();
@@ -557,6 +554,7 @@ const primaryFirstName = ref('Primary');
 const spouseFirstName = ref('Spouse');
 const clientTaxStatus = ref('single');
 const clientData = ref(null);
+const editingInvestment = ref(null);
 
 const scenario = ref({
   name: '',
@@ -596,11 +594,18 @@ const newIncome = ref({ income_type: '' });
 
 function addIncome() {
   if (!newIncome.value.income_type) return;
+  
+  // Set appropriate start age based on income type
+  let defaultStartAge = 65;
+  if (['Wages', 'Rental_Income', 'Other'].includes(newIncome.value.income_type)) {
+    defaultStartAge = youngestCurrentAge.value;
+  }
+  
   scenario.value.income.push({
     id: uuidv4(),
     income_type: newIncome.value.income_type,
     owned_by: 'primary',
-    start_age: 65,
+    start_age: defaultStartAge,
     end_age: 90,
     current_balance: 0,
     monthly_contribution: 0,
@@ -639,6 +644,32 @@ const primaryCurrentAge = computed(() => {
 const spouseCurrentAge = computed(() => {
   return clientData.value?.spouse?.birthdate ? calculateAge(clientData.value.spouse.birthdate) : 65;
 });
+
+// Calculate the youngest person's current age (for income types that should start from current age)
+const youngestCurrentAge = computed(() => {
+  if (isSingle.value) {
+    return primaryCurrentAge.value;
+  }
+  return Math.min(primaryCurrentAge.value, spouseCurrentAge.value);
+});
+
+// Dynamic age options based on income type
+const getAgeOptions = (incomeType, startAge = null) => {
+  let minAge, maxAge;
+  
+  if (['Wages', 'Rental_Income', 'Other'].includes(incomeType)) {
+    // For these income types, start from current age of youngest person
+    minAge = startAge || youngestCurrentAge.value;
+    maxAge = 100;
+  } else {
+    // For other income types (social security, pension, etc.), use standard retirement age range
+    minAge = 62;
+    maxAge = 100;
+  }
+  
+  const ageRange = maxAge - minAge + 1;
+  return Array.from({ length: ageRange }, (_, i) => minAge + i);
+};
 
 // Currency formatting methods
 const formatCurrencyInput = (value) => {
@@ -692,14 +723,49 @@ const groupedIncome = computed(() => {
 });
 
 // Investment functions
-function addInvestment(investmentData) {
+function handleInvestmentSave(investmentData) {
   // Convert growth_rate back to percentage for display
   investmentData.growth_rate = investmentData.growth_rate * 100;
-  scenario.value.investments.push(investmentData);
+  
+  if (investmentData.isEdit) {
+    // Update existing investment
+    const index = scenario.value.investments.findIndex(inv => inv.id === investmentData.id);
+    if (index !== -1) {
+      // Remove the isEdit flag before storing
+      delete investmentData.isEdit;
+      scenario.value.investments[index] = investmentData;
+    }
+    // Clear editing state
+    editingInvestment.value = null;
+  } else {
+    // Add new investment
+    delete investmentData.isEdit; // Remove the flag
+    scenario.value.investments.push(investmentData);
+  }
 }
 
 function removeInvestmentById(id) {
   scenario.value.investments = scenario.value.investments.filter(investment => investment.id !== id);
+}
+
+function addNewInvestment() {
+  // Clear any existing editing state to ensure modal opens in add mode
+  editingInvestment.value = null;
+}
+
+function cancelInvestmentEdit() {
+  // Clear the editing state when user cancels
+  editingInvestment.value = null;
+}
+
+function editInvestment(investment) {
+  // Set the investment being edited - this will trigger the modal to populate
+  editingInvestment.value = investment;
+  
+  // Open the modal
+  const modal = document.getElementById('investmentModal');
+  const bootstrapModal = new bootstrap.Modal(modal);
+  bootstrapModal.show();
 }
 
 // Group investments by type
@@ -787,6 +853,9 @@ async function submitScenario() {
       ss_adjustment_type: scenario.value.ss_adjustment_type,
       ss_adjustment_amount: scenario.value.ss_adjustment_amount,
       apply_standard_deduction: scenario.value.apply_standard_deduction,
+      federal_standard_deduction: scenario.value.federal_standard_deduction,
+      state_standard_deduction: scenario.value.state_standard_deduction,
+      custom_annual_deduction: scenario.value.custom_annual_deduction,
       primary_blind: scenario.value.primary_blind,
       spouse_blind: scenario.value.spouse_blind,
       is_dependent: scenario.value.is_dependent,
@@ -897,7 +966,7 @@ async function loadScenarioForDuplication(scenarioId) {
   try {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/?mode=duplicate`, { headers });
+    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/edit/?mode=duplicate`, { headers });
     const scenarioData = response.data;
     
     // Define investment account types
@@ -941,7 +1010,7 @@ async function loadScenarioForEditing(scenarioId) {
   try {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/?mode=edit`, { headers });
+    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/edit/?mode=edit`, { headers });
     const scenarioData = response.data;
     
     // Define investment account types
@@ -981,21 +1050,45 @@ async function loadScenarioForEditing(scenarioId) {
 }
 
 function handleCancel() {
-  // Check if we're editing by looking at route query params first
-  const editId = route.query.edit;
+  console.log('🔙 handleCancel called');
+  console.log('route.query:', route.query);
+  console.log('route.params:', route.params);
+  console.log('clientId:', clientId);
   
-  if (editId) {
-    // If we have an edit query param, go back to that scenario's detail page
-    console.log('🔙 Cancel from edit mode, returning to scenario:', editId);
-    router.push(`/clients/${clientId}/scenarios/detail/${editId}`);
-  } else if (scenario.value.id) {
-    // Fallback: if scenario has an ID, go back to that scenario's detail page
-    console.log('🔙 Cancel with scenario ID, returning to scenario:', scenario.value.id);
-    router.push(`/clients/${clientId}/scenarios/detail/${scenario.value.id}`);
-  } else {
-    // If creating a new scenario (including duplication), go back to client page
-    console.log('🔙 Cancel from create mode, returning to client page');
-    router.push(`/clients/${clientId}`);
+  try {
+    // Check if we're editing by looking at route query params first
+    const editId = route.query.edit;
+    
+    if (editId) {
+      // If we have an edit query param, go back to that scenario's detail page
+      const targetUrl = `/clients/${clientId}/scenarios/detail/${editId}`;
+      console.log('🔙 Cancel from edit mode, navigating to:', targetUrl);
+      router.push(targetUrl).then(() => {
+        console.log('✅ Navigation successful');
+      }).catch(err => {
+        console.error('❌ Navigation failed:', err);
+      });
+    } else if (scenario.value.id) {
+      // Fallback: if scenario has an ID, go back to that scenario's detail page
+      const targetUrl = `/clients/${clientId}/scenarios/detail/${scenario.value.id}`;
+      console.log('🔙 Cancel with scenario ID, navigating to:', targetUrl);
+      router.push(targetUrl).then(() => {
+        console.log('✅ Navigation successful');
+      }).catch(err => {
+        console.error('❌ Navigation failed:', err);
+      });
+    } else {
+      // If creating a new scenario (including duplication), go back to client page
+      const targetUrl = `/clients/${clientId}`;
+      console.log('🔙 Cancel from create mode, navigating to:', targetUrl);
+      router.push(targetUrl).then(() => {
+        console.log('✅ Navigation successful');
+      }).catch(err => {
+        console.error('❌ Navigation failed:', err);
+      });
+    }
+  } catch (error) {
+    console.error('🔙 Error in handleCancel:', error);
   }
 }
 
