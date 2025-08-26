@@ -146,8 +146,10 @@ Transform RetirementAdvisorPro from a retirement planning tool into a comprehens
 - `frontend/src/components/CRM/CommunicationList.vue`
 - `frontend/src/components/CRM/EmailSetup.vue`
 
-### Step 1.6: Integration with Client Detail Page (Week 8)
+### Step 1.6: Dashboard Integration & Client Detail Page (Week 8)
 **Tasks:**
+- [ ] Add CRM activity stream to main dashboard (`/dashboard`)
+- [ ] Create real-time activity feed component
 - [ ] Add CRM tabs to existing `ClientDetail.vue`
 - [ ] Integrate communication components
 - [ ] Update client navigation structure
@@ -155,12 +157,15 @@ Transform RetirementAdvisorPro from a retirement planning tool into a comprehens
 - [ ] Create communication summary widgets
 
 **Acceptance Criteria:**
+- Activity stream shows real-time CRM activities on dashboard
 - CRM tabs integrate seamlessly with existing UI
 - No disruption to existing client management workflow
 - Permission system works correctly
 - Performance remains acceptable
 
 **Files to Create/Modify:**
+- `frontend/src/views/Dashboard.vue` - Add activity stream
+- `frontend/src/components/CRM/ActivityStream.vue` - New component
 - `frontend/src/views/ClientDetail.vue`
 - `frontend/src/router/index.js` - Add CRM routes
 - `frontend/src/components/Client/ClientTabs.vue`
@@ -1098,9 +1103,165 @@ class EmailPermission(models.Model):
 - **Infrastructure**: $75,000 - $150,000 annually (increased for SMS and ads APIs)
 - **Third-party Services**: $50,000 - $100,000 annually (includes SMS costs)
 
+## Dashboard Activity Stream Specifications
+
+### Real-Time CRM Activity Feed
+The main dashboard (`/dashboard`) will feature a centralized activity stream showing all CRM activities across all clients:
+
+**Activity Stream Components:**
+```vue
+<!-- Dashboard.vue enhancement -->
+<template>
+  <div class="dashboard">
+    <div class="row">
+      <div class="col-lg-8">
+        <!-- Existing dashboard widgets -->
+        <ClientSummaryWidget />
+        <ScenarioMetrics />
+      </div>
+      
+      <div class="col-lg-4">
+        <!-- New CRM Activity Stream -->
+        <ActivityStream 
+          :limit="20"
+          :real-time="true"
+          :filters="activityFilters"
+        />
+      </div>
+    </div>
+    
+    <!-- Full-width activity timeline -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <ActivityTimeline 
+          :grouped-by-client="true"
+          :days-back="7"
+        />
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+**Activity Types Tracked:**
+```python
+class ActivityLog(models.Model):
+    ACTIVITY_TYPES = [
+        ('email_received', 'Email Received'),
+        ('email_sent', 'Email Sent'),
+        ('sms_received', 'SMS Received'),
+        ('sms_sent', 'SMS Sent'),
+        ('call_logged', 'Phone Call'),
+        ('meeting_scheduled', 'Meeting Scheduled'),
+        ('task_created', 'Task Created'),
+        ('task_completed', 'Task Completed'),
+        ('document_uploaded', 'Document Uploaded'),
+        ('note_added', 'Note Added'),
+        ('lead_converted', 'Lead Converted to Client'),
+        ('scenario_created', 'Scenario Created'),
+        ('report_generated', 'Report Generated'),
+    ]
+    
+    activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, null=True)
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    description = models.TextField()
+    metadata = models.JSONField()  # Store activity-specific data
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at', 'user']),
+            models.Index(fields=['client', '-created_at']),
+        ]
+```
+
+**Real-Time Updates:**
+```javascript
+// ActivityStream.vue
+export default {
+  setup() {
+    const activities = ref([])
+    const ws = new WebSocket('wss://api.app.com/ws/activities')
+    
+    ws.onmessage = (event) => {
+      const newActivity = JSON.parse(event.data)
+      activities.value.unshift(newActivity)
+      
+      // Limit to most recent 20 activities
+      if (activities.value.length > 20) {
+        activities.value.pop()
+      }
+      
+      // Show notification for important activities
+      if (newActivity.is_important) {
+        showNotification(newActivity)
+      }
+    }
+    
+    return { activities }
+  }
+}
+```
+
+**Activity Stream Features:**
+1. **Smart Prioritization**: 
+   - Urgent tasks and overdue items appear at top
+   - Client communications prioritized over internal tasks
+   - Lead activities highlighted for quick follow-up
+
+2. **Interactive Actions**:
+   - Click to view full communication thread
+   - Quick reply to emails/SMS directly from stream
+   - Mark tasks complete from dashboard
+   - Jump to client profile with one click
+
+3. **Filtering & Search**:
+   - Filter by activity type, client, date range
+   - Search across all activity descriptions
+   - Save custom filter presets
+   - Export activity reports
+
+4. **Visual Indicators**:
+   - Color-coded by activity type
+   - Icons for quick recognition
+   - Unread indicators for new items
+   - Priority badges for urgent items
+
+**Backend WebSocket Support:**
+```python
+# consumers.py
+class ActivityConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = self.scope["user"]
+        self.room_group_name = f"activities_{self.user.id}"
+        
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        await self.accept()
+    
+    async def receive(self, text_data):
+        # Handle activity filters from frontend
+        data = json.loads(text_data)
+        if data['type'] == 'filter':
+            await self.send_filtered_activities(data['filters'])
+    
+    async def activity_message(self, event):
+        # Send activity to WebSocket
+        await self.send(text_data=json.dumps({
+            'activity': event['activity']
+        }))
+```
+
 ## Conclusion
 
 This comprehensive CRM enhancement will transform RetirementAdvisorPro into a complete financial advisor platform that not only competes with standalone CRM solutions but surpasses them by combining retirement planning expertise with advanced marketing and communication capabilities.
+
+The addition of the dashboard activity stream provides advisors with immediate visibility into all client interactions and tasks, creating a command center for their daily workflow. This real-time awareness drives better client service and ensures no opportunity or task falls through the cracks.
 
 **Key Competitive Advantages:**
 
