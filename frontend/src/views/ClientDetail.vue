@@ -24,100 +24,57 @@
                 <div v-if="client">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h5 class="card-title">Basic Info</h5>
-                        <p><strong>Email:</strong> {{ client.email }}</p>
-                        <p><strong>Birthdate:</strong> {{ client.birthdate }}</p>
-                        <p><strong>Gender:</strong> {{ client.gender }}</p>
-                        <p><strong>Tax Status:</strong> {{ client.tax_status }}</p>
-                        <p><strong>Status:</strong> {{ client.status }}</p>
+                        <h5 class="card-title mb-4">Basic Info</h5>
                         
-                        <div v-if="client.spouse">
-                            <hr class="my-3" style="border-color: #e7eaf3;">
-                            <h6 class="mb-3">Spouse Information</h6>
-                            <p><strong>Name:</strong> {{ client.spouse.first_name }} {{ client.spouse.last_name }}</p>
-                            <p><strong>Birthdate:</strong> {{ client.spouse.birthdate }}</p>
-                            <p><strong>Gender:</strong> {{ client.spouse.gender }}</p>
+                        <!-- Primary Client Info -->
+                        <div class="client-info-section mb-4">
+                            <div class="client-info-item">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value">{{ client.email }}</span>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Birthdate:</span>
+                                <span class="info-value">{{ formatDate(client.birthdate) }}</span>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Gender:</span>
+                                <span class="info-value">{{ client.gender }}</span>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Tax Status:</span>
+                                <span class="info-value">{{ client.tax_status }}</span>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Status:</span>
+                                <span class="info-value">
+                                    <span class="badge" :class="getStatusBadgeClass(client.status)">
+                                        {{ client.status || 'Active' }}
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Spouse Information -->
+                        <div v-if="client.spouse" class="spouse-info-section">
+                            <div class="section-divider mb-3">
+                                <h6 class="mb-0 text-muted">Spouse Information</h6>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Name:</span>
+                                <span class="info-value">{{ client.spouse.first_name }} {{ client.spouse.last_name }}</span>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Birthdate:</span>
+                                <span class="info-value">{{ formatDate(client.spouse.birthdate) }}</span>
+                            </div>
+                            <div class="client-info-item">
+                                <span class="info-label">Gender:</span>
+                                <span class="info-value">{{ client.spouse.gender }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Real Estate Card -->
-                <div class="card mb-4">
-                  <div class="card-body">
-                    <h5 class="card-title">Real Estate</h5>
-                    <div v-if="realEstateList.length === 0" class="mb-2">
-                      <p>Add Real Estate</p>
-                    </div>
-                    <div v-else>
-                      <div v-for="(estate, idx) in realEstateList" :key="estate.id" class="mb-3 p-2 border rounded">
-                        <div class="d-flex align-items-center">
-                          <img v-if="estate.image_url || estate.image" :src="estate.image_url || estate.image" alt="Home" style="width:80px;height:80px;object-fit:cover;margin-right:15px;cursor:pointer;" @click="openImageModal(estate.image_url || estate.image)"/>
-                          <div>
-                            <div><strong>Address:</strong> {{ estate.address }}, {{ estate.city }}, {{ estate.state }} {{ estate.zip }}</div>
-                            <div><strong>Value:</strong> ${{ estate.value }}</div>
-                          </div>
-                          <button class="btn btn-sm btn-primary ms-3" @click="editRealEstate(estate, idx)">Edit</button>
-                          <button class="btn btn-sm btn-danger ms-2" @click="deleteRealEstate(estate, idx)">Delete</button>
-                        </div>
-                      </div>
-                    </div>
-                    <button class="btn btn-primary mt-2" @click="showRealEstateModal = true">Add</button>
-                  </div>
-                </div>
-
-                <!-- Real Estate Modal -->
-                <div v-if="showRealEstateModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.5);">
-                  <div class="modal-dialog">
-                    <div class="modal-content">
-                      <div class="modal-header">
-                        <h5 class="modal-title">Add Real Estate</h5>
-                        <button type="button" class="btn-close" @click="closeRealEstateModal"></button>
-                      </div>
-                      <div class="modal-body">
-                        <form @submit.prevent="addRealEstate">
-                          <div class="mb-3">
-                            <label for="addressInput" class="form-label">Street Address</label>
-                            <input v-model="realEstateAddress" type="text" class="form-control" id="addressInput" required />
-                          </div>
-                          <div class="mb-3">
-                            <label for="cityInput" class="form-label">City</label>
-                            <input v-model="realEstateCity" type="text" class="form-control" id="cityInput" required />
-                          </div>
-                          <div class="mb-3">
-                            <label for="stateInput" class="form-label">State</label>
-                            <input v-model="realEstateState" type="text" class="form-control" id="stateInput" required />
-                          </div>
-                          <div class="mb-3">
-                            <label for="zipInput" class="form-label">Zip Code</label>
-                            <input v-model="realEstateZip" type="text" class="form-control" id="zipInput" required />
-                          </div>
-                          <div class="mb-3">
-                            <label for="valueInput" class="form-label">Estimated Value</label>
-                            <input v-model="realEstateValue" type="number" class="form-control" id="valueInput" required min="0" />
-                          </div>
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" @click="closeRealEstateModal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">{{ editingRealEstateId !== null ? 'Save' : 'Add' }}</button>
-                          </div>
-                        </form>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Image Modal for Large View -->
-                <div v-if="showImageModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.7);">
-                  <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content" style="background:transparent; border:none; box-shadow:none;">
-                      <div class="modal-body text-center p-0">
-                        <img :src="selectedImage" alt="Large Home" style="max-width:90vw; max-height:80vh; border-radius:8px;" />
-                      </div>
-                      <div class="modal-footer justify-content-center" style="background:transparent; border:none;">
-                        <button type="button" class="btn btn-light" @click="closeImageModal">Close</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 <!-- Report Template Upload Modal -->
                 <div v-if="showReportTemplateModal" class="modal fade show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.5);">
@@ -421,18 +378,6 @@ export default {
   data() {
     return {
       client: null,
-      // Real estate state
-      realEstateList: [],
-      showRealEstateModal: false,
-      realEstateAddress: '',
-      realEstateCity: '',
-      realEstateState: '',
-      realEstateZip: '',
-      realEstateValue: '',
-      showImageModal: false,
-      selectedImage: '',
-      editingRealEstateIdx: null,
-      editingRealEstateId: null,
       // Report template state
       reportTemplates: [],
       showReportTemplateModal: false,
@@ -493,14 +438,6 @@ export default {
         return;
       }
       
-      // Fetch real estate list for this client
-      try {
-        const realEstateRes = await axios.get(`http://localhost:8000/api/clients/${id}/realestate/`, { headers });
-        this.realEstateList = realEstateRes.data;
-      } catch (realEstateError) {
-        console.error('Error loading real estate:', realEstateError);
-        this.realEstateList = [];
-      }
       
       // Fetch report templates for this client
       try {
@@ -550,93 +487,6 @@ export default {
         } catch (error) {
             console.error('Failed to archive client:', error.response?.data || error.message);
         }
-    },
-    closeRealEstateModal() {
-      this.showRealEstateModal = false;
-      this.realEstateAddress = '';
-      this.realEstateCity = '';
-      this.realEstateState = '';
-      this.realEstateZip = '';
-      this.realEstateValue = '';
-      this.editingRealEstateIdx = null;
-      this.editingRealEstateId = null;
-    },
-    editRealEstate(estate, idx) {
-      this.realEstateAddress = estate.address;
-      this.realEstateCity = estate.city;
-      this.realEstateState = estate.state;
-      this.realEstateZip = estate.zip;
-      this.realEstateValue = estate.value;
-      this.editingRealEstateIdx = idx;
-      this.editingRealEstateId = estate.id;
-      this.showRealEstateModal = true;
-    },
-    async addRealEstate() {
-      const address = this.realEstateAddress;
-      const city = this.realEstateCity;
-      const state = this.realEstateState;
-      const zip = this.realEstateZip;
-      const value = this.realEstateValue;
-      // Insert your Google Street View API key below
-      const GOOGLE_API_KEY = 'AIzaSyCsvoEjQW68CWwwMlCcbUfZIHTSPKW54Bc';
-      // Generate Street View image URL
-      const fullAddress = `${address}, ${city}, ${state} ${zip}`;
-      const image = `https://maps.googleapis.com/maps/api/streetview?size=400x400&location=${encodeURIComponent(fullAddress)}&key=${GOOGLE_API_KEY}`;
-      if (this.editingRealEstateId !== null) {
-        // Edit mode: update backend and local list
-        try {
-          const token = localStorage.getItem('token');
-          const headers = { Authorization: `Bearer ${token}` };
-          const payload = { address, city, state, zip, value: value.toString(), image_url: image };
-          // Defensive: remove client field if present
-          if ('client' in payload) delete payload.client;
-          const res = await axios.put(`http://localhost:8000/api/realestate/${this.editingRealEstateId}/`, payload, { headers });
-          this.$set(this.realEstateList, this.editingRealEstateIdx, res.data);
-        } catch (err) {
-          console.error('Failed to update real estate:', err.response?.data || err.message, err.response);
-        }
-      } else {
-        // Add mode: save to backend
-        try {
-          const token = localStorage.getItem('token');
-          const headers = { Authorization: `Bearer ${token}` };
-          const clientId = this.client.id;
-          const payload = { address, city, state, zip, value: value.toString(), image_url: image };
-          // Defensive: remove client field if present
-          if ('client' in payload) delete payload.client;
-          const res = await axios.post(`http://localhost:8000/api/clients/${clientId}/realestate/`, payload, { headers });
-          this.realEstateList.push(res.data);
-        } catch (err) {
-          console.error('Failed to save real estate:', err.response?.data || err.message, err.response);
-        }
-      }
-      this.showRealEstateModal = false;
-      this.realEstateAddress = '';
-      this.realEstateCity = '';
-      this.realEstateState = '';
-      this.realEstateZip = '';
-      this.realEstateValue = '';
-      this.editingRealEstateIdx = null;
-      this.editingRealEstateId = null;
-    },
-    openImageModal(imageUrl) {
-      this.selectedImage = imageUrl;
-      this.showImageModal = true;
-    },
-    closeImageModal() {
-      this.showImageModal = false;
-      this.selectedImage = '';
-    },
-    async deleteRealEstate(estate, idx) {
-      if (!confirm('Are you sure you want to delete this real estate entry?')) return;
-      try {
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        await axios.delete(`http://localhost:8000/api/realestate/${estate.id}/`, { headers });
-        this.realEstateList.splice(idx, 1);
-      } catch (err) {
-        console.error('Failed to delete real estate:', err.response?.data || err.message);
-      }
     },
     async deleteReportTemplate(templateId) {
       if (!confirm('Are you sure you want to delete this template?')) return;
@@ -1193,6 +1043,31 @@ export default {
         return 'bg-success'; // Green
       }
     },
+    formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    },
+    getStatusBadgeClass(status) {
+      const statusLower = (status || 'active').toLowerCase();
+      switch (statusLower) {
+        case 'active':
+        case 'in_progress':
+          return 'bg-success';
+        case 'draft':
+          return 'bg-warning';
+        case 'reviewed':
+          return 'bg-info';
+        case 'archived':
+          return 'bg-secondary';
+        default:
+          return 'bg-primary';
+      }
+    },
   }
 };
 </script>
@@ -1334,5 +1209,75 @@ export default {
 .btn-primary.text-white:focus,
 .btn-primary.text-white:active {
   color: #fff !important;
+}
+
+/* Client Info Formatting */
+.client-info-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.client-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.client-info-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #495057;
+  min-width: 30%;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #212529;
+  text-align: right;
+  flex: 1;
+}
+
+.spouse-info-section {
+  background: #f1f8ff;
+  border-radius: 8px;
+  padding: 1rem;
+  border-left: 4px solid #0d6efd;
+}
+
+.section-divider {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.section-divider h6 {
+  font-weight: 600;
+  color: #6c757d;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+}
+
+.section-divider::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5rem;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, #0d6efd, transparent);
+}
+
+/* Badge styling improvements */
+.badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  font-weight: 500;
 }
 </style>
