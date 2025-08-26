@@ -2,7 +2,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration
-from .views import ScenarioCreateView, create_scenario, run_scenario_calculation, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction
+from .views import ScenarioCreateView, create_scenario, run_scenario_calculation, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years
 from .views import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
 from . import views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -38,6 +38,7 @@ urlpatterns = [
     path('scenarios/<int:scenario_id>/calculate/', run_scenario_calculation, name='scenario-calculate'),
     path('scenarios/<int:scenario_id>/assets/', get_scenario_assets, name='scenario-assets'),
     path('scenarios/<int:scenario_id>/detail/', get_scenario_detail, name='scenario-detail'),
+    path('scenarios/<int:scenario_id>/edit/', get_scenario_for_editing, name='scenario-for-editing'),
     path('scenarios/<int:scenario_id>/duplicate/', duplicate_scenario, name='scenario-duplicate'),
     path('scenarios/<int:scenario_id>/comparison-data/', get_scenario_comparison_data, name='scenario-comparison-data'),
     path('scenarios/<int:scenario_id>/update/', views.update_scenario, name='scenario-update'),
@@ -65,6 +66,7 @@ urlpatterns = [
     path('reporttemplates/<uuid:template_id>/slides/', views.template_slides, name='template-slides'),
     path('reporttemplates/<uuid:template_id>/update_slides/', views.update_template_slides, name='update-template-slides'),
     path('tax/federal-standard-deduction/', get_federal_standard_deduction, name='federal-standard-deduction'),
+    path('tax/irmaa-thresholds/', get_irmaa_thresholds_for_years, name='irmaa-thresholds'),
 ]
 
 if settings.DEBUG:

@@ -101,6 +101,7 @@
                 <th>Federal Tax</th>
                 <th>Total Medicare</th>
                 <th>Remaining Income</th>
+                <th>Indicators</th>
               </tr>
             </thead>
             <tbody>
@@ -115,16 +116,22 @@
                 <td>{{ formatCurrency(row.magi) }}</td>
                 <td>{{ row.tax_bracket }}</td>
                 <td>{{ formatCurrency(row.federal_tax) }}</td>
-                <td style="position: relative;">
-                  {{ formatCurrency(row.total_medicare) }}
-                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)">
+                <td>{{ formatCurrency(row.total_medicare) }}</td>
+                <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>
+                <td style="position: relative; text-align: center;">
+                  <span v-if="row.ss_decrease_applied" class="ss-decrease-icon" @click.stop="toggleSsDecreaseTooltip(idx)" title="Social Security Decrease">
+                    📉
+                  </span>
+                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)" title="IRMAA Information" :style="{ marginLeft: row.ss_decrease_applied ? '5px' : '0' }">
                     ℹ️
                   </span>
                   <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                    IRMAA Bracket: {{ getIrmaaBracketLabel(row) }}
+                    {{ getIrmaaBracketLabel(row) }}
+                  </div>
+                  <div v-if="openSsDecreaseTooltipIdx === idx" class="ss-decrease-popover">
+                    Social Security Decrease
                   </div>
                 </td>
-                <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>
               </tr>
             </tbody>
             <tfoot>
@@ -138,6 +145,7 @@
                 <td></td>
                 <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0)) }}</td>
                 <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0)) }}</td>
+                <td></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -231,7 +239,9 @@ export default {
         financial: false,
         flow: false
       },
-      openIrmaaTooltipIdx: null
+      openIrmaaTooltipIdx: null,
+      openSsDecreaseTooltipIdx: null,
+      dynamicIrmaaThresholds: {} // Will store thresholds by year
     };
   },
   computed: {
@@ -385,6 +395,33 @@ export default {
     }
   },
   methods: {
+    async fetchIrmaaThresholds() {
+      if (!this.filteredResults || !this.filteredResults.length) return;
+      
+      const startYear = Math.min(...this.filteredResults.map(r => r.year));
+      const endYear = Math.max(...this.filteredResults.map(r => r.year));
+      const filingStatus = this.client?.tax_status || 'Single';
+      
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(
+          `http://localhost:8000/api/tax/irmaa-thresholds/?filing_status=${filingStatus}&start_year=${startYear}&end_year=${endYear}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          this.dynamicIrmaaThresholds = data.thresholds_by_year;
+        }
+      } catch (error) {
+        console.error('Error fetching IRMAA thresholds:', error);
+      }
+    },
     renderFlowChart(results) {
       if (!results || results.length === 0) return;
 
@@ -552,41 +589,98 @@ export default {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
     },
     isIrmaaBracketHit(row, idx) {
-      // Returns true if this row's MAGI crosses into a new IRMAA bracket compared to the previous row
-      const magi = Number(row.magi);
-      const thresholds = this.irmaaThresholds;
-      if (idx === 0) {
-        // First row: highlight if above first threshold
-        return thresholds.some(t => magi >= t);
+      // Returns true if this row's MAGI crosses into a new IRMAA bracket
+      const currentBracket = row.irmaa_bracket_number || 0;
+      
+      if (currentBracket > 0) {
+        // We're in an IRMAA bracket
+        if (idx === 0) {
+          // First row - show if in any bracket
+          return true;
+        }
+        
+        // Check if bracket changed from previous row
+        const prevRow = this.filteredResults[idx - 1];
+        const prevBracket = prevRow?.irmaa_bracket_number || 0;
+        
+        // Show indicator if bracket number changed
+        return currentBracket !== prevBracket;
       }
-      const prevMagi = Number(this.filteredResults[idx - 1]?.magi);
-      // Find the bracket index for current and previous
-      const getBracket = (m) => thresholds.findIndex(t => m < t);
-      const currBracket = getBracket(magi);
-      const prevBracket = getBracket(prevMagi);
-      // If the bracket index decreases, we've crossed up into a new bracket
-      return currBracket !== prevBracket;
+      
+      return false;
     },
     getIrmaaBracketLabel(row) {
       const magi = Number(row.magi);
-      const thresholds = this.irmaaThresholds;
-      const labels = this.irmaaLabels;
-      for (let i = 0; i < thresholds.length; i++) {
-        if (magi <= thresholds[i]) {
-          return labels[i];
-        }
+      const bracketNum = row.irmaa_bracket_number || 0;
+      const bracketThreshold = Number(row.irmaa_bracket_threshold);
+      const year = row.year;
+      
+      const bracketLabels = {
+        0: 'No IRMAA',
+        1: 'IRMAA Bracket 1',
+        2: 'IRMAA Bracket 2', 
+        3: 'IRMAA Bracket 3',
+        4: 'IRMAA Bracket 4',
+        5: 'IRMAA Bracket 5 (Highest)'
+      };
+      
+      if (bracketNum > 0) {
+        return `${bracketLabels[bracketNum] || `IRMAA Bracket ${bracketNum}`}: MAGI (${this.formatCurrency(magi)}) exceeds ${this.formatCurrency(bracketThreshold)} in ${year}`;
+      } else {
+        const firstThreshold = Number(row.irmaa_threshold);
+        const difference = firstThreshold - magi;
+        return `No IRMAA: ${this.formatCurrency(difference)} below first threshold of ${this.formatCurrency(firstThreshold)} in ${year}`;
       }
-      return labels[labels.length - 1];
+    },
+    getIrmaaThresholdForYear(year) {
+      const yearThresholds = this.dynamicIrmaaThresholds[year] || [];
+      
+      if (yearThresholds.length === 0) {
+        // Fallback: manually calculate inflation from base year 2025
+        const baseThreshold = 106000; // 2025 base threshold for single filers
+        const baseYear = 2025;
+        const inflationRate = 0.01; // 1% per year
+        const yearsToInflate = year - baseYear;
+        
+        if (yearsToInflate <= 0) {
+          return this.formatCurrency(baseThreshold);
+        }
+        
+        const inflatedThreshold = baseThreshold * Math.pow(1 + inflationRate, yearsToInflate);
+        return this.formatCurrency(inflatedThreshold);
+      }
+      
+      // Find the first (lowest) threshold that has a surcharge
+      const sortedThresholds = [...yearThresholds].sort((a, b) => a.magi_threshold - b.magi_threshold);
+      const firstThreshold = sortedThresholds.find(t => t.part_b_surcharge > 0 || t.part_d_surcharge > 0);
+      
+      if (firstThreshold) {
+        return this.formatCurrency(firstThreshold.magi_threshold);
+      }
+      
+      // If no threshold found, use the first one
+      return this.formatCurrency(sortedThresholds[0]?.magi_threshold || 106000);
     },
     toggleIrmaaTooltip(idx) {
       this.openIrmaaTooltipIdx = this.openIrmaaTooltipIdx === idx ? null : idx;
+      this.openSsDecreaseTooltipIdx = null; // Close SS tooltip when opening IRMAA tooltip
     },
     closeIrmaaTooltip() {
       this.openIrmaaTooltipIdx = null;
     },
+    toggleSsDecreaseTooltip(idx) {
+      this.openSsDecreaseTooltipIdx = this.openSsDecreaseTooltipIdx === idx ? null : idx;
+      this.openIrmaaTooltipIdx = null; // Close IRMAA tooltip when opening SS tooltip
+    },
+    closeSsDecreaseTooltip() {
+      this.openSsDecreaseTooltipIdx = null;
+    },
     handleClickOutside(event) {
       if (!event.target.closest('.irmaa-info-icon') && !event.target.closest('.irmaa-popover')) {
         this.closeIrmaaTooltip();
+      }
+      if (!event.target.closest('.ss-decrease-icon') && !event.target.closest('.ss-decrease-popover')) {
+        this.closeSsDecreaseTooltip();
       }
     },
     initializeCircles() {
@@ -640,6 +734,7 @@ export default {
   },
   mounted() {
     this.initializeCircles();
+    this.fetchIrmaaThresholds();
     document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
@@ -651,6 +746,12 @@ export default {
         this.$nextTick(() => {
           this.initializeCircles();
         });
+      },
+      deep: true
+    },
+    filteredResults: {
+      handler() {
+        this.fetchIrmaaThresholds();
       },
       deep: true
     }
@@ -668,19 +769,39 @@ export default {
   font-size: 1em;
   vertical-align: middle;
 }
-.irmaa-popover {
+.irmaa-popover,
+.ss-decrease-popover {
   position: absolute;
-  left: 30px;
+  right: 100%;
+  margin-right: 10px;
   top: 50%;
   transform: translateY(-50%);
   background: #fff;
   border: 1px solid #aaa;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  padding: 6px 12px;
+  padding: 8px 12px;
   z-index: 10;
-  font-size: 0.95em;
-  white-space: nowrap;
+  font-size: 0.9em;
+  max-width: 600px;
+  min-width: 450px;
+  white-space: normal;
+}
+
+.ss-decrease-popover {
+  min-width: 200px; /* Smaller width for SS decrease */
+}
+
+@media (max-width: 1400px) {
+  .irmaa-popover,
+  .ss-decrease-popover {
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, 100%);
+    top: 100%;
+    margin-top: 5px;
+    margin-right: 0;
+  }
 }
 .financial-chart-container {
   width: 100%;

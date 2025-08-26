@@ -172,19 +172,43 @@
                   <div class="card mb-4">
                     <div class="card-body">
                       <div class="row">
-                        <div class="col-sm-6 mb-0">
-                          <h5>Client Information</h5>
-                          <p><strong>Name:</strong> {{ formatClientName(client) }}</p>
-                          <p><strong>Tax Status:</strong> {{ client?.tax_status || 'Not specified' }}</p>
-                          <p class="mb-0"><strong>Current Age:</strong> {{ currentAge || 'Not specified' }}</p>
-                          <p v-if="client?.tax_status?.toLowerCase() !== 'single'" class="mb-0"><strong>Spouse Age:</strong> {{ spouseAge || 'Not specified' }}</p>
+                        <div class="col-sm-6">
+                          <h5 class="card-title mb-3">Client Information</h5>
+                          <div class="client-info-item">
+                            <span class="info-label">Name:</span>
+                            <span class="info-value">{{ formatClientName(client) }}</span>
+                          </div>
+                          <div class="client-info-item">
+                            <span class="info-label">Tax Status:</span>
+                            <span class="info-value">{{ client?.tax_status || 'Not specified' }}</span>
+                          </div>
+                          <div class="client-info-item">
+                            <span class="info-label">Current Age:</span>
+                            <span class="info-value">{{ currentAge || 'Not specified' }}</span>
+                          </div>
+                          <div v-if="client?.tax_status?.toLowerCase() !== 'single'" class="client-info-item">
+                            <span class="info-label">Spouse Age:</span>
+                            <span class="info-value">{{ spouseAge || 'Not specified' }}</span>
+                          </div>
                         </div>
-                        <div class="col-sm-6 mb-0">
-                          <h5>Scenario Details</h5>
-                          <p><strong>Name:</strong> {{ scenario?.name || 'Not specified' }}</p>
-                          <p><strong>Retirement Year:</strong> {{ scenario?.retirement_year || 'Not specified' }}</p>
-                          <p class="mb-0"><strong>Mortality Age:</strong> {{ scenario?.mortality_age || 'Not specified' }}</p>
-                          <p v-if="client?.tax_status?.toLowerCase() !== 'single'" class="mb-0"><strong>Spouse Mortality Age:</strong> {{ scenario?.spouse_mortality_age || 'Not specified' }}</p>
+                        <div class="col-sm-6">
+                          <h5 class="card-title mb-3">Scenario Details</h5>
+                          <div class="client-info-item">
+                            <span class="info-label">Name:</span>
+                            <span class="info-value">{{ scenario?.name || 'Not specified' }}</span>
+                          </div>
+                          <div class="client-info-item">
+                            <span class="info-label">Retirement Year:</span>
+                            <span class="info-value">{{ scenario?.retirement_year || 'Not specified' }}</span>
+                          </div>
+                          <div class="client-info-item">
+                            <span class="info-label">Mortality Age:</span>
+                            <span class="info-value">{{ scenario?.mortality_age || 'Not specified' }}</span>
+                          </div>
+                          <div v-if="client?.tax_status?.toLowerCase() !== 'single'" class="client-info-item">
+                            <span class="info-label">Spouse Mortality Age:</span>
+                            <span class="info-value">{{ scenario?.spouse_mortality_age || 'Not specified' }}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1268,5 +1292,32 @@ export default {
   top: 50%;
   left: 50%;
   transform: translate(0%, 0%);
+}
+
+.client-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.client-info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #495057;
+  min-width: 120px;
+  text-align: left;
+}
+
+.info-value {
+  font-weight: 500;
+  color: #212529;
+  text-align: right;
+  flex: 1;
+  margin-left: 15px;
 }
 </style>

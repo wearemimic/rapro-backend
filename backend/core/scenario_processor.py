@@ -347,9 +347,22 @@ class ScenarioProcessor:
             # Only include income/assets for living persons
             gross_income = 0
             ss_income = 0
+            ss_decrease_applied = False
+            ss_decrease_amount_actual = 0
             if primary_alive or spouse_alive:
                 gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
                 ss_income, ss_income_primary, ss_income_spouse = self._calculate_social_security(year, primary_alive, spouse_alive)
+                
+                # Check if SS decrease is applied this year and calculate actual amount
+                if (self.scenario.reduction_2030_ss and 
+                    year >= self.scenario.ss_adjustment_year and 
+                    self.scenario.ss_adjustment_direction == 'decrease' and 
+                    ss_income > 0):
+                    
+                    ss_decrease_applied = True
+                    # Calculate what the SS income would have been without the decrease
+                    ss_income_without_decrease, _, _ = self._calculate_social_security_without_decrease(year, primary_alive, spouse_alive)
+                    ss_decrease_amount_actual = float(ss_income_without_decrease - ss_income)
                 
                 # Add pre-retirement income if we're before retirement year
                 if year < retirement_year and pre_retirement_income:
@@ -473,7 +486,7 @@ class ScenarioProcessor:
             # STEP 5: Medicare & IRMAA Engine (2-year lookback)
             # Note: In real-world scenarios, IRMAA is based on MAGI from 2 years prior
             # For projection purposes, we're using current year MAGI for simplicity
-            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa = self._calculate_medicare_costs(magi, year)
+            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(magi, year)
             total_medicare = Decimal(total_medicare)
             
             print(f"\nMEDICARE COSTS:")
@@ -524,9 +537,14 @@ class ScenarioProcessor:
                 "part_b": round(medicare_base, 2),
                 "part_d": round(base_part_d, 2),
                 "irmaa_surcharge": round(irmaa, 2),
+                "irmaa_threshold": first_irmaa_threshold,
+                "irmaa_bracket_number": irmaa_bracket_number,
+                "irmaa_bracket_threshold": float(current_irmaa_bracket['magi_threshold']) if current_irmaa_bracket else None,
                 "total_medicare": round(total_medicare, 2),
                 "net_income": round(net_income, 2),
-                "tax_bracket": tax_bracket
+                "tax_bracket": tax_bracket,
+                "ss_decrease_applied": ss_decrease_applied,
+                "ss_decrease_amount": ss_decrease_amount_actual
             }
 
             # Add asset balances to summary with safe rounding
@@ -794,6 +812,8 @@ class ScenarioProcessor:
         primary_ss = 0
         spouse_ss = 0
         
+        # First pass - calculate raw SS benefits without adjustments
+        ss_assets = []
         for asset in self.assets:
             if asset.get("income_type") == "social_security":
                 owner = asset.get("owned_by", "primary")
@@ -811,6 +831,97 @@ class ScenarioProcessor:
                     monthly_amount = asset.get("monthly_amount", 0)
                     inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                     annual_income = inflated_amount * 12
+                    
+                    ss_assets.append({
+                        'owner': owner,
+                        'annual_income': annual_income
+                    })
+                    
+                    # Track primary vs spouse separately (before adjustments)
+                    if owner == "primary":
+                        primary_ss += annual_income
+                    else:
+                        spouse_ss += annual_income
+        
+        # Apply SS decrease adjustment only if enabled and conditions are met
+        if (self.scenario.reduction_2030_ss and 
+            year >= self.scenario.ss_adjustment_year and 
+            self.scenario.ss_adjustment_direction == 'decrease' and
+            ss_assets):  # Only apply if there are SS benefits
+            
+            adjustment_amount = Decimal(str(self.scenario.ss_adjustment_amount))
+            
+            # Check if both primary and spouse are receiving SS benefits
+            has_primary_ss = any(asset['owner'] == 'primary' for asset in ss_assets)
+            has_spouse_ss = any(asset['owner'] == 'spouse' for asset in ss_assets)
+            is_couple = self.tax_status and 'married' in self.tax_status.lower()
+            
+            # Only double the reduction if BOTH spouses are receiving SS benefits
+            should_double = is_couple and has_primary_ss and has_spouse_ss
+            if should_double:
+                adjustment_amount = adjustment_amount * 2
+            
+            # Apply the adjustment
+            total_adjustment = 0
+            if self.scenario.ss_adjustment_type == 'percentage':
+                # For percentage, apply to total SS income
+                total_raw_ss = sum(asset['annual_income'] for asset in ss_assets)
+                reduction_multiplier = adjustment_amount / 100
+                total_adjustment = total_raw_ss * reduction_multiplier
+            else:
+                # For flat amount, convert monthly to annual
+                total_adjustment = adjustment_amount * 12
+            
+            # Distribute the adjustment proportionally across SS assets
+            total_raw_ss = sum(asset['annual_income'] for asset in ss_assets)
+            if total_raw_ss > 0:
+                primary_ss = 0
+                spouse_ss = 0
+                
+                for asset in ss_assets:
+                    proportion = asset['annual_income'] / total_raw_ss
+                    asset_adjustment = total_adjustment * proportion
+                    adjusted_income = max(0, asset['annual_income'] - asset_adjustment)
+                    
+                    total_ss += adjusted_income
+                    if asset['owner'] == "primary":
+                        primary_ss += adjusted_income
+                    else:
+                        spouse_ss += adjusted_income
+            else:
+                total_ss = primary_ss + spouse_ss
+        else:
+            # No adjustment - use raw values
+            total_ss = primary_ss + spouse_ss
+                        
+        self._log_debug(f"Total Social Security Income for year {year}: {total_ss} (Primary: {primary_ss}, Spouse: {spouse_ss})")
+        return total_ss, primary_ss, spouse_ss
+    
+    def _calculate_social_security_without_decrease(self, year, primary_alive=True, spouse_alive=True):
+        """Calculate Social Security income as if no decrease was applied - for comparison purposes."""
+        total_ss = 0
+        primary_ss = 0
+        spouse_ss = 0
+        
+        for asset in self.assets:
+            if asset.get("income_type") == "social_security":
+                owner = asset.get("owned_by", "primary")
+                if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
+                    continue
+                birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
+                if not birthdate:
+                    continue
+                current_age = year - birthdate.year
+                start_age = asset.get("age_to_begin_withdrawal")
+                end_age = asset.get("age_to_end_withdrawal")
+                cola = Decimal('0.02')
+                if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
+                    years_since_start = current_age - start_age
+                    monthly_amount = asset.get("monthly_amount", 0)
+                    inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
+                    annual_income = inflated_amount * 12
+                    
+                    # NO SS decrease applied - this is the raw amount
                     total_ss += annual_income
                     
                     # Track primary vs spouse separately
@@ -819,8 +930,28 @@ class ScenarioProcessor:
                     else:
                         spouse_ss += annual_income
                         
-        self._log_debug(f"Total Social Security Income for year {year}: {total_ss} (Primary: {primary_ss}, Spouse: {spouse_ss})")
         return total_ss, primary_ss, spouse_ss
+    
+    def _get_ss_decrease_amount(self):
+        """Get the annual SS decrease amount, doubled for couples."""
+        if not self.scenario.reduction_2030_ss:
+            return 0
+            
+        adjustment_amount = Decimal(str(self.scenario.ss_adjustment_amount))
+        
+        # Double the reduction for couples (married filing jointly)
+        is_couple = self.tax_status and 'married' in self.tax_status.lower()
+        if is_couple:
+            adjustment_amount = adjustment_amount * 2
+        
+        if self.scenario.ss_adjustment_type == 'percentage':
+            # For percentage, we'd need to know the base SS amount
+            # This is a simplified approach - return 0 for now for percentage type
+            # In a real implementation, this would calculate based on actual SS amounts
+            return 0
+        else:
+            # Flat monthly amount - convert to annual
+            return float(adjustment_amount * 12)
 
     def _calculate_taxable_income(self, gross_income, ss_income):
         return gross_income + ss_income * Decimal("0.85")
@@ -867,8 +998,31 @@ class ScenarioProcessor:
         normalized_status = (self.tax_status or '').strip().lower()
         filing_status = status_mapping.get(normalized_status, 'Single')
         
-        # Calculate IRMAA surcharges using CSV data
-        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)
+        # Calculate IRMAA surcharges using inflated thresholds for the target year
+        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
+        
+        # Get the inflated IRMAA thresholds for this year to include in results
+        irmaa_thresholds_for_year = tax_loader.get_inflated_irmaa_thresholds(filing_status, year)
+        
+        # Find which IRMAA bracket we're in
+        current_irmaa_bracket = None
+        irmaa_bracket_number = 0
+        first_irmaa_threshold = None
+        
+        # Sort thresholds by MAGI amount
+        sorted_thresholds = sorted([t for t in irmaa_thresholds_for_year if t['magi_threshold'] > 0], 
+                                 key=lambda x: x['magi_threshold'])
+        
+        if sorted_thresholds:
+            first_irmaa_threshold = float(sorted_thresholds[0]['magi_threshold'])
+            
+            # Find the current bracket
+            for i, threshold in enumerate(sorted_thresholds):
+                if Decimal(magi) >= threshold['magi_threshold']:
+                    current_irmaa_bracket = threshold
+                    irmaa_bracket_number = i + 1
+                else:
+                    break
         
         # For married filing jointly, double the base rates
         if filing_status == "Married Filing Jointly":
@@ -911,7 +1065,7 @@ class ScenarioProcessor:
         base_part_d_annual = base_part_d * 12
         irmaa_cost_annual = irmaa_cost * 12
         
-        return base_part_b_annual, irmaa_cost_annual, total_medicare_annual, base_part_d_annual, part_d_irmaa
+        return base_part_b_annual, irmaa_cost_annual, total_medicare_annual, base_part_d_annual, part_d_irmaa, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number
 
     def _calculate_roth_conversion(self, year):
         """

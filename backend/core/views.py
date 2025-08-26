@@ -406,14 +406,111 @@ def get_scenario_detail(request, scenario_id):
             'spouse_medicare_age': scenario.spouse_medicare_age,
             'spouse_lifespan': scenario.spouse_mortality_age,
             'model_tax_change': '',  # Reset to default
-            'reduction_2030_ss': False,  # Reset to default
+            'reduction_2030_ss': scenario.reduction_2030_ss,
+            'ss_adjustment_year': scenario.ss_adjustment_year,
+            'ss_adjustment_direction': scenario.ss_adjustment_direction,
+            'ss_adjustment_type': scenario.ss_adjustment_type,
+            'ss_adjustment_amount': scenario.ss_adjustment_amount,
             'apply_standard_deduction': scenario.apply_standard_deduction,
-            'primary_blind': False,  # Reset to default
-            'spouse_blind': False,  # Reset to default
-            'is_dependent': False,  # Reset to default
+            'federal_standard_deduction': float(scenario.federal_standard_deduction or 0),
+            'state_standard_deduction': float(scenario.state_standard_deduction or 0),
+            'custom_annual_deduction': float(scenario.custom_annual_deduction or 0),
+            'primary_blind': scenario.primary_blind,
+            'spouse_blind': scenario.spouse_blind,
+            'is_dependent': scenario.is_dependent,
             'part_b_inflation_rate': str(int(scenario.part_b_inflation_rate)),
             'part_d_inflation_rate': str(int(scenario.part_d_inflation_rate)),
             'primary_state': scenario.primary_state or '',  # Use stored value or default
+            'income': income_data
+        }
+        
+        return Response(scenario_data, status=status.HTTP_200_OK)
+        
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_scenario_for_editing(request, scenario_id):
+    """
+    Get scenario data formatted specifically for editing in ScenarioCreate.vue
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
+        
+        # Get all income sources for this scenario
+        income_sources = scenario.income_sources.all()
+        income_data = []
+        
+        for income in income_sources:
+            income_dict = {
+                'id': income.id,  # Use actual database ID
+                'income_type': income.income_type,
+                'income_name': income.income_name,
+                'owned_by': income.owned_by,
+                'start_age': income.age_to_begin_withdrawal,
+                'end_age': income.age_to_end_withdrawal,
+                'current_balance': float(income.current_asset_balance or 0),
+                'monthly_contribution': float(income.monthly_contribution or 0),
+                'growth_rate': income.rate_of_return,
+                'withdrawal_amount': float(income.monthly_amount or 0),
+                'amount_per_month': float(income.monthly_amount or 0),
+                'amount_at_fra': float(income.monthly_amount or 0),
+                'cola': income.cola,
+                'exclusion_ratio': income.exclusion_ratio,
+                'tax_rate': income.tax_rate,
+                'max_to_convert': float(income.max_to_convert or 0),
+                'age_established': income.age_established,
+                'is_contributing': income.is_contributing,
+                'employer_match': income.employer_match,
+                'age_last_contribution': income.age_last_contribution
+            }
+            
+            # Add specific fields for different income types
+            if income.income_type == 'social_security':
+                income_dict['amount_at_fra'] = float(income.monthly_amount or 0)
+            elif income.income_type == 'Life_Insurance':
+                income_dict['loan_amount'] = float(income.monthly_amount or 0)
+            elif income.income_type == 'Annuity':
+                income_dict['percent_taxable'] = income.exclusion_ratio * 100
+            
+            income_data.append(income_dict)
+        
+        # Check if this is for duplication (add "Copy") or keep original name for editing
+        is_for_duplication = request.GET.get('mode') == 'duplicate'
+        scenario_name = f"{scenario.name} (Copy)" if is_for_duplication else scenario.name
+        
+        scenario_data = {
+            'name': scenario_name,
+            'description': scenario.description,
+            'primary_retirement_age': scenario.retirement_age,
+            'primary_medicare_age': scenario.medicare_age,
+            'primary_lifespan': scenario.mortality_age,
+            'spouse_retirement_age': scenario.spouse_retirement_age,
+            'spouse_medicare_age': scenario.spouse_medicare_age,
+            'spouse_lifespan': scenario.spouse_mortality_age,
+            'model_tax_change': '',  # Reset to default
+            'reduction_2030_ss': scenario.reduction_2030_ss,
+            'ss_adjustment_year': scenario.ss_adjustment_year,
+            'ss_adjustment_direction': scenario.ss_adjustment_direction,
+            'ss_adjustment_type': scenario.ss_adjustment_type,
+            'ss_adjustment_amount': scenario.ss_adjustment_amount,
+            'apply_standard_deduction': scenario.apply_standard_deduction,
+            'federal_standard_deduction': float(scenario.federal_standard_deduction or 0),
+            'state_standard_deduction': float(scenario.state_standard_deduction or 0),
+            'custom_annual_deduction': float(scenario.custom_annual_deduction or 0),
+            'primary_blind': scenario.primary_blind,
+            'spouse_blind': scenario.spouse_blind,
+            'is_dependent': scenario.is_dependent,
+            'part_b_inflation_rate': str(int(scenario.part_b_inflation_rate)),
+            'part_d_inflation_rate': str(int(scenario.part_d_inflation_rate)),
+            'primary_state': scenario.primary_state or '',
             'income': income_data
         }
         
@@ -1547,5 +1644,43 @@ def get_federal_standard_deduction(request):
     except Exception as e:
         return Response({
             'error': f'Error retrieving standard deduction: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_irmaa_thresholds_for_years(request):
+    """Get IRMAA thresholds inflated for each year in a scenario"""
+    from .tax_csv_loader import get_tax_loader
+    
+    filing_status = request.GET.get('filing_status', 'Single')
+    start_year = int(request.GET.get('start_year', 2025))
+    end_year = int(request.GET.get('end_year', 2045))
+    
+    try:
+        loader = get_tax_loader()
+        
+        # Get thresholds for each year
+        year_thresholds = {}
+        for year in range(start_year, end_year + 1):
+            thresholds = loader.get_inflated_irmaa_thresholds(filing_status, year)
+            year_thresholds[year] = [
+                {
+                    'magi_threshold': float(t['magi_threshold']),
+                    'part_b_surcharge': float(t['part_b_surcharge']),
+                    'part_d_surcharge': float(t['part_d_surcharge']),
+                    'description': t['description']
+                }
+                for t in thresholds if t['magi_threshold'] > 0
+            ]
+        
+        return Response({
+            'filing_status': filing_status,
+            'start_year': start_year,
+            'end_year': end_year,
+            'thresholds_by_year': year_thresholds
+        })
+    except Exception as e:
+        return Response({
+            'error': f'Error retrieving IRMAA thresholds: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

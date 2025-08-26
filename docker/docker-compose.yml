@@ -5,13 +5,15 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
     volumes:
       # - ../frontend:/app
       - ../frontend/src:/app/src
       - ../frontend/public:/app/public
       - ../frontend/package.json:/app/package.json
     working_dir: /app
+    environment:
+      - PORT=${FRONTEND_PORT:-3000}
     command: ["sh", "-c", "npm install sortablejs && npm run dev"]
   
   backend:
@@ -19,7 +21,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:${BACKEND_PORT:-8000}"
     volumes:
       - ../backend:/app
     working_dir: /app
@@ -27,12 +29,14 @@ services:
       - db
     env_file:
       - ../backend/.env
+    environment:
+      - PORT=${BACKEND_PORT:-8000}
     entrypoint: /bin/sh
     command: >
       -c "./wait-for-it.sh db:5432 -- 
       && python manage.py migrate 
       && python manage.py seed_data 
-      && gunicorn retirementadvisorpro.wsgi:application --bind 0.0.0.0:8000"
+      && gunicorn retirementadvisorpro.wsgi:application --bind 0.0.0.0:${BACKEND_PORT:-8000}"
 
   db:
     image: postgres:14

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 import router from '@/router';
+import { isTokenValid, isTokenExpiringSoon, getTokenExpirationInMinutes } from '@/utils/tokenUtils';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -18,6 +19,14 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     accessToken: (state) => state.token,
     isAuthenticated: (state) => !!state.token,
+    isTokenValidAndFresh: (state) => {
+      if (!state.token) return false;
+      return isTokenValid(state.token) && !isTokenExpiringSoon(state.token, 5);
+    },
+    tokenExpirationMinutes: (state) => {
+      if (!state.token) return -1;
+      return getTokenExpirationInMinutes(state.token);
+    },
   },
   actions: {
     init() {
@@ -76,6 +85,7 @@ export const useAuthStore = defineStore('auth', {
             localStorage.getItem('refresh_token') &&
             this.refreshAttempts < this.maxRefreshAttempts
           ) {
+            console.log(`401 error on ${originalRequest.url}, attempting token refresh (attempt ${this.refreshAttempts + 1}/${this.maxRefreshAttempts})`);
             originalRequest._retry = true;
 
             // If already refreshing, queue the request
@@ -149,6 +159,66 @@ export const useAuthStore = defineStore('auth', {
         }
       });
       this.failedRequestsQueue = [];
+    },
+
+    async refreshTokenPreemptively() {
+      if (this.isRefreshing) {
+        console.log('Refresh already in progress, skipping preemptive refresh');
+        return;
+      }
+
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) {
+        console.warn('No refresh token available for preemptive refresh');
+        throw new Error('No refresh token available');
+      }
+
+      this.isRefreshing = true;
+      console.log('Starting preemptive token refresh');
+
+      try {
+        const res = await axios.post('http://localhost:8000/api/token/refresh/', {
+          refresh: refreshToken,
+        });
+
+        const newToken = res.data.access;
+        this.token = newToken;
+        localStorage.setItem('token', newToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        
+        // Reset refresh attempts on success
+        this.refreshAttempts = 0;
+        console.log('Preemptive token refresh successful');
+        
+        return newToken;
+      } catch (error) {
+        console.error('Preemptive token refresh failed:', error);
+        throw error;
+      } finally {
+        this.isRefreshing = false;
+      }
+    },
+
+    async ensureValidToken() {
+      const token = this.token || localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No token available');
+      }
+
+      // If token is valid and not expiring soon, we're good
+      if (isTokenValid(token) && !isTokenExpiringSoon(token, 10)) {
+        return token;
+      }
+
+      // Try to refresh the token
+      try {
+        console.log('Token expires soon, refreshing before operation');
+        await this.refreshTokenPreemptively();
+        return this.token;
+      } catch (error) {
+        console.error('Failed to ensure valid token:', error);
+        throw error;
+      }
     },
 
     clearAuthData() {

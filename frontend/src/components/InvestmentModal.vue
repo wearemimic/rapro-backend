@@ -11,7 +11,7 @@
         <div class="modal-header">
           <h5 class="modal-title" id="investmentModalLabel">
             <i class="bi bi-question-circle" style="margin-right: 8px;"></i>
-            Investment Information
+            {{ isEditMode ? 'Edit Investment' : 'Add Investment' }}
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
@@ -188,7 +188,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="cancelEdit">Cancel</button>
           <button type="button" class="btn btn-primary" @click="saveInvestment">Save</button>
         </div>
       </div>
@@ -197,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   primaryFirstName: {
@@ -227,10 +227,17 @@ const props = defineProps({
   spouseCurrentAge: {
     type: Number,
     default: 65
+  },
+  editingInvestment: {
+    type: Object,
+    default: null
   }
 })
 
-const emit = defineEmits(['save'])
+const emit = defineEmits(['save', 'cancel'])
+
+// Computed property to determine if we're in edit mode
+const isEditMode = computed(() => props.editingInvestment !== null)
 
 const investment = ref({
   owned_by: 'primary',
@@ -319,14 +326,42 @@ const resetForm = () => {
   annualContributionDisplay.value = ''
 }
 
+// Watch for changes to editingInvestment to populate form
+watch(() => props.editingInvestment, (newValue) => {
+  if (newValue) {
+    // Populate form with existing investment data
+    investment.value = {
+      owned_by: newValue.owned_by || 'primary',
+      income_type: newValue.income_type || '',
+      investment_name: newValue.investment_name || newValue.income_name || '',
+      current_balance: newValue.current_balance || null,
+      age_established: newValue.age_established || null,
+      rate_of_return: newValue.growth_rate ? (newValue.growth_rate > 1 ? newValue.growth_rate : (newValue.growth_rate * 100)) : 6, // Handle both decimal and percentage forms
+      age_start_taking: newValue.start_age || 65,
+      age_stop_taking: newValue.end_age || 95,
+      monthly_withdrawal_amount: newValue.withdrawal_amount || null,
+      is_contributing: newValue.is_contributing || false,
+      annual_contribution_amount: newValue.monthly_contribution ? newValue.monthly_contribution * 12 : null,
+      annual_contribution_percentage: newValue.contribution_percentage || null,
+      employer_match: newValue.employer_match || null,
+      age_last_contribution: newValue.age_last_contribution || null
+    }
+    
+    // Update display values
+    currentBalanceDisplay.value = newValue.current_balance ? formatCurrency(newValue.current_balance) : ''
+    monthlyWithdrawalDisplay.value = newValue.withdrawal_amount ? new Intl.NumberFormat('en-US').format(newValue.withdrawal_amount) : ''
+    annualContributionDisplay.value = investment.value.annual_contribution_amount ? new Intl.NumberFormat('en-US').format(investment.value.annual_contribution_amount) : ''
+  } else {
+    resetForm()
+  }
+}, { immediate: true })
+
 // Currency formatting functions
 const formatCurrency = (value) => {
-  if (!value || value === 0) return '$0'
-  return new Intl.NumberFormat('en-US', { 
-    style: 'currency', 
-    currency: 'USD',
+  if (!value || value === 0) return '0'
+  return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 2
   }).format(value)
 }
 
@@ -473,7 +508,7 @@ const saveInvestment = () => {
 
   // Convert to the format expected by the backend
   const investmentData = {
-    id: Date.now() + Math.random(), // Temporary ID for frontend
+    id: isEditMode.value ? props.editingInvestment.id : (Date.now() + Math.random()), // Preserve ID when editing
     income_type: investment.value.income_type,
     income_name: investment.value.investment_name,  // For backend compatibility
     investment_name: investment.value.investment_name,  // For frontend display
@@ -488,7 +523,8 @@ const saveInvestment = () => {
     age_last_contribution: investment.value.age_last_contribution,
     start_age: investment.value.age_start_taking || 65,
     end_age: investment.value.age_stop_taking || 95,
-    withdrawal_amount: investment.value.monthly_withdrawal_amount || 0
+    withdrawal_amount: investment.value.monthly_withdrawal_amount || 0,
+    isEdit: isEditMode.value // Flag to indicate this is an edit
   }
 
   emit('save', investmentData)
@@ -498,6 +534,14 @@ const saveInvestment = () => {
   const bootstrapModal = bootstrap.Modal.getInstance(modal)
   bootstrapModal.hide()
   
+  resetForm()
+}
+
+const cancelEdit = () => {
+  // Emit cancel event so parent can clear editing state
+  if (isEditMode.value) {
+    emit('cancel')
+  }
   resetForm()
 }
 
