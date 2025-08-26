@@ -153,6 +153,22 @@ class ScenarioProcessor:
                 print(f"WARNING: Client missing required field '{field}', using default: {default_value}")
                 client[field] = default_value
         
+        # Ensure all required scenario fields are present with defaults
+        required_scenario_fields = {
+            'reduction_2030_ss': False,
+            'ss_adjustment_year': 2030,
+            'ss_adjustment_direction': 'decrease',
+            'ss_adjustment_type': 'percentage',
+            'ss_adjustment_amount': 23.0,
+            'apply_standard_deduction': True,
+        }
+        
+        for field, default_value in required_scenario_fields.items():
+            if field not in scenario or scenario[field] is None:
+                if instance.debug:
+                    print(f"WARNING: Scenario missing field '{field}', using default: {default_value}")
+                scenario[field] = default_value
+        
         # Set scenario attributes directly from the dictionary
         instance.scenario = type('obj', (object,), scenario)
         
