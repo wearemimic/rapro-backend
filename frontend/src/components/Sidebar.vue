@@ -34,8 +34,42 @@
               </div>
               <!-- End Collapse -->
 
-              
+              <!-- CRM Section -->
+              <div class="nav-item" v-if="hasCRMAccess">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuCRMMenu" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuCRMMenu'" 
+                   :title="isCollapsed ? 'CRM' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuCRMMenu">
+                  <i class="bi-envelope nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">CRM</span>
+                  <span v-if="totalUnreadCommunications > 0" class="badge bg-primary rounded-pill ms-1" v-show="!isCollapsed">{{ totalUnreadCommunications }}</span>
+                </a>
 
+                <div id="navbarVerticalMenuCRMMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <a class="nav-link" href="/communication-center">
+                    <i class="bi-inbox nav-icon me-2"></i>Communication Center
+                    <span v-if="totalUnreadCommunications > 0" class="badge bg-primary rounded-pill ms-1">{{ totalUnreadCommunications }}</span>
+                  </a>
+                  <a class="nav-link" href="/tasks">
+                    <i class="bi-check-square nav-icon me-2"></i>Task Management
+                    <span v-if="pendingTasksCount > 0" class="badge bg-warning rounded-pill ms-1">{{ pendingTasksCount }}</span>
+                  </a>
+                  <a class="nav-link" href="/calendar">
+                    <i class="bi-calendar-event nav-icon me-2"></i>Calendar
+                    <span v-if="todayEventsCount > 0" class="badge bg-info rounded-pill ms-1">{{ todayEventsCount }}</span>
+                  </a>
+                </div>
+              </div>
+              <!-- End CRM Section -->
+
+              <!-- Document Management -->
+              <div class="nav-item">
+                <a class="nav-link" href="/documents" :title="isCollapsed ? 'Documents' : ''" role="button">
+                  <i class="bi-files nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">Documents</span>
+                  <span class="badge bg-info rounded-pill ms-1" v-show="!isCollapsed">New</span>
+                </a>
+              </div>
+              <!-- End Document Management -->
 
               <!-- Collapse -->
               <div class="nav-item">
@@ -147,6 +181,11 @@
 </template>
 
 <script>
+import { useCommunicationStore } from '@/stores/communicationStore';
+import { useTaskStore } from '@/stores/taskStore';
+import { useCalendarStore } from '@/stores/calendarStore';
+import { hasCRMAccess } from '@/utils/permissions';
+
 export default {
   name: 'Sidebar',
   data() {
@@ -155,15 +194,46 @@ export default {
       currentScenarioId: null,
       clientScenarios: [],
       isClientRoute: false,
-      isCollapsed: false
+      isCollapsed: false,
+      totalUnreadCommunications: 0,
+      pendingTasksCount: 0,
+      todayEventsCount: 0,
+      communicationStore: null,
+      taskStore: null,
+      calendarStore: null
     };
   },
-  created() {
+  computed: {
+    hasCRMAccess() {
+      // Use auth store if available, otherwise fall back to localStorage
+      try {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        return hasCRMAccess(authStore.user);
+      } catch (error) {
+        // Fallback to direct function call which will check localStorage
+        return hasCRMAccess(null);
+      }
+    }
+  },
+  async created() {
+    // Initialize stores
+    this.communicationStore = useCommunicationStore();
+    this.taskStore = useTaskStore();
+    this.calendarStore = useCalendarStore();
+    
     // Restore collapsed state from localStorage
     const savedCollapsedState = localStorage.getItem('sidebarCollapsed');
     if (savedCollapsedState !== null) {
       this.isCollapsed = savedCollapsedState === 'true';
     }
+    
+    // Load counts for badges
+    await Promise.all([
+      this.loadUnreadCount(),
+      this.loadPendingTasksCount(),
+      this.loadTodayEventsCount()
+    ]);
     
     // Create handler for scenario deletion events
     this.handleScenarioDeleted = (event) => {
@@ -334,6 +404,53 @@ export default {
         .catch(error => {
           console.error('Error loading client scenarios:', error);
         });
+    },
+    
+    async loadUnreadCount() {
+      try {
+        // Get total unread communications count
+        await this.communicationStore.fetchCommunications({
+          is_read: false,
+          limit: 1
+        });
+        
+        this.totalUnreadCommunications = this.communicationStore.totalCount || 0;
+      } catch (error) {
+        console.error('Error loading unread count:', error);
+        this.totalUnreadCommunications = 0;
+      }
+    },
+    
+    async loadPendingTasksCount() {
+      try {
+        // Get pending tasks count (not completed)
+        await this.taskStore.fetchTasks({
+          status: 'pending',
+          limit: 1
+        });
+        
+        this.pendingTasksCount = this.taskStore.totalCount || 0;
+      } catch (error) {
+        console.error('Error loading pending tasks count:', error);
+        this.pendingTasksCount = 0;
+      }
+    },
+    
+    async loadTodayEventsCount() {
+      try {
+        // Get today's events count
+        const today = new Date().toISOString().split('T')[0];
+        await this.calendarStore.fetchCalendarEvents({
+          start_date: today,
+          end_date: today,
+          limit: 1
+        });
+        
+        this.todayEventsCount = this.calendarStore.todayEvents?.length || 0;
+      } catch (error) {
+        console.error('Error loading today events count:', error);
+        this.todayEventsCount = 0;
+      }
     }
   }
 };

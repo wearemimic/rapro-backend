@@ -19,13 +19,14 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 # from core.views import login_view
-from core.views import home_view
+from core.views_main import home_view
 # from core.views import AdvisorClientListView
 
 urlpatterns = [
     path('', home_view),
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),  # <-- this is what makes /api/login/ work
+    path('api/client-portal/', include('core.client_portal_urls')),  # Client portal API endpoints
     # path("api/clients/", AdvisorClientListView.as_view(), name="advisor-clients"),
    
 ]

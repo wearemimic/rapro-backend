@@ -59,6 +59,16 @@
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')"><i class="bi-plus-circle me-2"></i>New Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')"><i class="bi-files me-2"></i>Duplicate Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="editScenario"><i class="bi-pencil me-2"></i>Edit Scenario</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <a class="dropdown-item d-flex justify-content-between align-items-center" href="#" @click.prevent="toggleScenarioSharing">
+                        <span>
+                          <i class="bi-share me-2"></i>
+                          {{ scenario?.share_with_client ? 'Remove from Portal' : 'Share to Portal' }}
+                        </span>
+                        <span v-if="scenario?.share_with_client" class="badge bg-success">Shared</span>
+                      </a>
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -1021,6 +1031,48 @@ export default {
         params: { id: clientId },
         query: { edit: scenarioId }
       });
+    },
+    async toggleScenarioSharing() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No auth token found');
+          return;
+        }
+
+        const newSharingState = !this.scenario.share_with_client;
+        
+        const response = await fetch(`http://localhost:8000/api/scenarios/${this.scenario.id}/toggle-sharing/`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            share_with_client: newSharingState
+          })
+        });
+
+        if (response.ok) {
+          const updatedScenario = await response.json();
+          // Update local scenario data
+          this.scenario.share_with_client = updatedScenario.share_with_client;
+          
+          // Show success message
+          const message = newSharingState 
+            ? 'Scenario shared to client portal successfully!' 
+            : 'Scenario removed from client portal successfully!';
+          
+          this.$toast?.success?.(message) || alert(message);
+        } else {
+          const error = await response.json();
+          console.error('Failed to toggle scenario sharing:', error);
+          alert('Failed to update scenario sharing. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error toggling scenario sharing:', error);
+        alert('An error occurred. Please try again.');
+      }
     },
   },
   computed: {

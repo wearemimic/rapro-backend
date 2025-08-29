@@ -269,6 +269,7 @@ props: {
 - Backend runs on port 8000 (configurable via `BACKEND_PORT`)
 - PostgreSQL is containerized
 - Media files in `/backend/media/`
+- **IMPORTANT: Backend changes require restart** - Use `docker compose -f docker/docker-compose.yml restart backend` after any backend code changes
 - Ensure docker-compose loads .env files:
   ```yaml
   env_file:

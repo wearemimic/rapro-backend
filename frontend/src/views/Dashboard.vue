@@ -14,11 +14,94 @@
       <!-- End Row -->
     </div>
     <!-- End Page Header -->
-    <!-- Stats -->
+    <!-- CRM Quick Stats -->
+    <div class="row mb-4" style="margin-top:20px;" v-if="hasCRMAccess">
+      <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <div class="flex-shrink-0">
+                <div class="avatar avatar-sm avatar-circle bg-primary text-white">
+                  <i class="bi-envelope"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <span class="d-block h5 mb-0">{{ crmStats.unreadCommunications || 0 }}</span>
+                <span class="d-block fs-6 text-muted">Unread Communications</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <div class="flex-shrink-0">
+                <div class="avatar avatar-sm avatar-circle bg-warning text-white">
+                  <i class="bi-exclamation-triangle"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <span class="d-block h5 mb-0">{{ crmStats.highPriority || 0 }}</span>
+                <span class="d-block fs-6 text-muted">High Priority Items</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <div class="flex-shrink-0">
+                <div class="avatar avatar-sm avatar-circle bg-info text-white">
+                  <i class="bi-robot"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <span class="d-block h5 mb-0">{{ crmStats.aiAnalyzed || 0 }}</span>
+                <span class="d-block fs-6 text-muted">AI Analyzed Today</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <div class="flex-shrink-0">
+                <div class="avatar avatar-sm avatar-circle bg-success text-white">
+                  <i class="bi-people"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <span class="d-block h5 mb-0">{{ clients.length || 0 }}</span>
+                <span class="d-block fs-6 text-muted">Total Clients</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
     <div class="row" style="margin-top:20px;">
-    <div class="col-sm-6 col-lg-8 mb-3 mb-lg-5">
+    <div class="col-lg-8 mb-3 mb-lg-5">
       <div class="card mb-3 mb-lg-5">
-        <h2 class="card-title px-3 pt-3 mb-0">Recent Clients</h2>
+        <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+          <h2 class="mb-0">Recent Clients</h2>
+          <div class="d-flex gap-2">
+            <router-link to="/communication-center" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-envelope me-1"></i>
+              Communication Center
+            </router-link>
+          </div>
+        </div>
       
         <div class="card-body">
           <!-- Table -->
@@ -83,39 +166,50 @@
       </div>
     </div>
 
-    <div class="col-sm-6 col-lg-4 mb-3 mb-lg-5">
-      <!-- Card -->
+    <div class="col-lg-4 mb-3 mb-lg-5">
+      <!-- CRM Activity Stream -->
+      <div class="mb-4" v-if="hasCRMAccess">
+        <ActivityStream 
+          :max-items="8"
+          :auto-refresh="true"
+          :refresh-interval="60000"
+          @activity-click="handleActivityClick"
+          @action-executed="handleActionExecuted"
+        />
+      </div>
+
+      <!-- Getting Started Card -->
       <div class="card card-hover-shadow h-100">
         <div class="card-body">
-          <h3 class="card-title text-inherit">Getting Started</h3>
+          <h6 class="card-title text-inherit mb-3">Getting Started</h6>
           <ul class="list-unstyled">
-            <li class="d-flex align-items-center mb-2" style="font-size: 1.1rem;">
+            <li class="d-flex align-items-center mb-2">
               <i class="bi-check-circle-fill text-success me-2"></i>
-              Complete the signup 
+              <span>Complete the signup</span>
             </li>
-            <li class="d-flex align-items-center mb-2" style="font-size: 1.1rem;">
-              <i class="bi-circle me-2"></i>
-              Set up your White Label
+            <li class="d-flex align-items-center mb-2">
+              <i class="bi-circle me-2 text-muted"></i>
+              <span>Set up your White Label</span>
             </li>
-            <li class="d-flex align-items-center mb-2" style="font-size: 1.1rem;">
-              <i class="bi-circle me-2"></i>
-              Connect to your CRM
-            </li>
-            <li class="d-flex align-items-center mb-2" style="font-size: 1.1rem;">
-              <i class="bi-circle me-2"></i>
-              Import your contacts
-            </li>
-            <li class="d-flex align-items-center mb-2" style="font-size: 1.1rem;">
+            <li class="d-flex align-items-center mb-2">
               <i class="bi-check-circle-fill text-success me-2"></i>
-              Enable tech integrations
+              <span>Connect to your CRM</span>
             </li>
-            <li class="d-flex align-items-center" style="font-size: 1.1rem;">
-              <i class="bi-circle me-2"></i>
-              Browse Help Center
+            <li class="d-flex align-items-center mb-2">
+              <i class="bi-circle me-2 text-muted"></i>
+              <span>Import your contacts</span>
+            </li>
+            <li class="d-flex align-items-center mb-2">
+              <i class="bi-check-circle-fill text-success me-2"></i>
+              <span>Enable tech integrations</span>
+            </li>
+            <li class="d-flex align-items-center">
+              <i class="bi-circle me-2 text-muted"></i>
+              <span>Browse Help Center</span>
             </li>
           </ul>
           <div class="progress mt-3" style="height: 5px;">
-            <div class="progress-bar bg-primary" role="progressbar" style="width: 30%;" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+            <div class="progress-bar bg-primary" role="progressbar" style="width: 50%;" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
           </div>
         </div>
       </div>
@@ -130,14 +224,17 @@
 
 <script>
 import axios from 'axios'
+import { hasCRMAccess } from '@/utils/permissions'
+import ActivityStream from '@/components/CRM/ActivityStream.vue'
 // TestChart removed
 
 const token = localStorage.getItem('token')
 const headers = { Authorization: `Bearer ${token}` }
 
 export default {
-  name: 'ClientList',
+  name: 'Dashboard',
   components: {
+    ActivityStream
   },
   data() {
     return {
@@ -150,9 +247,25 @@ export default {
       currentPage: 1,
       perPage: 5,
       statusFilter: '',
+      crmStats: {
+        unreadCommunications: 0,
+        highPriority: 0,
+        aiAnalyzed: 0
+      }
     }
   },
   computed: {
+    hasCRMAccess() {
+      // Use auth store if available, otherwise fall back to localStorage
+      try {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        return hasCRMAccess(authStore.user);
+      } catch (error) {
+        // Fallback to direct function call which will check localStorage
+        return hasCRMAccess(null);
+      }
+    },
     filteredClients() {
       const query = this.searchQuery.toLowerCase()
       return this.clients.filter(c => {
@@ -209,6 +322,19 @@ export default {
     },
     editClient(clientId) {
       this.$router.push({ name: 'ClientEdit', params: { id: clientId } }) // placeholder
+    },
+    handleActivityClick(activity) {
+      // Handle activity item clicks - navigate to relevant section
+      if (activity.type === 'communication') {
+        this.$router.push('/communication-center');
+      } else if (activity.client_id) {
+        this.$router.push(`/clients/${activity.client_id}`);
+      }
+    },
+    handleActionExecuted(action) {
+      // Handle when an action is executed from activity stream
+      console.log('Action executed:', action);
+      // Could refresh dashboard stats here if needed
     }
   },
   mounted() {

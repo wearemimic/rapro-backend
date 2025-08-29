@@ -12,11 +12,26 @@ import Auth0Callback from '@/views/Auth0Callback.vue'
 import UserManagement from '@/views/UserManagement.vue'
 import ComparisonReport from '@/views/ComparisonReport.vue'
 
+// Client Portal Components
+import ClientPortalHome from '@/views/ClientPortal/ClientPortalHome.vue'
+import ClientDashboard from '@/views/ClientPortal/ClientDashboard.vue'
+import ClientPortalDocuments from '@/views/ClientPortal/ClientPortalDocuments.vue'
+import ClientPortalMessages from '@/views/ClientPortal/ClientPortalMessages.vue'
+import ClientPortalAppointments from '@/views/ClientPortal/ClientPortalAppointments.vue'
+import ClientPortalScenarios from '@/views/ClientPortal/ClientPortalScenarios.vue'
+
 
 const routes = [
   { path: '/register', name: 'Register', component: Register },
   { path: '/login', name: 'Login', component: Login },
   { path: '/auth/callback', name: 'Auth0Callback', component: Auth0Callback },
+  
+  // Client Portal Login (separate from advisor login)
+  { 
+    path: '/portal/login', 
+    name: 'ClientPortalLogin', 
+    component: () => import('@/views/ClientPortalLogin.vue')
+  },
   {
     path: '/',
     component: DefaultLayout,
@@ -31,8 +46,51 @@ const routes = [
       { path: 'clients/:id/comparison-report', name: 'ComparisonReport', component: ComparisonReport, meta: { requiresAuth: true } },
       { path: 'clients/:id/scenarios/new', name: 'ScenarioCreate', component: () => import('@/views/ScenarioCreate.vue'), meta: { requiresAuth: true }, props: true },
       { path: 'clients/:id/scenarios/detail/:scenarioid', name: 'ScenarioDetail', component: ScenarioDetail, meta: { requiresAuth: true } },
+      { path: 'communication-center', name: 'CommunicationCenter', component: () => import('@/components/CRM/CommunicationCenter.vue'), meta: { requiresAuth: true } },
+      { path: 'tasks', name: 'TaskManagement', component: () => import('@/components/TaskDashboard.vue'), meta: { requiresAuth: true } },
+      { path: 'calendar', name: 'Calendar', component: () => import('@/components/CRM/CalendarView.vue'), meta: { requiresAuth: true } },
       { path: 'integrations', name: 'Integrations', component: () => import('@/views/Integrations.vue'), meta: { requiresAuth: true } },
       { path: 'users', name: 'UserManagement', component: UserManagement, meta: { requiresAuth: true } },
+      { path: 'documents', name: 'DocumentCenter', component: () => import('@/components/DocumentCenter.vue'), meta: { requiresAuth: true } },
+    ]
+  },
+  // Client Portal Routes
+  {
+    path: '/portal',
+    component: ClientPortalHome,
+    meta: { requiresAuth: true, isClientPortal: true },
+    redirect: '/portal/dashboard',
+    children: [
+      { 
+        path: 'dashboard', 
+        name: 'client-portal-dashboard', 
+        component: () => import('@/views/ClientPortalDashboard.vue'), 
+        meta: { requiresAuth: true, isClientPortal: true } 
+      },
+      { 
+        path: 'documents', 
+        name: 'client-portal-documents', 
+        component: ClientPortalDocuments, 
+        meta: { requiresAuth: true, isClientPortal: true } 
+      },
+      { 
+        path: 'messages', 
+        name: 'client-portal-messages', 
+        component: ClientPortalMessages, 
+        meta: { requiresAuth: true, isClientPortal: true } 
+      },
+      { 
+        path: 'appointments', 
+        name: 'client-portal-appointments', 
+        component: ClientPortalAppointments, 
+        meta: { requiresAuth: true, isClientPortal: true } 
+      },
+      { 
+        path: 'scenarios', 
+        name: 'client-portal-scenarios', 
+        component: ClientPortalScenarios, 
+        meta: { requiresAuth: true, isClientPortal: true } 
+      }
     ]
   }
 ]

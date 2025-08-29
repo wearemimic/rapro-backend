@@ -19,3 +19,28 @@ python-jose[cryptography]
 PyJWT[crypto]
 cryptography
 python-dotenv
+
+# Email Integration Libraries
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+msal>=1.24.0
+exchangelib>=5.0.0
+imapclient>=3.0.0
+secure-smtplib
+email-validator
+
+# AI Integration Libraries
+openai>=1.3.0
+
+# Background Task Processing Libraries
+celery>=5.3.0
+redis>=4.5.0
+django-celery-beat>=2.5.0
+django-celery-results>=2.5.0
+flower>=2.0.0
+
+# AWS S3 Integration Libraries
+boto3>=1.34.0
+botocore>=1.34.0
