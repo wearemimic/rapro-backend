@@ -54,6 +54,9 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
     'social_django',  # Add social_django for Auth0
+    # Celery related apps
+    'django_celery_beat',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -120,10 +123,11 @@ SOCIAL_AUTH_AUTH0_SCOPE = [
     'email'
 ]
 
-AUTHENTICATION_BACKENDS = {
-    'social_core.backends.auth0.Auth0OAuth2',
-    'django.contrib.auth.backends.ModelBackend',
-}
+AUTHENTICATION_BACKENDS = [
+    'core.authentication.ClientPortalBackend',  # Client portal authentication
+    'social_core.backends.auth0.Auth0OAuth2',   # Auth0 authentication
+    'django.contrib.auth.backends.ModelBackend',  # Standard Django authentication
+]
 
 ROOT_URLCONF = 'retirementadvisorpro.urls'
 
@@ -220,3 +224,201 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'your_stripe_web
 # Stripe Product/Price IDs
 STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_id')
 STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID', 'price_annual_id')
+
+# =============================================================================
+# CELERY CONFIGURATION
+# =============================================================================
+
+# Celery Broker and Result Backend
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+
+# Task serialization
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = 'UTC'
+CELERY_ENABLE_UTC = True
+
+# Result backend settings
+CELERY_RESULT_EXPIRES = 86400  # Results expire after 24 hours
+CELERY_RESULT_PERSISTENT = True  # Store results persistently
+
+# Beat scheduler configuration
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Task execution settings
+CELERY_TASK_SOFT_TIME_LIMIT = 300  # 5 minutes soft limit
+CELERY_TASK_TIME_LIMIT = 600  # 10 minutes hard limit
+CELERY_TASK_ACKS_LATE = True  # Acknowledge tasks after completion
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Don't prefetch tasks
+
+# Worker settings
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100  # Restart worker after N tasks
+CELERY_WORKER_DISABLE_RATE_LIMITS = False
+CELERY_TASK_COMPRESSION = 'gzip'
+CELERY_RESULT_COMPRESSION = 'gzip'
+
+# Monitoring settings
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+
+# Error handling
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_IGNORE_RESULT = False
+
+# Local development fallback configuration
+# This ensures the app can run locally without Redis for basic functionality
+if 'CELERY_BROKER_URL' not in os.environ and DEBUG:
+    # Use synchronous task execution for local development without Redis
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+    CELERY_BROKER_URL = 'memory://'
+    CELERY_RESULT_BACKEND = 'cache+memory://'
+
+# =============================================================================
+# AI INTEGRATION CONFIGURATION  
+# =============================================================================
+
+# OpenAI Configuration
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_MODEL_VERSION = os.environ.get('OPENAI_MODEL_VERSION', 'gpt-4o-mini')
+
+# AI Cost tracking settings
+AI_MONTHLY_BUDGET_LIMIT = float(os.environ.get('AI_MONTHLY_BUDGET_LIMIT', '100.0'))  # $100 default
+AI_COST_ALERT_THRESHOLD = float(os.environ.get('AI_COST_ALERT_THRESHOLD', '80.0'))  # 80% of budget
+
+# =============================================================================
+# EMAIL INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Gmail OAuth2 Configuration
+GOOGLE_OAUTH2_CLIENT_ID = os.environ.get('GOOGLE_OAUTH2_CLIENT_ID', '')
+GOOGLE_OAUTH2_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH2_CLIENT_SECRET', '')
+
+# Microsoft OAuth2 Configuration  
+MICROSOFT_CLIENT_ID = os.environ.get('MICROSOFT_CLIENT_ID', '')
+MICROSOFT_CLIENT_SECRET = os.environ.get('MICROSOFT_CLIENT_SECRET', '')
+
+# Email sync settings
+EMAIL_SYNC_BATCH_SIZE = int(os.environ.get('EMAIL_SYNC_BATCH_SIZE', '50'))
+EMAIL_SYNC_RATE_LIMIT = int(os.environ.get('EMAIL_SYNC_RATE_LIMIT', '100'))  # per hour
+
+# Django Email Configuration for Client Portal Invitations
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@retirementadvisorpro.com')
+
+# Frontend URL for client portal invitations
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
+# =============================================================================
+# SMS/TWILIO CONFIGURATION
+# =============================================================================
+
+# Default Twilio configuration (advisors can override with their own)
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
+
+# SMS settings
+SMS_RATE_LIMIT = int(os.environ.get('SMS_RATE_LIMIT', '100'))  # per hour
+SMS_MAX_LENGTH = int(os.environ.get('SMS_MAX_LENGTH', '1600'))  # characters
+
+# =============================================================================
+# AWS S3 DOCUMENT STORAGE CONFIGURATION
+# =============================================================================
+
+# AWS S3 Configuration for Document Management
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'retirementadvisorpro-documents')
+
+# S3 Security and Compliance Settings
+AWS_S3_ENCRYPTION = os.environ.get('AWS_S3_ENCRYPTION', 'AES256')  # Server-side encryption
+AWS_S3_STORAGE_CLASS = os.environ.get('AWS_S3_STORAGE_CLASS', 'STANDARD_IA')  # Cost-effective for documents
+AWS_S3_VERSIONING = os.environ.get('AWS_S3_VERSIONING', 'Enabled')  # Version control for compliance
+
+# File Upload Settings
+MAX_UPLOAD_SIZE = int(os.environ.get('MAX_UPLOAD_SIZE', str(50 * 1024 * 1024)))  # 50MB default
+ALLOWED_DOCUMENT_TYPES = [
+    'application/pdf',
+    'application/vnd.ms-excel', 
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+    'text/csv',
+    'image/jpeg',
+    'image/png',
+    'image/tiff'
+]
+
+# Document Management Settings
+DOCUMENT_RETENTION_DAYS = int(os.environ.get('DOCUMENT_RETENTION_DAYS', '2555'))  # 7 years default for FINRA
+DOCUMENT_AUTO_CLEANUP = os.environ.get('DOCUMENT_AUTO_CLEANUP', 'False').lower() == 'true'
+DOCUMENT_VIRUS_SCAN = os.environ.get('DOCUMENT_VIRUS_SCAN', 'True').lower() == 'true'
+
+# Presigned URL Settings
+PRESIGNED_URL_EXPIRATION = int(os.environ.get('PRESIGNED_URL_EXPIRATION', '3600'))  # 1 hour default
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{levelname}] {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery.tasks': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'core.services': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

@@ -33,6 +33,20 @@ export const apiService = {
    */
   getUrl(endpoint) {
     return getApiUrl(endpoint);
+  },
+  
+  /**
+   * Get axios config with authentication headers
+   * @returns {Object} The axios config object with Authorization header
+   */
+  getConfig() {
+    const token = localStorage.getItem('token');
+    return {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    };
   }
 };
 
