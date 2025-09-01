@@ -105,6 +105,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { clearAuthData, initAuthState, storeAuthState } from '@/utils/authHelper';
 // import { useAuth0 } from '@auth0/auth0-vue';
 
 const router = useRouter();
@@ -207,6 +208,9 @@ const loginWithAuth0 = async (connection) => {
   console.log('🔵 loginWithAuth0 called with connection:', connection);
   
   try {
+    // Clear any stale authentication data first
+    clearAuthData();
+    
     // Store that this is a login flow (not registration)
     localStorage.setItem('auth0_flow', 'login');
     console.log('🔄 Set auth0_flow to login');
@@ -214,15 +218,9 @@ const loginWithAuth0 = async (connection) => {
     // For now, use the direct method since Auth0 Vue plugin has issues
     console.log('🔄 Using direct Auth0 redirect method...');
     
-    // Generate a random state parameter for CSRF protection
-    const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-    // Store state in sessionStorage for verification on callback
-    sessionStorage.setItem('auth0_state', state);
-    console.log('🔐 Generated and stored state parameter');
-    
-    // Generate a nonce for additional security
-    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-    sessionStorage.setItem('auth0_nonce', nonce);
+    // Initialize fresh auth state
+    const { state, nonce } = initAuthState();
+    console.log('🔐 Generated and stored fresh state parameter');
     
     // Map common connection names to Auth0 connection names
     const connectionMap = {

@@ -51,7 +51,7 @@
         :class="getTaskItemClass(task)"
         @click="handleTaskClick(task)"
       >
-        <div class="card-body p-3">
+        <div class="card-body py-2 px-3">
           <div class="d-flex align-items-start">
             <!-- Selection Checkbox -->
             <div class="form-check me-3">
@@ -65,32 +65,86 @@
               >
             </div>
 
-            <!-- Task Content -->
+            <!-- Task Content - Single Line Layout -->
             <div class="flex-grow-1 min-width-0">
-              <div class="d-flex justify-content-between align-items-start mb-2">
-                <div class="task-header">
-                  <h6 class="task-title mb-1" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
+              <div class="d-flex justify-content-between align-items-center">
+                <!-- Left side: Title and all metadata in one line -->
+                <div class="d-flex align-items-center flex-wrap gap-2 flex-grow-1 min-width-0">
+                  <!-- Task Title -->
+                  <h6 class="task-title mb-0 me-3" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
                     {{ task.title }}
-                    <span v-if="task.is_overdue" class="badge bg-danger ms-2">
+                    <span v-if="task.is_overdue" class="badge bg-danger ms-1">
                       <i class="fas fa-exclamation-triangle me-1"></i>Overdue
                     </span>
                   </h6>
                   
-                  <div class="task-meta">
-                    <span class="badge me-1" :class="getStatusBadgeClass(task.status)">
-                      {{ getStatusLabel(task.status) }}
-                    </span>
-                    <span class="badge me-1" :class="getPriorityBadgeClass(task.priority)">
-                      {{ getPriorityLabel(task.priority) }}
-                    </span>
-                    <span v-if="task.task_type" class="badge bg-light text-dark me-1">
-                      {{ getTaskTypeLabel(task.task_type) }}
-                    </span>
+                  <!-- Status and Priority Badges -->
+                  <span class="badge me-1" :class="getStatusBadgeClass(task.status)">
+                    {{ getStatusLabel(task.status) }}
+                  </span>
+                  <span class="badge me-1" :class="getPriorityBadgeClass(task.priority)">
+                    {{ getPriorityLabel(task.priority) }}
+                  </span>
+                  <span v-if="task.task_type" class="badge bg-light text-dark me-1">
+                    {{ getTaskTypeLabel(task.task_type) }}
+                  </span>
+                  
+                  <!-- Task Description (truncated) -->
+                  <span v-if="task.description" class="text-muted me-3" style="font-size: 0.9em;">
+                    {{ truncateText(task.description, 80) }}
+                  </span>
+                  
+                  <!-- Task Details -->
+                  <div class="d-flex align-items-center gap-3 text-sm text-muted">
+                    <div v-if="task.due_date" class="d-flex align-items-center">
+                      <i class="fas fa-calendar me-1"></i>
+                      {{ formatDate(task.due_date) }}
+                    </div>
+                    
+                    <div v-if="task.assigned_to_name" class="d-flex align-items-center">
+                      <i class="fas fa-user me-1"></i>
+                      {{ task.assigned_to_name }}
+                    </div>
+                    
+                    <div v-if="task.client_name" class="d-flex align-items-center">
+                      <i class="fas fa-user-tie me-1"></i>
+                      {{ task.client_name }}
+                    </div>
+                    
+                    <div v-if="task.lead_name" class="d-flex align-items-center">
+                      <i class="fas fa-user-plus me-1"></i>
+                      {{ task.lead_name }}
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                      <i class="fas fa-clock me-1"></i>
+                      {{ formatRelativeDate(task.created_at) }}
+                    </div>
+                    
+                    <div v-if="task.comments_count > 0" class="d-flex align-items-center">
+                      <i class="fas fa-comments me-1"></i>
+                      {{ task.comments_count }}
+                    </div>
+                    
+                    <!-- Tags inline -->
+                    <div v-if="task.tags && task.tags.length > 0" class="d-flex align-items-center gap-1">
+                      <span
+                        v-for="tag in task.tags.slice(0, 3)"
+                        :key="tag"
+                        class="badge bg-secondary"
+                        style="font-size: 0.65em;"
+                      >
+                        {{ tag }}
+                      </span>
+                      <span v-if="task.tags.length > 3" class="badge bg-secondary" style="font-size: 0.65em;">
+                        +{{ task.tags.length - 3 }}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Task Actions -->
-                <div class="task-actions">
+                <!-- Right side: Task Actions -->
+                <div class="task-actions ms-3">
                   <div class="btn-group btn-group-sm">
                     <button
                       class="btn btn-outline-primary"
@@ -158,56 +212,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- Task Description -->
-              <p v-if="task.description" class="task-description text-muted mb-2">
-                {{ truncateText(task.description, 150) }}
-              </p>
-
-              <!-- Task Details -->
-              <div class="task-details d-flex flex-wrap align-items-center gap-3 text-sm text-muted">
-                <div v-if="task.due_date" class="d-flex align-items-center">
-                  <i class="fas fa-calendar me-1"></i>
-                  Due: {{ formatDate(task.due_date) }}
-                </div>
-                
-                <div v-if="task.assigned_to_name" class="d-flex align-items-center">
-                  <i class="fas fa-user me-1"></i>
-                  {{ task.assigned_to_name }}
-                </div>
-                
-                <div v-if="task.client_name" class="d-flex align-items-center">
-                  <i class="fas fa-user-tie me-1"></i>
-                  {{ task.client_name }}
-                </div>
-                
-                <div v-if="task.lead_name" class="d-flex align-items-center">
-                  <i class="fas fa-user-plus me-1"></i>
-                  {{ task.lead_name }}
-                </div>
-                
-                <div class="d-flex align-items-center">
-                  <i class="fas fa-clock me-1"></i>
-                  Created {{ formatRelativeDate(task.created_at) }}
-                </div>
-                
-                <div v-if="task.comments_count > 0" class="d-flex align-items-center">
-                  <i class="fas fa-comments me-1"></i>
-                  {{ task.comments_count }} {{ task.comments_count === 1 ? 'comment' : 'comments' }}
-                </div>
-              </div>
-
-              <!-- Tags -->
-              <div v-if="task.tags && task.tags.length > 0" class="task-tags mt-2">
-                <span
-                  v-for="tag in task.tags"
-                  :key="tag"
-                  class="badge bg-secondary me-1"
-                  style="font-size: 0.7em;"
-                >
-                  {{ tag }}
-                </span>
               </div>
             </div>
           </div>

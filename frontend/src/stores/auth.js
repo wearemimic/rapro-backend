@@ -27,6 +27,27 @@ export const useAuthStore = defineStore('auth', {
       if (!state.token) return -1;
       return getTokenExpirationInMinutes(state.token);
     },
+    
+    // Admin-related getters
+    isAdminUser: (state) => {
+      return state.user?.is_admin_user || false;
+    },
+    
+    adminRole: (state) => {
+      return state.user?.admin_role || '';
+    },
+    
+    adminRoleDisplay: (state) => {
+      return state.user?.admin_role_display || 'No Admin Role';
+    },
+    
+    adminPermissions: (state) => {
+      return state.user?.admin_permissions || {};
+    },
+    
+    isSuperAdmin: (state) => {
+      return state.user?.admin_role === 'super_admin';
+    },
   },
   actions: {
     init() {
@@ -407,6 +428,66 @@ export const useAuthStore = defineStore('auth', {
       } else {
         // If no Auth0 instance, just redirect to login
         router.push('/login');
+      }
+    },
+    
+    // Admin helper methods
+    hasAdminPermission(permissionKey) {
+      if (!this.isAdminUser) return false;
+      if (this.isSuperAdmin) return true;
+      return this.adminPermissions[permissionKey] || false;
+    },
+    
+    canAccessAdminSection(section) {
+      if (!this.isAdminUser) return false;
+      if (this.isSuperAdmin) return true;
+      
+      const sectionPermissions = {
+        'user_management': ['admin', 'support'],
+        'billing': ['admin', 'billing'],
+        'analytics': ['admin', 'analyst'],
+        'system_monitoring': ['admin'],
+        'support_tools': ['admin', 'support'],
+      };
+      
+      const allowedRoles = sectionPermissions[section] || [];
+      return allowedRoles.includes(this.adminRole);
+    },
+    
+    getAccessibleAdminSections() {
+      if (!this.isAdminUser) return [];
+      
+      const sections = ['user_management', 'billing', 'analytics', 'system_monitoring', 'support_tools'];
+      return sections.filter(section => this.canAccessAdminSection(section));
+    },
+    
+    async updateUserAdminRole(userId, adminRole, adminPermissions = {}) {
+      if (!this.canAccessAdminSection('user_management')) {
+        throw new Error('Insufficient permissions to update user admin roles');
+      }
+      
+      try {
+        const response = await axios.put(`http://localhost:8000/api/admin/users/${userId}/admin-role/`, {
+          admin_role: adminRole,
+          admin_permissions: adminPermissions,
+          is_platform_admin: !!adminRole
+        });
+        return response.data;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to update admin role');
+      }
+    },
+    
+    async fetchAdminStats() {
+      if (!this.isAdminUser) {
+        throw new Error('Admin access required');
+      }
+      
+      try {
+        const response = await axios.get('http://localhost:8000/api/admin/stats/');
+        return response.data;
+      } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to fetch admin stats');
       }
     }
   }

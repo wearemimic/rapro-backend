@@ -42,6 +42,16 @@ app.conf.task_routes = {
     'core.tasks.calculate_campaign_roi': {'queue': 'analytics'},
     'core.tasks.update_client_relationship_scores': {'queue': 'analytics'},
     
+    # Report Center Tasks - High CPU/IO, moderate priority
+    'report_center.tasks.generate_report_pdf': {'queue': 'analytics'},
+    'report_center.tasks.generate_report_pptx': {'queue': 'analytics'},
+    'report_center.tasks.batch_generate_reports': {'queue': 'analytics'},
+    'report_center.tasks.update_template_usage_stats': {'queue': 'analytics'},
+    'report_center.tasks.generate_template_preview': {'queue': 'analytics'},
+    'report_center.tasks.cleanup_old_report_files': {'queue': 'default'},
+    'report_center.tasks.update_all_template_analytics': {'queue': 'analytics'},
+    'report_center.tasks.report_center_health_check': {'queue': 'default'},
+    
     # Default queue for miscellaneous tasks
     'core.tasks.cleanup_old_task_results': {'queue': 'default'},
     'core.tasks.health_check_task': {'queue': 'default'},

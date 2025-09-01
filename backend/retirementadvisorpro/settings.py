@@ -42,6 +42,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.83', '*']
 
 INSTALLED_APPS = [
     'core',
+    'report_center',
     'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -69,6 +70,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.performance_middleware.PerformanceMonitoringMiddleware',
+    'core.performance_middleware.SystemHealthMonitoringMiddleware',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -210,6 +213,38 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 # Media files (User uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Report Center specific file storage settings
+REPORT_CENTER_STORAGE = {
+    'TEMPLATE_PREVIEWS': os.path.join(MEDIA_ROOT, 'report_center/template_previews/'),
+    'GENERATED_REPORTS': os.path.join(MEDIA_ROOT, 'report_center/generated_reports/'),
+    'PDF_REPORTS': os.path.join(MEDIA_ROOT, 'report_center/generated_reports/pdf/'),
+    'PPTX_REPORTS': os.path.join(MEDIA_ROOT, 'report_center/generated_reports/pptx/'),
+    'TEMPLATE_ASSETS': os.path.join(MEDIA_ROOT, 'report_center/template_assets/'),
+    'TEMPORARY_FILES': os.path.join(MEDIA_ROOT, 'report_center/temp/'),
+}
+
+# File size limits for Report Center uploads (in bytes)
+REPORT_CENTER_LIMITS = {
+    'MAX_TEMPLATE_PREVIEW_SIZE': 5 * 1024 * 1024,  # 5MB
+    'MAX_GENERATED_REPORT_SIZE': 50 * 1024 * 1024,  # 50MB
+    'MAX_TEMPLATE_ASSET_SIZE': 10 * 1024 * 1024,  # 10MB
+}
+
+# File type restrictions
+REPORT_CENTER_ALLOWED_TYPES = {
+    'TEMPLATE_PREVIEWS': ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
+    'TEMPLATE_ASSETS': ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf'],
+    'GENERATED_REPORTS': ['.pdf', '.pptx'],
+}
+
+# Report retention settings (in days)
+REPORT_CENTER_RETENTION = {
+    'DRAFT_REPORTS': 90,  # Keep draft reports for 90 days
+    'SHARED_REPORTS': 365,  # Keep shared reports for 1 year
+    'TEMPORARY_FILES': 7,  # Clean temp files after 7 days
+    'ANALYTICS_DATA': 730,  # Keep analytics for 2 years
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -366,6 +401,68 @@ DOCUMENT_VIRUS_SCAN = os.environ.get('DOCUMENT_VIRUS_SCAN', 'True').lower() == '
 
 # Presigned URL Settings
 PRESIGNED_URL_EXPIRATION = int(os.environ.get('PRESIGNED_URL_EXPIRATION', '3600'))  # 1 hour default
+
+# =============================================================================
+# CACHING CONFIGURATION
+# =============================================================================
+
+# Redis Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            # Remove PARSER_CLASS entirely - let Redis use its default
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'SERIALIZER': 'django_redis.serializers.json.JSONSerializer',
+        },
+        'KEY_PREFIX': 'retirementadvisorpro',
+        'VERSION': 1,
+        'TIMEOUT': 900,  # 15 minutes default
+    }
+}
+
+# Cache key versioning for easy invalidation
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 600
+CACHE_MIDDLEWARE_KEY_PREFIX = ''
+
+# Session cache configuration
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+SESSION_COOKIE_AGE = 86400  # 24 hours
+
+# Performance monitoring cache settings
+CACHE_PERFORMANCE_MONITORING = True
+CACHE_SLOW_QUERY_THRESHOLD = 1.0  # seconds
+
+# =============================================================================
+# CDN AND STATIC ASSET OPTIMIZATION
+# =============================================================================
+
+# CDN Configuration
+CDN_ENABLED = os.environ.get('CDN_ENABLED', 'False').lower() == 'true'
+CDN_DOMAIN = os.environ.get('CDN_DOMAIN', '')
+AWS_CLOUDFRONT_DISTRIBUTION_ID = os.environ.get('AWS_CLOUDFRONT_DISTRIBUTION_ID', '')
+
+# Static file compression
+COMPRESS_ENABLED = True
+COMPRESS_CSS_HASHING_METHOD = 'mtime'
+COMPRESS_JS_COMPRESSOR = 'compressor.js.JsCompressor'
+COMPRESS_CSS_COMPRESSOR = 'compressor.css.CssCompressor'
+
+# Static file optimization
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
+# Asset optimization settings
+OPTIMIZE_IMAGES = os.environ.get('OPTIMIZE_IMAGES', 'True').lower() == 'true'
+IMAGE_OPTIMIZATION_QUALITY = int(os.environ.get('IMAGE_OPTIMIZATION_QUALITY', '85'))
+WEBP_ENABLED = os.environ.get('WEBP_ENABLED', 'True').lower() == 'true'
 
 # =============================================================================
 # LOGGING CONFIGURATION

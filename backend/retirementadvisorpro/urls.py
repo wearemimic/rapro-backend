@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),  # <-- this is what makes /api/login/ work
     path('api/client-portal/', include('core.client_portal_urls')),  # Client portal API endpoints
+    # path('api/', include('report_center.urls')),  # Report Center API endpoints - TEMPORARILY DISABLED for debugging
     # path("api/clients/", AdvisorClientListView.as_view(), name="advisor-clients"),
    
 ]

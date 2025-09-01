@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 import logging
 
+from .services.analytics_service import RevenueAnalyticsService
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -57,6 +59,10 @@ def handle_subscription_created(subscription):
         
         user.save()
         logger.info(f"Subscription created successfully for user {user.email}")
+        
+        # Trigger revenue analytics recalculation
+        trigger_revenue_analytics()
+        
     except User.DoesNotExist:
         logger.error(f"User not found for Stripe customer ID: {subscription.customer}")
     except Exception as e:
@@ -80,6 +86,10 @@ def handle_subscription_updated(subscription):
         
         user.save()
         logger.info(f"Subscription updated successfully for user {user.email}")
+        
+        # Trigger revenue analytics recalculation
+        trigger_revenue_analytics()
+        
     except User.DoesNotExist:
         logger.error(f"User not found for Stripe subscription ID: {subscription.id}")
     except Exception as e:
@@ -92,6 +102,10 @@ def handle_subscription_deleted(subscription):
         user.subscription_end_date = timezone.now()
         user.save()
         logger.info(f"Subscription canceled successfully for user {user.email}")
+        
+        # Trigger revenue analytics recalculation
+        trigger_revenue_analytics()
+        
     except User.DoesNotExist:
         logger.error(f"User not found for Stripe subscription ID: {subscription.id}")
     except Exception as e:
@@ -112,7 +126,29 @@ def handle_payment_failed(invoice):
         user.subscription_status = 'past_due'
         user.save()
         logger.info(f"Payment failed for user {user.email}, status updated to past_due")
+        
+        # Trigger revenue analytics recalculation
+        trigger_revenue_analytics()
+        
     except User.DoesNotExist:
         logger.error(f"User not found for Stripe customer ID: {invoice.customer}")
     except Exception as e:
-        logger.error(f"Error handling payment failure: {str(e)}") 
+        logger.error(f"Error handling payment failure: {str(e)}")
+
+
+def trigger_revenue_analytics():
+    """Trigger recalculation of revenue analytics after subscription changes"""
+    try:
+        revenue_service = RevenueAnalyticsService()
+        today = timezone.now().date()
+        
+        # Recalculate key metrics
+        revenue_service.calculate_mrr(today)
+        revenue_service.calculate_arr(today)
+        revenue_service.calculate_churn_rate(today)
+        revenue_service.calculate_arpu(today)
+        
+        logger.info("Revenue analytics recalculated after subscription change")
+        
+    except Exception as e:
+        logger.error(f"Error triggering revenue analytics: {str(e)}") 

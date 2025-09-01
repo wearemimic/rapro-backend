@@ -10,7 +10,7 @@
     <!-- Empty State -->
     <div v-else-if="communications.length === 0" class="text-center py-5">
       <div class="avatar avatar-xl avatar-circle bg-soft-secondary text-secondary mx-auto mb-3">
-        <i class="bi bi-inbox"></i>
+        <i class="bi-inbox"></i>
       </div>
       <h5 class="text-secondary mb-2">No Communications Found</h5>
       <p class="text-muted mb-0">
@@ -94,7 +94,7 @@
                       class="badge badge-sm bg-danger ms-1"
                       title="High Priority"
                     >
-                      <i class="bi bi-star-fill"></i>
+                      <i class="bi-star-fill"></i>
                     </span>
 
                     <!-- Unread Indicator -->
@@ -117,7 +117,7 @@
                         type="button" 
                         data-bs-toggle="dropdown"
                       >
-                        <i class="bi bi-three-dots-vertical"></i>
+                        <i class="bi-three-dots-vertical"></i>
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
                         <li>
@@ -125,7 +125,7 @@
                             class="dropdown-item" 
                             @click="viewCommunication(communication.id)"
                           >
-                            <i class="bi bi-eye me-2"></i>View Details
+                            <i class="bi-eye me-2"></i>View Details
                           </button>
                         </li>
                         <li>
@@ -133,7 +133,7 @@
                             class="dropdown-item" 
                             @click="toggleRead(communication.id)"
                           >
-                            <i :class="communication.is_read ? 'bi bi-envelope' : 'bi bi-envelope-open'" class="me-2"></i>
+                            <i :class="communication.is_read ? 'bi-envelope' : 'bi-envelope-open'" class="me-2"></i>
                             Mark as {{ communication.is_read ? 'Unread' : 'Read' }}
                           </button>
                         </li>
@@ -142,7 +142,7 @@
                             class="dropdown-item" 
                             @click="showAISuggestion(communication)"
                           >
-                            <i class="bi bi-robot me-2"></i>View AI Suggestion
+                            <i class="bi-robot me-2"></i>View AI Suggestion
                           </button>
                         </li>
                         <li><hr class="dropdown-divider"></li>
@@ -151,7 +151,7 @@
                             class="dropdown-item text-danger" 
                             @click="deleteCommunication(communication.id)"
                           >
-                            <i class="bi bi-trash me-2"></i>Delete
+                            <i class="bi-trash me-2"></i>Delete
                           </button>
                         </li>
                       </ul>
@@ -218,7 +218,7 @@
                     class="badge badge-sm bg-light text-dark"
                     :title="`Topics: ${communication.ai_topics.join(', ')}`"
                   >
-                    <i class="bi bi-tags me-1"></i>
+                    <i class="bi-tags me-1"></i>
                     {{ communication.ai_topics[0] }}{{ communication.ai_topics.length > 1 ? ` +${communication.ai_topics.length - 1}` : '' }}
                   </span>
                 </div>
@@ -298,7 +298,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              <i class="bi bi-robot me-2"></i>
+              <i class="bi-robot me-2"></i>
               AI Response Suggestion
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -338,7 +338,7 @@
               class="btn btn-primary"
               @click="useAISuggestion"
             >
-              <i class="bi bi-reply me-1"></i>
+              <i class="bi-reply me-1"></i>
               Use This Response
             </button>
           </div>

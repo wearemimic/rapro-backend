@@ -18,6 +18,16 @@ class Command(BaseCommand):
             advisor = User.objects.get(email=email)
             self.stdout.write(self.style.WARNING(f"User {email} already exists"))
 
+        # Always ensure this user is a super admin
+        advisor.is_platform_admin = True
+        advisor.is_staff = True
+        advisor.is_superuser = True
+        advisor.admin_role = 'super_admin'
+        advisor.subscription_status = 'active'
+        advisor.subscription_plan = 'monthly'
+        advisor.save()
+        self.stdout.write(self.style.SUCCESS(f"User {email} configured as super admin with active subscription"))
+
         # Seed clients for this advisor
         from core.models import Client, Scenario, IncomeSource
         client_data = [

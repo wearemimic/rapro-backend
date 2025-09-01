@@ -34,32 +34,35 @@
               </div>
               <!-- End Collapse -->
 
-              <!-- CRM Section -->
-              <div class="nav-item" v-if="hasCRMAccess">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuCRMMenu" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuCRMMenu'" 
-                   :title="isCollapsed ? 'CRM' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuCRMMenu">
-                  <i class="bi-envelope nav-icon"></i>
-                  <span class="nav-link-title" v-show="!isCollapsed">CRM</span>
+              <!-- Communication Center -->
+              <div class="nav-item">
+                <router-link class="nav-link" to="/communication-center" :title="isCollapsed ? 'Communication Center' : ''" role="button">
+                  <i class="bi-inbox nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">Communication Center</span>
                   <span v-if="totalUnreadCommunications > 0" class="badge bg-primary rounded-pill ms-1" v-show="!isCollapsed">{{ totalUnreadCommunications }}</span>
-                </a>
-
-                <div id="navbarVerticalMenuCRMMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/communication-center">
-                    <i class="bi-inbox nav-icon me-2"></i>Communication Center
-                    <span v-if="totalUnreadCommunications > 0" class="badge bg-primary rounded-pill ms-1">{{ totalUnreadCommunications }}</span>
-                  </a>
-                  <a class="nav-link" href="/tasks">
-                    <i class="bi-check-square nav-icon me-2"></i>Task Management
-                    <span v-if="pendingTasksCount > 0" class="badge bg-warning rounded-pill ms-1">{{ pendingTasksCount }}</span>
-                  </a>
-                  <a class="nav-link" href="/calendar">
-                    <i class="bi-calendar-event nav-icon me-2"></i>Calendar
-                    <span v-if="todayEventsCount > 0" class="badge bg-info rounded-pill ms-1">{{ todayEventsCount }}</span>
-                  </a>
-                </div>
+                </router-link>
               </div>
-              <!-- End CRM Section -->
+              <!-- End Communication Center -->
+
+              <!-- Task Management -->
+              <div class="nav-item">
+                <router-link class="nav-link" to="/tasks" :title="isCollapsed ? 'Task Management' : ''" role="button">
+                  <i class="bi-check-square nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">Task Management</span>
+                  <span v-if="pendingTasksCount > 0" class="badge bg-warning rounded-pill ms-1" v-show="!isCollapsed">{{ pendingTasksCount }}</span>
+                </router-link>
+              </div>
+              <!-- End Task Management -->
+
+              <!-- Calendar -->
+              <div class="nav-item">
+                <router-link class="nav-link" to="/calendar" :title="isCollapsed ? 'Calendar' : ''" role="button">
+                  <i class="bi-calendar-event nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">Calendar</span>
+                  <span v-if="todayEventsCount > 0" class="badge bg-info rounded-pill ms-1" v-show="!isCollapsed">{{ todayEventsCount }}</span>
+                </router-link>
+              </div>
+              <!-- End Calendar -->
 
               <!-- Document Management -->
               <div class="nav-item">
@@ -71,19 +74,44 @@
               </div>
               <!-- End Document Management -->
 
-              <!-- Collapse -->
+              <!-- Report Center -->
               <div class="nav-item">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuIntegrationsMenu" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuIntegrationsMenu'" 
-                   :title="isCollapsed ? 'Integrations' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuIntegrationsMenu">
-                  <i class="bi-plug nav-icon"></i>
-                  <span class="nav-link-title" v-show="!isCollapsed">Integrations</span>
+                <router-link class="nav-link" to="/report-center" :title="isCollapsed ? 'Report Center' : ''" role="button">
+                  <i class="bi-file-earmark-slides nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">Report Center</span>
+                  <span class="badge bg-primary rounded-pill ms-1" v-show="!isCollapsed">AI</span>
+                </router-link>
+              </div>
+              <!-- End Report Center -->
+
+              <!-- Compliance Section -->
+              <div class="nav-item">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuComplianceMenu" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuComplianceMenu'" 
+                   :title="isCollapsed ? 'FINRA Compliance' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuComplianceMenu">
+                  <i class="bi-shield-check nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">FINRA Compliance</span>
+                  <span class="badge bg-success rounded-pill ms-1" v-show="!isCollapsed">✓</span>
                 </a>
 
-                <div id="navbarVerticalMenuIntegrationsMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link" href="/integrations/crm">CRM</a>
+                <div id="navbarVerticalMenuComplianceMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <router-link class="nav-link" to="/compliance">
+                    <i class="bi-speedometer2 nav-icon me-2"></i>Compliance Dashboard
+                  </router-link>
+                  <router-link class="nav-link" to="/compliance/audit-trail">
+                    <i class="bi-list-check nav-icon me-2"></i>Audit Trail
+                    <span v-if="complianceAlerts > 0" class="badge bg-warning rounded-pill ms-1">{{ complianceAlerts }}</span>
+                  </router-link>
+                  <router-link class="nav-link" to="/compliance/retention">
+                    <i class="bi-clock-history nav-icon me-2"></i>Document Retention
+                  </router-link>
+                  <router-link class="nav-link" to="/compliance/reports">
+                    <i class="bi-file-earmark-text nav-icon me-2"></i>Compliance Reports
+                  </router-link>
                 </div>
               </div>
+              <!-- End Compliance Section -->
+
               
               <!-- Client navigation section - only shown when in client context -->
               <div class="nav-item" v-if="isClientRoute">
@@ -158,6 +186,48 @@
                   </div>
               </div>
               <!-- End Collapse -->
+              
+              <!-- Admin Section -->
+              <div class="nav-item" v-if="isAdminUser">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuAdminMenu" role="button" 
+                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuAdminMenu'" 
+                   :title="isCollapsed ? 'Admin Panel' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuAdminMenu">
+                  <i class="bi-gear nav-icon"></i>
+                  <span class="nav-link-title" v-show="!isCollapsed">Admin Panel</span>
+                  <span v-if="adminRole === 'super_admin'" class="badge bg-danger rounded-pill ms-1" v-show="!isCollapsed">Super</span>
+                </a>
+
+                <div id="navbarVerticalMenuAdminMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                  <router-link class="nav-link" to="/admin/dashboard">
+                    <i class="bi-speedometer2 nav-icon me-2"></i>Dashboard
+                  </router-link>
+                  <router-link v-if="canAccessSection('user_management')" class="nav-link" to="/admin/users">
+                    <i class="bi-people nav-icon me-2"></i>User Management
+                  </router-link>
+                  <router-link v-if="canAccessSection('analytics')" class="nav-link" to="/admin/analytics">
+                    <i class="bi-bar-chart nav-icon me-2"></i>Analytics
+                  </router-link>
+                  <router-link v-if="canAccessSection('billing')" class="nav-link" to="/admin/billing">
+                    <i class="bi-credit-card nav-icon me-2"></i>Billing
+                  </router-link>
+                  <router-link v-if="canAccessSection('system_monitoring')" class="nav-link" to="/admin/monitoring">
+                    <i class="bi-cpu nav-icon me-2"></i>System Monitoring
+                  </router-link>
+                  <router-link v-if="canAccessSection('system_monitoring')" class="nav-link" to="/admin/performance">
+                    <i class="bi-speedometer2 nav-icon me-2"></i>Performance
+                  </router-link>
+                  <router-link v-if="canAccessSection('system_monitoring')" class="nav-link" to="/admin/alerts">
+                    <i class="bi-bell nav-icon me-2"></i>Alert Management
+                  </router-link>
+                  <router-link v-if="canAccessSection('support_tools')" class="nav-link" to="/admin/support">
+                    <i class="bi-life-preserver nav-icon me-2"></i>Support Tools
+                  </router-link>
+                  <router-link v-if="canAccessSection('support_tools')" class="nav-link" to="/admin/support/tickets">
+                    <i class="bi-ticket nav-icon me-2"></i>Support Tickets
+                  </router-link>
+                </div>
+              </div>
+              <!-- End Admin Section -->
             </div>
             <!-- End Collapse -->
 
@@ -198,6 +268,7 @@ export default {
       totalUnreadCommunications: 0,
       pendingTasksCount: 0,
       todayEventsCount: 0,
+      complianceAlerts: 0,
       communicationStore: null,
       taskStore: null,
       calendarStore: null
@@ -213,6 +284,31 @@ export default {
       } catch (error) {
         // Fallback to direct function call which will check localStorage
         return hasCRMAccess(null);
+      }
+    },
+    
+    // Admin-related computed properties
+    isAdminUser() {
+      try {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        return authStore.user?.is_admin_user || false;
+      } catch (error) {
+        // Fallback to localStorage
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        return user.is_admin_user || false;
+      }
+    },
+    
+    adminRole() {
+      try {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        return authStore.user?.admin_role || '';
+      } catch (error) {
+        // Fallback to localStorage
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        return user.admin_role || '';
       }
     }
   },
@@ -451,6 +547,26 @@ export default {
         console.error('Error loading today events count:', error);
         this.todayEventsCount = 0;
       }
+    },
+    
+    // Admin access method
+    canAccessSection(section) {
+      // Super admin can access everything
+      if (this.adminRole === 'super_admin') {
+        return true;
+      }
+      
+      // Define section permissions mapping
+      const sectionPermissions = {
+        'user_management': ['admin', 'support'],
+        'billing': ['admin', 'billing'], 
+        'analytics': ['admin', 'analyst'],
+        'system_monitoring': ['admin'],
+        'support_tools': ['admin', 'support'],
+      };
+      
+      const allowedRoles = sectionPermissions[section] || [];
+      return allowedRoles.includes(this.adminRole);
     }
   }
 };

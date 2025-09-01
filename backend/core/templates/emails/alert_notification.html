@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Alert</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header.critical {
+            border-bottom: 3px solid #dc3545;
+        }
+        .header.high {
+            border-bottom: 3px solid #fd7e14;
+        }
+        .header.medium {
+            border-bottom: 3px solid #ffc107;
+        }
+        .header.low {
+            border-bottom: 3px solid #28a745;
+        }
+        .header.info {
+            border-bottom: 3px solid #17a2b8;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .header.critical h1 { color: #dc3545; }
+        .header.high h1 { color: #fd7e14; }
+        .header.medium h1 { color: #ffc107; }
+        .header.low h1 { color: #28a745; }
+        .header.info h1 { color: #17a2b8; }
+        .severity-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 10px 0;
+        }
+        .severity-critical { background: #dc3545; color: white; }
+        .severity-high { background: #fd7e14; color: white; }
+        .severity-medium { background: #ffc107; color: #212529; }
+        .severity-low { background: #28a745; color: white; }
+        .severity-info { background: #17a2b8; color: white; }
+        .alert-message {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .alert-details {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .alert-details h4 {
+            margin-top: 0;
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details-table td {
+            padding: 8px 0;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        .details-table td:first-child {
+            font-weight: 500;
+            width: 150px;
+            color: #495057;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .footer {
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .timestamp {
+            font-size: 14px;
+            color: #6c757d;
+            margin: 10px 0;
+        }
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header {{ severity }}">
+            <h1>System Alert</h1>
+            <span class="severity-badge severity-{{ severity }}">{{ severity|upper }} PRIORITY</span>
+            <div class="timestamp">{{ timestamp|date:"F j, Y g:i A T" }}</div>
+        </div>
+
+        <div class="alert-message">
+            {{ notification.alert_message }}
+        </div>
+
+        <div class="alert-details">
+            <h4>Alert Rule Details</h4>
+            <table class="details-table">
+                <tr>
+                    <td>Rule Name:</td>
+                    <td><strong>{{ alert_rule.name }}</strong></td>
+                </tr>
+                <tr>
+                    <td>Alert Type:</td>
+                    <td>{{ alert_rule.get_alert_type_display }}</td>
+                </tr>
+                {% if alert_rule.description %}
+                <tr>
+                    <td>Description:</td>
+                    <td>{{ alert_rule.description }}</td>
+                </tr>
+                {% endif %}
+                {% if alert_rule.threshold_value %}
+                <tr>
+                    <td>Threshold:</td>
+                    <td>{{ alert_rule.comparison_operator }} {{ alert_rule.threshold_value }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>Check Interval:</td>
+                    <td>Every {{ alert_rule.check_interval_minutes }} minutes</td>
+                </tr>
+            </table>
+        </div>
+
+        {% if alert_data %}
+        <div class="alert-details">
+            <h4>Alert Data</h4>
+            <table class="details-table">
+                {% for key, value in alert_data.items %}
+                    {% if key != 'test' %}
+                    <tr>
+                        <td>{{ key|title }}:</td>
+                        <td>
+                            {% if key == 'current_value' or key == 'metric_value' %}
+                                <span class="metric-value">{{ value }}</span>
+                            {% else %}
+                                {{ value }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
+        {% if alert_rule.alert_type == 'metric_threshold' and alert_data.current_value and alert_rule.threshold_value %}
+        <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 15px; margin: 20px 0;">
+            <strong>Threshold Breach:</strong>
+            Current value <span class="metric-value">{{ alert_data.current_value }}</span>
+            is {{ alert_rule.comparison_operator }} threshold of {{ alert_rule.threshold_value }}
+        </div>
+        {% endif %}
+
+        <div style="margin: 30px 0;">
+            <a href="{{ site_url }}/admin/dashboard" class="btn">View Admin Dashboard</a>
+            {% if alert_rule.alert_type == 'system_health' or alert_rule.alert_type == 'metric_threshold' %}
+                <a href="{{ site_url }}/admin/monitoring" class="btn" style="margin-left: 10px;">System Monitoring</a>
+            {% endif %}
+        </div>
+
+        {% if alert_rule.trigger_count > 1 %}
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 20px 0;">
+            <strong>Note:</strong> This alert has been triggered {{ alert_rule.trigger_count }} times. 
+            {% if alert_rule.last_triggered %}
+                Last triggered: {{ alert_rule.last_triggered|date:"F j, Y g:i A" }}
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <p>
+                <strong>RetirementAdvisorPro System Monitoring</strong><br>
+                This is an automated alert from your system monitoring. 
+                {% if alert_rule.cooldown_minutes > 0 %}
+                    <br>Additional alerts for this rule will be suppressed for {{ alert_rule.cooldown_minutes }} minutes.
+                {% endif %}
+            </p>
+            <p>
+                To modify this alert or adjust notification settings, visit the 
+                <a href="{{ site_url }}/admin/alerts">alert management dashboard</a>.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
