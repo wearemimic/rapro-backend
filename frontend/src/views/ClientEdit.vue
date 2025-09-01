@@ -27,7 +27,16 @@
               <div class="row">
                 <div class="col-md-4 mb-3">
                   <label>Birthdate</label>
-                  <input v-model="form.birthdate" type="date" class="form-control" required>
+                  <input 
+                    v-model="form.birthdate" 
+                    type="date" 
+                    class="form-control" 
+                    required 
+                    :min="minBirthdate"
+                    :max="maxBirthdate"
+                    @blur="validatePrimaryBirthdate"
+                  >
+                  <div v-if="primaryBirthdateError" class="text-danger mt-1">{{ primaryBirthdateError }}</div>
                 </div>
                 <div class="col-md-4 mb-3">
                   <label>Gender</label>
@@ -141,6 +150,7 @@ export default {
         apply_standard_deduction: true
       },
       showSpouseFields: false,
+      primaryBirthdateError: "",
       spouseBirthdateError: "",
       minBirthdate: "1900-01-01",
       maxBirthdate: new Date().toISOString().split('T')[0]
@@ -152,6 +162,35 @@ export default {
   methods: {
     updateSpouseRequirement() {
       this.showSpouseFields = this.form.tax_status !== "Single";
+    },
+    validatePrimaryBirthdate() {
+      this.primaryBirthdateError = "";
+      
+      if (!this.form.birthdate) {
+        return;
+      }
+      
+      const birthDate = new Date(this.form.birthdate);
+      const minDate = new Date(this.minBirthdate);
+      const maxDate = new Date(this.maxBirthdate);
+      
+      if (isNaN(birthDate.getTime())) {
+        this.primaryBirthdateError = "Please enter a valid date";
+        return;
+      }
+      
+      if (birthDate < minDate || birthDate > maxDate) {
+        this.primaryBirthdateError = `Birthdate must be between ${minDate.getFullYear()} and ${maxDate.getFullYear()}`;
+        return;
+      }
+      
+      // Additional check for reasonable age range (18-120 years old)
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      if (age < 18 || age > 120) {
+        this.primaryBirthdateError = `Age (${age}) should be between 18 and 120 years`;
+        return;
+      }
     },
     validateSpouseBirthdate() {
       this.spouseBirthdateError = "";
@@ -204,6 +243,13 @@ export default {
       }
     },
     async submitForm() {
+      // Validate primary birthdate before submission
+      this.validatePrimaryBirthdate();
+      if (this.primaryBirthdateError) {
+        alert("Please fix the primary birthdate error before submitting.");
+        return;
+      }
+      
       // Validate spouse birthdate before submission
       if (this.showSpouseFields) {
         this.validateSpouseBirthdate();

@@ -148,7 +148,13 @@
                                 </div>
                                 <div class="flex-grow-1 ms-3">
                                   <h6 class="mb-1">Federal and State Taxes</h6>
-                                  <span class="d-block fw-bold text-primary fs-2">{{ formatCurrency(totalFederalTaxes) }}</span>
+                                  <div v-if="isCalculating" class="d-flex align-items-center">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                      <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="text-muted">Calculating...</span>
+                                  </div>
+                                  <span v-else class="d-block fw-bold text-primary fs-2">{{ formatCurrency(totalFederalTaxes) }}</span>
                                 </div>
                               </div>
                             </div>
@@ -164,7 +170,13 @@
                                 </div>
                                 <div class="flex-grow-1 ms-3">
                                   <h6 class="mb-1">Medicare Costs</h6>
-                                  <span class="d-block fw-bold text-primary fs-2">{{ formatCurrency(totalMedicareCosts) }}</span>
+                                  <div v-if="isCalculating" class="d-flex align-items-center">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                      <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="text-muted">Calculating...</span>
+                                  </div>
+                                  <span v-else class="d-block fw-bold text-primary fs-2">{{ formatCurrency(totalMedicareCosts) }}</span>
                                 </div>
                               </div>
                             </div>
@@ -180,7 +192,13 @@
                                 </div>
                                 <div class="flex-grow-1 ms-3">
                                   <h6 class="mb-1">Medicare Out Of Pocket</h6>
-                                  <span class="d-block fw-bold text-primary fs-2">{{ formatCurrency(medicareOutOfPocket) }}</span>
+                                  <div v-if="isCalculating" class="d-flex align-items-center">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                      <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="text-muted">Calculating...</span>
+                                  </div>
+                                  <span v-else class="d-block fw-bold text-primary fs-2">{{ formatCurrency(medicareOutOfPocket) }}</span>
                                 </div>
                               </div>
                             </div>
@@ -196,7 +214,13 @@
                                 </div>
                                 <div class="flex-grow-1 ms-3">
                                   <h6 class="mb-1">IRMAA Status</h6>
-                                  <div :style="{width: '100%', height: '20px', backgroundColor: irmaaColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', color: 'white', borderRadius: '3px'}">
+                                  <div v-if="isCalculating" class="d-flex align-items-center">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                      <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="text-muted">Calculating...</span>
+                                  </div>
+                                  <div v-else :style="{width: '100%', height: '20px', backgroundColor: irmaaColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', color: 'white', borderRadius: '3px'}">
                                     {{ irmaaPercentage }}%
                                   </div>
                                 </div>
@@ -263,7 +287,13 @@
                     <div class="col-lg-8 col-md-7 mb-3 mb-lg-0">
                       <div class="card h-100">
                         <div class="card-body">
-                          <div class="financial-chart-container">
+                          <div v-if="isCalculating" class="d-flex flex-column align-items-center justify-content-center" style="height: 300px;">
+                            <div class="spinner-border text-primary mb-2" role="status">
+                              <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-muted">Loading chart data...</span>
+                          </div>
+                          <div v-else class="financial-chart-container">
                             <Graph 
                               :data="overviewChartData" 
                               :options="overviewChartOptions"
@@ -279,7 +309,13 @@
                       <div class="card h-100 d-flex flex-column justify-content-center align-items-center">
                         <div class="card-body w-100">
                           <h5 class="mb-4 text-center">Taxes & Medicare as % of Gross Income</h5>
-                          <div class="circles-chart d-flex justify-content-center" style="padding-top:20px; min-height: 180px;">
+                          <div v-if="isCalculating" class="d-flex flex-column align-items-center justify-content-center" style="min-height: 180px; padding-top: 20px;">
+                            <div class="spinner-border text-primary mb-2" role="status">
+                              <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-muted">Loading chart...</span>
+                          </div>
+                          <div v-else class="circles-chart d-flex justify-content-center" style="padding-top:20px; min-height: 180px;">
                             <div class="js-circle" id="circle-overview"></div>
                           </div>
                         </div>
@@ -299,7 +335,7 @@
               <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
-              <SocialSecurityOverviewTab :scenario="scenario" :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
+              <SocialSecurityOverviewTab :scenario="scenario" :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" :is-calculating="isCalculating" />
             </div>
             <div v-show="activeTab === 'socialSecurity2'" class="tab-pane active" style="margin-top:50px;">
               <SocialSecurity2Tab :key="`ss2-${scenario?.id}-${activeTab}`" :scenario="scenario" :scenario-results="scenarioResults" :client="client" @update-scenario="handleScenarioUpdate" />
@@ -1209,7 +1245,7 @@ export default {
         // Start async calculation
         const response = await axios.post(`http://localhost:8000/api/scenarios/${scenarioId}/calculate-async/`, {}, { 
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
           }
         });
@@ -1237,7 +1273,7 @@ export default {
       try {
         const response = await axios.get(`http://localhost:8000/api/tasks/${this.currentTaskId}/status/`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
           }
         });
@@ -1300,7 +1336,7 @@ export default {
       try {
         await axios.delete(`http://localhost:8000/api/tasks/${this.currentTaskId}/cancel/`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
           }
         });
