@@ -7,48 +7,80 @@
             <div class="row">
               <div class="col-lg mb-3 mb-lg-0">
                 
-                <h1 class="page-header-title">
-                  {{ scenario ? scenario.name : 'Scenario Detail' }} - 
-                  <span v-if="activeTab === 'overview'">Scenario Overview</span>
-                  <span v-if="activeTab === 'financial'">Financial Overview</span>
-                  <span v-if="activeTab === 'socialSecurity'">Social Security Overview</span>
-                  <span v-if="activeTab === 'socialSecurity2'">Social Security 2</span>
-                  <span v-if="activeTab === 'medicare'">Medicare Overview</span>
-                  <span v-if="activeTab === 'income'">Income</span>
-                  <span v-if="activeTab === 'rothConversion'">Roth Conversion</span>
-                  <span v-if="activeTab === 'worksheets'">Social Security Worksheets</span>
-                  <span v-if="activeTab === 'nextSteps'">Next Steps</span>
-                </h1>
-
-                <div class="row align-items-center">
-                  <div class="col-auto">
-                    <span>Client:</span>
-                    <router-link v-if="client" :to="{ name: 'ClientDetail', params: { id: client.id } }">
-                      {{ formatClientName(client) }}
-                    </router-link>
-                    <span v-else>Loading...</span>
-                  </div>
-                  <!-- End Col -->
-
-                  <div class="col-auto">
-                    <div class="row align-items-center g-0">
-                      
-                      <!-- End Flatpickr -->
-                    </div>
-                  </div>
-
-                  <!-- End Col -->
+                <div class="d-flex align-items-center">
+                  <span>Client:</span>
+                  <router-link v-if="client" :to="{ name: 'ClientDetail', params: { id: client.id } }" class="ms-2">
+                    {{ formatClientName(client) }}
+                  </router-link>
+                  <span v-else class="ms-2">Loading...</span>
                 </div>
+
                 <!-- End Row -->
               </div>
               <!-- End Col -->
 
               <div class="col-lg-auto d-flex align-items-center">
+                <!-- Navigation Dropdowns -->
                 <div class="d-flex align-items-center me-3">
-                  <label for="scenarioSelect" class="form-label mb-0 me-2" style="white-space: nowrap;">Switch Scenario</label>
-                  <select id="scenarioSelect" class="form-select" v-model="selectedScenarioId" @change="onScenarioChange">
-                    <option v-for="s in scenarios" :value="s.id" :key="s.id">{{ s.name }}</option>
-                  </select>
+                  <span class="me-2 fw-semibold">Choose</span>
+                  <!-- Scenario Switcher Dropdown -->
+                  <div class="dropdown me-2">
+                    <button class="btn btn-outline-primary dropdown-toggle" type="button" id="scenarioSwitchDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                      {{ scenario ? scenario.name : 'Select Scenario' }}
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="scenarioSwitchDropdown">
+                      <li v-for="s in scenarios" :key="s.id">
+                        <a class="dropdown-item" :class="{ active: selectedScenarioId === s.id }" href="#" @click.prevent="switchToScenario(s.id)">
+                          <i class="bi-graph-up me-2"></i>{{ s.name }}
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                  <span class="me-2 text-muted">-</span>
+                  <!-- Page Navigation Dropdown -->
+                  <div class="dropdown">
+                    <button class="btn btn-outline-primary dropdown-toggle" type="button" id="scenarioNavDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                      <span v-if="activeTab === 'overview'">Scenario Overview</span>
+                      <span v-else-if="activeTab === 'financial'">Financial Overview</span>
+                      <span v-else-if="activeTab === 'socialSecurity'">Social Security Overview</span>
+                      <span v-else-if="activeTab === 'socialSecurity2'">Social Security 2</span>
+                      <span v-else-if="activeTab === 'medicare'">Medicare Overview</span>
+                      <span v-else-if="activeTab === 'income'">Income</span>
+                      <span v-else-if="activeTab === 'rothConversion'">Roth Conversion</span>
+                      <span v-else-if="activeTab === 'worksheets'">Social Security Worksheets</span>
+                      <span v-else-if="activeTab === 'nextSteps'">Next Steps</span>
+                      <span v-else>Select View</span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="scenarioNavDropdown">
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'overview' }" href="#" @click.prevent="navigateToTab('overview')">
+                        <i class="bi-graph-up me-2"></i>Scenario Overview
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'financial' }" href="#" @click.prevent="navigateToTab('financial')">
+                        <i class="bi-bar-chart me-2"></i>Financial Overview
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'socialSecurity' }" href="#" @click.prevent="navigateToTab('socialSecurity')">
+                        <i class="bi-shield-check me-2"></i>Social Security Overview
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'socialSecurity2' }" href="#" @click.prevent="navigateToTab('socialSecurity2')">
+                        <i class="bi-shield me-2"></i>Social Security 2
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'medicare' }" href="#" @click.prevent="navigateToTab('medicare')">
+                        <i class="bi-hospital me-2"></i>Medicare Overview
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'income' }" href="#" @click.prevent="navigateToTab('income')">
+                        <i class="bi-currency-dollar me-2"></i>Income
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'rothConversion' }" href="#" @click.prevent="navigateToTab('rothConversion')">
+                        <i class="bi-arrow-repeat me-2"></i>Roth Conversion
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'worksheets' }" href="#" @click.prevent="navigateToTab('worksheets')">
+                        <i class="bi-table me-2"></i>Social Security Worksheets
+                      </a></li>
+                      <li><a class="dropdown-item" :class="{ active: activeTab === 'nextSteps' }" href="#" @click.prevent="navigateToTab('nextSteps')">
+                        <i class="bi-list-check me-2"></i>Next Steps
+                      </a></li>
+                    </ul>
+                  </div>
                 </div>
                 <!-- Actions Dropdown -->
                 <div class="dropdown">
@@ -401,43 +433,17 @@ export default {
       assetDetails: [],
     };
   },
-  mounted() {
+  async mounted() {
     // Check if we should set a specific tab from route query params
     if (this.$route.query.tab) {
       this.activeTab = this.$route.query.tab;
     }
-    // Fetch the client and scenarios, select scenario by id
-    const clientId = this.$route.params.id;
-    axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers })
-      .then(response => {
-        this.client = response.data;
-        this.scenarios = response.data.scenarios || [];
-        const scenarioId = this.$route.params.scenarioid;
-        this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
-        console.log('DEBUG: scenario.id:', this.scenario?.id, 'scenario.mortality_age:', this.scenario?.mortality_age, typeof this.scenario?.mortality_age);
-        this.selectedScenarioId = this.scenario?.id || null;
-        
-        // Set client and scenario IDs in local storage for sidebar access
-        if (this.scenario?.id && clientId) {
-          localStorage.setItem('currentClientId', clientId);
-          localStorage.setItem('currentScenarioId', this.scenario.id);
-        }
-        
-        this.initPlugins();
-        this.initializeCircles();
-        this.fetchScenarioData();
-        this.fetchAssetDetails();
-        // Load detailed scenario data with income_sources after scenario is set
-        if (this.scenario?.id) {
-          this.fetchScenarioDetails();
-        }
-        console.log('Client Tax Status:', this.client?.tax_status);
-        console.log('Scenarios:', this.scenarios);
-        console.log('Selected Scenario:', this.scenario);
-      })
-      .catch(error => {
-        console.error('Error loading client and scenario:', error);
-      });
+    
+    this.initPlugins();
+    this.initializeCircles();
+    
+    // Load all scenario data in one batch to prevent rate limiting
+    await this.loadAllScenarioData();
 
     // Add event listener for clicks outside the dropdown
     document.addEventListener('click', this.handleClickOutside);
@@ -454,6 +460,68 @@ export default {
   },
   methods: {
     ...mapActions(['fetchScenarioData']),
+    
+    // Batch load all scenario data to prevent rate limiting
+    async loadAllScenarioData() {
+      const clientId = this.$route.params.id;
+      const scenarioId = this.$route.params.scenarioid;
+      
+      try {
+        console.log('Loading client and scenario data...');
+        
+        // First, load client data to get scenarios
+        const clientResponse = await axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers });
+        this.client = clientResponse.data;
+        this.scenarios = clientResponse.data.scenarios || [];
+        this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
+        
+        if (!this.scenario) {
+          console.error('Scenario not found');
+          return;
+        }
+        
+        this.selectedScenarioId = this.scenario.id;
+        
+        // Set localStorage for sidebar access
+        localStorage.setItem('currentClientId', clientId);
+        localStorage.setItem('currentScenarioId', this.scenario.id);
+        
+        console.log('Client Tax Status:', this.client?.tax_status);
+        console.log('Selected Scenario:', this.scenario);
+        
+        // Now batch load scenario-specific data with a small delay to prevent rate limiting
+        await this.batchLoadScenarioDetails();
+        
+      } catch (error) {
+        console.error('Error loading client and scenario:', error);
+      }
+    },
+    
+    async batchLoadScenarioDetails() {
+      const scenarioId = this.scenario?.id;
+      if (!scenarioId) return;
+      
+      try {
+        console.log('Batch loading scenario details with delay...');
+        
+        // Load scenario calculation data first
+        this.fetchScenarioData();
+        
+        // Add small delays between API calls to prevent rate limiting burst
+        setTimeout(() => {
+          this.fetchAssetDetails();
+        }, 100);
+        
+        setTimeout(() => {
+          if (this.scenario?.id) {
+            this.fetchScenarioDetails();
+          }
+        }, 200);
+        
+      } catch (error) {
+        console.error('Error batch loading scenario details:', error);
+      }
+    },
     scrollToTop() {
       console.log('Forcing scroll to top');
       // The main scrollable container in the layout is .main-content
@@ -467,6 +535,28 @@ export default {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+    },
+    navigateToTab(tab) {
+      // Navigate to the selected tab by updating the URL
+      this.$router.push({
+        name: 'ScenarioDetail',
+        params: { 
+          id: this.$route.params.id, 
+          scenarioid: this.$route.params.scenarioid 
+        },
+        query: { tab: tab }
+      });
+    },
+    switchToScenario(scenarioId) {
+      // Switch to a different scenario while maintaining current tab
+      this.$router.push({
+        name: 'ScenarioDetail',
+        params: { 
+          id: this.$route.params.id, 
+          scenarioid: scenarioId 
+        },
+        query: { tab: this.activeTab }
+      });
     },
     formatCurrency(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -732,10 +822,6 @@ export default {
             console.error('Error loading scenarios for client:', error);
           });
       }
-    },
-    onScenarioChange() {
-      // Navigate using both clientId and scenarioid to match new route structure
-      this.$router.push({ name: 'ScenarioDetail', params: { clientId: this.$route.params.id, scenarioid: this.selectedScenarioId } });
     },
     fetchScenarioData(useSync = false) {
       // Use async calculation by default, sync as fallback
@@ -1495,11 +1581,10 @@ export default {
         const scenarioId = parseInt(newVal);
         this.scenario = this.scenarios.find(s => s.id === scenarioId);
         this.selectedScenarioId = scenarioId;
-        this.fetchScenarioData();
-        this.fetchAssetDetails();
-        // Only fetch detailed scenario data if scenarios are loaded
+        
+        // Use batched loading to prevent rate limiting when switching scenarios
         if (this.scenarios.length > 0 && this.scenario?.id) {
-          this.fetchScenarioDetails();
+          this.batchLoadScenarioDetails();
         }
       }
     },
@@ -1559,5 +1644,67 @@ export default {
   text-align: right;
   flex: 1;
   margin-left: 15px;
+}
+
+/* Scenario Navigation Dropdown Styles */
+#scenarioNavDropdown, #scenarioSwitchDropdown {
+  min-width: 160px;
+}
+
+.dropdown-menu {
+  min-width: 220px;
+}
+
+.dropdown-item.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.dropdown-item i {
+  width: 16px;
+  text-align: center;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 991px) {
+  .col-lg-auto {
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .d-flex.align-items-center {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .d-flex.align-items-center > span:first-child {
+    margin-bottom: 0.5rem;
+  }
+  
+  .dropdown {
+    margin-top: 0.25rem;
+    width: 100%;
+    margin-right: 0;
+  }
+  
+  .text-muted {
+    display: none; /* Hide dash on mobile */
+  }
+  
+  #scenarioNavDropdown, #scenarioSwitchDropdown {
+    width: 100%;
+  }
+  
+  .col-lg-auto .d-flex {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  
+  .col-lg-auto .d-flex .dropdown {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
 }
 </style>
