@@ -27,10 +27,13 @@ services:
     working_dir: /app
     depends_on:
       - db
+      - redis
     env_file:
       - ../backend/.env
     environment:
       - PORT=${BACKEND_PORT:-8000}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     entrypoint: /bin/sh
     command: >
       -c "./wait-for-it.sh db:5432 -- 

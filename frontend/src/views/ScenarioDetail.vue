@@ -364,6 +364,12 @@ export default {
       client: null,
       scenarioResults: [],
       activeTab: this.$route.query.tab || 'overview', // Use route query param or default to overview
+      // Async calculation tracking
+      isCalculating: false,
+      calculationProgress: 0,
+      calculationMessage: '',
+      currentTaskId: null,
+      calculationStartTime: null,
       partBInflationRate: 7.42,
       partDInflationRate: 6.73,
       breakevenChartInstance: null,
@@ -731,7 +737,15 @@ export default {
       // Navigate using both clientId and scenarioid to match new route structure
       this.$router.push({ name: 'ScenarioDetail', params: { clientId: this.$route.params.id, scenarioid: this.selectedScenarioId } });
     },
-    fetchScenarioData() {
+    fetchScenarioData(useSync = false) {
+      // Use async calculation by default, sync as fallback
+      if (!useSync) {
+        console.log('🎯 SCENARIO_DEBUG: Starting async calculation...');
+        this.startAsyncCalculation();
+        return;
+      }
+      
+      // Synchronous calculation (fallback)
       const scenarioId = this.$route.params.scenarioid;
       
       // Clean up existing charts when switching scenarios
@@ -1089,6 +1103,145 @@ export default {
         alert('An error occurred. Please try again.');
       }
     },
+    
+    // New async calculation methods
+    async startAsyncCalculation() {
+      const scenarioId = this.$route.params.scenarioid;
+      
+      try {
+        this.isCalculating = true;
+        this.calculationProgress = 0;
+        this.calculationMessage = 'Starting calculation...';
+        this.calculationStartTime = Date.now();
+        
+        // Clean up existing charts when starting new calculation
+        if (this.chartInstance) {
+          this.chartInstance.destroy();
+          this.chartInstance = null;
+        }
+        
+        // Start async calculation
+        const response = await axios.post(`http://localhost:8000/api/scenarios/${scenarioId}/calculate-async/`, {}, { 
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        this.currentTaskId = response.data.task_id;
+        this.calculationMessage = response.data.message;
+        
+        // Start polling for progress
+        this.pollTaskProgress();
+        
+      } catch (error) {
+        console.error('Error starting async calculation:', error);
+        this.isCalculating = false;
+        this.calculationMessage = 'Failed to start calculation';
+        
+        // Fallback to synchronous calculation
+        console.log('Falling back to synchronous calculation...');
+        this.fetchScenarioData(true);
+      }
+    },
+    
+    async pollTaskProgress() {
+      if (!this.currentTaskId) return;
+      
+      try {
+        const response = await axios.get(`http://localhost:8000/api/tasks/${this.currentTaskId}/status/`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        const taskData = response.data;
+        this.calculationProgress = taskData.progress || 0;
+        this.calculationMessage = taskData.message || 'Processing...';
+        
+        if (taskData.status === 'SUCCESS') {
+          // Calculation completed successfully
+          this.scenarioResults = taskData.results || [];
+          this.isCalculating = false;
+          this.calculationProgress = 100;
+          this.calculationMessage = 'Calculation completed successfully!';
+          
+          // Re-initialize chart with new data
+          this.initializeChartJS();
+          
+          // Calculate and update the percentage metrics
+          this.updateScenarioPercentages();
+          
+          console.log('🎯 ASYNC_DEBUG: Calculation completed, results:', this.scenarioResults.length);
+          
+        } else if (taskData.status === 'FAILURE') {
+          // Calculation failed
+          this.isCalculating = false;
+          this.calculationMessage = `Calculation failed: ${taskData.error || 'Unknown error'}`;
+          console.error('Async calculation failed:', taskData.error);
+          
+          // Fallback to synchronous calculation
+          console.log('Falling back to synchronous calculation...');
+          this.fetchScenarioData(true);
+          
+        } else if (taskData.status === 'PROGRESS') {
+          // Still in progress, continue polling
+          setTimeout(() => {
+            this.pollTaskProgress();
+          }, 1000); // Poll every second
+          
+        } else {
+          // PENDING or other states, continue polling
+          setTimeout(() => {
+            this.pollTaskProgress();
+          }, 2000); // Poll every 2 seconds for pending tasks
+        }
+        
+      } catch (error) {
+        console.error('Error polling task progress:', error);
+        this.isCalculating = false;
+        this.calculationMessage = 'Error checking calculation progress';
+        
+        // Fallback to synchronous calculation
+        this.fetchScenarioData(true);
+      }
+    },
+    
+    async cancelCalculation() {
+      if (!this.currentTaskId) return;
+      
+      try {
+        await axios.delete(`http://localhost:8000/api/tasks/${this.currentTaskId}/cancel/`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        this.isCalculating = false;
+        this.calculationProgress = 0;
+        this.calculationMessage = 'Calculation cancelled';
+        this.currentTaskId = null;
+        
+      } catch (error) {
+        console.error('Error cancelling task:', error);
+        this.calculationMessage = 'Error cancelling calculation';
+      }
+    },
+    
+    getCalculationTimeElapsed() {
+      if (!this.calculationStartTime) return '';
+      
+      const elapsed = Math.floor((Date.now() - this.calculationStartTime) / 1000);
+      if (elapsed < 60) {
+        return `${elapsed}s`;
+      } else {
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        return `${minutes}m ${seconds}s`;
+      }
+    }
   },
   computed: {
     filteredScenarioResults() {

@@ -84,7 +84,23 @@
     <!-- Table Card -->
     <div class="card mb-3 mb-lg-5">
       <div class="card-header">
-        <h4 class="card-header-title">Financial Overview Table</h4>
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+          <h4 class="card-header-title mb-0">Financial Overview Table</h4>
+          <div class="indicator-legend d-flex align-items-center mt-2 mt-md-0" style="font-size: 0.9em;">
+            <span class="me-3">
+              <span class="me-1">📉</span>
+              <small class="text-muted">SS Decrease</small>
+            </span>
+            <span class="me-3">
+              <span class="me-1">ℹ️</span>
+              <small class="text-muted">IRMAA Bracket</small>
+            </span>
+            <span>
+              <span class="me-1">🔒</span>
+              <small class="text-muted">Hold Harmless</small>
+            </span>
+          </div>
+        </div>
       </div>
       <div class="card-body">
         <div v-if="filteredResults.length" class="table-responsive">
@@ -125,11 +141,17 @@
                   <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)" title="IRMAA Information" :style="{ marginLeft: row.ss_decrease_applied ? '5px' : '0' }">
                     ℹ️
                   </span>
+                  <span v-if="isHoldHarmlessProtected(row)" class="hold-harmless-icon" @click.stop="toggleHoldHarmlessTooltip(idx)" title="Hold Harmless Protection" :style="{ marginLeft: (row.ss_decrease_applied || isIrmaaBracketHit(row, idx)) ? '5px' : '0' }">
+                    🔒
+                  </span>
                   <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
                     {{ getIrmaaBracketLabel(row) }}
                   </div>
                   <div v-if="openSsDecreaseTooltipIdx === idx" class="ss-decrease-popover">
                     Social Security Decrease
+                  </div>
+                  <div v-if="openHoldHarmlessTooltipIdx === idx" class="hold-harmless-popover">
+                    Hold Harmless Protection: Social Security maintained at previous year's level. Without this protection, you would have received {{ formatCurrency(row.original_remaining_ss || 0) }} ({{ formatCurrency(row.hold_harmless_amount || 0) }} less).
                   </div>
                 </td>
               </tr>
@@ -241,6 +263,7 @@ export default {
       },
       openIrmaaTooltipIdx: null,
       openSsDecreaseTooltipIdx: null,
+      openHoldHarmlessTooltipIdx: null,
       dynamicIrmaaThresholds: {} // Will store thresholds by year
     };
   },
@@ -675,12 +698,28 @@ export default {
     closeSsDecreaseTooltip() {
       this.openSsDecreaseTooltipIdx = null;
     },
+    isHoldHarmlessProtected(row) {
+      // Use backend calculation for Hold Harmless protection
+      return row.hold_harmless_protected === true;
+    },
+    toggleHoldHarmlessTooltip(idx) {
+      this.openHoldHarmlessTooltipIdx = this.openHoldHarmlessTooltipIdx === idx ? null : idx;
+      // Close other tooltips when opening Hold Harmless tooltip
+      this.openIrmaaTooltipIdx = null;
+      this.openSsDecreaseTooltipIdx = null;
+    },
+    closeHoldHarmlessTooltip() {
+      this.openHoldHarmlessTooltipIdx = null;
+    },
     handleClickOutside(event) {
       if (!event.target.closest('.irmaa-info-icon') && !event.target.closest('.irmaa-popover')) {
         this.closeIrmaaTooltip();
       }
       if (!event.target.closest('.ss-decrease-icon') && !event.target.closest('.ss-decrease-popover')) {
         this.closeSsDecreaseTooltip();
+      }
+      if (!event.target.closest('.hold-harmless-icon') && !event.target.closest('.hold-harmless-popover')) {
+        this.closeHoldHarmlessTooltip();
       }
     },
     initializeCircles() {
@@ -769,8 +808,15 @@ export default {
   font-size: 1em;
   vertical-align: middle;
 }
+.ss-decrease-icon,
+.hold-harmless-icon {
+  cursor: pointer;
+  font-size: 1em;
+  vertical-align: middle;
+}
 .irmaa-popover,
-.ss-decrease-popover {
+.ss-decrease-popover,
+.hold-harmless-popover {
   position: absolute;
   right: 100%;
   margin-right: 10px;
@@ -792,9 +838,17 @@ export default {
   min-width: 200px; /* Smaller width for SS decrease */
 }
 
+.hold-harmless-popover {
+  background: #f0f8ff;
+  border-color: #007bff;
+  max-width: 400px;
+  white-space: normal;
+}
+
 @media (max-width: 1400px) {
   .irmaa-popover,
-  .ss-decrease-popover {
+  .ss-decrease-popover,
+  .hold-harmless-popover {
     right: auto;
     left: 50%;
     transform: translate(-50%, 100%);

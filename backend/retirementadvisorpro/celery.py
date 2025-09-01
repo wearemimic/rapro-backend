@@ -52,6 +52,10 @@ app.conf.task_routes = {
     'report_center.tasks.update_all_template_analytics': {'queue': 'analytics'},
     'report_center.tasks.report_center_health_check': {'queue': 'default'},
     
+    # Scenario calculation tasks - High CPU, moderate priority
+    'core.tasks.calculate_scenario_async': {'queue': 'analytics'},
+    'core.tasks.quick_scenario_estimate': {'queue': 'default'},
+    
     # Default queue for miscellaneous tasks
     'core.tasks.cleanup_old_task_results': {'queue': 'default'},
     'core.tasks.health_check_task': {'queue': 'default'},
