@@ -365,6 +365,8 @@ class ScenarioProcessor:
             ss_income = 0
             ss_decrease_applied = False
             ss_decrease_amount_actual = 0
+            ss_income_primary_gross = 0
+            ss_income_spouse_gross = 0
             if primary_alive or spouse_alive:
                 gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
                 ss_income, ss_income_primary, ss_income_spouse = self._calculate_social_security(year, primary_alive, spouse_alive)
@@ -377,8 +379,11 @@ class ScenarioProcessor:
                     
                     ss_decrease_applied = True
                     # Calculate what the SS income would have been without the decrease
-                    ss_income_without_decrease, _, _ = self._calculate_social_security_without_decrease(year, primary_alive, spouse_alive)
+                    ss_income_without_decrease, ss_income_primary_gross, ss_income_spouse_gross = self._calculate_social_security_without_decrease(year, primary_alive, spouse_alive)
                     ss_decrease_amount_actual = float(ss_income_without_decrease - ss_income)
+                else:
+                    # No reduction applied - gross amounts are the same as net amounts
+                    _, ss_income_primary_gross, ss_income_spouse_gross = self._calculate_social_security_without_decrease(year, primary_alive, spouse_alive)
                 
                 # Add pre-retirement income if we're before retirement year
                 if year < retirement_year and pre_retirement_income:
@@ -386,7 +391,7 @@ class ScenarioProcessor:
                     gross_income += pre_retirement_income_decimal
                     print(f"  Adding pre-retirement income: ${pre_retirement_income_decimal:,.2f}")
                     
-            agi_excl_ss = Decimal(gross_income) - Decimal(ss_income)
+            agi_excl_ss = Decimal(gross_income)
             taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
 
             # Calculate provisional income for debug
@@ -469,10 +474,11 @@ class ScenarioProcessor:
             ira_contribution_deduction = Decimal('0')
             
             # The MAGI adjustment factors can be set based on tax situation
-            # Traditionally there are several adjustments for MAGI, but for Medicare IRMAA purposes
-            # the key additions are tax-exempt interest and excluded foreign income
+            # For Medicare IRMAA purposes, MAGI includes ALL Social Security benefits (not just taxable portion)
+            # plus tax-exempt interest and excluded foreign income
+            untaxed_ss = Decimal(ss_income) - taxable_ss  # The portion of SS not included in AGI
             magi_adjustments = excluded_municipal_bond_interest + excluded_series_ee_bond_interest + \
-                             excluded_foreign_income + ira_contribution_deduction
+                             excluded_foreign_income + ira_contribution_deduction + untaxed_ss
             
             magi = agi + magi_adjustments
             
@@ -538,10 +544,12 @@ class ScenarioProcessor:
                 "year": year,
                 "primary_age": primary_age if primary_alive else None,
                 "spouse_age": spouse_age if spouse_alive else None,
-                "gross_income": round(gross_income, 2),
+                "gross_income": round(gross_income + ss_income, 2),
                 "ss_income": round(ss_income, 2),
                 "ss_income_primary": round(ss_income_primary, 2),
                 "ss_income_spouse": round(ss_income_spouse, 2),
+                "ss_income_primary_gross": round(ss_income_primary_gross, 2),
+                "ss_income_spouse_gross": round(ss_income_spouse_gross, 2),
                 "taxable_ss": round(taxable_ss, 2),
                 "agi": round(agi, 2),
                 "magi": round(magi, 2),
@@ -799,6 +807,10 @@ class ScenarioProcessor:
         self._log_debug(f"Processing gross income for year {year}")
         income_total = 0
         for asset in self.assets:
+            # Skip Social Security assets - they are handled separately
+            if asset.get("income_type") == "social_security":
+                continue
+                
             owner = asset.get("owned_by", "primary")
             if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
                 continue
@@ -867,44 +879,120 @@ class ScenarioProcessor:
             
             adjustment_amount = Decimal(str(self.scenario.ss_adjustment_amount))
             
-            # Check if both primary and spouse are receiving SS benefits
-            has_primary_ss = any(asset['owner'] == 'primary' for asset in ss_assets)
-            has_spouse_ss = any(asset['owner'] == 'spouse' for asset in ss_assets)
+            # Check who has SS benefits and if they're alive
+            has_primary_ss = any(asset['owner'] == 'primary' for asset in ss_assets) and primary_alive
+            has_spouse_ss = any(asset['owner'] == 'spouse' for asset in ss_assets) and spouse_alive
+            
+            primary_raw_ss = sum(asset['annual_income'] for asset in ss_assets if asset['owner'] == 'primary')
+            spouse_raw_ss = sum(asset['annual_income'] for asset in ss_assets if asset['owner'] == 'spouse')
+            
+            # Check if this is a couple scenario
             is_couple = self.tax_status and 'married' in self.tax_status.lower()
             
-            # Only double the reduction if BOTH spouses are receiving SS benefits
-            should_double = is_couple and has_primary_ss and has_spouse_ss
-            if should_double:
-                adjustment_amount = adjustment_amount * 2
+            # Determine reduction strategy based on who's alive and receiving benefits:
+            # 1. If both spouses are alive and receiving SS → Double the reduction, apply to both
+            # 2. If only one spouse is alive/receiving SS → Single reduction, apply to that person
+            both_receiving_ss = has_primary_ss and has_spouse_ss and primary_alive and spouse_alive
             
-            # Apply the adjustment
-            total_adjustment = 0
-            if self.scenario.ss_adjustment_type == 'percentage':
-                # For percentage, apply to total SS income
-                total_raw_ss = sum(asset['annual_income'] for asset in ss_assets)
-                reduction_multiplier = adjustment_amount / 100
-                total_adjustment = total_raw_ss * reduction_multiplier
+            if both_receiving_ss and is_couple:
+                # Double the reduction when both are retired and receiving benefits
+                if self.scenario.ss_adjustment_type == 'percentage':
+                    # Apply percentage to each person's benefits
+                    reduction_multiplier = adjustment_amount / 100
+                    primary_adjustment = primary_raw_ss * reduction_multiplier
+                    spouse_adjustment = spouse_raw_ss * reduction_multiplier
+                    total_adjustment = primary_adjustment + spouse_adjustment
+                else:
+                    # Double the flat amount (apply to both)
+                    monthly_adjustment = adjustment_amount * 2
+                    total_adjustment = monthly_adjustment * 12
             else:
-                # For flat amount, convert monthly to annual
-                total_adjustment = adjustment_amount * 12
+                # Single person reduction
+                # Determine who to apply it to
+                apply_to_primary = has_primary_ss and primary_raw_ss > 0 and primary_alive
+                apply_to_spouse = has_spouse_ss and spouse_raw_ss > 0 and spouse_alive and not apply_to_primary
+                
+                target_ss_amount = 0
+                if apply_to_primary:
+                    target_ss_amount = primary_raw_ss
+                elif apply_to_spouse:
+                    target_ss_amount = spouse_raw_ss
+                
+                total_adjustment = 0
+                if target_ss_amount > 0:
+                    if self.scenario.ss_adjustment_type == 'percentage':
+                        # Apply percentage to target person's SS income
+                        reduction_multiplier = adjustment_amount / 100
+                        total_adjustment = target_ss_amount * reduction_multiplier
+                    else:
+                        # Apply flat amount to target person
+                        total_adjustment = adjustment_amount * 12
             
-            # Distribute the adjustment proportionally across SS assets
-            total_raw_ss = sum(asset['annual_income'] for asset in ss_assets)
-            if total_raw_ss > 0:
+            # Apply the adjustment based on the scenario
+            if total_adjustment > 0:
                 primary_ss = 0
                 spouse_ss = 0
                 
-                for asset in ss_assets:
-                    proportion = asset['annual_income'] / total_raw_ss
-                    asset_adjustment = total_adjustment * proportion
-                    adjusted_income = max(0, asset['annual_income'] - asset_adjustment)
+                if both_receiving_ss and is_couple:
+                    # Apply reduction to both spouses proportionally to their benefits
+                    for asset in ss_assets:
+                        if asset['owner'] == "primary" and primary_raw_ss > 0:
+                            # Apply reduction proportionally to primary's SS assets
+                            proportion = asset['annual_income'] / primary_raw_ss
+                            if self.scenario.ss_adjustment_type == 'percentage':
+                                reduction_multiplier = adjustment_amount / 100
+                                asset_adjustment = asset['annual_income'] * reduction_multiplier
+                            else:
+                                # For flat amount, distribute proportionally among primary's assets
+                                monthly_per_person = adjustment_amount
+                                annual_per_person = monthly_per_person * 12
+                                asset_adjustment = annual_per_person * proportion
+                            adjusted_income = max(0, asset['annual_income'] - asset_adjustment)
+                            primary_ss += adjusted_income
+                        elif asset['owner'] == "spouse" and spouse_raw_ss > 0:
+                            # Apply reduction proportionally to spouse's SS assets
+                            proportion = asset['annual_income'] / spouse_raw_ss
+                            if self.scenario.ss_adjustment_type == 'percentage':
+                                reduction_multiplier = adjustment_amount / 100
+                                asset_adjustment = asset['annual_income'] * reduction_multiplier
+                            else:
+                                # For flat amount, distribute proportionally among spouse's assets
+                                monthly_per_person = adjustment_amount
+                                annual_per_person = monthly_per_person * 12
+                                asset_adjustment = annual_per_person * proportion
+                            adjusted_income = max(0, asset['annual_income'] - asset_adjustment)
+                            spouse_ss += adjusted_income
+                        else:
+                            # Asset owner is not alive, no income
+                            pass
+                else:
+                    # Single person reduction - apply to whoever is receiving benefits
+                    apply_to_primary = has_primary_ss and primary_raw_ss > 0 and primary_alive
+                    apply_to_spouse = has_spouse_ss and spouse_raw_ss > 0 and spouse_alive and not apply_to_primary
                     
-                    total_ss += adjusted_income
-                    if asset['owner'] == "primary":
-                        primary_ss += adjusted_income
-                    else:
-                        spouse_ss += adjusted_income
+                    for asset in ss_assets:
+                        if apply_to_primary and asset['owner'] == "primary":
+                            # Apply reduction proportionally to primary's SS assets
+                            proportion = asset['annual_income'] / primary_raw_ss
+                            asset_adjustment = total_adjustment * proportion
+                            adjusted_income = max(0, asset['annual_income'] - asset_adjustment)
+                            primary_ss += adjusted_income
+                        elif apply_to_spouse and asset['owner'] == "spouse":
+                            # Apply reduction proportionally to spouse's SS assets
+                            proportion = asset['annual_income'] / spouse_raw_ss
+                            asset_adjustment = total_adjustment * proportion
+                            adjusted_income = max(0, asset['annual_income'] - asset_adjustment)
+                            spouse_ss += adjusted_income
+                        else:
+                            # No reduction applied to this asset
+                            if asset['owner'] == "primary":
+                                primary_ss += asset['annual_income']
+                            else:
+                                spouse_ss += asset['annual_income']
+                    
+                total_ss = primary_ss + spouse_ss
             else:
+                # No adjustment applied - use raw values
                 total_ss = primary_ss + spouse_ss
         else:
             # No adjustment - use raw values
