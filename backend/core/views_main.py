@@ -4433,3 +4433,48 @@ def mock_report_status(request, report_id):
         'message': 'Report generation completed successfully'
     })
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def medicare_inflation_rates(request):
+    """Get Medicare Part B and Part D inflation rates for different time periods"""
+    import csv
+    import os
+    from django.conf import settings
+    
+    try:
+        # Path to the Medicare inflation rates CSV file
+        csv_path = os.path.join(settings.BASE_DIR, 'core', 'tax_data', 'medicare_inflation_rates.csv')
+        
+        inflation_rates = []
+        
+        with open(csv_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # Skip comment lines that start with #
+                if row['period'].startswith('#'):
+                    continue
+                
+                inflation_rates.append({
+                    'period': row['period'],
+                    'time_span': int(row['time_span']),
+                    'part_b_rate': float(row['part_b_rate']),
+                    'part_d_rate': float(row['part_d_rate']),
+                    'description': row['description']
+                })
+        
+        return Response({
+            'inflation_rates': inflation_rates,
+            'message': 'Medicare inflation rates retrieved successfully'
+        })
+        
+    except FileNotFoundError:
+        return Response({
+            'error': 'Medicare inflation rates data file not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+        
+    except Exception as e:
+        return Response({
+            'error': f'Error loading Medicare inflation rates: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

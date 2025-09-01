@@ -198,6 +198,7 @@ The application includes a sophisticated IRMAA (Income-Related Monthly Adjustmen
 **Tax & IRMAA:**
 - `/api/tax/federal-standard-deduction/` - Get standard deduction amounts
 - `/api/tax/irmaa-thresholds/` - Get inflation-adjusted IRMAA thresholds by year
+- `/api/medicare/inflation-rates/` - Get historical Medicare Part B and Part D inflation rates
 
 ## Testing Approach
 
@@ -382,3 +383,140 @@ The component had both `scenarioResults` as a prop (from parent) and as internal
 - Prop/data collision resolved ✓
 - Asset graph legends showing correct names ✓
 - Conversion Impact Table functionality restored ✓
+
+## Recent Development Updates (September 2025)
+
+### Redis/Celery Async Processing System
+- **Complete async processing infrastructure** for scenario calculations
+- **Docker services**: Redis message broker, Celery worker, Celery beat scheduler, Celery Flower monitoring
+- **Frontend integration**: Progress tracking, task cancellation, fallback to sync calculations
+- **Scalability**: Supports 1000+ concurrent users with distributed task processing
+
+### Authentication System Improvements
+- **Fixed rate limiting issues** causing frequent logout redirects during navigation
+- **Increased throttle rates**: Authenticated users from 100/min to 1000/min requests
+- **Enhanced error handling**: Exponential backoff retry logic for rate-limited requests
+- **Token consistency**: Fixed authentication token mismatches in async calculation methods
+- **Batched API loading**: Staggered API calls to prevent rate limiting bursts
+
+### Medicare Inflation Rates System
+**Complete historical data analysis and dynamic dropdown implementation:**
+
+#### **Backend Implementation:**
+- **CSV data source**: `/backend/core/tax_data/medicare_inflation_rates.csv`
+- **API endpoint**: `/api/medicare/inflation-rates/` with JWT authentication
+- **Historical analysis**: Complete Medicare Part B data from 1966 inception through 2025
+- **Calculation methodology**: Compound Annual Growth Rate (CAGR) for accurate projections
+
+#### **Available Time Periods:**
+- **From inception (59 years)**: Part B 7.3%, Part D 4.1% (Medicare started 1966, Part D 2006)
+- **Last 1 year**: Part B 5.9%, Part D 6.0%
+- **Last 5 years**: Part B 5.1%, Part D 4.2%
+- **Last 10 years**: Part B 5.8%, Part D 4.0%
+- **Last 15 years**: Part B 3.5%, Part D 3.8%
+- **Last 25 years**: Part B 5.8%, Part D 3.9%
+
+#### **Frontend Integration (ScenarioCreate.vue):**
+- **Dynamic dropdowns**: Populate from API with descriptive labels
+- **Custom rate option**: Users can enter custom inflation rates when needed
+- **Fallback handling**: Graceful degradation if API unavailable
+- **Real-time loading**: Data loaded on component mount with error handling
+
+### Investment Modal Improvements
+- **Fixed age calculation issues** in "Age Last Year of Contribution" dropdown
+- **Enhanced validation**: Proper handling of client birthdate data and age ranges
+- **Extended age range**: Contribution ages now go from current age to 80 years
+- **Better error handling**: Debug logging and fallback values for invalid dates
+- **Client data loading**: Ensures client data is loaded before opening investment modal
+
+### Hold Harmless Act Implementation
+**Added comprehensive Social Security Hold Harmless protection indicators:**
+
+#### **Backend Calculation Logic:**
+- **Medicare cost protection**: Reduces Medicare deduction instead of increasing SS income
+- **IRMAA bracket eligibility**: Only applies to those in first IRMAA bracket (bracket 0)
+- **Annual comparison**: Maintains previous year's net Social Security amount
+- **Accurate tax calculations**: Ensures Hold Harmless doesn't affect IRMAA or tax computations
+
+#### **Frontend Visual Indicators:**
+- **Lock icon (🔒)**: Shows when beneficiary is protected by Hold Harmless
+- **Detailed tooltips**: Display protection amounts and eligibility criteria
+- **Indicator legends**: Right-justified in table headers for Social Security and Financial Overview tabs
+- **Cross-tab consistency**: Same functionality across all relevant scenario pages
+
+### Navigation System Restructure
+**Complete navigation overhaul for cleaner user experience:**
+
+#### **Header Navigation System:**
+- **Dropdown-based navigation**: Moved scenario page links from left sidebar to header dropdowns
+- **Dual dropdown design**: Scenario switcher + Page navigation dropdowns
+- **Improved layout**: Client info moved to first row, navigation right-justified
+- **Consistent styling**: Bootstrap-based dropdowns with identical styling
+- **Label structure**: "Choose [Scenario ▼] - [Page ▼]" format
+
+#### **Sidebar Cleanup:**
+- **Removed scenario page sections**: Eliminated collapsible scenario page navigation
+- **Direct scenario links**: Simplified links that go directly to scenario overview
+- **Reduced clutter**: Cleaner left navigation focused on core functionality
+
+### Scenario Calculation Fixes
+- **Division by zero error**: Fixed Social Security taxation percentage calculation
+- **Error handling**: Proper handling of scenarios without Social Security income
+- **Debugging improvements**: Enhanced logging for troubleshooting calculation issues
+- **Fallback mechanisms**: Graceful degradation when calculations encounter edge cases
+
+### Performance Optimizations
+- **Batched data loading**: Concurrent loading of client data and configuration
+- **API call optimization**: Staggered requests to prevent rate limiting
+- **Enhanced caching**: Better use of browser and server-side caching
+- **Database query optimization**: Improved query patterns for faster response times
+
+## Development Workflow Updates
+
+### Backend Restart Requirements
+After making changes to:
+- CSV configuration files (tax data, Medicare rates)
+- Backend Python code
+- Environment variables
+
+**Always restart the backend:**
+```bash
+docker compose -f docker/docker-compose.yml restart backend
+```
+
+### Configuration File Management
+**Medicare Inflation Rates:**
+- File: `/backend/core/tax_data/medicare_inflation_rates.csv`
+- Update process: Edit CSV → Restart backend → Hard refresh frontend
+- No code changes required for rate updates
+
+**Tax Data Updates:**
+- Annual updates via CSV files only
+- Automatic inflation calculations via `tax_csv_loader.py`
+- Version control friendly (CSV diffs)
+
+### Debugging Best Practices
+- **Browser console**: Check for API errors and authentication issues
+- **Backend logs**: Monitor Docker container logs for calculation errors
+- **Rate limiting**: Watch for 429 status codes in network tab
+- **Token validation**: Verify JWT tokens are properly formatted and valid
+
+## Architecture Decisions
+
+### Async Processing
+- **Redis**: Message broker and result backend
+- **Celery**: Distributed task queue with worker processes
+- **Progress tracking**: Real-time updates via polling mechanism
+- **Fault tolerance**: Automatic fallback to synchronous calculations
+
+### Data Management
+- **CSV-based configuration**: Easy updates without code deployment
+- **Historical data accuracy**: Research-based inflation calculations
+- **API-driven dropdowns**: Dynamic configuration loading
+- **Caching strategies**: Balance between performance and data freshness
+
+### User Experience
+- **Progressive enhancement**: Graceful degradation when services unavailable
+- **Clear visual feedback**: Loading states, progress bars, error messages
+- **Responsive design**: Works across different screen sizes and devices
+- **Accessibility**: Proper ARIA labels and keyboard navigation support

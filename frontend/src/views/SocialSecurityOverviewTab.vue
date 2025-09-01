@@ -6,7 +6,13 @@
       <div class="col-lg-8">
         <div class="card h-100">
           <div class="card-body">
-            <div style="height: 300px">
+            <div v-if="isCalculating" class="d-flex flex-column align-items-center justify-content-center" style="height: 300px;">
+              <div class="spinner-border text-primary mb-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <span class="text-muted">Loading chart data...</span>
+            </div>
+            <div v-else style="height: 300px">
               <Graph 
                 :data="chartData" 
                 :options="chartOptions"
@@ -288,6 +294,10 @@ export default {
     spouseMortalityAge: {
       type: [Number, String],
       required: false
+    },
+    isCalculating: {
+      type: Boolean,
+      default: false
     }
   },
   data() {

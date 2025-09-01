@@ -3,7 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views_main import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration, mock_report_templates, mock_reports, mock_generate_report, mock_report_status
 from . import report_views
-from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, start_scenario_calculation_async, get_task_status, cancel_task, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years
+from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, start_scenario_calculation_async, get_task_status, cancel_task, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years, medicare_inflation_rates
 from .views_main import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
 from .views_main import EmailAccountViewSet, CommunicationViewSet, LeadViewSet, LeadSourceViewSet, ActivityLogViewSet, TaskViewSet, TaskTemplateViewSet, CalendarAccountViewSet, CalendarEventViewSet, MeetingTemplateViewSet
 from .views.document_views import DocumentViewSet, DocumentCategoryViewSet, DocumentVersionViewSet, DocumentAuditLogViewSet, DocumentTemplateViewSet, DocumentRetentionPolicyViewSet, bulk_document_action
@@ -216,6 +216,7 @@ urlpatterns = [
     path('reporttemplates/<uuid:template_id>/update_slides/', views.update_template_slides, name='update-template-slides'),
     path('tax/federal-standard-deduction/', get_federal_standard_deduction, name='federal-standard-deduction'),
     path('tax/irmaa-thresholds/', get_irmaa_thresholds_for_years, name='irmaa-thresholds'),
+    path('medicare/inflation-rates/', medicare_inflation_rates, name='medicare-inflation-rates'),
     
     # Document Management endpoints
     path('documents/bulk-action/', bulk_document_action, name='bulk-document-action'),

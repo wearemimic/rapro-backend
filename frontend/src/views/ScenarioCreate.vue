@@ -273,7 +273,7 @@
                         />
                       </td>
                       <td>
-                        <input v-model.number="income.growth_rate" type="number" class="form-control" />
+                        <input v-model.number="income.rate_of_return" type="number" class="form-control" />
                       </td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
@@ -412,7 +412,7 @@
                     <td>{{ investment.owned_by === 'primary' ? primaryFirstName : spouseFirstName }}</td>
                     <td>{{ investment.investment_name || investment.income_name }}</td>
                     <td>{{ formatCurrencyDisplay(investment.current_balance || 0) }}</td>
-                    <td>{{ investment.growth_rate ? (investment.growth_rate > 1 ? investment.growth_rate.toFixed(1) : (investment.growth_rate * 100).toFixed(1)) : '0' }}%</td>
+                    <td>{{ investment.rate_of_return ? investment.rate_of_return.toFixed(1) : '0' }}%</td>
                     <td>{{ investment.start_age }}</td>
                     <td>{{ investment.end_age }}</td>
                     <td class="text-center">
@@ -464,10 +464,19 @@
             <td>Medicare Part B</td>
             <td>$185.00</td>
             <td>
-              <select class="form-control">
-                <option>Average Historical Inflation (7.42%)</option>
-                <option>Custom Inflation Rate</option>
+              <select v-model="scenario.part_b_inflation_rate" class="form-control">
+                <option v-for="rate in medicareInflationRates" :key="rate.period" :value="rate.part_b_rate.toString()">
+                  {{ rate.description }} ({{ rate.part_b_rate }}%)
+                </option>
+                <option value="custom">Custom Inflation Rate</option>
               </select>
+              <input v-if="scenario.part_b_inflation_rate === 'custom'" 
+                     v-model="customPartBRate" 
+                     @input="scenario.part_b_inflation_rate = customPartBRate"
+                     type="number" 
+                     step="0.1" 
+                     class="form-control mt-2" 
+                     placeholder="Enter custom rate (%)" />
             </td>
           </tr>
           <tr>
@@ -475,10 +484,19 @@
             <td>Medicare Part D</td>
             <td>$0</td>
             <td>
-              <select class="form-control">
-                <option>Average Historical Inflation (6.73%)</option>
-                <option>Custom Inflation Rate</option>
+              <select v-model="scenario.part_d_inflation_rate" class="form-control">
+                <option v-for="rate in medicareInflationRates" :key="rate.period" :value="rate.part_d_rate.toString()">
+                  {{ rate.description }} ({{ rate.part_d_rate }}%)
+                </option>
+                <option value="custom">Custom Inflation Rate</option>
               </select>
+              <input v-if="scenario.part_d_inflation_rate === 'custom'" 
+                     v-model="customPartDRate" 
+                     @input="scenario.part_d_inflation_rate = customPartDRate"
+                     type="number" 
+                     step="0.1" 
+                     class="form-control mt-2" 
+                     placeholder="Enter custom rate (%)" />
             </td>
           </tr>
         </tbody>
@@ -555,6 +573,9 @@ const spouseFirstName = ref('Spouse');
 const clientTaxStatus = ref('single');
 const clientData = ref(null);
 const editingInvestment = ref(null);
+const medicareInflationRates = ref([]);
+const customPartBRate = ref('');
+const customPartDRate = ref('');
 
 const scenario = ref({
   name: '',
@@ -609,7 +630,7 @@ function addIncome() {
     end_age: 90,
     current_balance: 0,
     monthly_contribution: 0,
-    growth_rate: 0
+    rate_of_return: null
   });
   newIncome.value.income_type = '';
 }
@@ -627,22 +648,60 @@ const isSingle = computed(() => {
 // Calculate current ages from birthdates
 const calculateAge = (birthdate) => {
   if (!birthdate) return 65; // Default age
+  
   const today = new Date();
   const birth = new Date(birthdate);
+  
+  // Check if birth date is valid
+  if (isNaN(birth.getTime())) {
+    console.warn('ScenarioCreate: Invalid birthdate detected:', birthdate);
+    return 65; // Return default age for invalid dates
+  }
+  
   let age = today.getFullYear() - birth.getFullYear();
   const monthDiff = today.getMonth() - birth.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
     age--;
   }
+  
+  // Debug log for negative ages
+  if (age < 0) {
+    console.warn('ScenarioCreate: Negative age calculated:', {
+      birthdate,
+      today: today.toISOString(),
+      birth: birth.toISOString(),
+      calculatedAge: age
+    });
+    return 65; // Return reasonable default for negative ages
+  }
+  
+  // Cap age to reasonable bounds
+  if (age > 120) {
+    console.warn('ScenarioCreate: Unreasonably high age calculated:', age, 'for birthdate:', birthdate);
+    return 65;
+  }
+  
   return age;
 };
 
 const primaryCurrentAge = computed(() => {
-  return clientData.value?.birthdate ? calculateAge(clientData.value.birthdate) : 65;
+  const age = clientData.value?.birthdate ? calculateAge(clientData.value.birthdate) : 65;
+  console.log('ScenarioCreate: Primary age calculation:', {
+    birthdate: clientData.value?.birthdate,
+    calculatedAge: age,
+    clientData: clientData.value ? 'loaded' : 'not loaded'
+  });
+  return age;
 });
 
 const spouseCurrentAge = computed(() => {
-  return clientData.value?.spouse?.birthdate ? calculateAge(clientData.value.spouse.birthdate) : 65;
+  const age = clientData.value?.spouse?.birthdate ? calculateAge(clientData.value.spouse.birthdate) : 65;
+  console.log('ScenarioCreate: Spouse age calculation:', {
+    birthdate: clientData.value?.spouse?.birthdate,
+    calculatedAge: age,
+    hasSpouse: !!clientData.value?.spouse
+  });
+  return age;
 });
 
 // Calculate the youngest person's current age (for income types that should start from current age)
@@ -724,8 +783,7 @@ const groupedIncome = computed(() => {
 
 // Investment functions
 function handleInvestmentSave(investmentData) {
-  // Convert growth_rate back to percentage for display
-  investmentData.growth_rate = investmentData.growth_rate * 100;
+  // Growth rate is already in percentage format, no conversion needed
   
   if (investmentData.isEdit) {
     // Update existing investment
@@ -748,9 +806,53 @@ function removeInvestmentById(id) {
   scenario.value.investments = scenario.value.investments.filter(investment => investment.id !== id);
 }
 
-function addNewInvestment() {
+// Load client data function
+async function loadClientData() {
+  if (clientData.value) return; // Already loaded
+  
+  try {
+    const response = await axios.get(`http://localhost:8000/api/clients/${clientId}/`);
+    const client = response.data;
+    clientData.value = client;
+    console.log('ScenarioCreate: Client data loaded for age calculations:', {
+      birthdate: client?.birthdate,
+      spouseBirthdate: client?.spouse?.birthdate
+    });
+  } catch (error) {
+    console.error('Error loading client data:', error);
+  }
+}
+
+// Load Medicare inflation rates function
+async function loadMedicareInflationRates() {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`http://localhost:8000/api/medicare/inflation-rates/`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    medicareInflationRates.value = response.data.inflation_rates;
+    console.log('ScenarioCreate: Medicare inflation rates loaded:', medicareInflationRates.value);
+  } catch (error) {
+    console.error('Error loading Medicare inflation rates:', error);
+    // Set fallback rates if API fails
+    medicareInflationRates.value = [
+      { period: '1_year', description: 'Last 1 year', part_b_rate: 5.9, part_d_rate: 3.5 },
+      { period: '5_years', description: 'Last 5 years', part_b_rate: 6.8, part_d_rate: 4.2 },
+      { period: '10_years', description: 'Last 10 years', part_b_rate: 4.9, part_d_rate: 3.8 },
+      { period: 'inception', description: 'From inception', part_b_rate: 4.3, part_d_rate: 3.7 }
+    ];
+  }
+}
+
+async function addNewInvestment() {
   // Clear any existing editing state to ensure modal opens in add mode
   editingInvestment.value = null;
+  
+  // Ensure client data is loaded before opening modal
+  if (!clientData.value) {
+    console.log('ScenarioCreate: Loading client data before opening investment modal');
+    await loadClientData();
+  }
 }
 
 function cancelInvestmentEdit() {
@@ -824,7 +926,7 @@ async function submitScenario() {
       sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
-      sanitized.rate_of_return = (parseFloat(row.growth_rate || 0) / 100).toFixed(4); // Convert percentage to decimal
+      sanitized.rate_of_return = parseFloat(row.rate_of_return || 0) / 100; // Convert percentage to decimal for backend rate_of_return field
       sanitized.cola = 0;
       sanitized.exclusion_ratio = 0;
       sanitized.tax_rate = 0;
@@ -934,9 +1036,12 @@ async function submitScenario() {
 
 onMounted(async () => {
   try {
-    const response = await axios.get(`http://localhost:8000/api/clients/${clientId}/`);
-    const client = response.data;
-    clientData.value = client; // Store client data for age calculations
+    // Load client data and Medicare inflation rates concurrently
+    await Promise.all([
+      loadClientData(),
+      loadMedicareInflationRates()
+    ]);
+    const client = clientData.value;
     if (!client || !client.first_name) {
       console.warn('Client data missing or incomplete:', client);
     }
@@ -987,7 +1092,7 @@ async function loadScenarioForDuplication(scenarioId) {
       current_balance: item.current_asset_balance || item.current_balance || 0,
       start_age: item.age_to_begin_withdrawal || item.start_age || 65,
       end_age: item.age_to_end_withdrawal || item.end_age || 95,
-      growth_rate: item.rate_of_return || item.growth_rate || 0.06,
+      rate_of_return: (item.rate_of_return || item.growth_rate) * 100, // Convert decimal to percentage for display
       withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0
     }));
     
@@ -1028,7 +1133,7 @@ async function loadScenarioForEditing(scenarioId) {
       current_balance: item.current_asset_balance || item.current_balance || 0,
       start_age: item.age_to_begin_withdrawal || item.start_age || 65,
       end_age: item.age_to_end_withdrawal || item.end_age || 95,
-      growth_rate: item.rate_of_return || item.growth_rate || 0.06,
+      rate_of_return: (item.rate_of_return || item.growth_rate) * 100, // Convert decimal to percentage for display
       withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0
     }));
     

@@ -222,11 +222,11 @@ const props = defineProps({
   },
   primaryCurrentAge: {
     type: Number,
-    default: 65
+    default: 45
   },
   spouseCurrentAge: {
     type: Number,
-    default: 65
+    default: 45
   },
   editingInvestment: {
     type: Object,
@@ -245,7 +245,7 @@ const investment = ref({
   investment_name: '',
   current_balance: null,
   age_established: null,
-  rate_of_return: 6,
+  rate_of_return: null,
   age_start_taking: 65,
   age_stop_taking: 95,
   monthly_withdrawal_amount: null,
@@ -297,10 +297,56 @@ const availableEndAges = computed(() => {
 const availableContributionEndAges = computed(() => {
   // Contribution end ages from current age to retirement age (typically 65-70)
   const ages = []
-  const currentAge = investment.value.owned_by === 'spouse' ? props.spouseCurrentAge : props.primaryCurrentAge
-  for (let age = currentAge; age <= Math.min(currentLifespan.value, 70); age++) {
-    ages.push(age)
+  let currentAge = investment.value.owned_by === 'spouse' ? props.spouseCurrentAge : props.primaryCurrentAge
+  
+  // Debug: Always log the age calculation details
+  console.log('InvestmentModal: Age calculation debug:', {
+    currentAge,
+    primaryCurrentAge: props.primaryCurrentAge,
+    spouseCurrentAge: props.spouseCurrentAge,
+    owned_by: investment.value.owned_by,
+    currentLifespan: currentLifespan.value
+  })
+  
+  // Validate currentAge is a valid positive number and not the default fallback
+  if (typeof currentAge !== 'number' || isNaN(currentAge) || currentAge < 0) {
+    console.warn('InvestmentModal: Invalid current age, using fallback:', {
+      receivedAge: currentAge,
+      primaryCurrentAge: props.primaryCurrentAge,
+      spouseCurrentAge: props.spouseCurrentAge,
+      owned_by: investment.value.owned_by
+    })
+    currentAge = 45 // Use reasonable default instead of invalid values
   }
+  
+  // If we're getting the default 65 age, it likely means client data isn't loaded yet
+  // So use a more reasonable starting age for contribution planning
+  if (currentAge === 65) {
+    console.info('InvestmentModal: Received default age 65, using 45 for contribution planning')
+    currentAge = 45
+  }
+  
+  // Ensure we have valid minimum and maximum ages
+  const minAge = Math.max(currentAge, 18) // Minimum 18 years old
+  const maxAge = Math.min(currentLifespan.value || 90, 80)
+  
+  console.log('InvestmentModal: Final age range:', { minAge, maxAge, currentAge })
+  
+  // Only generate age options if we have valid ages
+  if (minAge <= maxAge && minAge > 0) {
+    for (let age = minAge; age <= maxAge; age++) {
+      ages.push(age)
+    }
+  } else {
+    // Fallback range if calculation fails
+    console.warn('InvestmentModal: Invalid age range, using fallback:', { minAge, maxAge, currentAge })
+    for (let age = 25; age <= 80; age++) {
+      ages.push(age)
+    }
+  }
+  
+  console.log('InvestmentModal: Generated ages:', ages.slice(0, 5), '...', ages.slice(-5))
+  
   return ages
 })
 
@@ -311,7 +357,7 @@ const resetForm = () => {
     investment_name: '',
     current_balance: null,
     age_established: null,
-    rate_of_return: 6,
+    rate_of_return: null,
     age_start_taking: 65,
     age_stop_taking: 95,
     monthly_withdrawal_amount: null,
@@ -336,7 +382,7 @@ watch(() => props.editingInvestment, (newValue) => {
       investment_name: newValue.investment_name || newValue.income_name || '',
       current_balance: newValue.current_balance || null,
       age_established: newValue.age_established || null,
-      rate_of_return: newValue.growth_rate ? (newValue.growth_rate > 1 ? newValue.growth_rate : (newValue.growth_rate * 100)) : 6, // Handle both decimal and percentage forms
+      rate_of_return: newValue.rate_of_return ? (newValue.rate_of_return < 1 ? newValue.rate_of_return * 100 : newValue.rate_of_return) : (newValue.growth_rate ? newValue.growth_rate * 100 : null), // Convert decimal to percentage for display
       age_start_taking: newValue.start_age || 65,
       age_stop_taking: newValue.end_age || 95,
       monthly_withdrawal_amount: newValue.withdrawal_amount || null,
@@ -515,7 +561,7 @@ const saveInvestment = () => {
     owned_by: investment.value.owned_by,
     current_balance: investment.value.current_balance || 0,
     age_established: investment.value.age_established,
-    growth_rate: investment.value.rate_of_return / 100, // Convert percentage to decimal
+    rate_of_return: investment.value.rate_of_return / 100, // Convert percentage to decimal for backend
     monthly_contribution: investment.value.is_contributing ? 
       (investment.value.annual_contribution_amount ? investment.value.annual_contribution_amount / 12 : 0) : 0,
     contribution_percentage: investment.value.annual_contribution_percentage || 0,

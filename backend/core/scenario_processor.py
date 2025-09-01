@@ -1390,7 +1390,12 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
         print(f"    85% of amount above additional: ${taxable_portion_second_tier:,.2f}")
         print(f"    Calculated taxable amount: ${calculated_taxable_ss:,.2f}")
         print(f"    Maximum allowed (85% of SS): ${max_taxable_ss:,.2f}")
-        print(f"    Final Taxable SS: ${taxable_ss:,.2f} ({(taxable_ss / ss_benefits * 100):,.1f}% of benefits)")
+        # Avoid division by zero when calculating percentage
+        if ss_benefits > 0:
+            percentage = (taxable_ss / ss_benefits * 100)
+            print(f"    Final Taxable SS: ${taxable_ss:,.2f} ({percentage:.1f}% of benefits)")
+        else:
+            print(f"    Final Taxable SS: ${taxable_ss:,.2f} (no SS benefits)")
 
     return taxable_ss
 
