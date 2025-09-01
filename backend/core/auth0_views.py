@@ -5,10 +5,11 @@ import time
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from .authentication import create_jwt_pair_for_user, get_enhanced_user_data
 from urllib.parse import urlencode
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -41,6 +42,7 @@ def get_auth0_management_token():
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([])  # Disable throttling for Auth0 authentication
 def auth0_login(request):
     """
     Exchange Auth0 token for Django JWT token
@@ -130,20 +132,14 @@ def auth0_login(request):
             }
         )
         
-        # Generate Django JWT token
-        refresh = RefreshToken.for_user(user)
+        # Generate Django JWT token with admin claims
+        tokens = create_jwt_pair_for_user(user)
         
         # Return the token and user info
         return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'username': user.username,
-                'first_name': user.first_name,
-                'last_name': user.last_name
-            }
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+            'user': get_enhanced_user_data(user)
         })
     
     except jwt.ExpiredSignatureError:
@@ -191,6 +187,7 @@ def auth0_debug(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([])  # Disable throttling for Auth0 authentication
 def auth0_exchange_code(request):
     """
     Exchange Auth0 authorization code for tokens and create Django session
@@ -256,16 +253,25 @@ def auth0_exchange_code(request):
         # Create or get user in Django
         email = user_info.get('email')
         if not email:
+            print(f"❌ No email in user_info: {user_info}")
             return Response({'message': 'Email not found in user info'}, status=status.HTTP_400_BAD_REQUEST)
         
+        print(f"🔍 Auth0 returned email: '{email}'")
+        print(f"🔍 Full user_info from Auth0: {user_info}")
+        
         # Check if user exists first, and handle accordingly
+        # Try case-insensitive lookup first
         try:
-            user = User.objects.get(email=email)
-            print(f"✅ Retrieved existing user: {email}")
+            user = User.objects.get(email__iexact=email)
+            print(f"✅ Retrieved existing user: {user.email} (matched '{email}')")
             created = False
         except User.DoesNotExist:
             # User doesn't exist in our Django system
-            print(f"❌ User {email} not found in Django system")
+            print(f"❌ User '{email}' not found in Django system")
+            print(f"🔍 Available users in system:")
+            for existing_user in User.objects.all():
+                print(f"   - {existing_user.email} (active: {existing_user.is_active})")
+            print(f"🔍 Looking for exact match vs case-insensitive...")
             
             # For new users coming from Auth0, we need to check if they completed registration
             # If they're here, they successfully authenticated with Auth0 but we don't have them in Django
@@ -300,19 +306,13 @@ def auth0_exchange_code(request):
                 'user_email': email
             }, status=status.HTTP_202_ACCEPTED)
         
-        # Generate Django JWT token
-        refresh = RefreshToken.for_user(user)
+        # Generate Django JWT token with admin claims
+        tokens = create_jwt_pair_for_user(user)
         
         response_data = {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'username': user.username,
-                'first_name': user.first_name,
-                'last_name': user.last_name
-            }
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+            'user': get_enhanced_user_data(user)
         }
         
         print(f"✅ Successful auth response for {user.email}: {response_data}")
@@ -530,17 +530,13 @@ def auth0_signup(request):
             last_name=data.get('last_name', '')
         )
         
-        # Generate JWT token
-        refresh = RefreshToken.for_user(user)
+        # Generate JWT token with admin claims
+        tokens = create_jwt_pair_for_user(user)
         
         return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'username': user.username
-            }
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+            'user': get_enhanced_user_data(user)
         }, status=status.HTTP_201_CREATED)
     
     except Exception as e:

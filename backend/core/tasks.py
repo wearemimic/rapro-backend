@@ -446,6 +446,128 @@ def generate_ai_usage_report() -> Dict:
         return {'status': 'error', 'error': str(e)}
 
 # =============================================================================
+# REPORT CENTER TASKS
+# =============================================================================
+
+@shared_task(bind=True, max_retries=3)
+def generate_report_task(self, report_config):
+    """
+    Background task for generating reports
+    
+    Args:
+        report_config: Dictionary containing report configuration
+        
+    Returns:
+        Dictionary with generation results
+    """
+    try:
+        from .services.report_generator import ReportGenerator
+        
+        logger.info(f"Starting background report generation task")
+        logger.info(f"Report config: {report_config}")
+        
+        # Initialize report generator
+        generator = ReportGenerator()
+        
+        # Generate report
+        result = generator.generate_report(report_config)
+        
+        logger.info(f"Background report generation completed: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Background report generation failed: {str(e)}", exc_info=True)
+        
+        # Retry logic with exponential backoff
+        if self.request.retries < self.max_retries:
+            retry_delay = 30 * (2 ** self.request.retries)  # 30s, 60s, 120s
+            logger.info(f"Retrying report generation in {retry_delay} seconds (attempt {self.request.retries + 1})")
+            raise self.retry(countdown=retry_delay, exc=e)
+        
+        return {
+            'success': False,
+            'error': str(e),
+            'generated_at': timezone.now().isoformat(),
+            'retries_exhausted': True
+        }
+
+
+@shared_task
+def cleanup_old_reports():
+    """
+    Background task to clean up old report files
+    Runs daily to remove expired reports
+    """
+    try:
+        import os
+        from pathlib import Path
+        from django.conf import settings
+        
+        logger.info("Starting report cleanup task")
+        
+        # Get report directories
+        reports_dir = Path(settings.MEDIA_ROOT) / "reports"
+        
+        if not reports_dir.exists():
+            logger.info("Reports directory does not exist, skipping cleanup")
+            return {'cleaned_files': 0}
+        
+        # Clean up files older than 30 days
+        cutoff_date = timezone.now() - timedelta(days=30)
+        cutoff_timestamp = cutoff_date.timestamp()
+        
+        cleaned_count = 0
+        
+        for format_dir in ['pdf', 'pptx']:
+            format_path = reports_dir / format_dir
+            if format_path.exists():
+                for file_path in format_path.iterdir():
+                    if file_path.is_file():
+                        # Check file age
+                        file_age = file_path.stat().st_mtime
+                        if file_age < cutoff_timestamp:
+                            try:
+                                file_path.unlink()
+                                cleaned_count += 1
+                                logger.info(f"Cleaned up old report file: {file_path}")
+                            except Exception as e:
+                                logger.error(f"Failed to delete file {file_path}: {str(e)}")
+        
+        logger.info(f"Report cleanup completed. Cleaned {cleaned_count} files.")
+        return {'cleaned_files': cleaned_count}
+        
+    except Exception as e:
+        logger.error(f"Report cleanup task failed: {str(e)}", exc_info=True)
+        return {'error': str(e)}
+
+
+@shared_task
+def generate_report_analytics():
+    """
+    Background task to generate report usage analytics
+    """
+    try:
+        logger.info("Starting report analytics generation")
+        
+        # This would generate analytics data for the admin dashboard
+        # For now, return mock data
+        analytics = {
+            'total_reports_generated': 156,
+            'pdf_reports': 89,
+            'pptx_reports': 67,
+            'most_popular_template': 'retirement-overview',
+            'average_generation_time': 45.2,
+            'generated_at': timezone.now().isoformat()
+        }
+        
+        logger.info(f"Report analytics generated: {analytics}")
+        return analytics
+        
+    except Exception as e:
+        logger.error(f"Report analytics generation failed: {str(e)}", exc_info=True)
+        return {'error': str(e)}
+
+# =============================================================================
 # UTILITY TASKS
 # =============================================================================
 

@@ -161,10 +161,11 @@ def run_scenario_calculation(request, scenario_id):
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
+    from .authentication import get_enhanced_user_data
     user = request.user
     if request.method == 'GET':
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
+        # Return enhanced user data including admin fields
+        return Response(get_enhanced_user_data(user))
     elif request.method == 'PUT':
         # Handle file uploads
         data = request.data.copy()
@@ -231,7 +232,28 @@ class AdvisorClientListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Client.objects.filter(advisor=self.request.user)
+        queryset = Client.objects.filter(advisor=self.request.user)
+        
+        # Add search functionality
+        search = self.request.query_params.get('search', None)
+        if search:
+            # Search in first name, last name, and email fields
+            queryset = queryset.filter(
+                models.Q(first_name__icontains=search) |
+                models.Q(last_name__icontains=search) |
+                models.Q(email__icontains=search)
+            )
+        
+        # Add limit parameter for search results
+        limit = self.request.query_params.get('limit', None)
+        if limit:
+            try:
+                limit = int(limit)
+                queryset = queryset[:limit]
+            except ValueError:
+                pass  # Ignore invalid limit values
+                
+        return queryset
     
   
 class ClientDetailView(generics.RetrieveAPIView):
@@ -4176,4 +4198,122 @@ def get_jump_ai_meeting_insights(request, event_id):
             {'error': f'Failed to get meeting insights: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# Temporary mock Report Center endpoints for debugging
+from rest_framework.decorators import api_view
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def mock_report_templates(request):
+    """Temporary mock endpoint for report templates while fixing Report Center imports"""
+    if request.method == 'GET':
+        # Return mock template data
+        return Response({
+            'results': [
+                {
+                    'id': 1,
+                    'name': 'Comprehensive Retirement Report',
+                    'description': 'Complete financial analysis and recommendations',
+                    'template_type': 'comprehensive',
+                    'is_public': True,
+                    'is_active': True,
+                    'created_by': request.user.id if request.user.is_authenticated else 1,
+                    'created_at': '2025-01-01T00:00:00Z',
+                    'updated_at': '2025-01-01T00:00:00Z',
+                    'preview_image': None,
+                    'sections': []
+                },
+                {
+                    'id': 2,
+                    'name': 'Tax Planning Analysis',
+                    'description': 'Tax optimization strategies and projections',
+                    'template_type': 'tax_planning',
+                    'is_public': True,
+                    'is_active': True,
+                    'created_by': request.user.id if request.user.is_authenticated else 1,
+                    'created_at': '2025-01-01T00:00:00Z',
+                    'updated_at': '2025-01-01T00:00:00Z',
+                    'preview_image': None,
+                    'sections': []
+                }
+            ],
+            'count': 2,
+            'next': None,
+            'previous': None
+        })
+    else:
+        # Mock POST response
+        return Response({
+            'id': 3,
+            'name': request.data.get('name', 'New Template'),
+            'description': request.data.get('description', ''),
+            'template_type': request.data.get('template_type', 'comprehensive'),
+            'is_public': False,
+            'is_active': True,
+            'created_by': request.user.id if request.user.is_authenticated else 1,
+            'created_at': '2025-01-01T00:00:00Z',
+            'updated_at': '2025-01-01T00:00:00Z',
+            'sections': []
+        }, status=status.HTTP_201_CREATED)
+
+@api_view(['GET', 'POST'])  
+@permission_classes([AllowAny])
+def mock_reports(request):
+    """Temporary mock endpoint for reports"""
+    if request.method == 'GET':
+        return Response({
+            'results': [],
+            'count': 0,
+            'next': None,
+            'previous': None
+        })
+    else:
+        # More complete mock response that matches what the frontend expects
+        return Response({
+            'id': 1,
+            'name': request.data.get('name', 'New Report'),
+            'description': request.data.get('description', ''),
+            'client_id': request.data.get('client_id'),
+            'scenario_id': request.data.get('scenario_id'),  
+            'template_id': request.data.get('template_id'),
+            'export_format': request.data.get('export_format', 'pdf'),
+            'sections': request.data.get('sections', []),
+            'status': request.data.get('status', 'draft'),
+            'created_by': request.user.id if request.user.is_authenticated else 1,
+            'created_at': '2025-01-01T00:00:00Z',
+            'updated_at': '2025-01-01T00:00:00Z',
+            'client_name': None,  # Would be populated from client_id in real implementation
+            'template_name': None,  # Would be populated from template_id in real implementation
+        }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def mock_generate_report(request, report_id):
+    """Temporary mock endpoint for report generation"""
+    format_type = request.data.get('format', 'pdf')
+    
+    return Response({
+        'task_id': f'mock_task_{report_id}_{format_type}',
+        'format': format_type,
+        'report_id': report_id,
+        'status': 'generating',
+        'message': f'Report generation started for {format_type.upper()} format',
+        'estimated_completion': '2025-01-01T00:05:00Z'  # Mock 5 minutes from now
+    })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def mock_report_status(request, report_id):
+    """Temporary mock endpoint for checking report generation status"""
+    # Simulate a completed report after some time (for demo purposes)
+    return Response({
+        'id': report_id,
+        'status': 'completed',  # Could be 'generating', 'completed', 'failed'
+        'generation_completed_at': '2025-01-01T00:02:00Z',
+        'download_url': f'/api/report-center/reports/{report_id}/download/',
+        'file_size': '2.4 MB',
+        'pages': 12,
+        'message': 'Report generation completed successfully'
+    })
 

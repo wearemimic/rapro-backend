@@ -311,3 +311,91 @@ class ClientPortalSecurity:
         """
         # Implementation for IP-based access controls
         return True
+
+
+# Admin Authentication System
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Custom JWT serializer to include admin claims"""
+    
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        
+        # Add admin-related claims to the token
+        token['is_admin_user'] = user.is_admin_user
+        token['admin_role'] = user.admin_role or ''
+        token['admin_permissions'] = user.admin_permissions or {}
+        
+        # Add other user claims
+        token['user_id'] = user.id
+        token['email'] = user.email
+        token['company_name'] = user.company_name or ''
+        token['subscription_status'] = user.subscription_status or ''
+        
+        return token
+
+
+class CustomRefreshToken(RefreshToken):
+    """Custom refresh token with admin claims"""
+    
+    @classmethod
+    def for_user(cls, user):
+        """
+        Returns an authorization grant token for the given user that will be
+        provided after authenticating the user's credentials.
+        """
+        token = cls()
+        token[cls.token_type] = cls.token_type
+        token['user_id'] = user.pk
+        
+        # Add admin-related claims
+        token['is_admin_user'] = user.is_admin_user
+        token['admin_role'] = user.admin_role or ''
+        token['admin_permissions'] = user.admin_permissions or {}
+        
+        # Add other user claims
+        token['email'] = user.email
+        token['company_name'] = user.company_name or ''
+        token['subscription_status'] = user.subscription_status or ''
+        
+        return token
+
+
+def create_jwt_pair_for_user(user):
+    """
+    Helper function to create JWT token pair with admin claims
+    """
+    refresh = CustomRefreshToken.for_user(user)
+    return {
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }
+
+
+def get_enhanced_user_data(user):
+    """
+    Get comprehensive user data including admin information for API responses
+    """
+    return {
+        'id': user.id,
+        'email': user.email,
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'company_name': user.company_name,
+        'subscription_status': user.subscription_status,
+        'subscription_plan': user.subscription_plan,
+        'is_subscription_active': user.is_subscription_active,
+        # Admin fields
+        'is_admin_user': user.is_admin_user,
+        'admin_role': user.admin_role,
+        'admin_role_display': user.get_admin_role_display_name(),
+        'admin_permissions': user.admin_permissions,
+    }

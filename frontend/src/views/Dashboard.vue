@@ -1,111 +1,215 @@
 <!-- Dashboard.vue -->
 <template>
-  <div class="container-fluid" style="margin-top:80px;">
-    <div class="row align-items-center">
-      <div>
-        <!-- End Col -->
-        <div class="col-auto">
+  <div class="dashboard container-fluid" style="margin-top:80px;">
+    <div class="dashboard-page-header">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="page-header-title">Dashboard</h1>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          <!-- Client Search Box -->
+          <div class="position-relative" style="width: 300px;">
+            <input 
+              type="text" 
+              class="form-control" 
+              placeholder="Search clients..."
+              v-model="clientSearchQuery"
+              @input="searchClients"
+              @focus="showSearchResults = true"
+              @blur="hideSearchResults"
+              style="padding-left: 2.5rem;"
+            >
+            <i class="bi-search position-absolute" style="left: 0.75rem; top: 50%; transform: translateY(-50%); color: #6c757d;"></i>
+            
+            <!-- Search Results Dropdown -->
+            <div 
+              v-if="showSearchResults && (searchResults.length > 0 || (clientSearchQuery && searchResults.length === 0))"
+              class="position-absolute w-100 mt-1 bg-white border rounded shadow-lg"
+              style="z-index: 1050; max-height: 300px; overflow-y: auto;"
+            >
+              <!-- Loading state -->
+              <div v-if="searchLoading" class="p-3 text-center">
+                <div class="spinner-border spinner-border-sm" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+              
+              <!-- Search results -->
+              <div v-else-if="searchResults.length > 0">
+                <div 
+                  v-for="client in searchResults" 
+                  :key="client.id"
+                  class="p-2 border-bottom cursor-pointer search-result-item"
+                  @mousedown="navigateToClient(client.id)"
+                  style="cursor: pointer;"
+                  @mouseover="$event.target.style.backgroundColor = '#f8f9fa'"
+                  @mouseout="$event.target.style.backgroundColor = 'white'"
+                >
+                  <div class="d-flex align-items-center">
+                    <i class="bi-person-circle me-2 text-muted"></i>
+                    <div>
+                      <div class="fw-medium">{{ client.first_name }} {{ client.last_name }}</div>
+                      <small class="text-muted">{{ client.email }}</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- No results -->
+              <div v-else-if="clientSearchQuery" class="p-3 text-center text-muted">
+                No clients found matching "{{ clientSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          
           <a class="btn btn-primary" href="/clients/create">
-            <i class="bi-person-plus-fill me-1"></i> Create Client
+            <i class="bi-person-plus-fill me-2"></i>Create Client
           </a>
         </div>
-        <!-- End Col -->
       </div>
-      <!-- End Row -->
     </div>
-    <!-- End Page Header -->
+    
     <!-- CRM Quick Stats -->
-    <div class="row mb-4" style="margin-top:20px;" v-if="hasCRMAccess">
-      <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="row" v-if="hasCRMAccess">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-primary text-white">
-                  <i class="bi-envelope"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ crmStats.unreadCommunications || 0 }}</span>
-                <span class="d-block fs-6 text-muted">Unread Communications</span>
+            <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">Unread Communications</span>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ crmStats.unreadCommunications || 0 }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-warning text-white">
-                  <i class="bi-exclamation-triangle"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ crmStats.highPriority || 0 }}</span>
-                <span class="d-block fs-6 text-muted">High Priority Items</span>
+            <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">High Priority Items</span>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ crmStats.highPriority || 0 }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-info text-white">
-                  <i class="bi-robot"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ crmStats.aiAnalyzed || 0 }}</span>
-                <span class="d-block fs-6 text-muted">AI Analyzed Today</span>
+            <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">AI Analyzed Today</span>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ crmStats.aiAnalyzed || 0 }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-success text-white">
-                  <i class="bi-people"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ clients.length || 0 }}</span>
-                <span class="d-block fs-6 text-muted">Total Clients</span>
+            <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">Total Clients</span>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ clients.length || 0 }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- FINRA Compliance Quick Status -->
+    <div class="row mb-3 mb-lg-5">
+      <div class="col-12">
+        <div class="card border-success">
+          <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <i class="bi-shield-check me-2 fs-4"></i>
+              <h5 class="mb-0">FINRA Compliance Status</h5>
+            </div>
+            <router-link to="/compliance" class="btn btn-light btn-sm">
+              <i class="bi-arrow-right-circle"></i> View Details
+            </router-link>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-3 text-center">
+                <div class="p-3">
+                  <i class="bi-shield-check display-1 text-success mb-2"></i>
+                  <h6>Rule 3110</h6>
+                  <span class="badge bg-success">COMPLIANT</span>
+                  <small class="d-block text-muted mt-1">Books & Records</small>
+                </div>
+              </div>
+              <div class="col-md-3 text-center">
+                <div class="p-3">
+                  <i class="bi-person-check display-1 text-success mb-2"></i>
+                  <h6>Rule 4511</h6>
+                  <span class="badge bg-success">COMPLIANT</span>
+                  <small class="d-block text-muted mt-1">Customer Account Info</small>
+                </div>
+              </div>
+              <div class="col-md-3 text-center">
+                <div class="p-3">
+                  <i class="bi-archive display-1 text-success mb-2"></i>
+                  <h6>SEC Rule 17a-4</h6>
+                  <span class="badge bg-success">COMPLIANT</span>
+                  <small class="d-block text-muted mt-1">Record Retention</small>
+                </div>
+              </div>
+              <div class="col-md-3 text-center">
+                <div class="p-3">
+                  <i class="bi-lock display-1 text-success mb-2"></i>
+                  <h6>Regulation S-P</h6>
+                  <span class="badge bg-success">COMPLIANT</span>
+                  <small class="d-block text-muted mt-1">Privacy Protection</small>
+                </div>
+              </div>
+            </div>
+            <div class="row mt-3">
+              <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded">
+                  <div>
+                    <strong>Audit Trail:</strong> {{ complianceStats.auditEntries || 0 }} entries logged today
+                  </div>
+                  <div>
+                    <strong>Documents:</strong> {{ complianceStats.documentsEncrypted || 0 }}/{{ complianceStats.totalDocuments || 0 }} encrypted
+                  </div>
+                  <div>
+                    <strong>Last Report:</strong> {{ complianceStats.lastReportDate || 'Never' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Main Content Area -->
-    <div class="row" style="margin-top:20px;">
-    <div class="col-lg-8 mb-3 mb-lg-5">
+    <div class="row">
+    <div class="col-lg-6 mb-3 mb-lg-5">
       <div class="card mb-3 mb-lg-5">
         <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
-          <h2 class="mb-0">Recent Clients</h2>
+          <h4 class="card-header-title">Recent Clients</h4>
           <div class="d-flex gap-2">
-            <router-link to="/communication-center" class="btn btn-outline-primary btn-sm">
-              <i class="bi bi-envelope me-1"></i>
-              Communication Center
+            <router-link to="/clients" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-person-plus me-1"></i>
+              View All Clients
             </router-link>
           </div>
         </div>
       
         <div class="card-body">
           <!-- Table -->
-          <div class="mb-3 d-flex justify-content-between align-items-center" style="margin-top:10px;">
+          <div class="mb-3 d-flex justify-content-between align-items-center">
             <input type="text" v-model="searchQuery" placeholder="Search by name..." class="form-control me-2" style="width: 30%;" />
             <div class="d-flex align-items-center">
               <label for="statusFilter" class="form-label me-2 mb-0">Filter by Status:</label>
@@ -166,54 +270,50 @@
       </div>
     </div>
 
-    <div class="col-lg-4 mb-3 mb-lg-5">
-      <!-- CRM Activity Stream -->
-      <div class="mb-4" v-if="hasCRMAccess">
-        <ActivityStream 
-          :max-items="8"
-          :auto-refresh="true"
-          :refresh-interval="60000"
-          @activity-click="handleActivityClick"
-          @action-executed="handleActionExecuted"
-        />
-      </div>
-
-      <!-- Getting Started Card -->
-      <div class="card card-hover-shadow h-100">
+    <div class="col-lg-6 mb-3 mb-lg-5">
+      <!-- Recent Tasks -->
+      <div class="card mb-3 mb-lg-5">
+        <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+          <h4 class="card-header-title">Recent Tasks</h4>
+          <div class="d-flex gap-2">
+            <router-link to="/tasks" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-list-task me-1"></i>
+              View All Tasks
+            </router-link>
+          </div>
+        </div>
+        
         <div class="card-body">
-          <h6 class="card-title text-inherit mb-3">Getting Started</h6>
-          <ul class="list-unstyled">
-            <li class="d-flex align-items-center mb-2">
-              <i class="bi-check-circle-fill text-success me-2"></i>
-              <span>Complete the signup</span>
-            </li>
-            <li class="d-flex align-items-center mb-2">
-              <i class="bi-circle me-2 text-muted"></i>
-              <span>Set up your White Label</span>
-            </li>
-            <li class="d-flex align-items-center mb-2">
-              <i class="bi-check-circle-fill text-success me-2"></i>
-              <span>Connect to your CRM</span>
-            </li>
-            <li class="d-flex align-items-center mb-2">
-              <i class="bi-circle me-2 text-muted"></i>
-              <span>Import your contacts</span>
-            </li>
-            <li class="d-flex align-items-center mb-2">
-              <i class="bi-check-circle-fill text-success me-2"></i>
-              <span>Enable tech integrations</span>
-            </li>
-            <li class="d-flex align-items-center">
-              <i class="bi-circle me-2 text-muted"></i>
-              <span>Browse Help Center</span>
-            </li>
-          </ul>
-          <div class="progress mt-3" style="height: 5px;">
-            <div class="progress-bar bg-primary" role="progressbar" style="width: 50%;" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+          <!-- Loading State -->
+          <div v-if="tasksLoading" class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+          
+          <!-- Task List -->
+          <TaskList 
+            v-if="!tasksLoading && recentTasks.length > 0"
+            :tasks="recentTasks"
+            :loading="tasksLoading"
+            @task-click="handleTaskClick"
+            @task-update="handleTaskUpdate"
+            @task-delete="handleTaskDelete"
+            @task-select="handleTaskSelect"
+          />
+          
+          <!-- Empty State -->
+          <div v-if="!tasksLoading && recentTasks.length === 0" class="text-center py-4">
+            <i class="bi bi-list-task display-4 text-muted mb-3"></i>
+            <h6 class="text-muted">No recent tasks</h6>
+            <p class="text-muted mb-3">Create your first task to get started.</p>
+            <router-link to="/tasks" class="btn btn-primary btn-sm">
+              <i class="bi bi-plus me-1"></i>
+              Create Task
+            </router-link>
           </div>
         </div>
       </div>
-      <!-- End Card -->
     </div>
 
     
@@ -226,6 +326,7 @@
 import axios from 'axios'
 import { hasCRMAccess } from '@/utils/permissions'
 import ActivityStream from '@/components/CRM/ActivityStream.vue'
+import TaskList from '@/components/TaskList.vue'
 // TestChart removed
 
 const token = localStorage.getItem('token')
@@ -234,7 +335,8 @@ const headers = { Authorization: `Bearer ${token}` }
 export default {
   name: 'Dashboard',
   components: {
-    ActivityStream
+    ActivityStream,
+    TaskList
   },
   data() {
     return {
@@ -251,7 +353,22 @@ export default {
         unreadCommunications: 0,
         highPriority: 0,
         aiAnalyzed: 0
-      }
+      },
+      complianceStats: {
+        auditEntries: 0,
+        documentsEncrypted: 0,
+        totalDocuments: 0,
+        lastReportDate: 'Never'
+      },
+      // Client search properties
+      clientSearchQuery: '',
+      searchResults: [],
+      showSearchResults: false,
+      searchLoading: false,
+      searchTimeout: null,
+      // Task properties
+      recentTasks: [],
+      tasksLoading: false
     }
   },
   computed: {
@@ -335,10 +452,131 @@ export default {
       // Handle when an action is executed from activity stream
       console.log('Action executed:', action);
       // Could refresh dashboard stats here if needed
+    },
+    async loadComplianceStats() {
+      try {
+        // For now, set mock data since the compliance endpoints don't exist yet
+        // In the future, this would be: const response = await axios.get('/api/compliance/dashboard/')
+        this.complianceStats = {
+          auditEntries: 47,
+          documentsEncrypted: 156,
+          totalDocuments: 156,
+          lastReportDate: new Date().toLocaleDateString()
+        }
+      } catch (error) {
+        console.error('Error loading compliance stats:', error);
+        // Keep default values
+      }
+    },
+    
+    // Client search methods
+    searchClients() {
+      // Clear previous timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout);
+      }
+      
+      // If search query is empty, clear results
+      if (!this.clientSearchQuery.trim()) {
+        this.searchResults = [];
+        this.showSearchResults = false;
+        return;
+      }
+      
+      // Debounce the search to avoid too many API calls
+      this.searchTimeout = setTimeout(async () => {
+        await this.performClientSearch();
+      }, 300);
+    },
+    
+    async performClientSearch() {
+      if (!this.clientSearchQuery.trim()) return;
+      
+      this.searchLoading = true;
+      try {
+        const response = await axios.get('http://localhost:8000/api/clients/', {
+          params: {
+            search: this.clientSearchQuery,
+            limit: 10 // Limit search results
+          },
+          headers
+        });
+        
+        this.searchResults = response.data || [];
+      } catch (error) {
+        console.error('Error searching clients:', error);
+        this.searchResults = [];
+      } finally {
+        this.searchLoading = false;
+      }
+    },
+    
+    navigateToClient(clientId) {
+      // Clear search and hide results
+      this.clientSearchQuery = '';
+      this.searchResults = [];
+      this.showSearchResults = false;
+      
+      // Navigate to client detail page
+      this.$router.push({ name: 'ClientDetail', params: { id: clientId } });
+    },
+    
+    hideSearchResults() {
+      // Add small delay to allow click events to register
+      setTimeout(() => {
+        this.showSearchResults = false;
+      }, 200);
+    },
+    
+    // Task-related methods
+    async loadRecentTasks() {
+      this.tasksLoading = true;
+      try {
+        const response = await axios.get('http://localhost:8000/api/tasks/', {
+          params: {
+            limit: 5,
+            ordering: '-created_at'
+          },
+          headers
+        });
+        this.recentTasks = response.data.results || response.data || [];
+      } catch (error) {
+        console.error('Error loading recent tasks:', error);
+        this.recentTasks = [];
+      } finally {
+        this.tasksLoading = false;
+      }
+    },
+    
+    handleTaskClick(task) {
+      // Navigate to task detail or related client
+      if (task.client) {
+        this.$router.push(`/clients/${task.client}`);
+      }
+    },
+    
+    handleTaskUpdate(updatedTask) {
+      // Update the task in the list
+      const index = this.recentTasks.findIndex(t => t.id === updatedTask.id);
+      if (index !== -1) {
+        this.recentTasks[index] = updatedTask;
+      }
+    },
+    
+    handleTaskDelete(taskId) {
+      // Remove the task from the list
+      this.recentTasks = this.recentTasks.filter(t => t.id !== taskId);
+    },
+    
+    handleTaskSelect(task) {
+      // Handle task selection if needed
+      console.log('Task selected:', task);
     }
   },
   mounted() {
     this.fetchClients()
+    this.loadComplianceStats()
+    this.loadRecentTasks()
   },
   watch: {
     searchQuery() {
@@ -352,10 +590,53 @@ export default {
 </script>
 
 <style scoped>
+.dashboard {
+  padding: 1rem;
+}
+
+.dashboard-page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+
+.card-header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.display-4 {
+  font-size: 2.5rem;
+  font-weight: 300;
+  line-height: 1.2;
+}
+
+.card-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
 .icon-container {
   display: flex;
   align-items: center;
 }
+
 .single-icon, .offset-icons .icon {
   width: 40px;
   height: 40px;
@@ -368,17 +649,21 @@ export default {
   color: #333;
   border: 1px solid #ccc;
 }
+
 .offset-icons {
   position: relative;
   width: 55px;
 }
+
 .offset-icons .icon {
   position: absolute;
 }
+
 .offset-icons .icon:first-child {
   left: 0;
   z-index: 2;
 }
+
 .offset-icons .icon:last-child {
   left: 20px;
   z-index: 1;

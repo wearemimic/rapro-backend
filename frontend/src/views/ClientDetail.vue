@@ -19,66 +19,62 @@
     </div>
     
     <!-- Tabbed Interface -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header border-bottom-0">
-            <ul class="nav nav-tabs card-header-tabs" id="clientDetailTabs" role="tablist">
-              <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" 
-                  data-bs-target="#overview-pane" type="button" role="tab" 
+    <ul class="nav nav-segment mb-3" id="clientDetailTabs" role="tablist">
+              <li class="nav-item">
+                <a class="nav-link active" id="overview-tab" data-bs-toggle="tab" 
+                  href="#overview-pane" role="tab" 
                   aria-controls="overview-pane" aria-selected="true">
-                  <i class="bi bi-person-circle me-2"></i>Overview
-                </button>
+                  Overview
+                </a>
               </li>
-              <li class="nav-item" role="presentation" v-if="hasCRMAccess">
-                <button class="nav-link" id="communications-tab" data-bs-toggle="tab" 
-                  data-bs-target="#communications-pane" type="button" role="tab" 
+              <li class="nav-item" v-if="hasCRMAccess">
+                <a class="nav-link" id="communications-tab" data-bs-toggle="tab" 
+                  href="#communications-pane" role="tab" 
                   aria-controls="communications-pane" aria-selected="false">
-                  <i class="bi bi-envelope me-2"></i>Communications
+                  Communications
                   <span v-if="unreadCount > 0" class="badge bg-primary ms-1">{{ unreadCount }}</span>
-                </button>
+                </a>
               </li>
-              <li class="nav-item" role="presentation" v-if="hasCRMAccess">
-                <button class="nav-link" id="activity-tab" data-bs-toggle="tab" 
-                  data-bs-target="#activity-pane" type="button" role="tab" 
+              <li class="nav-item" v-if="hasCRMAccess">
+                <a class="nav-link" id="activity-tab" data-bs-toggle="tab" 
+                  href="#activity-pane" role="tab" 
                   aria-controls="activity-pane" aria-selected="false">
-                  <i class="bi bi-activity me-2"></i>Activity
-                </button>
+                  Activity
+                </a>
               </li>
-              <li class="nav-item" role="presentation" v-if="hasCRMAccess">
-                <button class="nav-link" id="tasks-tab" data-bs-toggle="tab" 
-                  data-bs-target="#tasks-pane" type="button" role="tab" 
+              <li class="nav-item" v-if="hasCRMAccess">
+                <a class="nav-link" id="tasks-tab" data-bs-toggle="tab" 
+                  href="#tasks-pane" role="tab" 
                   aria-controls="tasks-pane" aria-selected="false">
-                  <i class="bi bi-check2-square me-2"></i>Tasks
+                  Tasks
                   <span v-if="clientTasks.length > 0" class="badge bg-info ms-1">{{ clientTasks.length }}</span>
-                </button>
+                </a>
               </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link" id="documents-tab" data-bs-toggle="tab" 
-                  data-bs-target="#documents-pane" type="button" role="tab" 
+              <li class="nav-item">
+                <a class="nav-link" id="documents-tab" data-bs-toggle="tab" 
+                  href="#documents-pane" role="tab" 
                   aria-controls="documents-pane" aria-selected="false">
-                  <i class="bi bi-file-earmark-text me-2"></i>Documents
+                  Documents
                   <span v-if="clientDocumentCount > 0" class="badge bg-secondary ms-1">{{ clientDocumentCount }}</span>
-                </button>
+                </a>
               </li>
-              <li class="nav-item" role="presentation">
-                <button class="nav-link" id="portal-access-tab" data-bs-toggle="tab" 
-                  data-bs-target="#portal-access-pane" type="button" role="tab" 
+              <li class="nav-item">
+                <a class="nav-link" id="portal-access-tab" data-bs-toggle="tab" 
+                  href="#portal-access-pane" role="tab" 
                   aria-controls="portal-access-pane" aria-selected="false">
-                  <i class="bi bi-key me-2"></i>Portal Access
+                  Portal Access
                   <span v-if="client?.portal_access_enabled" class="badge bg-success ms-1">Enabled</span>
-                </button>
+                </a>
               </li>
-            </ul>
-          </div>
-          
-          <div class="tab-content p-0">
+    </ul>
+    
+    <!-- Tab Content -->
+    <div class="tab-content">
             <!-- Overview Tab -->
             <div class="tab-pane fade show active" id="overview-pane" role="tabpanel" 
                  aria-labelledby="overview-tab">
               <!-- Two column layout with reduced spacing -->
-              <div class="row gx-3 p-4">
+              <div class="row gx-3">
                 <div class="col-lg-4">
                   <div v-if="client">
                     <div class="card mb-4">
@@ -224,7 +220,7 @@
             <!-- Communications Tab -->
             <div class="tab-pane fade" id="communications-pane" role="tabpanel" 
                  aria-labelledby="communications-tab" v-if="hasCRMAccess">
-              <div class="p-4">
+              <div>
                 <CommunicationSummaryWidget :client="client" class="mb-4" />
                 <CommunicationList 
                   :client-filter="client ? client.id : null" 
@@ -238,7 +234,7 @@
             <!-- Activity Tab -->
             <div class="tab-pane fade" id="activity-pane" role="tabpanel" 
                  aria-labelledby="activity-tab" v-if="hasCRMAccess">
-              <div class="p-4">
+              <div>
                 <ActivityStream 
                   :client-filter="client ? client.id : null"
                   :max-items="20"
@@ -253,7 +249,7 @@
             <!-- Tasks Tab -->
             <div class="tab-pane fade" id="tasks-pane" role="tabpanel" 
                  aria-labelledby="tasks-tab" v-if="hasCRMAccess">
-              <div class="p-4">
+              <div>
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <h5 class="mb-0">Client Tasks</h5>
                   <button @click="showCreateTaskModal" class="btn btn-primary">
@@ -323,7 +319,7 @@
             <!-- Documents Tab -->
             <div class="tab-pane fade" id="documents-pane" role="tabpanel" 
                  aria-labelledby="documents-tab">
-              <div class="p-4">
+              <div>
                 <ClientDocuments 
                   v-if="client"
                   :clientId="client.id"
@@ -336,7 +332,7 @@
             <!-- Portal Access Tab -->
             <div class="tab-pane fade" id="portal-access-pane" role="tabpanel" 
                  aria-labelledby="portal-access-tab">
-              <div class="p-4">
+              <div>
                 <ClientPortalAccess 
                   v-if="client"
                   :client="client"
@@ -344,9 +340,6 @@
                 />
               </div>
             </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Task Form Modal -->

@@ -1084,3 +1084,625 @@ from .serializers.document_serializers import (
     DocumentUploadSerializer, DocumentStatsSerializer, DocumentShareSerializer
 )
 
+
+# =============================================================================
+# CONFIGURATION MANAGEMENT SERIALIZERS
+# =============================================================================
+
+from .models import (
+    FeatureFlag, SystemConfiguration, IntegrationSettings, 
+    EmailTemplate, ConfigurationAuditLog
+)
+
+
+class FeatureFlagSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = FeatureFlag
+        fields = [
+            'id', 'name', 'description', 'is_enabled', 'rollout_percentage',
+            'user_segments', 'enabled_in_dev', 'enabled_in_staging', 'enabled_in_prod',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'approval_status', 'approved_by', 'approved_by_name', 'approved_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'approved_by', 'approved_at']
+
+    def validate_name(self, value):
+        """Validate feature flag name follows naming conventions"""
+        if not value.replace('_', '').replace('-', '').isalnum():
+            raise serializers.ValidationError("Feature flag name can only contain letters, numbers, hyphens, and underscores")
+        return value.lower()
+
+
+class SystemConfigurationSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = SystemConfiguration
+        fields = [
+            'id', 'config_key', 'config_name', 'description', 'category',
+            'config_value', 'config_type', 'environment', 'is_sensitive',
+            'validation_rule', 'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'approval_status', 'approved_by', 'approved_by_name', 'approved_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'approved_by', 'approved_at']
+
+    def validate_config_value(self, value):
+        """Validate config value matches the specified type"""
+        config_type = self.initial_data.get('config_type', 'string')
+        
+        if config_type == 'integer':
+            try:
+                int(value)
+            except ValueError:
+                raise serializers.ValidationError("Value must be a valid integer")
+        elif config_type == 'float':
+            try:
+                float(value)
+            except ValueError:
+                raise serializers.ValidationError("Value must be a valid number")
+        elif config_type == 'boolean':
+            if value.lower() not in ['true', 'false', '1', '0', 'yes', 'no']:
+                raise serializers.ValidationError("Value must be a valid boolean (true/false)")
+        elif config_type == 'json':
+            try:
+                json.loads(value)
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("Value must be valid JSON")
+        
+        return value
+
+
+class IntegrationSettingsSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = IntegrationSettings
+        fields = [
+            'id', 'integration_name', 'environment', 'config_data', 'is_active',
+            'last_tested', 'test_status', 'test_error_message',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'approval_status', 'approved_by', 'approved_by_name', 'approved_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'approved_by', 'approved_at', 'last_tested', 'test_status']
+
+    def to_representation(self, instance):
+        """Mask sensitive configuration data in responses"""
+        data = super().to_representation(instance)
+        
+        # Mask sensitive keys in config_data
+        sensitive_keys = [
+            'secret', 'key', 'token', 'password', 'client_secret',
+            'private_key', 'webhook_secret', 'api_key'
+        ]
+        
+        if 'config_data' in data and isinstance(data['config_data'], dict):
+            masked_config = {}
+            for key, value in data['config_data'].items():
+                if any(sensitive_key in key.lower() for sensitive_key in sensitive_keys):
+                    masked_config[key] = '***MASKED***' if value else ''
+                else:
+                    masked_config[key] = value
+            data['config_data'] = masked_config
+        
+        return data
+
+
+class EmailTemplateSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = EmailTemplate
+        fields = [
+            'id', 'template_name', 'template_type', 'description', 'subject',
+            'html_body', 'text_body', 'variables', 'default_sender_name',
+            'default_sender_email', 'is_active', 'usage_count', 'last_used',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'approval_status', 'approved_by', 'approved_by_name', 'approved_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'approved_by', 'approved_at', 'usage_count', 'last_used']
+
+    def validate_html_body(self, value):
+        """Basic validation for HTML content"""
+        if not value.strip():
+            raise serializers.ValidationError("HTML body cannot be empty")
+        return value
+
+    def validate_variables(self, value):
+        """Validate template variables format"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Variables must be a list")
+        
+        for variable in value:
+            if not isinstance(variable, str) or not variable.strip():
+                raise serializers.ValidationError("Each variable must be a non-empty string")
+        
+        return value
+
+
+class ConfigurationAuditLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = ConfigurationAuditLog
+        fields = [
+            'id', 'object_type', 'object_id', 'object_name', 'action',
+            'old_values', 'new_values', 'change_reason', 'user', 'user_name',
+            'ip_address', 'user_agent', 'requires_approval', 'approval_status',
+            'approved_by', 'approved_by_name', 'approved_at', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+# Summary serializers for dashboard views
+class ConfigurationSummarySerializer(serializers.Serializer):
+    """Summary statistics for configuration management dashboard"""
+    
+    feature_flags_total = serializers.IntegerField()
+    feature_flags_enabled = serializers.IntegerField()
+    feature_flags_pending_approval = serializers.IntegerField()
+    
+    system_configs_total = serializers.IntegerField()
+    system_configs_by_category = serializers.DictField()
+    system_configs_pending_approval = serializers.IntegerField()
+    
+    integrations_total = serializers.IntegerField()
+    integrations_active = serializers.IntegerField()
+    integrations_test_failed = serializers.IntegerField()
+    
+    email_templates_total = serializers.IntegerField()
+    email_templates_active = serializers.IntegerField()
+    email_templates_pending_approval = serializers.IntegerField()
+    
+    pending_approvals_total = serializers.IntegerField()
+    recent_changes_count = serializers.IntegerField()
+
+
+# =============================================================================
+# ANALYTICS & REPORTING SERIALIZERS
+# =============================================================================
+
+from .models import (
+    CustomReport, ReportSchedule, ReportExecution, PredictiveAnalyticsModel,
+    UserChurnPrediction, CustomerLifetimeValue, ExecutiveDashboard
+)
+
+
+class CustomReportSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    allowed_users_names = serializers.SerializerMethodField()
+    execution_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CustomReport
+        fields = [
+            'id', 'report_name', 'description', 'report_type', 'data_sources',
+            'filters', 'grouping', 'aggregations', 'sorting', 'chart_type',
+            'chart_config', 'is_public', 'allowed_users', 'allowed_users_names',
+            'allowed_roles', 'created_by', 'created_by_name', 'created_at',
+            'updated_at', 'view_count', 'last_viewed', 'execution_count'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'view_count', 'last_viewed']
+    
+    def get_allowed_users_names(self, obj):
+        return [user.get_full_name() or user.email for user in obj.allowed_users.all()]
+    
+    def get_execution_count(self, obj):
+        return obj.executions.count()
+
+
+class CustomReportListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for report lists"""
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = CustomReport
+        fields = [
+            'id', 'report_name', 'description', 'report_type', 'is_public',
+            'created_by_name', 'created_at', 'view_count', 'last_viewed'
+        ]
+
+
+class ReportScheduleSerializer(serializers.ModelSerializer):
+    report_name = serializers.CharField(source='report.report_name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = ReportSchedule
+        fields = [
+            'id', 'report', 'report_name', 'schedule_name', 'frequency',
+            'day_of_week', 'day_of_month', 'time_of_day', 'email_recipients',
+            'export_format', 'include_charts', 'status', 'last_run', 'next_run',
+            'run_count', 'error_count', 'last_error', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'last_run', 'run_count', 'error_count']
+    
+    def validate_email_recipients(self, value):
+        """Validate email recipients list"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Email recipients must be a list")
+        
+        for email in value:
+            if not email or '@' not in email:
+                raise serializers.ValidationError(f"Invalid email address: {email}")
+        
+        return value
+    
+    def validate(self, data):
+        frequency = data.get('frequency')
+        
+        if frequency == 'weekly' and not data.get('day_of_week'):
+            raise serializers.ValidationError("day_of_week is required for weekly schedules")
+        
+        if frequency == 'monthly' and not data.get('day_of_month'):
+            raise serializers.ValidationError("day_of_month is required for monthly schedules")
+        
+        return data
+
+
+class ReportExecutionSerializer(serializers.ModelSerializer):
+    report_name = serializers.CharField(source='report.report_name', read_only=True)
+    schedule_name = serializers.CharField(source='schedule.schedule_name', read_only=True)
+    executed_by_name = serializers.CharField(source='executed_by.get_full_name', read_only=True)
+    duration_formatted = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ReportExecution
+        fields = [
+            'id', 'report', 'report_name', 'schedule', 'schedule_name',
+            'status', 'started_at', 'completed_at', 'execution_time',
+            'duration_formatted', 'result_count', 'export_file_path',
+            'export_file_size', 'error_message', 'stack_trace',
+            'executed_by', 'executed_by_name', 'execution_params'
+        ]
+        read_only_fields = ['id', 'started_at']
+    
+    def get_duration_formatted(self, obj):
+        if obj.execution_time:
+            minutes, seconds = divmod(obj.execution_time, 60)
+            if minutes > 0:
+                return f"{minutes}m {seconds}s"
+            return f"{seconds}s"
+        return None
+
+
+class PredictiveAnalyticsModelSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    performance_metrics = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PredictiveAnalyticsModel
+        fields = [
+            'id', 'model_name', 'model_type', 'description', 'features',
+            'target_variable', 'algorithm', 'hyperparameters', 'accuracy_score',
+            'precision_score', 'recall_score', 'f1_score', 'model_file_path',
+            'feature_importance', 'training_data_size', 'status', 'trained_at',
+            'last_prediction_at', 'prediction_count', 'created_by', 'created_by_name',
+            'created_at', 'updated_at', 'performance_metrics'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'trained_at', 'prediction_count']
+    
+    def get_performance_metrics(self, obj):
+        """Get formatted performance metrics"""
+        metrics = {}
+        if obj.accuracy_score:
+            metrics['accuracy'] = f"{obj.accuracy_score:.2%}"
+        if obj.precision_score:
+            metrics['precision'] = f"{obj.precision_score:.2%}"
+        if obj.recall_score:
+            metrics['recall'] = f"{obj.recall_score:.2%}"
+        if obj.f1_score:
+            metrics['f1'] = f"{obj.f1_score:.2%}"
+        return metrics
+
+
+class UserChurnPredictionSerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    model_name = serializers.CharField(source='model.model_name', read_only=True)
+    
+    class Meta:
+        model = UserChurnPrediction
+        fields = [
+            'id', 'user', 'user_email', 'user_name', 'model', 'model_name',
+            'churn_probability', 'risk_level', 'feature_values', 'contributing_factors',
+            'recommendations', 'predicted_at', 'prediction_horizon_days',
+            'actual_churned', 'churn_date'
+        ]
+        read_only_fields = ['id', 'predicted_at']
+
+
+class CustomerLifetimeValueSerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    model_name = serializers.CharField(source='model.model_name', read_only=True)
+    
+    class Meta:
+        model = CustomerLifetimeValue
+        fields = [
+            'id', 'user', 'user_email', 'user_name', 'model', 'model_name',
+            'predicted_clv', 'current_value', 'future_value', 'clv_6_months',
+            'clv_1_year', 'clv_3_years', 'value_segment', 'predicted_lifetime_months',
+            'average_monthly_revenue', 'retention_probability', 'calculated_at',
+            'calculation_method', 'confidence_score'
+        ]
+        read_only_fields = ['id', 'calculated_at']
+
+
+class ExecutiveDashboardSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = ExecutiveDashboard
+        fields = [
+            'id', 'dashboard_name', 'description', 'layout_config', 'refresh_interval',
+            'widgets', 'visible_to_roles', 'is_default', 'created_by', 'created_by_name',
+            'created_at', 'updated_at', 'view_count', 'last_viewed'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'view_count', 'last_viewed']
+
+
+# =============================================================================
+# COMMUNICATION TOOLS SERIALIZERS
+# =============================================================================
+
+from .models import (
+    BroadcastMessage, BroadcastDelivery, EmailCampaign, EmailCampaignDelivery,
+    InAppNotification, MaintenanceMode, UserFeedback, FeedbackResponse
+)
+
+
+class BroadcastMessageSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    specific_users_names = serializers.SerializerMethodField()
+    delivery_stats = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BroadcastMessage
+        fields = [
+            'id', 'title', 'message', 'message_type', 'delivery_method',
+            'target_all_users', 'target_roles', 'target_user_segments',
+            'specific_users', 'specific_users_names', 'send_immediately',
+            'scheduled_send_time', 'status', 'sent_at', 'total_recipients',
+            'delivered_count', 'opened_count', 'clicked_count', 'has_action_button',
+            'action_button_text', 'action_button_url', 'created_by', 'created_by_name',
+            'created_at', 'updated_at', 'delivery_stats'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'sent_at', 'status']
+    
+    def get_specific_users_names(self, obj):
+        return [user.get_full_name() or user.email for user in obj.specific_users.all()]
+    
+    def get_delivery_stats(self, obj):
+        if obj.total_recipients > 0:
+            return {
+                'delivery_rate': (obj.delivered_count / obj.total_recipients) * 100,
+                'open_rate': (obj.opened_count / obj.total_recipients) * 100,
+                'click_rate': (obj.clicked_count / obj.total_recipients) * 100
+            }
+        return {'delivery_rate': 0, 'open_rate': 0, 'click_rate': 0}
+
+
+class BroadcastDeliverySerializer(serializers.ModelSerializer):
+    broadcast_title = serializers.CharField(source='broadcast.title', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = BroadcastDelivery
+        fields = [
+            'id', 'broadcast', 'broadcast_title', 'user', 'user_email', 'user_name',
+            'delivery_method', 'status', 'sent_at', 'delivered_at', 'opened_at',
+            'clicked_at', 'error_message', 'retry_count', 'user_agent', 'ip_address'
+        ]
+        read_only_fields = ['id', 'sent_at', 'delivered_at', 'opened_at', 'clicked_at']
+
+
+class EmailCampaignSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    performance_metrics = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = EmailCampaign
+        fields = [
+            'id', 'campaign_name', 'description', 'campaign_type', 'subject_line',
+            'preview_text', 'email_content', 'plain_text_content', 'is_ab_test',
+            'ab_test_config', 'target_segments', 'estimated_recipients',
+            'send_immediately', 'scheduled_send_time', 'sender_name', 'sender_email',
+            'reply_to_email', 'status', 'sent_at', 'total_sent', 'delivered_count',
+            'opened_count', 'clicked_count', 'unsubscribed_count', 'bounced_count',
+            'open_rate', 'click_rate', 'click_through_rate', 'unsubscribe_rate',
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'performance_metrics'
+        ]
+        read_only_fields = [
+            'id', 'created_by', 'created_at', 'updated_at', 'sent_at', 'status',
+            'total_sent', 'delivered_count', 'opened_count', 'clicked_count',
+            'unsubscribed_count', 'bounced_count', 'open_rate', 'click_rate',
+            'click_through_rate', 'unsubscribe_rate'
+        ]
+    
+    def get_performance_metrics(self, obj):
+        return {
+            'open_rate': f"{obj.open_rate:.1f}%" if obj.open_rate else "0%",
+            'click_rate': f"{obj.click_rate:.1f}%" if obj.click_rate else "0%",
+            'click_through_rate': f"{obj.click_through_rate:.1f}%" if obj.click_through_rate else "0%",
+            'unsubscribe_rate': f"{obj.unsubscribe_rate:.1f}%" if obj.unsubscribe_rate else "0%"
+        }
+
+
+class EmailCampaignListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for campaign lists"""
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = EmailCampaign
+        fields = [
+            'id', 'campaign_name', 'campaign_type', 'status', 'total_sent',
+            'open_rate', 'click_rate', 'created_by_name', 'created_at', 'sent_at'
+        ]
+
+
+class EmailCampaignDeliverySerializer(serializers.ModelSerializer):
+    campaign_name = serializers.CharField(source='campaign.campaign_name', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = EmailCampaignDelivery
+        fields = [
+            'id', 'campaign', 'campaign_name', 'user', 'user_name', 'email_address',
+            'subject_line', 'status', 'sent_at', 'delivered_at', 'first_opened_at',
+            'last_opened_at', 'open_count', 'click_count', 'user_agent', 'ip_address',
+            'email_client', 'device_type', 'bounce_reason', 'error_message', 'ab_variant'
+        ]
+        read_only_fields = ['id', 'sent_at', 'delivered_at', 'first_opened_at', 'last_opened_at']
+
+
+class InAppNotificationSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    broadcast_title = serializers.CharField(source='source_broadcast.title', read_only=True)
+    
+    class Meta:
+        model = InAppNotification
+        fields = [
+            'id', 'user', 'title', 'message', 'notification_type', 'priority',
+            'has_action', 'action_text', 'action_url', 'action_data', 'icon',
+            'color', 'is_read', 'read_at', 'is_dismissed', 'dismissed_at',
+            'expires_at', 'auto_dismiss_after', 'source_broadcast', 'broadcast_title',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'read_at', 'dismissed_at']
+
+
+class MaintenanceModeSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    duration_estimated = serializers.SerializerMethodField()
+    duration_actual = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = MaintenanceMode
+        fields = [
+            'id', 'title', 'description', 'maintenance_type', 'scheduled_start',
+            'scheduled_end', 'actual_start', 'actual_end', 'status', 'is_active',
+            'block_all_access', 'allow_admin_access', 'public_message',
+            'notification_sent', 'advance_notice_hours', 'progress_percentage',
+            'progress_message', 'estimated_completion', 'contact_email',
+            'status_page_url', 'created_by', 'created_by_name', 'created_at',
+            'updated_at', 'duration_estimated', 'duration_actual'
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'actual_start', 'actual_end']
+    
+    def get_duration_estimated(self, obj):
+        if obj.scheduled_start and obj.scheduled_end:
+            delta = obj.scheduled_end - obj.scheduled_start
+            hours, remainder = divmod(int(delta.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
+            return f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+        return None
+    
+    def get_duration_actual(self, obj):
+        if obj.actual_start and obj.actual_end:
+            delta = obj.actual_end - obj.actual_start
+            hours, remainder = divmod(int(delta.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
+            return f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+        return None
+
+
+class UserFeedbackSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
+    response_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = UserFeedback
+        fields = [
+            'id', 'user', 'user_name', 'email', 'feedback_type', 'title', 'description',
+            'priority', 'status', 'page_url', 'user_agent', 'browser_info',
+            'screen_resolution', 'has_attachments', 'attachment_paths', 'tags',
+            'category', 'assigned_to', 'assigned_to_name', 'staff_notes',
+            'resolution_notes', 'created_at', 'updated_at', 'resolved_at',
+            'follow_up_required', 'follow_up_date', 'customer_satisfied',
+            'satisfaction_rating', 'response_count'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'resolved_at']
+    
+    def get_response_count(self, obj):
+        return obj.responses.filter(visible_to_user=True).count()
+
+
+class UserFeedbackListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for feedback lists"""
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
+    
+    class Meta:
+        model = UserFeedback
+        fields = [
+            'id', 'title', 'feedback_type', 'priority', 'status', 'user_name',
+            'assigned_to_name', 'created_at', 'updated_at'
+        ]
+
+
+class FeedbackResponseSerializer(serializers.ModelSerializer):
+    staff_user_name = serializers.CharField(source='staff_user.get_full_name', read_only=True)
+    feedback_title = serializers.CharField(source='feedback.title', read_only=True)
+    
+    class Meta:
+        model = FeedbackResponse
+        fields = [
+            'id', 'feedback', 'feedback_title', 'staff_user', 'staff_user_name',
+            'message', 'is_internal_note', 'visible_to_user', 'user_notified',
+            'notification_sent_at', 'has_attachments', 'attachment_paths',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user_notified', 'notification_sent_at']
+
+
+# Summary serializers for analytics dashboards
+class AnalyticsSummarySerializer(serializers.Serializer):
+    """Summary statistics for analytics dashboard"""
+    
+    total_users = serializers.IntegerField()
+    active_users_30d = serializers.IntegerField()
+    new_users_30d = serializers.IntegerField()
+    churn_rate_30d = serializers.FloatField()
+    
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    revenue_30d = serializers.DecimalField(max_digits=12, decimal_places=2)
+    avg_revenue_per_user = serializers.DecimalField(max_digits=12, decimal_places=2)
+    
+    reports_executed = serializers.IntegerField()
+    scheduled_reports_active = serializers.IntegerField()
+    
+    high_risk_users = serializers.IntegerField()
+    high_value_users = serializers.IntegerField()
+
+
+class CommunicationSummarySerializer(serializers.Serializer):
+    """Summary statistics for communication dashboard"""
+    
+    broadcasts_sent = serializers.IntegerField()
+    broadcasts_pending = serializers.IntegerField()
+    broadcast_avg_open_rate = serializers.FloatField()
+    
+    campaigns_sent = serializers.IntegerField()
+    campaigns_pending = serializers.IntegerField()
+    campaign_avg_open_rate = serializers.FloatField()
+    campaign_avg_click_rate = serializers.FloatField()
+    
+    notifications_unread = serializers.IntegerField()
+    
+    feedback_open = serializers.IntegerField()
+    feedback_pending_response = serializers.IntegerField()
+    avg_response_time_hours = serializers.FloatField()
+    
+    maintenance_scheduled = serializers.IntegerField()
+    maintenance_active = serializers.IntegerField()
+

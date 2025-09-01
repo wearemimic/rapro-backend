@@ -1,6 +1,24 @@
 <template>
-  <div class="calendar-view" style="margin-top: 80px;">
-    <!-- Calendar Header -->
+  <div class="calendar-view">
+    <div class="calendar-view-page-header">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="page-header-title">Calendar</h1>
+        </div>
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-primary btn-sm"
+            @click="showMeetingScheduler = true"
+            :disabled="!hasCalendarAccounts"
+          >
+            <i class="bi-plus me-1"></i>
+            Schedule Meeting
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar Navigation -->
     <div class="calendar-header d-flex justify-content-between align-items-center mb-4">
       <div class="calendar-navigation d-flex align-items-center">
         <button
@@ -8,7 +26,7 @@
           @click="navigatePrevious"
           :disabled="loading"
         >
-          <i class="bi bi-chevron-left"></i>
+          <i class="bi-chevron-left"></i>
         </button>
         <h4 class="mb-0 me-2">
           {{ formatHeaderDate(currentDate, currentView) }}
@@ -18,7 +36,7 @@
           @click="navigateNext"
           :disabled="loading"
         >
-          <i class="bi bi-chevron-right"></i>
+          <i class="bi-chevron-right"></i>
         </button>
         <button
           class="btn btn-outline-secondary btn-sm me-3"
@@ -27,21 +45,13 @@
         >
           Today
         </button>
-        <button
-          class="btn btn-primary btn-sm"
-          @click="showMeetingScheduler = true"
-          :disabled="!hasCalendarAccounts"
-        >
-          <i class="fas fa-plus me-1"></i>
-          Schedule Meeting
-        </button>
       </div>
       
       <div class="calendar-controls d-flex align-items-center">
         <!-- Sync Status -->
         <div v-if="syncingAccounts.size > 0" class="me-3">
           <span class="text-muted small">
-            <i class="fas fa-sync fa-spin me-1"></i>
+            <i class="bi-arrow-repeat fa-spin me-1"></i>
             Syncing...
           </span>
         </div>
@@ -87,7 +97,7 @@
           class="btn btn-outline-secondary btn-sm me-3"
           @click="showFilters = !showFilters"
         >
-          <i class="fas fa-filter me-1"></i>
+          <i class="bi-funnel me-1"></i>
           Filters
           <span v-if="hasActiveFilters" class="badge bg-primary ms-1">{{ activeFilterCount }}</span>
         </button>
@@ -1066,8 +1076,32 @@ watch(
 
 <style scoped>
 .calendar-view {
+  padding: 1.5rem;
   min-height: 100vh;
-  background-color: #f8f9fa;
+}
+
+.calendar-view-page-header {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  padding-top: 1rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+/* Using default Bootstrap card styles */
+
+.card-header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0;
 }
 
 .calendar-header {

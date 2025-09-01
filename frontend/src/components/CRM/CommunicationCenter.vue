@@ -1,99 +1,80 @@
 <template>
   <div class="communication-center">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <div>
-        <h1 class="h3 mb-0">Communication Center</h1>
-        <p class="text-muted mb-0">Manage client communications and email accounts</p>
-      </div>
-      <div class="d-flex gap-2">
-        <button 
-          class="btn btn-outline-primary"
-          @click="refreshData"
-          :disabled="isRefreshing"
-        >
-          <i class="bi bi-arrow-clockwise" :class="{ 'spin': isRefreshing }"></i>
-          <span class="ms-1">Refresh</span>
-        </button>
-        <button 
-          class="btn btn-primary"
-          @click="showComposeModal = true"
-          :disabled="!hasEmailAccounts"
-        >
-          <i class="bi bi-plus-circle me-1"></i>
-          Compose Email
-        </button>
+    <div class="communication-center-page-header">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="page-header-title">Communication Center</h1>
+          <p class="text-muted mb-0">Manage client communications and email accounts</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button 
+            class="btn btn-outline-primary"
+            @click="refreshData"
+            :disabled="isRefreshing"
+          >
+            <i class="bi-arrow-clockwise" :class="{ 'spin': isRefreshing }"></i>
+            <span class="ms-1">Refresh</span>
+          </button>
+          <button 
+            class="btn btn-primary"
+            @click="showComposeModal = true"
+            :disabled="!hasEmailAccounts"
+          >
+            <i class="bi-plus-circle me-1"></i>
+            Compose Email
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Quick Stats Row -->
-    <div class="row mb-4">
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="row mb-3">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-primary text-white">
-                  <i class="bi bi-envelope"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ analytics.total_communications }}</span>
-                <span class="d-block fs-6 text-muted">Total Communications</span>
+            <h5 class="card-subtitle mb-2 text-center">Total Communications</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ analytics.total_communications }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-warning text-white">
-                  <i class="bi bi-exclamation-triangle"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ analytics.unread_count }}</span>
-                <span class="d-block fs-6 text-muted">Unread Messages</span>
+            <h5 class="card-subtitle mb-2 text-center">Unread Messages</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ analytics.unread_count }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-danger text-white">
-                  <i class="bi bi-star-fill"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ analytics.high_priority_count }}</span>
-                <span class="d-block fs-6 text-muted">High Priority</span>
+            <h5 class="card-subtitle mb-2 text-center">High Priority</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ analytics.high_priority_count }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <div class="flex-shrink-0">
-                <div class="avatar avatar-sm avatar-circle bg-success text-white">
-                  <i class="bi bi-check-circle"></i>
-                </div>
-              </div>
-              <div class="flex-grow-1 ms-3">
-                <span class="d-block h5 mb-0">{{ analytics.read_percentage }}%</span>
-                <span class="d-block fs-6 text-muted">Read Rate</span>
+            <h5 class="card-subtitle mb-2 text-center">Read Rate</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ analytics.read_percentage }}%</span>
               </div>
             </div>
           </div>
@@ -105,9 +86,9 @@
     <div class="row">
       <!-- Sidebar -->
       <div class="col-lg-3 col-md-4 mb-4">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-transparent border-bottom">
-            <h6 class="card-title mb-0">Filters & Views</h6>
+        <div class="card h-100">
+          <div class="card-header">
+            <h4 class="card-header-title">Filters & Views</h4>
           </div>
           <div class="card-body p-0">
             <!-- Quick Filter Buttons -->
@@ -117,7 +98,7 @@
                 :class="{ active: currentView === 'all' }"
                 @click="setView('all')"
               >
-                <span><i class="bi bi-inbox me-2"></i>All Messages</span>
+                <span><i class="bi-inbox me-2"></i>All Messages</span>
                 <span class="badge bg-secondary rounded-pill">{{ analytics.total_communications }}</span>
               </button>
               
@@ -126,7 +107,7 @@
                 :class="{ active: currentView === 'unread' }"
                 @click="setView('unread')"
               >
-                <span><i class="bi bi-envelope me-2"></i>Unread</span>
+                <span><i class="bi-envelope me-2"></i>Unread</span>
                 <span class="badge bg-warning rounded-pill">{{ analytics.unread_count }}</span>
               </button>
               
@@ -135,7 +116,7 @@
                 :class="{ active: currentView === 'priority' }"
                 @click="setView('priority')"
               >
-                <span><i class="bi bi-star me-2"></i>High Priority</span>
+                <span><i class="bi-star me-2"></i>High Priority</span>
                 <span class="badge bg-danger rounded-pill">{{ analytics.high_priority_count }}</span>
               </button>
             </div>
@@ -177,10 +158,10 @@
         </div>
 
         <!-- Email Setup Section -->
-        <div class="card border-0 shadow-sm mt-4" v-if="!hasEmailAccounts">
+        <div class="card h-100 mt-4" v-if="!hasEmailAccounts">
           <div class="card-body text-center">
             <div class="avatar avatar-lg avatar-circle bg-soft-primary text-primary mx-auto mb-3">
-              <i class="bi bi-envelope-plus"></i>
+              <i class="bi-envelope-plus"></i>
             </div>
             <h6 class="mb-2">Setup Email Integration</h6>
             <p class="text-muted small mb-3">Connect your email accounts to start managing communications</p>
@@ -188,22 +169,22 @@
               class="btn btn-primary btn-sm"
               @click="showEmailSetup = true"
             >
-              <i class="bi bi-plus me-1"></i>
+              <i class="bi-plus me-1"></i>
               Setup Email
             </button>
           </div>
         </div>
 
         <!-- Sync Status -->
-        <div class="card border-0 shadow-sm mt-4" v-if="hasEmailAccounts">
-          <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Email Sync Status</h6>
+        <div class="card h-100 mt-4" v-if="hasEmailAccounts">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-header-title">Email Sync Status</h4>
             <button 
               class="btn btn-sm btn-outline-primary"
               @click="triggerSync"
               :disabled="isSyncing"
             >
-              <i class="bi bi-arrow-clockwise" :class="{ 'spin': isSyncing }"></i>
+              <i class="bi-arrow-clockwise" :class="{ 'spin': isSyncing }"></i>
             </button>
           </div>
           <div class="card-body p-2">
@@ -243,12 +224,12 @@
 
       <!-- Main Communication List -->
       <div class="col-lg-9 col-md-8">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-transparent border-bottom">
+        <div class="card">
+          <div class="card-header">
             <div class="row align-items-center">
               <div class="col">
                 <div class="d-flex align-items-center">
-                  <h6 class="mb-0 me-3">Communications</h6>
+                  <h4 class="card-header-title me-3">Communications</h4>
                   <span class="badge bg-light text-dark" v-if="hasActiveFilters">
                     {{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }} applied
                   </span>
@@ -266,7 +247,7 @@
                       placeholder="Search communications..."
                     >
                     <button class="btn btn-outline-secondary" type="button" @click="clearSearch" v-if="searchQuery">
-                      <i class="bi bi-x"></i>
+                      <i class="bi-x"></i>
                     </button>
                   </div>
 
@@ -314,7 +295,7 @@
                 @click="previousPage"
                 :disabled="!hasPrevious"
               >
-                <i class="bi bi-chevron-left"></i>
+                <i class="bi-chevron-left"></i>
                 Previous
               </button>
               <button 
@@ -323,7 +304,7 @@
                 :disabled="!hasNext"
               >
                 Next
-                <i class="bi bi-chevron-right"></i>
+                <i class="bi-chevron-right"></i>
               </button>
             </div>
           </div>
@@ -605,7 +586,23 @@ onUnmounted(() => {
 
 <style scoped>
 .communication-center {
-  padding: 1rem;
+  padding: 1.5rem;
+}
+
+.communication-center-page-header {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  padding-top: 1rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0;
 }
 
 .spin {
@@ -657,14 +654,24 @@ onUnmounted(() => {
   color: #0d6efd !important;
 }
 
-.card {
-  border-radius: 0.5rem;
+/* Using default Bootstrap card styles */
+
+.card-header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0;
 }
 
-.card-header {
-  padding: 1rem 1.25rem;
-  background-color: transparent;
-  border-bottom: 1px solid #dee2e6;
+.display-4 {
+  font-size: 2.5rem;
+  font-weight: 300;
+  line-height: 1.2;
+}
+
+.card-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }
 
 .list-group-item-action:hover {

@@ -1,76 +1,73 @@
 <template>
-  <div class="task-dashboard container-fluid" style="margin-top:80px;">
-    <!-- Header with Actions -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <div>
-        <h2 class="mb-1">Task Management</h2>
-        <p class="text-muted mb-0">Manage tasks, templates, and deadlines</p>
-      </div>
-      <div class="d-flex gap-2">
-        <button
-          class="btn btn-outline-secondary"
-          @click="showTemplateModal = true"
-        >
-          <i class="fas fa-file-alt me-1"></i>Templates
-        </button>
-        <button
-          class="btn btn-primary"
-          @click="openCreateTask"
-        >
-          <i class="fas fa-plus me-1"></i>New Task
-        </button>
+  <div class="task-dashboard">
+    <div class="task-dashboard-page-header">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="page-header-title">Task Management</h1>
+          <p class="text-muted mb-0">Manage tasks, templates, and deadlines</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-outline-secondary"
+            @click="showTemplateModal = true"
+          >
+            <i class="bi-file-earmark-text me-1"></i>Templates
+          </button>
+          <button
+            class="btn btn-primary"
+            @click="openCreateTask"
+          >
+            <i class="bi-plus me-1"></i>New Task
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Task Statistics -->
-    <div class="row mb-4">
-      <div class="col-md-3 col-6 mb-3">
-        <div class="card bg-primary text-white">
+    <div class="row mb-3">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <i class="fas fa-tasks fa-2x me-3"></i>
-              <div>
-                <h3 class="mb-0">{{ taskStore.stats.total_tasks }}</h3>
-                <small>Total Tasks</small>
+            <h5 class="card-subtitle mb-2 text-center">Total Tasks</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ taskStore.stats.total_tasks }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-6 mb-3">
-        <div class="card bg-success text-white">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <i class="fas fa-check-circle fa-2x me-3"></i>
-              <div>
-                <h3 class="mb-0">{{ taskStore.stats.completed_tasks }}</h3>
-                <small>Completed</small>
+            <h5 class="card-subtitle mb-2 text-center">Pending</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ taskStore.stats.pending_tasks }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-6 mb-3">
-        <div class="card bg-warning text-white">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <i class="fas fa-clock fa-2x me-3"></i>
-              <div>
-                <h3 class="mb-0">{{ taskStore.stats.in_progress_tasks }}</h3>
-                <small>In Progress</small>
+            <h5 class="card-subtitle mb-2 text-center">In Progress</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ taskStore.stats.in_progress_tasks }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-6 mb-3">
-        <div class="card bg-danger text-white">
+      <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="card h-100">
           <div class="card-body">
-            <div class="d-flex align-items-center">
-              <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
-              <div>
-                <h3 class="mb-0">{{ taskStore.stats.overdue_tasks }}</h3>
-                <small>Overdue</small>
+            <h5 class="card-subtitle mb-2 text-center">Overdue</h5>
+            <div class="row align-items-center gx-2">
+              <div class="col text-center">
+                <span class="js-counter display-4 text-dark">{{ taskStore.stats.overdue_tasks }}</span>
               </div>
             </div>
           </div>
@@ -82,7 +79,7 @@
     <div class="card mb-4">
       <div class="card-header">
         <div class="d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Quick Filters</h5>
+          <h4 class="card-header-title">Quick Filters</h4>
           <button
             class="btn btn-sm btn-outline-secondary"
             @click="taskStore.clearFilters()"
@@ -188,7 +185,7 @@
           @change="taskStore.setViewMode('list')"
         >
         <label class="btn btn-outline-primary" for="listView">
-          <i class="fas fa-list me-1"></i>List
+          <i class="bi-list me-1"></i>List
         </label>
 
         <input
@@ -201,7 +198,7 @@
           @change="taskStore.setViewMode('kanban')"
         >
         <label class="btn btn-outline-primary" for="kanbanView">
-          <i class="fas fa-columns me-1"></i>Kanban
+          <i class="bi-columns me-1"></i>Kanban
         </label>
 
         <input
@@ -214,7 +211,7 @@
           @change="taskStore.setViewMode('calendar')"
         >
         <label class="btn btn-outline-primary" for="calendarView">
-          <i class="fas fa-calendar me-1"></i>Calendar
+          <i class="bi-calendar me-1"></i>Calendar
         </label>
       </div>
 
@@ -507,16 +504,47 @@ watch(() => taskStore.filters.search, (newValue) => {
 
 <style scoped>
 .task-dashboard {
-  padding: 1rem;
+  padding: 1.5rem;
+}
+
+.task-dashboard-page-header {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  padding-top: 1rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0;
 }
 
 .task-content {
   min-height: 400px;
 }
 
-.card {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  border: 1px solid rgba(0, 0, 0, 0.125);
+/* Using default Bootstrap card styles */
+
+.card-header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.display-4 {
+  font-size: 2.5rem;
+  font-weight: 300;
+  line-height: 1.2;
+}
+
+.card-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }
 
 .btn-check:checked + .btn {

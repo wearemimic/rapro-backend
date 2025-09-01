@@ -1,7 +1,8 @@
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from .views_main import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration
+from .views_main import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration, mock_report_templates, mock_reports, mock_generate_report, mock_report_status
+from . import report_views
 from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years
 from .views_main import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
 from .views_main import EmailAccountViewSet, CommunicationViewSet, LeadViewSet, LeadSourceViewSet, ActivityLogViewSet, TaskViewSet, TaskTemplateViewSet, CalendarAccountViewSet, CalendarEventViewSet, MeetingTemplateViewSet
@@ -15,6 +16,28 @@ from .webhooks import stripe_webhook
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
 from .auth0_views import auth0_login, auth0_signup, list_users, user_detail, reset_user_password, auth0_debug, auth0_exchange_code, auth0_complete_registration, validate_coupon
+from .admin_views import (
+    admin_dashboard_stats, admin_user_list, update_user_admin_role, admin_analytics_overview, 
+    admin_system_monitoring, admin_support_overview, start_user_impersonation, 
+    end_user_impersonation, get_active_impersonation_sessions,
+    admin_revenue_analytics, admin_recalculate_revenue_metrics, admin_user_engagement_analytics,
+    admin_client_portfolio_analytics, admin_run_analytics_calculation,
+    # Phase 2.3: System Performance Monitoring
+    admin_performance_metrics, admin_record_performance_metric, admin_system_health_dashboard,
+    # Phase 2.4: Support Ticket System
+    admin_support_tickets_list, admin_support_ticket_detail, admin_create_support_ticket,
+    admin_update_support_ticket, admin_add_ticket_comment, admin_support_sla_report,
+    # Phase 2.5: Alert & Notification System  
+    admin_alert_rules_list, admin_create_alert_rule, admin_update_alert_rule, 
+    admin_delete_alert_rule, admin_alert_notifications_list, admin_test_alert_rule,
+    # Phase 3.1: Tax Data Management
+    admin_tax_data_files_list, admin_tax_data_file_content, admin_upload_tax_data_file,
+    admin_update_tax_data_file, admin_validate_tax_data_file, admin_tax_data_backups_list,
+    admin_restore_tax_data_backup, admin_tax_data_validation_rules,
+    # Phase 3.2: Configuration Management
+    FeatureFlagViewSet, SystemConfigurationViewSet, IntegrationSettingsViewSet,
+    EmailTemplateViewSet, ConfigurationAuditLogViewSet, configuration_summary
+)
 
 # Create routers for ViewSets
 reporttemplate_router = DefaultRouter()
@@ -39,6 +62,51 @@ document_router.register(r'documents', DocumentViewSet, basename='document')
 document_router.register(r'document-categories', DocumentCategoryViewSet, basename='documentcategory')
 document_router.register(r'document-templates', DocumentTemplateViewSet, basename='documenttemplate')
 document_router.register(r'document-retention-policies', DocumentRetentionPolicyViewSet, basename='documentretentionpolicy')
+
+# Configuration Management router
+config_router = DefaultRouter()
+config_router.register(r'admin/feature-flags', FeatureFlagViewSet, basename='featureflag')
+config_router.register(r'admin/system-configs', SystemConfigurationViewSet, basename='systemconfiguration')
+config_router.register(r'admin/integrations', IntegrationSettingsViewSet, basename='integrationsettings')
+config_router.register(r'admin/email-templates', EmailTemplateViewSet, basename='emailtemplate')
+config_router.register(r'admin/config-audit', ConfigurationAuditLogViewSet, basename='configurationauditlog')
+
+# Analytics & Reporting router
+from .views.analytics_views import (
+    CustomReportViewSet, ReportScheduleViewSet, ReportExecutionViewSet,
+    ExecutiveDashboardViewSet, analytics_summary
+)
+
+analytics_router = DefaultRouter()
+analytics_router.register(r'admin/reports', CustomReportViewSet, basename='customreport')
+analytics_router.register(r'admin/report-schedules', ReportScheduleViewSet, basename='reportschedule')
+analytics_router.register(r'admin/report-executions', ReportExecutionViewSet, basename='reportexecution')
+analytics_router.register(r'admin/dashboards', ExecutiveDashboardViewSet, basename='executivedashboard')
+
+# Communication Tools router
+from .views.communication_views import (
+    BroadcastMessageViewSet, EmailCampaignViewSet, InAppNotificationViewSet,
+    MaintenanceModeViewSet, UserFeedbackViewSet, FeedbackResponseViewSet,
+    communication_summary
+)
+
+communication_router = DefaultRouter()
+communication_router.register(r'admin/broadcasts', BroadcastMessageViewSet, basename='broadcastmessage')
+communication_router.register(r'admin/campaigns', EmailCampaignViewSet, basename='emailcampaign')
+communication_router.register(r'notifications', InAppNotificationViewSet, basename='inappnotification')
+communication_router.register(r'admin/maintenance', MaintenanceModeViewSet, basename='maintenancemode')
+communication_router.register(r'feedback', UserFeedbackViewSet, basename='userfeedback')
+communication_router.register(r'admin/feedback-responses', FeedbackResponseViewSet, basename='feedbackresponse')
+
+# Phase 4: Optimization & Enhancement router
+from .views.workflow_views import (
+    WorkflowViewSet, SearchViewSet, FilterPresetViewSet, workflow_dashboard
+)
+
+workflow_router = DefaultRouter()
+workflow_router.register(r'admin/workflows', WorkflowViewSet, basename='workflow')
+workflow_router.register(r'admin/search', SearchViewSet, basename='search')
+workflow_router.register(r'admin/search/filter-presets', FilterPresetViewSet, basename='filterpreset')
 
 urlpatterns = [
     path('logout/', logout_view, name='logout'),
@@ -92,6 +160,15 @@ urlpatterns = [
     # Include Document Management router
     path('', include(document_router.urls)),
     
+    # Include Configuration Management router
+    path('', include(config_router.urls)),
+    
+    # Include Analytics & Reporting router
+    path('', include(analytics_router.urls)),
+    
+    # Include Communication Tools router
+    path('', include(communication_router.urls)),
+    
     # CRM-specific endpoints
     path('email/gmail/auth-url/', gmail_auth_url, name='gmail-auth-url'),
     path('email/gmail/callback/', gmail_oauth_callback, name='gmail_oauth_callback'),
@@ -139,7 +216,85 @@ urlpatterns = [
     
     # Document Management endpoints
     path('documents/bulk-action/', bulk_document_action, name='bulk-document-action'),
+    
+    # Admin API endpoints
+    path('admin/stats/', admin_dashboard_stats, name='admin-dashboard-stats'),
+    path('admin/users/', admin_user_list, name='admin-user-list'),
+    path('admin/users/<int:user_id>/admin-role/', update_user_admin_role, name='update-user-admin-role'),
+    path('admin/users/<int:user_id>/impersonate/', start_user_impersonation, name='start-user-impersonation'),
+    path('admin/impersonation/<int:session_id>/end/', end_user_impersonation, name='end-user-impersonation'),
+    path('admin/impersonation/active/', get_active_impersonation_sessions, name='get-active-impersonation-sessions'),
+    path('admin/analytics/', admin_analytics_overview, name='admin-analytics-overview'),
+    path('admin/monitoring/', admin_system_monitoring, name='admin-system-monitoring'),
+    path('admin/support/', admin_support_overview, name='admin-support-overview'),
+    
+    # Phase 2: Enhanced Analytics API endpoints
+    path('admin/analytics/revenue/', admin_revenue_analytics, name='admin-revenue-analytics'),
+    path('admin/analytics/revenue/recalculate/', admin_recalculate_revenue_metrics, name='admin-recalculate-revenue-metrics'),
+    path('admin/analytics/engagement/', admin_user_engagement_analytics, name='admin-user-engagement-analytics'),
+    path('admin/analytics/portfolio/', admin_client_portfolio_analytics, name='admin-client-portfolio-analytics'),
+    path('admin/analytics/calculate/', admin_run_analytics_calculation, name='admin-run-analytics-calculation'),
+    
+    # Phase 2.3: System Performance Monitoring
+    path('admin/performance/metrics/', admin_performance_metrics, name='admin-performance-metrics'),
+    path('admin/performance/record/', admin_record_performance_metric, name='admin-record-performance-metric'),
+    path('admin/performance/health/', admin_system_health_dashboard, name='admin-system-health-dashboard'),
+    
+    # Phase 2.4: Support Ticket System
+    path('admin/support/tickets/', admin_support_tickets_list, name='admin-support-tickets-list'),
+    path('admin/support/tickets/<int:ticket_id>/', admin_support_ticket_detail, name='admin-support-ticket-detail'),
+    path('admin/support/tickets/create/', admin_create_support_ticket, name='admin-create-support-ticket'),
+    path('admin/support/tickets/<int:ticket_id>/update/', admin_update_support_ticket, name='admin-update-support-ticket'),
+    path('admin/support/tickets/<int:ticket_id>/comment/', admin_add_ticket_comment, name='admin-add-ticket-comment'),
+    path('admin/support/sla-report/', admin_support_sla_report, name='admin-support-sla-report'),
+    
+    # Phase 2.5: Alert & Notification System
+    path('admin/alerts/rules/', admin_alert_rules_list, name='admin-alert-rules-list'),
+    path('admin/alerts/rules/create/', admin_create_alert_rule, name='admin-create-alert-rule'),
+    path('admin/alerts/rules/<int:rule_id>/', admin_update_alert_rule, name='admin-update-alert-rule'),
+    path('admin/alerts/rules/<int:rule_id>/delete/', admin_delete_alert_rule, name='admin-delete-alert-rule'),
+    path('admin/alerts/rules/<int:rule_id>/test/', admin_test_alert_rule, name='admin-test-alert-rule'),
+    path('admin/alerts/notifications/', admin_alert_notifications_list, name='admin-alert-notifications-list'),
+    
+    # Phase 3.1: Tax Data Management
+    path('admin/tax-data/files/', admin_tax_data_files_list, name='admin-tax-data-files-list'),
+    path('admin/tax-data/files/<str:filename>/', admin_tax_data_file_content, name='admin-tax-data-file-content'),
+    path('admin/tax-data/upload/', admin_upload_tax_data_file, name='admin-upload-tax-data-file'),
+    path('admin/tax-data/files/<str:filename>/update/', admin_update_tax_data_file, name='admin-update-tax-data-file'),
+    path('admin/tax-data/validate/', admin_validate_tax_data_file, name='admin-validate-tax-data-file'),
+    path('admin/tax-data/backups/', admin_tax_data_backups_list, name='admin-tax-data-backups-list'),
+    path('admin/tax-data/backups/<str:backup_filename>/restore/', admin_restore_tax_data_backup, name='admin-restore-tax-data-backup'),
+    path('admin/tax-data/validation-rules/', admin_tax_data_validation_rules, name='admin-tax-data-validation-rules'),
+    
+    # Phase 3.2: Configuration Management
+    path('admin/config-summary/', configuration_summary, name='admin-configuration-summary'),
+    
+    # Phase 3.3: Analytics & Reporting
+    path('admin/analytics-summary/', analytics_summary, name='admin-analytics-summary'),
+    
+    # Phase 3.4: Communication Tools
+    path('admin/communication-summary/', communication_summary, name='admin-communication-summary'),
+    
+    # Phase 4: Optimization & Enhancement
+    path('admin/workflows/dashboard/', workflow_dashboard, name='admin-workflows-dashboard'),
+    
+    # Report Center endpoints - PRODUCTION READY
+    path('report-center/reports/<uuid:report_id>/download/', report_views.download_report, name='download-report'),
+    path('report-center/templates/', report_views.ReportTemplateListView.as_view(), name='report-templates'),
+    path('report-center/reports/', report_views.ReportListView.as_view(), name='report-list'),
+    path('report-center/reports/<uuid:report_id>/generate/', report_views.generate_report, name='generate-report'),
+    path('report-center/reports/<uuid:report_id>/status/', report_views.report_status, name='report-status'),
+    path('report-center/data/<int:client_id>/', report_views.report_data, name='report-data'),
 ]
+
+# Add router URLs
+urlpatterns += reporttemplate_router.urls
+urlpatterns += crm_router.urls
+urlpatterns += document_router.urls
+urlpatterns += config_router.urls
+urlpatterns += analytics_router.urls
+urlpatterns += communication_router.urls
+urlpatterns += workflow_router.urls
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
