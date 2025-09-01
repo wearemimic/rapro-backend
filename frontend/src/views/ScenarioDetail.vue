@@ -148,7 +148,7 @@
                                 </div>
                                 <div class="flex-grow-1 ms-3">
                                   <h6 class="mb-1">Medicare Out Of Pocket</h6>
-                                  <span class="d-block fw-bold text-primary fs-2">$50,000</span>
+                                  <span class="d-block fw-bold text-primary fs-2">{{ formatCurrency(medicareOutOfPocket) }}</span>
                                 </div>
                               </div>
                             </div>
@@ -267,7 +267,7 @@
               <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
-              <SocialSecurityOverviewTab :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
+              <SocialSecurityOverviewTab :scenario="scenario" :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity2'" class="tab-pane active" style="margin-top:50px;">
               <SocialSecurity2Tab :key="`ss2-${scenario?.id}-${activeTab}`" :scenario="scenario" :scenario-results="scenarioResults" :client="client" @update-scenario="handleScenarioUpdate" />
@@ -775,13 +775,28 @@ export default {
           console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Detailed scenario data received:', response.data);
           console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Income sources in response:', response.data?.income_sources?.length || 0);
           
-          // Carefully merge only the income_sources to avoid breaking reactivity
-          if (response.data && response.data.income_sources) {
-            // Use Vue.set or direct assignment to maintain reactivity
-            this.$set ? this.$set(this.scenario, 'income_sources', response.data.income_sources) : 
-                        (this.scenario.income_sources = response.data.income_sources);
+          // Merge all scenario data, not just income_sources
+          if (response.data) {
+            // Merge all fields from the detailed response
+            Object.keys(response.data).forEach(key => {
+              if (this.$set) {
+                this.$set(this.scenario, key, response.data[key]);
+              } else {
+                this.scenario[key] = response.data[key];
+              }
+            });
             
-            console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Updated scenario with income_sources:', this.scenario.income_sources?.length || 0);
+            console.log('🔍 SS_REDUCTION_DEBUG: SS Reduction fields after merge:', {
+              reduction_2030_ss: this.scenario.reduction_2030_ss,
+              ss_adjustment_year: this.scenario.ss_adjustment_year,
+              ss_adjustment_direction: this.scenario.ss_adjustment_direction,
+              ss_adjustment_type: this.scenario.ss_adjustment_type,
+              ss_adjustment_amount: this.scenario.ss_adjustment_amount,
+              primary_ss_claiming_age: this.scenario.primary_ss_claiming_age,
+              spouse_ss_claiming_age: this.scenario.spouse_ss_claiming_age
+            });
+            
+            console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Updated scenario with all fields');
             
             // Log social security specific data
             const socialSecurityIncomes = this.scenario.income_sources?.filter(income => income.income_type === 'social_security');
@@ -1256,6 +1271,26 @@ export default {
         const tax = parseFloat(row.federal_tax || 0);
         const medicare = parseFloat(row.total_medicare || 0);
         return total + (gross - tax - medicare);
+      }, 0);
+    },
+    medicareOutOfPocket() {
+      // Calculate Medicare out-of-pocket as the aggregate of negative "Remaining SSI" amounts
+      return this.filteredScenarioResults.reduce((total, row) => {
+        // Calculate remaining SSI using the same logic as SocialSecurityOverviewTab
+        const primarySSI = parseFloat(row.ss_income_primary_gross || 0);
+        const spouseSSI = parseFloat(row.ss_income_spouse_gross || 0);
+        const totalSSI = primarySSI + spouseSSI;
+        const ssDecrease = parseFloat(row.ss_decrease_amount || 0);
+        const medicare = parseFloat(row.total_medicare || 0);
+        
+        const remainingSSI = totalSSI - ssDecrease - medicare;
+        
+        // Only add negative amounts (when Medicare exceeds SSI)
+        if (remainingSSI < 0) {
+          total += Math.abs(remainingSSI);
+        }
+        
+        return total;
       }, 0);
     },
   },
