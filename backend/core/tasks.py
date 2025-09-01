@@ -666,3 +666,145 @@ def schedule_periodic_tasks():
         )
     
     logger.info("Periodic tasks configured successfully")
+
+
+# =============================================================================
+# SCENARIO CALCULATION TASKS
+# =============================================================================
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=60)
+def calculate_scenario_async(self, scenario_id: int, user_id: int = None) -> Dict:
+    """
+    Background task to calculate retirement scenario projections
+    Returns comprehensive financial projections with progress updates
+    """
+    try:
+        from .models import Scenario
+        from .scenario_processor import ScenarioProcessor
+        
+        logger.info(f"Starting async calculation for scenario {scenario_id}")
+        
+        # Get scenario
+        try:
+            scenario = Scenario.objects.select_related('client').get(id=scenario_id)
+        except Scenario.DoesNotExist:
+            logger.error(f"Scenario {scenario_id} not found")
+            return {
+                'status': 'error',
+                'error': f'Scenario {scenario_id} not found',
+                'scenario_id': scenario_id
+            }
+        
+        # Initialize processor
+        try:
+            processor = ScenarioProcessor(scenario.id, debug=True)
+            total_years = len(range(scenario.client.birthdate.year + scenario.retirement_age, 
+                                  scenario.client.birthdate.year + scenario.mortality_age + 1))
+            
+            # Update progress
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current_step': 'initializing',
+                    'progress': 5,
+                    'message': 'Initializing scenario calculations...',
+                    'scenario_id': scenario_id,
+                    'total_years': total_years
+                }
+            )
+            
+            # Run calculation - ScenarioProcessor.calculate() returns the full results
+            results = processor.calculate()
+            
+            # Update progress to show completion
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current_step': 'calculating',
+                    'progress': 90,
+                    'message': f'Calculations completed, processing results...',
+                    'scenario_id': scenario_id,
+                    'total_years': len(results) if results else 0
+                }
+            )
+            
+            # Final processing
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current_step': 'finalizing',
+                    'progress': 95,
+                    'message': 'Finalizing calculations...',
+                    'scenario_id': scenario_id
+                }
+            )
+            
+            # Calculate summary metrics
+            total_gross_income = sum(float(r.get('gross_income', 0)) for r in results)
+            total_federal_tax = sum(float(r.get('federal_tax', 0)) for r in results)
+            total_medicare = sum(float(r.get('total_medicare', 0)) for r in results)
+            
+            summary = {
+                'total_years': len(results),
+                'total_gross_income': round(total_gross_income, 2),
+                'total_federal_tax': round(total_federal_tax, 2),
+                'total_medicare': round(total_medicare, 2),
+                'total_net_income': round(total_gross_income - total_federal_tax - total_medicare, 2),
+                'average_tax_rate': round((total_federal_tax / total_gross_income * 100) if total_gross_income > 0 else 0, 2)
+            }
+            
+            logger.info(f"Completed async calculation for scenario {scenario_id}: {len(results)} years calculated")
+            
+            return {
+                'status': 'success',
+                'scenario_id': scenario_id,
+                'results': results,
+                'summary': summary,
+                'calculation_time': datetime.now().isoformat(),
+                'message': f'Successfully calculated {len(results)} years of projections'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in scenario processor for scenario {scenario_id}: {str(e)}", exc_info=True)
+            return {
+                'status': 'error',
+                'error': f'Calculation failed: {str(e)}',
+                'scenario_id': scenario_id
+            }
+            
+    except Exception as e:
+        logger.error(f"Unexpected error in calculate_scenario_async for scenario {scenario_id}: {str(e)}", exc_info=True)
+        
+        # Retry on specific errors
+        if "database" in str(e).lower() or "connection" in str(e).lower():
+            if self.request.retries < self.max_retries:
+                logger.info(f"Retrying scenario {scenario_id} calculation (attempt {self.request.retries + 1})")
+                raise self.retry(countdown=60 * (self.request.retries + 1))
+        
+        return {
+            'status': 'error',
+            'error': str(e),
+            'scenario_id': scenario_id
+        }
+
+
+@shared_task(bind=True)
+def quick_scenario_estimate(self, scenario_data: Dict) -> Dict:
+    """
+    Quick scenario estimation for real-time previews
+    Uses simplified calculations for faster response
+    """
+    try:
+        # This would implement a simplified version for quick estimates
+        # Useful for real-time UI updates while full calculation runs in background
+        return {
+            'status': 'success',
+            'estimate': 'Quick estimation logic would go here',
+            'message': 'Quick estimate completed'
+        }
+    except Exception as e:
+        logger.error(f"Error in quick_scenario_estimate: {str(e)}")
+        return {
+            'status': 'error',
+            'error': str(e)
+        }

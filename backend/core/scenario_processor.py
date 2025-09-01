@@ -529,7 +529,35 @@ class ScenarioProcessor:
             # STEP 7: Asset Spend-Down & Growth Engine
             self._calculate_asset_spend_down(year)
 
-            net_income = gross_income + ss_income - federal_tax - total_medicare
+            # STEP 8: Apply Hold Harmless Act if applicable
+            # IMPORTANT: Hold Harmless reduces Medicare deductions to maintain previous year's net SS
+            # It does NOT change SS income used for tax/IRMAA calculations
+            hold_harmless_protected = False
+            hold_harmless_amount = 0
+            original_remaining_ss = ss_income - total_medicare
+            effective_medicare = total_medicare  # This is what's actually deducted (may be reduced by Hold Harmless)
+            
+            if (ss_income > 0 and irmaa_bracket_number == 0):  # Eligible for Hold Harmless
+                if len(results) > 0:  # Not the first year
+                    previous_year_result = results[-1]
+                    previous_remaining_ss = previous_year_result.get('remaining_ss', 0)
+                    
+                    # If Medicare increases would reduce net SS, apply Hold Harmless
+                    if original_remaining_ss < previous_remaining_ss:
+                        hold_harmless_protected = True
+                        hold_harmless_amount = previous_remaining_ss - original_remaining_ss
+                        # Reduce Medicare deduction to maintain previous year's remaining amount
+                        effective_medicare = total_medicare - hold_harmless_amount
+                        print(f"\nHOLD HARMLESS PROTECTION APPLIED:")
+                        print(f"  SS income (unchanged): ${ss_income:,.2f}")
+                        print(f"  Full Medicare cost: ${total_medicare:,.2f}")
+                        print(f"  Effective Medicare deduction: ${effective_medicare:,.2f}")
+                        print(f"  Previous year remaining SS: ${previous_remaining_ss:,.2f}")
+                        print(f"  Current calculated remaining: ${original_remaining_ss:,.2f}")
+                        print(f"  Hold Harmless protection: ${hold_harmless_amount:,.2f}")
+
+            net_income = gross_income + ss_income - federal_tax - effective_medicare
+            remaining_ss = ss_income - effective_medicare
             irmaa = irmaa + part_d_irmaa
             
             print(f"\nFINAL RESULTS FOR YEAR {year}:")
@@ -565,10 +593,15 @@ class ScenarioProcessor:
                 "irmaa_bracket_number": irmaa_bracket_number,
                 "irmaa_bracket_threshold": float(current_irmaa_bracket['magi_threshold']) if current_irmaa_bracket else None,
                 "total_medicare": round(total_medicare, 2),
+                "effective_medicare": round(effective_medicare, 2),
                 "net_income": round(net_income, 2),
+                "remaining_ss": round(remaining_ss, 2),
                 "tax_bracket": tax_bracket,
                 "ss_decrease_applied": ss_decrease_applied,
-                "ss_decrease_amount": ss_decrease_amount_actual
+                "ss_decrease_amount": ss_decrease_amount_actual,
+                "hold_harmless_protected": hold_harmless_protected,
+                "hold_harmless_amount": round(hold_harmless_amount, 2),
+                "original_remaining_ss": round(original_remaining_ss, 2)
             }
 
             # Add asset balances to summary with safe rounding

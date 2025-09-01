@@ -78,11 +78,25 @@ export const useAuthStore = defineStore('auth', {
 
           // Check for rate limiting (429 status)
           if (error.response && error.response.status === 429) {
-            console.error('Rate limited - too many requests');
-            // Clear tokens and redirect to login
-            this.clearAuthData();
-            router.push('/login');
-            return Promise.reject(new Error('Rate limited. Please log in again.'));
+            console.warn('Rate limited - retrying after delay');
+            
+            // Implement exponential backoff for rate limiting
+            const retryDelay = Math.min(1000 * Math.pow(2, (originalRequest._retryCount || 0)), 5000);
+            originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+            
+            // Only retry up to 3 times
+            if (originalRequest._retryCount <= 3) {
+              console.log(`Retrying rate limited request in ${retryDelay}ms (attempt ${originalRequest._retryCount})`);
+              
+              return new Promise((resolve) => {
+                setTimeout(() => {
+                  resolve(axios(originalRequest));
+                }, retryDelay);
+              });
+            } else {
+              console.error('Rate limited - max retries exceeded, continuing without logout');
+              return Promise.reject(new Error('Rate limited. Please wait and try again.'));
+            }
           }
 
           // Skip refresh for certain endpoints

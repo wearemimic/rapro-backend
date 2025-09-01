@@ -36,6 +36,8 @@ from .serializers import ScenarioCreateSerializer, ScenarioUpdateSerializer, Inc
 from .serializers import ReportTemplateSerializer, ReportTemplateDetailSerializer, TemplateSlideSerializer
 from .scenario_processor import ScenarioProcessor
 from .roth_conversion_processor import RothConversionProcessor
+from .tasks import calculate_scenario_async
+from celery.result import AsyncResult
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.db import models
@@ -157,6 +159,120 @@ def run_scenario_calculation(request, scenario_id):
         return Response(result)
     except Scenario.DoesNotExist:
         return Response({"error": "Scenario not found."}, status=404)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def start_scenario_calculation_async(request, scenario_id):
+    """
+    Start async scenario calculation and return task ID for progress tracking
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+        # Check if the user owns the client associated with this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied."}, status=403)
+        
+        # Start async task
+        task = calculate_scenario_async.delay(scenario_id, request.user.id)
+        
+        return Response({
+            "task_id": task.id,
+            "status": "PENDING",
+            "message": "Calculation started in background",
+            "scenario_id": scenario_id
+        }, status=202)
+        
+    except Scenario.DoesNotExist:
+        return Response({"error": "Scenario not found."}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_task_status(request, task_id):
+    """
+    Get the status and result of an async task
+    """
+    try:
+        task = AsyncResult(task_id)
+        
+        if task.state == 'PENDING':
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'PENDING',
+                'message': 'Task is waiting to be processed',
+                'progress': 0
+            }
+        elif task.state == 'PROGRESS':
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'PROGRESS',
+                'message': task.info.get('message', 'Processing...'),
+                'progress': task.info.get('progress', 0),
+                'current_step': task.info.get('current_step', ''),
+                'current_year': task.info.get('current_year'),
+                'processed_years': task.info.get('processed_years', 0),
+                'total_years': task.info.get('total_years', 0)
+            }
+        elif task.state == 'SUCCESS':
+            result = task.result
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'SUCCESS',
+                'message': result.get('message', 'Calculation completed successfully'),
+                'progress': 100,
+                'results': result.get('results', []),
+                'summary': result.get('summary', {}),
+                'calculation_time': result.get('calculation_time')
+            }
+        else:
+            # FAILURE or other states
+            response = {
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'FAILURE',
+                'message': str(task.info) if task.info else 'Task failed with unknown error',
+                'progress': 0,
+                'error': str(task.info) if task.info else 'Unknown error'
+            }
+        
+        return Response(response)
+        
+    except Exception as e:
+        return Response({
+            'task_id': task_id,
+            'status': 'ERROR',
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def cancel_task(request, task_id):
+    """
+    Cancel a running async task
+    """
+    try:
+        task = AsyncResult(task_id)
+        task.revoke(terminate=True)
+        
+        return Response({
+            'task_id': task_id,
+            'status': 'CANCELLED',
+            'message': 'Task cancelled successfully'
+        })
+        
+    except Exception as e:
+        return Response({
+            'task_id': task_id,
+            'status': 'ERROR',
+            'error': str(e)
+        }, status=500)
     
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])

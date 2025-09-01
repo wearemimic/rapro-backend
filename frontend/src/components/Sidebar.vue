@@ -132,56 +132,14 @@
                       <i class="bi-bar-chart nav-icon me-2"></i>Comparison Report
                     </router-link>
                     
-                    <!-- For each scenario, create a collapsible section -->
+                    <!-- For each scenario, create a simple link -->
                     <div v-for="scenario in clientScenarios" :key="scenario.id" class="nav-item">
-                                          <!-- Non-clickable scenario name header -->
-                    <a class="nav-link nav-link-title ps-3 dropdown-toggle" :href="'#scenario-' + scenario.id" role="button" 
-                      data-bs-toggle="collapse" :data-bs-target="'#scenario-' + scenario.id" 
-                      :aria-expanded="isCurrentScenario(scenario.id)" :aria-controls="'scenario-' + scenario.id">
-                      <i class="bi-graph-up nav-icon me-2"></i>
-                      <strong>{{ scenario.name.length > 12 ? scenario.name.slice(0, 12) + '' : scenario.name }}</strong>
-                      <span v-if="isCurrentScenario(scenario.id)" class="badge bg-info rounded-pill ms-1">Current</span>
-                    </a>
-                    
-                    <!-- Collapsible content for each scenario - only expanded for current scenario -->
-                    <div :id="'scenario-' + scenario.id" class="nav-collapse collapse" :class="{ show: isCurrentScenario(scenario.id) }">
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'overview' }}">
-                          Scenario Overview
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'financial' }}">
-                          Financial Details
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'socialSecurity' }}">
-                          Social Security Details
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'socialSecurity2' }}">
-                          Social Security 2
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'medicare' }}">
-                          Medicare Details
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'income' }}">
-                          Income
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'rothConversion' }}">
-                          Roth Conversion
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'worksheets' }}">
-                          Social Security Worksheets
-                        </router-link>
-                        <router-link class="nav-link ps-4" 
-                          :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'nextSteps' }}">
-                          Next Steps
-                        </router-link>
-                                            </div>
+                      <router-link class="nav-link ps-3" 
+                        :to="{ name: 'ScenarioDetail', params: { id: currentClientId, scenarioid: scenario.id }, query: { tab: 'overview' }}">
+                        <i class="bi-graph-up nav-icon me-2"></i>
+                        <strong>{{ scenario.name.length > 12 ? scenario.name.slice(0, 12) + '' : scenario.name }}</strong>
+                        <span v-if="isCurrentScenario(scenario.id)" class="badge bg-info rounded-pill ms-1">Current</span>
+                      </router-link>
                     </div>
                   </div>
               </div>
