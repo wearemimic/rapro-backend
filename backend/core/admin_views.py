@@ -242,8 +242,9 @@ def admin_dashboard_stats(request):
         )
 
 
+
 @api_view(['GET'])
-@admin_required(section='user_management')
+@admin_required()
 def admin_user_list(request):
     """Get paginated list of users with admin-specific data"""
     try:
@@ -3588,3 +3589,137 @@ def configuration_summary(request):
         return Response(serializer.data)
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# ============================================================================
+# BILLING MANAGEMENT API ENDPOINTS
+# ============================================================================
+
+@api_view(['GET'])
+@admin_required(section='billing')
+def admin_billing_data(request):
+    """Get comprehensive billing and revenue data for admin billing dashboard"""
+    try:
+        import stripe
+        from django.conf import settings
+        
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        
+        # Initialize analytics service
+        revenue_service = RevenueAnalyticsService()
+        
+        # Get current revenue metrics
+        current_metrics = {}
+        
+        # Calculate current MRR from Stripe
+        mrr_data = revenue_service.calculate_mrr()
+        if mrr_data:
+            current_metrics['totalMRR'] = mrr_data['total_mrr']
+            current_metrics['monthlyMRR'] = mrr_data['monthly_mrr']
+            current_metrics['annualMRR'] = mrr_data['annual_mrr']
+        else:
+            current_metrics['totalMRR'] = 0
+            current_metrics['monthlyMRR'] = 0
+            current_metrics['annualMRR'] = 0
+        
+        # Get subscription breakdown from Stripe
+        subscriptions = stripe.Subscription.list(limit=100, expand=['data.items.data.price'])
+        
+        subscription_breakdown = {
+            'active': 0,
+            'trial': 0,
+            'past_due': 0,
+            'canceled': 0
+        }
+        
+        active_subscriptions = 0
+        new_users_this_month = 0
+        
+        for subscription in subscriptions.auto_paging_iter():
+            status = subscription.status
+            if status in subscription_breakdown:
+                subscription_breakdown[status] += 1
+                
+            if status == 'active':
+                active_subscriptions += 1
+                
+            # Count new subscriptions this month
+            created_date = datetime.fromtimestamp(subscription.created)
+            if created_date.month == datetime.now().month and created_date.year == datetime.now().year:
+                new_users_this_month += 1
+        
+        # Calculate ARPU
+        average_revenue_per_user = 0
+        if active_subscriptions > 0:
+            average_revenue_per_user = current_metrics['totalMRR'] / active_subscriptions
+        
+        # Get recent billing activity from Stripe
+        charges = stripe.Charge.list(limit=20, expand=['data.customer'])
+        recent_billing_activity = []
+        
+        for charge in charges.data:
+            customer_email = 'N/A'
+            customer_name = 'Unknown Customer'
+            
+            if charge.customer:
+                try:
+                    customer = stripe.Customer.retrieve(charge.customer)
+                    customer_email = customer.email or 'N/A'
+                    customer_name = customer.name or customer_email
+                except:
+                    pass
+            
+            activity_status = 'paid' if charge.paid else 'failed'
+            if charge.status == 'pending':
+                activity_status = 'pending'
+            
+            plan_name = 'One-time Payment'
+            if charge.invoice:
+                try:
+                    invoice = stripe.Invoice.retrieve(charge.invoice, expand=['subscription.items.data.price'])
+                    if invoice.subscription and invoice.subscription.items.data:
+                        price = invoice.subscription.items.data[0].price
+                        if price.recurring:
+                            interval = price.recurring.interval
+                            plan_name = f"{'Annual' if interval == 'year' else 'Monthly'} Plan"
+                except:
+                    pass
+            
+            recent_billing_activity.append({
+                'id': charge.id,
+                'customer_name': customer_name,
+                'customer_email': customer_email,
+                'amount': charge.amount / 100,  # Convert cents to dollars
+                'plan_name': plan_name,
+                'status': activity_status,
+                'created_at': datetime.fromtimestamp(charge.created).isoformat()
+            })
+        
+        # Count failed payments
+        failed_payments_count = len([a for a in recent_billing_activity if a['status'] == 'failed'])
+        
+        # Mock data for items not available from Stripe API
+        expiring_trials_count = 5  # Would need to track trials separately
+        
+        return Response({
+            'stats': {
+                'totalMRR': current_metrics['totalMRR'],
+                'activeSubscriptions': active_subscriptions,
+                'averageRevenuePerUser': average_revenue_per_user,
+                'newUsersThisMonth': new_users_this_month,
+                'subscriptionBreakdown': subscription_breakdown
+            },
+            'recentBillingActivity': recent_billing_activity,
+            'failedPaymentsCount': failed_payments_count,
+            'expiringTrialsCount': expiring_trials_count,
+            'success': True
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in admin_billing_data: {str(e)}")
+        print(traceback.format_exc())
+        
+        return Response({
+            'error': str(e),
+            'success': False
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

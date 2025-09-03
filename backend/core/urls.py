@@ -15,13 +15,13 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .webhooks import stripe_webhook
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
-from .auth0_views import auth0_login, auth0_signup, list_users, user_detail, reset_user_password, auth0_debug, auth0_exchange_code, auth0_complete_registration, validate_coupon
+from .auth0_views import auth0_login_redirect, auth0_login_google, auth0_callback, auth0_logout, auth0_exchange_code, complete_professional_info, auth0_complete_registration, validate_coupon, embedded_signup, create_account
 from .admin_views import (
     admin_dashboard_stats, admin_user_list, update_user_admin_role, admin_analytics_overview, 
     admin_system_monitoring, admin_support_overview, start_user_impersonation, 
     end_user_impersonation, get_active_impersonation_sessions,
     admin_revenue_analytics, admin_recalculate_revenue_metrics, admin_user_engagement_analytics,
-    admin_client_portfolio_analytics, admin_run_analytics_calculation,
+    admin_client_portfolio_analytics, admin_run_analytics_calculation, admin_billing_data,
     # Phase 2.3: System Performance Monitoring
     admin_performance_metrics, admin_record_performance_metric, admin_system_health_dashboard,
     # Phase 2.4: Support Ticket System
@@ -113,15 +113,17 @@ urlpatterns = [
     path('register/', register_view, name='register'),
     path('profile/', profile_view, name='profile'),
     path('login/', login_view),  # 👈 expose JWT login at root if needed
-    path('auth0/login/', auth0_login, name='auth0_login'),  # Auth0 login endpoint
-    path('auth0/signup/', auth0_signup, name='auth0_signup'),  # Auth0 signup endpoint
-    path('auth0/debug/', auth0_debug, name='auth0_debug'),  # Auth0 debug endpoint
-    path('auth0/exchange-code/', auth0_exchange_code, name='auth0_exchange_code'),  # Auth0 code exchange
-    path('auth0/complete-registration/', auth0_complete_registration, name='auth0_complete_registration'),  # Auth0 registration completion
-    path('validate-coupon/', validate_coupon, name='validate_coupon'),  # Validate coupon code
-    path('users/', list_users, name='list_users'),  # List all users
-    path('users/<int:user_id>/', user_detail, name='user_detail'),  # Get/Update/Delete user
-    path('users/<int:user_id>/reset-password/', reset_user_password, name='reset_user_password'),  # Reset user password
+    # Clean Django Regular Web Application Auth0 endpoints
+    path('auth0/login-redirect/', auth0_login_redirect, name='auth0_login_redirect'),  # Auth0 login redirect
+    path('auth0/login-google/', auth0_login_google, name='auth0_login_google'),  # Auth0 Google login redirect
+    path('auth0/callback/', auth0_callback, name='auth0_callback'),  # Auth0 callback handler
+    path('auth0/logout/', auth0_logout, name='auth0_logout'),  # Auth0 logout redirect
+    path('auth0/exchange-code/', auth0_exchange_code, name='auth0_exchange_code'),  # Frontend calls this to exchange code
+    path('auth0/embedded-signup/', embedded_signup, name='embedded_signup'),  # Embedded signup without redirects
+    path('auth0/create-account/', create_account, name='create_account'),  # Create Auth0 account only (no auth)
+    path('auth0/complete-professional-info/', complete_professional_info, name='complete_professional_info'),  # Professional info step
+    path('auth0/complete-registration/', auth0_complete_registration, name='auth0_complete_registration'),  # Registration completion with Stripe
+    path('validate-coupon/', validate_coupon, name='validate_coupon'),  # Coupon validation
     path('clients/', AdvisorClientListView.as_view(), name='advisor-client-list'),
     path('clients/create/', ClientCreateView.as_view(), name='client-create'),
     path('clients/<int:pk>/', ClientDetailView.as_view(), name='client-detail'),
@@ -238,6 +240,9 @@ urlpatterns = [
     path('admin/analytics/engagement/', admin_user_engagement_analytics, name='admin-user-engagement-analytics'),
     path('admin/analytics/portfolio/', admin_client_portfolio_analytics, name='admin-client-portfolio-analytics'),
     path('admin/analytics/calculate/', admin_run_analytics_calculation, name='admin-run-analytics-calculation'),
+    
+    # Billing Management API endpoints
+    path('admin/billing/', admin_billing_data, name='admin-billing-data'),
     
     # Phase 2.3: System Performance Monitoring
     path('admin/performance/metrics/', admin_performance_metrics, name='admin-performance-metrics'),

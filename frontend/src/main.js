@@ -5,8 +5,7 @@ import { createPinia } from 'pinia';
 import Toast, { POSITION } from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
 import axios from 'axios';
-import { createAuth0 } from '@auth0/auth0-vue';
-import { auth0Config } from './config/auth0';
+// Removed Auth0 Vue SDK - using Django server-side auth
 
 const token = localStorage.getItem('token');
 if (token) {
@@ -19,18 +18,7 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(router);
 
-// Initialize Auth0 - TEMPORARILY DISABLED FOR DEBUGGING
-// The Auth0 Vue plugin might be intercepting callbacks
-// app.use(
-//   createAuth0({
-//     domain: auth0Config.domain,
-//     clientId: auth0Config.clientId,
-//     authorizationParams: {
-//       redirect_uri: auth0Config.redirectUri,
-//       audience: auth0Config.audience,
-//     },
-//   })
-// );
+// Auth0 removed - using Django server-side authentication
 
 import { useAuthStore } from './stores/auth';
 const authStore = useAuthStore();

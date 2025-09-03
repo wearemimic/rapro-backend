@@ -8,7 +8,6 @@ import Login from '@/views/Login.vue'
 import ClientList from '@/views/ClientList.vue'
 import ClientsCreate from '@/views/ClientCreate.vue'
 import ScenarioDetail from '@/views/ScenarioDetail.vue'
-import Auth0Callback from '@/views/Auth0Callback.vue'
 import UserManagement from '@/views/UserManagement.vue'
 import ComparisonReport from '@/views/ComparisonReport.vue'
 
@@ -24,7 +23,10 @@ import ClientPortalScenarios from '@/views/ClientPortal/ClientPortalScenarios.vu
 const routes = [
   { path: '/register', name: 'Register', component: Register },
   { path: '/login', name: 'Login', component: Login },
-  { path: '/auth/callback', name: 'Auth0Callback', component: Auth0Callback },
+  { path: '/auth/callback', name: 'Auth0Callback', component: () => import('@/views/Auth0CallbackSimple.vue') },
+  { path: '/auth/success', name: 'Auth0Success', component: () => import('@/views/Auth0Success.vue') },
+  { path: '/auth0-debug', name: 'Auth0Debug', component: () => import('@/views/Auth0Debug.vue') },
+  { path: '/callback-debug', name: 'CallbackDebug', component: () => import('@/views/CallbackDebug.vue') },
   
   // Client Portal Login (separate from advisor login)
   { 
@@ -234,12 +236,12 @@ router.beforeEach((to, _, next) => {
   
   console.log('🔍 Router navigation to:', to.path);
   console.log('🔍 Router query params:', to.query);
+  console.log('🔍 Has token:', !!authStore.token);
   
-  // Special handling for Auth0 callback
-  if (to.path === '/auth/callback') {
-    console.log('🎯 Auth0 callback route detected!');
-    console.log('🎯 Full URL:', window.location.href);
-    // Don't interfere with the callback
+  // Allow public routes
+  const publicRoutes = ['/login', '/register', '/auth/callback', '/auth/success', '/portal/login', '/auth0-debug', '/callback-debug'];
+  if (publicRoutes.includes(to.path)) {
+    console.log('✅ Public route, allowing access');
     next();
     return;
   }

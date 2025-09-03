@@ -379,6 +379,63 @@ def create_jwt_pair_for_user(user):
     }
 
 
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
+class CustomJWTAuthentication(JWTAuthentication):
+    """
+    Custom JWT Authentication that reads admin claims from token
+    and applies them to the user object during authentication
+    """
+    
+    def authenticate(self, request):
+        """Override to add debugging"""
+        print(f"🔐 CustomJWTAuthentication.authenticate called")
+        result = super().authenticate(request)
+        print(f"🔐 Authentication result: {result}")
+        return result
+    
+    def get_user(self, validated_token):
+        """
+        Override to add admin claims from token to user object
+        """
+        print(f"🎫 CustomJWTAuthentication.get_user called with token: {validated_token}")
+        user = super().get_user(validated_token)
+        print(f"👤 Retrieved user: {user.id} ({user.email})")
+        
+        # Get admin claims from token payload
+        is_admin_user = validated_token.get('is_admin_user', False)
+        admin_role = validated_token.get('admin_role', '')
+        admin_permissions = validated_token.get('admin_permissions', {})
+        
+        # Temporarily override user properties with token claims
+        # This ensures the decorators see the admin status from the token
+        if is_admin_user:
+            # Store original values
+            user._original_admin_role = user.admin_role
+            user._original_admin_permissions = user.admin_permissions
+            user._original_is_platform_admin = user.is_platform_admin
+            user._original_can_access_admin_section = user.can_access_admin_section
+            
+            # Override with token values (set writable fields instead of read-only property)
+            user.admin_role = admin_role
+            user.admin_permissions = admin_permissions
+            # Set is_platform_admin to True to make is_admin_user property return True
+            user.is_platform_admin = True
+            
+            # Override the can_access_admin_section method
+            def token_can_access_admin_section(section):
+                """Always return True for super_admin from token"""
+                if admin_role == 'super_admin':
+                    return True
+                # Fallback to original method
+                return user._original_can_access_admin_section(section)
+            
+            user.can_access_admin_section = token_can_access_admin_section
+        
+        return user
+
+
 def get_enhanced_user_data(user):
     """
     Get comprehensive user data including admin information for API responses
@@ -389,7 +446,18 @@ def get_enhanced_user_data(user):
         'username': user.username,
         'first_name': user.first_name,
         'last_name': user.last_name,
+        'phone_number': user.phone_number,
         'company_name': user.company_name,
+        'website_url': user.website_url,
+        'address': user.address,
+        'city': user.city,
+        'state': user.state,
+        'zip_code': user.zip_code,
+        'white_label_company_name': user.white_label_company_name,
+        'white_label_support_email': user.white_label_support_email,
+        'primary_color': user.primary_color,
+        'logo': user.logo.url if user.logo else None,
+        'custom_disclosure': user.custom_disclosure,
         'subscription_status': user.subscription_status,
         'subscription_plan': user.subscription_plan,
         'is_subscription_active': user.is_subscription_active,

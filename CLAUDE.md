@@ -118,12 +118,21 @@ The core Django models include:
 - `TaxSettings` - Tax configuration per scenario
 
 ### Authentication Flow
-The application uses Auth0 authentication:
-- **Frontend:** Direct Auth0 redirect method
-- **Backend:** Custom JWT validation and user management
-- **Flow:** Auth0 login → Authorization code → Backend token exchange → Django JWT tokens
+The application uses Auth0 Regular Web Application authentication:
+- **Architecture:** Frontend handles Auth0 redirects, backend exchanges codes with client_secret
+- **Flow:** Frontend → Auth0 → Frontend callback → Django token exchange → JWT tokens
+- **Security:** Server-side token exchange using client_secret (not PKCE)
 - **Social Providers:** Google, Facebook, Apple, and email/password
 - **Protected routes:** All API endpoints require valid Django JWT tokens
+
+**Detailed Auth0 Regular Web Application Flow:**
+1. **User clicks login** → Frontend redirects directly to Auth0 (not backend URL)
+2. **Auth0 authentication** → User authenticates with chosen provider (Google, etc.)
+3. **Auth0 callback** → Auth0 redirects back to `localhost:3000/auth/callback` with authorization code
+4. **Frontend callback handler** → Extracts code and sends POST to `/api/auth0/exchange-code/`
+5. **Django backend exchange** → Uses client_secret to exchange code for Auth0 tokens
+6. **User creation/retrieval** → Django creates or finds user, generates JWT tokens
+7. **Frontend completion** → Stores JWT tokens and redirects to dashboard
 
 ### Key Features
 1. **Monte Carlo Simulation Engine** - Stress tests retirement scenarios
@@ -178,11 +187,12 @@ The application includes a sophisticated IRMAA (Income-Related Monthly Adjustmen
 
 ### API Endpoints Summary
 
-**Authentication:**
-- `/api/auth0/login/` - Auth0 token exchange
-- `/api/auth0/signup/` - User creation
-- `/api/auth0/exchange-code/` - Authorization code exchange
-- `/api/auth0/complete-registration/` - Registration completion
+**Authentication (Regular Web Application):**
+- `/api/auth0/login-redirect/` - Django redirects to Auth0 (general login)
+- `/api/auth0/login-google/` - Django redirects to Auth0 (Google-specific)
+- `/api/auth0/callback/` - Django receives Auth0 callback directly (not used in current flow)
+- `/api/auth0/exchange-code/` - Frontend sends authorization code for token exchange
+- `/api/auth0/logout/` - Django handles Auth0 logout redirect
 
 **Scenarios:**
 - `/api/scenarios/<id>/calculate/` - Run calculations
@@ -298,10 +308,46 @@ props: {
 4. No code changes or restarts required
 
 ### Testing Auth0 Integration
-1. Verify configuration with `/api/auth0/debug/`
-2. Check browser console for redirect URLs
-3. Ensure Backend has Auth0 client secret in .env
-4. Callback URLs must match in Auth0 Dashboard
+1. **Auth0 Dashboard Configuration**: Ensure `http://localhost:3000/auth/callback` is in allowed callback URLs
+2. **Environment Variables**: Backend must have `AUTH0_CLIENT_SECRET` in .env file
+3. **Frontend Environment**: Frontend needs `VITE_AUTH0_DOMAIN` and `VITE_AUTH0_CLIENT_ID`
+4. **Test Flow**: Click login → Auth0 redirect → Callback → Token exchange → Dashboard
+5. **Debug**: Check browser console and Django logs for errors during token exchange
+
+### Auth0 Regular Web Application Implementation (September 2025)
+**Complete rewrite of Auth0 authentication to follow Regular Web Application pattern:**
+
+#### **Key Architecture Changes:**
+- **Removed Auth0 Vue SDK**: No more `@auth0/auth0-vue` dependency in frontend
+- **Frontend Direct Auth0**: Login buttons redirect directly to Auth0 authorization endpoint
+- **Backend Token Exchange**: Django exchanges authorization codes using `client_secret`
+- **Hybrid Security Model**: Frontend handles redirects, backend handles secure token exchange
+
+#### **Implementation Details:**
+- **Login Flow**: `Login.vue` builds Auth0 URLs manually and redirects to Auth0
+- **Callback Handling**: `Auth0CallbackSimple.vue` extracts authorization code from URL
+- **Token Exchange**: Frontend POSTs code to `/api/auth0/exchange-code/` endpoint
+- **Django Backend**: Exchanges code with Auth0 using `client_secret`, creates user, returns JWT tokens
+
+#### **Files Modified:**
+- `frontend/src/main.js` - Removed Auth0 Vue SDK initialization
+- `frontend/src/views/Login.vue` - Manual Auth0 redirect URL construction
+- `frontend/src/views/Auth0CallbackSimple.vue` - Code extraction and backend API call
+- `backend/core/auth0_views.py` - Complete rewrite with clean Regular Web App endpoints
+- `backend/core/urls.py` - Updated to only include necessary Auth0 endpoints
+
+#### **Auth0 Dashboard Requirements:**
+- **Application Type**: Regular Web Application (not Single Page Application)
+- **Callback URLs**: `http://localhost:3000/auth/callback` (frontend receives callbacks)
+- **Client Secret**: Must be configured in Django backend `.env` file
+- **No audience parameter**: Removed from Auth0 configuration to avoid service errors
+
+#### **Benefits of New Implementation:**
+- ✅ **Server-side security**: Token exchange uses `client_secret` instead of PKCE
+- ✅ **Simplified frontend**: No complex Auth0 SDK state management
+- ✅ **Better error handling**: Clear separation of concerns between frontend and backend
+- ✅ **Standard compliance**: Follows Auth0 Regular Web Application documentation exactly
+- ✅ **Debugging friendly**: Clear request/response flow for troubleshooting
 
 ## Recent Updates & Fixes
 

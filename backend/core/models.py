@@ -78,6 +78,17 @@ class CustomUser(AbstractUser):
         blank=True,
         help_text="Custom permissions dictionary for granular access control"
     )
+    
+    # Communication preferences
+    sms_consent = models.BooleanField(
+        default=False, 
+        help_text="User consent to receive SMS messages for company information and updates"
+    )
+    sms_consent_date = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        help_text="Date when SMS consent was given"
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []

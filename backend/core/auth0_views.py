@@ -2,207 +2,249 @@ import json
 import jwt
 import requests
 import time
+import stripe
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.shortcuts import redirect
+from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .authentication import create_jwt_pair_for_user, get_enhanced_user_data
-from urllib.parse import urlencode
-from django.core.paginator import Paginator
-from django.db.models import Q
+from urllib.parse import urlencode, quote
+
+# Initialize Stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 User = get_user_model()
 
-def get_auth0_management_token():
+# Django Regular Web Application Auth0 Views - Following Auth0 Django Quickstart Exactly
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def auth0_login_redirect(request):
     """
-    Get Auth0 Management API token
+    Redirect to Auth0 for authentication - Regular Web Application flow
+    Following Django quickstart: Auth0 redirects back to Django backend directly
     """
     domain = settings.AUTH0_DOMAIN
     client_id = settings.AUTH0_CLIENT_ID
-    client_secret = settings.AUTH0_CLIENT_SECRET
+    # Critical: Use Django backend callback URL - Auth0 will callback here
+    callback_url = request.build_absolute_uri('/api/auth0/callback/')
     
-    token_url = f'https://{domain}/oauth/token'
-    token_payload = {
+    # Build Auth0 authorization URL exactly as per Django quickstart
+    params = {
+        'response_type': 'code',
         'client_id': client_id,
-        'client_secret': client_secret,
-        'audience': f'https://{domain}/api/v2/',
-        'grant_type': 'client_credentials'
+        'redirect_uri': callback_url,
+        'scope': 'openid profile email',
+        'state': 'login'
     }
     
-    token_response = requests.post(token_url, json=token_payload)
-    token_data = token_response.json()
-    
-    if 'access_token' not in token_data:
-        raise Exception('Failed to get Auth0 management token')
-    
-    return token_data['access_token']
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-@throttle_classes([])  # Disable throttling for Auth0 authentication
-def auth0_login(request):
-    """
-    Exchange Auth0 token for Django JWT token
-    """
-    try:
-        print(f"Auth0 login attempt from {request.META.get('REMOTE_ADDR', 'unknown')}")
-        
-        # Get the Auth0 token from the request
-        auth0_token = request.data.get('auth0Token')
-        if not auth0_token:
-            print("Error: No Auth0 token provided")
-            return Response({'message': 'Auth0 token is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        print(f"Auth0 token received, length: {len(auth0_token)}")
-
-        # Verify the Auth0 token
-        domain = settings.AUTH0_DOMAIN
-        audience = settings.AUTH0_AUDIENCE or settings.AUTH0_CLIENT_ID  # Use audience from settings
-        
-        print(f"Using Auth0 domain: {domain}")
-        print(f"Using Auth0 audience: {audience}")
-        
-        # Get the JWKS (JSON Web Key Set) from Auth0
-        jwks_url = f'https://{domain}/.well-known/jwks.json'
-        print(f"Fetching JWKS from: {jwks_url}")
-        
-        jwks_response = requests.get(jwks_url)
-        if jwks_response.status_code != 200:
-            print(f"Failed to fetch JWKS: {jwks_response.status_code}")
-            return Response({'message': 'Failed to fetch Auth0 keys'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        jwks = jwks_response.json()
-        print(f"JWKS fetched successfully, keys count: {len(jwks.get('keys', []))}")
-        
-        # Decode the token header to get the key ID
-        try:
-            token_header = jwt.get_unverified_header(auth0_token)
-            key_id = token_header.get('kid')
-            print(f"Token key ID: {key_id}")
-        except Exception as e:
-            print(f"Failed to decode token header: {str(e)}")
-            return Response({'message': 'Invalid token format'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Find the matching key in the JWKS
-        rsa_key = {}
-        for key in jwks['keys']:
-            if key['kid'] == key_id:
-                rsa_key = {
-                    'kty': key['kty'],
-                    'kid': key['kid'],
-                    'use': key['use'],
-                    'n': key['n'],
-                    'e': key['e']
-                }
-                break
-        
-        if not rsa_key:
-            print(f"No matching key found for kid: {key_id}")
-            return Response({'message': 'Invalid token key'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        print("RSA key found, decoding token...")
-        
-        # Decode and verify the token
-        payload = jwt.decode(
-            auth0_token,
-            rsa_key,
-            algorithms=[settings.AUTH0_ALGORITHM],
-            audience=audience,
-            issuer=f'https://{domain}/'
-        )
-        
-        print(f"Token decoded successfully, subject: {payload.get('sub')}")
-        
-        # Get user info from payload
-        email = payload.get('email')
-        if not email:
-            return Response({'message': 'Email not found in token'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get or create user
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                'username': email,
-                'is_active': True,
-                'first_name': payload.get('given_name', ''),
-                'last_name': payload.get('family_name', '')
-            }
-        )
-        
-        # Generate Django JWT token with admin claims
-        tokens = create_jwt_pair_for_user(user)
-        
-        # Return the token and user info
-        return Response({
-            'access': tokens['access'],
-            'refresh': tokens['refresh'],
-            'user': get_enhanced_user_data(user)
-        })
-    
-    except jwt.ExpiredSignatureError:
-        print("JWT token has expired")
-        return Response({'message': 'Token has expired'}, status=status.HTTP_401_UNAUTHORIZED)
-    except jwt.InvalidTokenError as e:
-        print(f"Invalid JWT token: {str(e)}")
-        return Response({'message': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
-    except Exception as e:
-        print(f"Auth0 login exception: {str(e)}")
-        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    auth_url = f'https://{domain}/authorize?' + urlencode(params)
+    print(f"🔗 Redirecting to Auth0: {auth_url}")
+    print(f"🔗 Callback URL: {callback_url}")
+    return redirect(auth_url)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def auth0_debug(request):
+def auth0_login_google(request):
     """
-    Debug endpoint to check Auth0 configuration (remove in production)
+    Redirect to Auth0 for Google authentication - Regular Web Application flow
     """
+    domain = settings.AUTH0_DOMAIN
+    client_id = settings.AUTH0_CLIENT_ID
+    # Critical: Use Django backend callback URL
+    callback_url = request.build_absolute_uri('/api/auth0/callback/')
+    
+    # Build Auth0 authorization URL with Google connection
+    params = {
+        'response_type': 'code',
+        'client_id': client_id,
+        'redirect_uri': callback_url,
+        'scope': 'openid profile email',
+        'connection': 'google-oauth2',
+        'state': 'login'
+    }
+    
+    auth_url = f'https://{domain}/authorize?' + urlencode(params)
+    print(f"🔗 Redirecting to Auth0 Google: {auth_url}")
+    print(f"🔗 Callback URL: {callback_url}")
+    return redirect(auth_url)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def auth0_callback(request):
+    """
+    Handle Auth0 callback - Regular Web Application flow
+    Following Django quickstart: Django backend receives the callback directly from Auth0
+    This is the key difference from SPA - Auth0 calls the backend directly
+    """
+    code = request.GET.get('code')
+    state = request.GET.get('state')
+    error = request.GET.get('error')
+    
+    if error:
+        error_description = request.GET.get('error_description', 'Unknown error')
+        print(f"❌ Auth0 error: {error} - {error_description}")
+        # Redirect to frontend with error
+        frontend_url = f'http://localhost:3000/login?error={quote(f"{error}: {error_description}")}'
+        return redirect(frontend_url)
+    
+    if not code:
+        print("❌ No authorization code received")
+        frontend_url = 'http://localhost:3000/login?error=no_code'
+        return redirect(frontend_url)
+    
     try:
-        from django.conf import settings
+        print(f"✅ Django backend received authorization code: {code[:10]}...")
         
-        config_info = {
-            'domain': settings.AUTH0_DOMAIN,
-            'client_id': settings.AUTH0_CLIENT_ID,
-            'audience': getattr(settings, 'AUTH0_AUDIENCE', 'Not set'),
-            'algorithm': settings.AUTH0_ALGORITHM,
-            'has_secret': bool(settings.AUTH0_CLIENT_SECRET and settings.AUTH0_CLIENT_SECRET != 'your-auth0-client-secret'),
-            'jwks_url': f'https://{settings.AUTH0_DOMAIN}/.well-known/jwks.json'
+        # Exchange code for tokens with Auth0 - Server-side with client_secret
+        domain = settings.AUTH0_DOMAIN
+        client_id = settings.AUTH0_CLIENT_ID
+        client_secret = settings.AUTH0_CLIENT_SECRET
+        callback_url = request.build_absolute_uri('/api/auth0/callback/')
+        
+        token_url = f'https://{domain}/oauth/token'
+        token_payload = {
+            'grant_type': 'authorization_code',
+            'client_id': client_id,
+            'client_secret': client_secret,  # This is the key - server-side with secret
+            'code': code,
+            'redirect_uri': callback_url
         }
         
-        # Test JWKS endpoint
-        try:
-            import requests
-            jwks_response = requests.get(config_info['jwks_url'], timeout=5)
-            config_info['jwks_accessible'] = jwks_response.status_code == 200
-            config_info['jwks_keys_count'] = len(jwks_response.json().get('keys', [])) if jwks_response.status_code == 200 else 0
-        except Exception as e:
-            config_info['jwks_accessible'] = False
-            config_info['jwks_error'] = str(e)
+        print(f"🔄 Exchanging code for tokens with client_secret...")
+        token_response = requests.post(token_url, json=token_payload)
         
-        return Response(config_info)
-    
+        if token_response.status_code != 200:
+            print(f"❌ Token exchange failed: {token_response.status_code}")
+            print(f"Response: {token_response.text}")
+            frontend_url = f'http://localhost:3000/login?error=token_exchange_failed'
+            return redirect(frontend_url)
+        
+        tokens = token_response.json()
+        print(f"✅ Token exchange successful")
+        
+        # Get user info from Auth0
+        userinfo_url = f'https://{domain}/userinfo'
+        userinfo_headers = {'Authorization': f'Bearer {tokens["access_token"]}'}
+        userinfo_response = requests.get(userinfo_url, headers=userinfo_headers)
+        
+        if userinfo_response.status_code != 200:
+            print(f"❌ Failed to get user info: {userinfo_response.status_code}")
+            frontend_url = f'http://localhost:3000/login?error=user_info_failed'
+            return redirect(frontend_url)
+        
+        user_info = userinfo_response.json()
+        email = user_info.get('email')
+        print(f"✅ User info retrieved: {email}")
+        
+        if not email:
+            print("❌ No email in user info")
+            frontend_url = 'http://localhost:3000/login?error=no_email'
+            return redirect(frontend_url)
+        
+        # Check if Django user already exists with active subscription
+        try:
+            existing_user = User.objects.get(email=email)
+            
+            # Check if user has an active subscription
+            has_active_subscription = (
+                existing_user.subscription_status == 'active' and
+                (existing_user.subscription_end_date is None or existing_user.is_subscription_active)
+            )
+            
+            if has_active_subscription or existing_user.is_superuser:
+                print(f"✅ Existing user with active subscription: {email}")
+                
+                # Update user with latest Auth0 info
+                existing_user.first_name = user_info.get('given_name', existing_user.first_name)
+                existing_user.last_name = user_info.get('family_name', existing_user.last_name)
+                existing_user.auth0_sub = user_info.get('sub')
+                existing_user.save()
+                
+                # Create Django JWT tokens for authenticated user
+                jwt_tokens = create_jwt_pair_for_user(existing_user)
+                
+                # Prepare user data for frontend
+                user_data = {
+                    'id': existing_user.id,
+                    'email': existing_user.email,
+                    'first_name': existing_user.first_name,
+                    'last_name': existing_user.last_name,
+                    'username': existing_user.username,
+                    'is_active': existing_user.is_active
+                }
+                
+                # Redirect to frontend with tokens and user data
+                frontend_url = (
+                    f'http://localhost:3000/auth/success?'
+                    f'access_token={jwt_tokens["access"]}&'
+                    f'refresh_token={jwt_tokens["refresh"]}&'
+                    f'user={quote(json.dumps(user_data))}'
+                )
+                print(f"✅ Redirecting existing user to dashboard: {frontend_url[:100]}...")
+                return redirect(frontend_url)
+            else:
+                print(f"❌ Existing user without active subscription: {email}")
+                # Redirect to registration to complete payment
+                frontend_url = f'http://localhost:3000/register?email={quote(email)}&social_login=true&message=Please complete your subscription to access the platform'
+                return redirect(frontend_url)
+                
+        except User.DoesNotExist:
+            print(f"🔄 New social login user needs to complete registration: {email}")
+            # SECURITY: New users must complete registration with payment
+            # Store their Auth0 info temporarily and redirect to registration
+            frontend_url = f'http://localhost:3000/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&auth0_sub={quote(user_info.get("sub", ""))}'
+            print(f"✅ Redirecting new user to complete registration: {frontend_url[:100]}...")
+            return redirect(frontend_url)
+        
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"❌ Auth0 callback error: {str(e)}")
+        import traceback
+        print(f"❌ Full traceback: {traceback.format_exc()}")
+        frontend_url = f'http://localhost:3000/login?error={quote(str(e))}'
+        return redirect(frontend_url)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def auth0_logout(request):
+    """
+    Logout from Auth0 and redirect to frontend
+    """
+    domain = settings.AUTH0_DOMAIN
+    client_id = settings.AUTH0_CLIENT_ID
+    return_url = 'http://localhost:3000/login'
+    
+    logout_params = {
+        'client_id': client_id,
+        'returnTo': return_url
+    }
+    
+    logout_url = f'https://{domain}/v2/logout?' + urlencode(logout_params)
+    return redirect(logout_url)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@throttle_classes([])  # Disable throttling for Auth0 authentication
+@throttle_classes([])
 def auth0_exchange_code(request):
     """
-    Exchange Auth0 authorization code for tokens and create Django session
+    Exchange Auth0 authorization code for Django JWT tokens
+    Enhanced to handle both login and registration flows
     """
     try:
         code = request.data.get('code')
-        redirect_uri = request.data.get('redirect_uri')
+        flow_type = request.data.get('flow_type', 'login')  # 'login' or 'registration'
         
         if not code:
             return Response({'message': 'Authorization code is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if not redirect_uri:
-            return Response({'message': 'Redirect URI is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Use the same redirect_uri that was used in the authorization request
+        redirect_uri = 'http://localhost:3000/auth/callback'
         
-        print(f"Exchanging authorization code: {code[:10]}...")
+        print(f"Exchanging authorization code for {flow_type} flow: {code[:10]}...")
         
         # Exchange code for tokens with Auth0
         domain = settings.AUTH0_DOMAIN
@@ -250,604 +292,860 @@ def auth0_exchange_code(request):
         user_info = userinfo_response.json()
         print(f"✅ User info retrieved: {user_info.get('email')}")
         
-        # Create or get user in Django
         email = user_info.get('email')
         if not email:
-            print(f"❌ No email in user_info: {user_info}")
             return Response({'message': 'Email not found in user info'}, status=status.HTTP_400_BAD_REQUEST)
         
-        print(f"🔍 Auth0 returned email: '{email}'")
-        print(f"🔍 Full user_info from Auth0: {user_info}")
-        
-        # Check if user exists first, and handle accordingly
-        # Try case-insensitive lookup first
+        # SECURITY: Check if Django user exists and has active subscription
         try:
-            user = User.objects.get(email__iexact=email)
-            print(f"✅ Retrieved existing user: {user.email} (matched '{email}')")
-            created = False
-        except User.DoesNotExist:
-            # User doesn't exist in our Django system
-            print(f"❌ User '{email}' not found in Django system")
-            print(f"🔍 Available users in system:")
-            for existing_user in User.objects.all():
-                print(f"   - {existing_user.email} (active: {existing_user.is_active})")
-            print(f"🔍 Looking for exact match vs case-insensitive...")
+            existing_user = User.objects.get(email=email)
             
-            # For new users coming from Auth0, we need to check if they completed registration
-            # If they're here, they successfully authenticated with Auth0 but we don't have them in Django
-            # This means they might have used social login but never completed our registration process
-            
-            # Create a basic user record, but mark them as needing to complete registration
-            user = User.objects.create_user(
-                username=email,
-                email=email,
-                is_active=False,  # Inactive until they complete registration
-                first_name=user_info.get('given_name', ''),
-                last_name=user_info.get('family_name', '')
+            # Check if user has an active subscription
+            has_active_subscription = (
+                existing_user.subscription_status == 'active' and
+                (existing_user.subscription_end_date is None or existing_user.is_subscription_active)
             )
-            print(f"✅ Created placeholder user: {email} (inactive, needs registration)")
-            created = True
             
-            # Return a special response indicating they need to complete registration
+            if has_active_subscription or existing_user.is_superuser:
+                print(f"✅ Existing user with active subscription: {email}")
+                
+                # Update user with latest Auth0 info
+                existing_user.first_name = user_info.get('given_name', existing_user.first_name)
+                existing_user.last_name = user_info.get('family_name', existing_user.last_name)
+                existing_user.auth0_sub = user_info.get('sub')
+                existing_user.save()
+                
+                # Generate Django JWT tokens for authenticated user
+                jwt_tokens = create_jwt_pair_for_user(existing_user)
+                
+                # Prepare response data
+                response_data = {
+                    'access': jwt_tokens['access'],
+                    'refresh': jwt_tokens['refresh'],
+                    'user': get_enhanced_user_data(existing_user),
+                    'is_new_user': False,
+                    'registration_complete': True
+                }
+            else:
+                print(f"❌ Existing user without active subscription: {email}")
+                # Return special response indicating registration needed
+                return Response({
+                    'message': 'Registration required',
+                    'requires_registration': True,
+                    'email': email,
+                    'first_name': user_info.get('given_name', ''),
+                    'last_name': user_info.get('family_name', ''),
+                    'auth0_sub': user_info.get('sub'),
+                    'social_login': True
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
+                
+        except User.DoesNotExist:
+            print(f"🔄 New social login user needs to complete registration: {email}")
+            # SECURITY: New users must complete registration with payment
             return Response({
-                'message': 'Account authentication successful, but registration is incomplete.',
-                'code': 'REGISTRATION_INCOMPLETE',
-                'action': 'complete_registration',
-                'user_email': email
-            }, status=status.HTTP_202_ACCEPTED)
+                'message': 'Registration required',
+                'requires_registration': True,
+                'email': email,
+                'first_name': user_info.get('given_name', ''),
+                'last_name': user_info.get('family_name', ''),
+                'auth0_sub': user_info.get('sub'),
+                'social_login': True,
+                'is_new_user': True
+            }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
         
-        # Check if user is active (completed registration)
-        if not user.is_active:
-            print(f"❌ User {email} exists but is inactive (incomplete registration)")
-            return Response({
-                'message': 'Account found but registration is incomplete. Please complete your registration.',
-                'code': 'REGISTRATION_INCOMPLETE',
-                'action': 'complete_registration',
-                'user_email': email
-            }, status=status.HTTP_202_ACCEPTED)
+        print(f"✅ Authenticated user response prepared")
         
-        # Generate Django JWT token with admin claims
-        tokens = create_jwt_pair_for_user(user)
-        
-        response_data = {
-            'access': tokens['access'],
-            'refresh': tokens['refresh'],
-            'user': get_enhanced_user_data(user)
-        }
-        
-        print(f"✅ Successful auth response for {user.email}: {response_data}")
         return Response(response_data)
-    
+        
     except Exception as e:
-        print(f"❌ Auth0 code exchange exception: {str(e)}")
+        print(f"Auth0 exchange code error: {str(e)}")
         import traceback
-        print(f"❌ Full traceback: {traceback.format_exc()}")
-        return Response({
-            'message': f'Authentication failed: {str(e)}',
-            'error': 'INTERNAL_ERROR'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def auth0_complete_registration(request):
+def complete_professional_info(request):
     """
-    Complete Auth0 user registration with professional info and payment
+    Complete professional information for user registration
+    Phase 2 of registration flow
     """
     try:
-        import stripe
-        from django.conf import settings
-        
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        
         user = request.user
         data = request.data
         
-        # Step 1: Update user profile with professional info and activate account
+        print(f"🔄 Completing professional info for user: {user.email}")
+        
+        # Extract and validate professional info
+        required_fields = ['firstName', 'lastName', 'phone', 'smsConsent']
+        missing_fields = []
+        
+        for field in required_fields:
+            if field == 'smsConsent':
+                # SMS consent must be explicitly True
+                if not data.get(field) or data.get(field) != True:
+                    missing_fields.append('SMS consent')
+            elif not data.get(field):
+                missing_fields.append(field)
+        
+        if missing_fields:
+            return Response(
+                {'message': f'Missing required fields: {", ".join(missing_fields)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update user with professional information
+        user.first_name = data.get('firstName', '').strip()
+        user.last_name = data.get('lastName', '').strip()
+        user.phone_number = data.get('phone', '').strip()
+        user.sms_consent = data.get('smsConsent', False)
+        
+        # Set consent date if consenting for the first time
+        if data.get('smsConsent') and not user.sms_consent_date:
+            from django.utils import timezone
+            user.sms_consent_date = timezone.now()
+        
+        # Save the updated user
+        user.save()
+        
+        print(f"✅ Professional info updated for: {user.email}")
+        
+        return Response({
+            'status': 'success',
+            'message': 'Professional information updated successfully',
+            'user': get_enhanced_user_data(user)
+        })
+        
+    except Exception as e:
+        print(f"❌ Professional info completion error: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # Allow unauthenticated - authenticate AFTER payment
+def auth0_complete_registration(request):
+    """
+    Complete Auth0 registration with Stripe subscription
+    Phase 3 of registration flow - handles professional info + payment
+    SECURITY: Authenticates user ONLY AFTER successful payment
+    """
+    try:
+        data = request.data
+        
+        # Extract registration credentials (stored in sessionStorage)
+        registration_email = data.get('registrationEmail')
+        registration_password = data.get('registrationPassword')
+        
+        if not registration_email or not registration_password:
+            return Response({
+                'message': 'Registration credentials required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"🔄 Processing payment for registration: {registration_email}")
+        
+        # Extract data
         professional_info = data.get('professionalInfo', {})
-        if professional_info:
-            user.first_name = professional_info.get('firstName', user.first_name)
-            user.last_name = professional_info.get('lastName', user.last_name)
-            # Add other professional fields if your user model supports them
-            
-            # Activate the user account now that they're completing registration
-            user.is_active = True
-            user.save()
-            print(f"✅ Updated user profile and activated account for: {user.email}")
+        payment_info = data.get('paymentInfo', {})
         
-        # Step 2: Create Stripe customer if not exists
-        if not user.stripe_customer_id:
-            try:
-                customer = stripe.Customer.create(
-                    email=user.email,
-                    name=f"{user.first_name} {user.last_name}",
-                    metadata={
-                        'user_id': user.id,
-                        'auth0_user': True
-                    }
-                )
-                user.stripe_customer_id = customer.id
-                user.save()
-                print(f"✅ Created Stripe customer: {customer.id}")
-            except Exception as e:
-                print(f"❌ Failed to create Stripe customer: {str(e)}")
-                return Response({
-                    'message': 'Failed to create customer account'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Validate required data
+        if not professional_info or not payment_info:
+            return Response(
+                {'message': 'Both professionalInfo and paymentInfo are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        # Step 3: Handle payment if provided
-        payment_info = data.get('paymentInfo')
-        if payment_info:
-            payment_method_id = payment_info.get('paymentMethodId')
-            plan = payment_info.get('plan', 'monthly')
-            coupon_code = payment_info.get('couponCode')
-            
-            if not payment_method_id:
-                return Response({
-                    'message': 'Payment method is required'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Attach payment method to customer
-            stripe.PaymentMethod.attach(
-                payment_method_id,
-                customer=user.stripe_customer_id,
+        # SECURITY: Process payment BEFORE authentication
+        print(f"🔒 Processing payment before authentication (secure flow)")
+        
+        # Extract payment info
+        payment_method_id = payment_info.get('paymentMethodId')
+        plan = payment_info.get('plan')  # 'monthly' or 'annual'
+        billing_details = payment_info.get('billingDetails', {})
+        coupon_code = payment_info.get('couponCode')
+        is_zero_cost = payment_info.get('isZeroCost', False)
+        
+        if not plan:
+            return Response(
+                {'message': 'Plan selection is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
             )
             
-            # Set as default payment method
-            stripe.Customer.modify(
-                user.stripe_customer_id,
-                invoice_settings={
-                    'default_payment_method': payment_method_id
-                }
+        # For paid subscriptions, require payment method
+        if not is_zero_cost and not payment_method_id:
+            return Response(
+                {'message': 'Payment method is required for paid subscriptions'}, 
+                status=status.HTTP_400_BAD_REQUEST
             )
-            
-            # Get the price ID based on the plan
-            price_id = settings.STRIPE_MONTHLY_PRICE_ID if plan == 'monthly' else settings.STRIPE_ANNUAL_PRICE_ID
-            
-            # Prepare subscription creation parameters
-            subscription_params = {
-                'customer': user.stripe_customer_id,
-                'items': [{'price': price_id}],
-                'payment_behavior': 'default_incomplete',
-                'expand': ['latest_invoice.payment_intent'],
-                'metadata': {
-                    'user_id': user.id,
-                    'plan': plan,
-                    'auth0_user': True
-                }
+        
+        # Create Stripe customer (before authentication)
+        try:
+            customer_data = {
+                'email': registration_email,
+                'name': f"{professional_info.get('firstName', '')} {professional_info.get('lastName', '')}".strip(),
+                'phone': professional_info.get('phone', '')
             }
             
-            # Add coupon if provided
+            # Only add payment method and billing info for paid subscriptions
+            if not is_zero_cost and payment_method_id:
+                customer_data.update({
+                    'payment_method': payment_method_id,
+                    'invoice_settings': {
+                        'default_payment_method': payment_method_id
+                    },
+                    'address': {
+                        'line1': billing_details.get('address', {}).get('line1'),
+                        'city': billing_details.get('address', {}).get('city'),
+                        'state': billing_details.get('address', {}).get('state'),
+                        'postal_code': billing_details.get('address', {}).get('postal_code'),
+                        'country': billing_details.get('address', {}).get('country', 'US')
+                    }
+                })
+                
+                # Remove None values from address
+                if 'address' in customer_data:
+                    customer_data['address'] = {k: v for k, v in customer_data['address'].items() if v}
+            
+            # Remove None values
+            customer_data = {k: v for k, v in customer_data.items() if v}
+            
+            customer = stripe.Customer.create(**customer_data)
+            print(f"✅ Stripe customer created: {customer.id}")
+            
+        except stripe.error.StripeError as e:
+            print(f"❌ Stripe customer creation failed: {str(e)}")
+            return Response(
+                {'message': f'Payment setup failed: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Determine price ID based on plan
+        if plan == 'monthly':
+            price_id = settings.STRIPE_MONTHLY_PRICE_ID
+        elif plan == 'annual':
+            price_id = settings.STRIPE_ANNUAL_PRICE_ID
+        else:
+            return Response(
+                {'message': 'Invalid plan type'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create subscription
+        try:
+            subscription_data = {
+                'customer': customer.id,
+                'items': [{'price': price_id}],
+                'expand': ['latest_invoice.payment_intent'],
+            }
+            
+            # For paid subscriptions, set incomplete payment behavior
+            if not is_zero_cost:
+                subscription_data['payment_behavior'] = 'default_incomplete'
+            
+            # Apply coupon if provided (using new discounts format)
             if coupon_code:
-                subscription_params['coupon'] = coupon_code
-                print(f"✅ Applying coupon code: {coupon_code}")
+                subscription_data['discounts'] = [{'coupon': coupon_code}]
+                print(f"✅ Applying coupon via discounts: {coupon_code}")
             
-            # Create the subscription
-            subscription = stripe.Subscription.create(**subscription_params)
+            subscription = stripe.Subscription.create(**subscription_data)
+            print(f"✅ Stripe subscription created: {subscription.id}")
             
-            # Save subscription ID to user model
-            user.stripe_subscription_id = subscription.id
-            user.subscription_status = subscription.status
-            user.save()
+            # Store subscription end date for user creation later
+            subscription_end_date = None
+            if hasattr(subscription, 'current_period_end') and subscription.current_period_end:
+                from datetime import datetime
+                subscription_end_date = datetime.fromtimestamp(subscription.current_period_end)
             
-            print(f"✅ Created subscription: {subscription.id}")
+            # Handle payment intent if needed (only for paid subscriptions)
+            payment_intent = None
+            requires_action = False
             
-            return Response({
+            if not is_zero_cost and subscription.latest_invoice and subscription.latest_invoice.payment_intent:
+                payment_intent = subscription.latest_invoice.payment_intent
+                if payment_intent.status == 'requires_action':
+                    requires_action = True
+                    print(f"⚠️  Payment requires additional action")
+            elif is_zero_cost:
+                print(f"✅ Zero-cost subscription activated immediately")
+            
+            # SECURITY: Create Django user ONLY after successful payment
+            print(f"🔐 Payment successful, now creating Django user: {registration_email}")
+            
+            # Create Django user directly with professional info and payment details
+            # This avoids Auth0 Resource Owner Password Grant issues
+            user_defaults = {
+                'username': registration_email,
+                'first_name': professional_info.get('firstName', ''),
+                'last_name': professional_info.get('lastName', ''),
+                'phone_number': professional_info.get('phone', ''),
+                'sms_consent': professional_info.get('smsConsent', False),
+                'is_active': True,
+                'stripe_customer_id': customer.id,
+                'stripe_subscription_id': subscription.id,
+                'subscription_status': subscription.status,
+                'subscription_plan': plan,
+            }
+            
+            # Add subscription end date if available
+            if subscription_end_date:
+                user_defaults['subscription_end_date'] = subscription_end_date
+            
+            user, created = User.objects.get_or_create(
+                email=registration_email,
+                defaults=user_defaults
+            )
+            
+            # Update existing user if needed
+            if not created:
+                user.first_name = professional_info.get('firstName', '')
+                user.last_name = professional_info.get('lastName', '')
+                user.phone_number = professional_info.get('phone', '')
+                user.sms_consent = professional_info.get('smsConsent', False)
+                user.stripe_customer_id = customer.id
+                user.stripe_subscription_id = subscription.id
+                user.subscription_status = subscription.status
+                user.subscription_plan = plan
+                if subscription_end_date:
+                    user.subscription_end_date = subscription_end_date
+                user.save()
+                
+            print(f"✅ Django user {'created' if created else 'updated'}: {registration_email}")
+            
+            # Set SMS consent date if consenting for the first time
+            if professional_info.get('smsConsent') and not user.sms_consent_date:
+                from django.utils import timezone
+                user.sms_consent_date = timezone.now()
+                user.save()
+            
+            print(f"✅ Django user {'created' if created else 'updated'} with payment info: {registration_email}")
+            
+            # Generate Django JWT tokens
+            jwt_tokens = create_jwt_pair_for_user(user)
+            
+            response_data = {
                 'status': 'success',
-                'message': 'Registration completed successfully',
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'subscription_status': user.subscription_status
-                },
+                'message': 'Registration completed successfully' if not is_zero_cost else 'Free account activated successfully',
+                'access': jwt_tokens['access'],  # Return JWT tokens
+                'refresh': jwt_tokens['refresh'],
+                'user': get_enhanced_user_data(user),
+                'is_zero_cost': is_zero_cost,
                 'subscription': {
                     'id': subscription.id,
                     'status': subscription.status,
-                    'client_secret': subscription.latest_invoice.payment_intent.client_secret if subscription.latest_invoice.payment_intent else None
+                    'plan': plan,
+                    'current_period_end': getattr(subscription, 'current_period_end', None)
                 }
-            })
-        else:
-            # Just update profile without payment
-            return Response({
-                'status': 'success',
-                'message': 'Profile updated successfully',
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name
+            }
+            
+            # Add payment intent info if action required
+            if requires_action and payment_intent:
+                response_data['payment_intent'] = {
+                    'client_secret': payment_intent.client_secret,
+                    'status': payment_intent.status
                 }
-            })
-    
-    except stripe.error.StripeError as e:
-        print(f"❌ Stripe error: {str(e)}")
-        return Response({
-            'message': f'Payment processing failed: {str(e)}'
-        }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response(response_data)
+            
+        except stripe.error.StripeError as e:
+            print(f"❌ Stripe subscription creation failed: {str(e)}")
+            # Try to delete the customer if subscription failed
+            try:
+                stripe.Customer.delete(customer.id)
+            except:
+                pass
+            return Response(
+                {'message': f'Subscription creation failed: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
     except Exception as e:
         print(f"❌ Registration completion error: {str(e)}")
-        return Response({
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
-def auth0_signup(request):
-    """
-    Create a new user via Auth0
-    """
-    try:
-        # Get user data from request
-        data = request.data
-        email = data.get('email')
-        password = data.get('password')
-        
-        if not email or not password:
-            return Response({'message': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if user already exists
-        if User.objects.filter(email=email).exists():
-            return Response({'message': 'Email already in use'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create user in Auth0
-        domain = settings.AUTH0_DOMAIN
-        
-        # Get Auth0 management API token
-        try:
-            management_token = get_auth0_management_token()
-        except Exception as e:
-            return Response({'message': 'Failed to get Auth0 management token'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # Create user in Auth0
-        create_url = f'https://{domain}/api/v2/users'
-        create_headers = {
-            'Authorization': f'Bearer {management_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        create_payload = {
-            'email': email,
-            'password': password,
-            'connection': 'Username-Password-Authentication',
-            'email_verified': False,
-            'given_name': data.get('first_name', ''),
-            'family_name': data.get('last_name', '')
-        }
-        
-        create_response = requests.post(create_url, headers=create_headers, json=create_payload)
-        
-        if create_response.status_code != 201:
-            return Response({'message': 'Failed to create user in Auth0', 'details': create_response.json()}, 
-                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # Create user in Django
-        user = User.objects.create_user(
-            username=email,
-            email=email,
-            password=password,  # This will be hashed by Django
-            first_name=data.get('first_name', ''),
-            last_name=data.get('last_name', '')
-        )
-        
-        # Generate JWT token with admin claims
-        tokens = create_jwt_pair_for_user(user)
-        
-        return Response({
-            'access': tokens['access'],
-            'refresh': tokens['refresh'],
-            'user': get_enhanced_user_data(user)
-        }, status=status.HTTP_201_CREATED)
-    
-    except Exception as e:
-        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_users(request):
-    """
-    List all users with pagination and search
-    """
-    try:
-        # Get query parameters
-        page = request.GET.get('page', 1)
-        page_size = request.GET.get('page_size', 10)
-        search = request.GET.get('search', '')
-        
-        # Query users from Django database
-        users = User.objects.all()
-        
-        # Apply search filter if provided
-        if search:
-            users = users.filter(
-                Q(email__icontains=search) |
-                Q(first_name__icontains=search) |
-                Q(last_name__icontains=search) |
-                Q(username__icontains=search)
-            )
-        
-        # Paginate results
-        paginator = Paginator(users, page_size)
-        page_obj = paginator.get_page(page)
-        
-        # Serialize user data
-        users_data = []
-        for user in page_obj:
-            users_data.append({
-                'id': user.id,
-                'email': user.email,
-                'username': user.username,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_active': user.is_active,
-                'date_joined': user.date_joined.isoformat(),
-                'last_login': user.last_login.isoformat() if user.last_login else None,
-                'subscription_status': user.subscription_status,
-                'stripe_customer_id': user.stripe_customer_id
-            })
-        
-        return Response({
-            'users': users_data,
-            'total': paginator.count,
-            'page': page_obj.number,
-            'pages': paginator.num_pages,
-            'has_next': page_obj.has_next(),
-            'has_previous': page_obj.has_previous()
-        })
-    
-    except Exception as e:
-        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def user_detail(request, user_id):
-    """
-    Get, update, or delete a specific user
-    """
-    try:
-        # Get the user
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        if request.method == 'GET':
-            # Return user details
-            return Response({
-                'id': user.id,
-                'email': user.email,
-                'username': user.username,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_active': user.is_active,
-                'date_joined': user.date_joined.isoformat(),
-                'last_login': user.last_login.isoformat() if user.last_login else None,
-                'subscription_status': user.subscription_status,
-                'stripe_customer_id': user.stripe_customer_id
-            })
-        
-        elif request.method == 'PUT':
-            # Update user in both Django and Auth0
-            data = request.data
-            
-            # Update Django user
-            if 'first_name' in data:
-                user.first_name = data['first_name']
-            if 'last_name' in data:
-                user.last_name = data['last_name']
-            if 'is_active' in data:
-                user.is_active = data['is_active']
-            
-            user.save()
-            
-            # Update user in Auth0
-            try:
-                management_token = get_auth0_management_token()
-                domain = settings.AUTH0_DOMAIN
-                
-                # Find Auth0 user by email
-                search_url = f'https://{domain}/api/v2/users-by-email?email={user.email}'
-                search_headers = {
-                    'Authorization': f'Bearer {management_token}'
-                }
-                
-                search_response = requests.get(search_url, headers=search_headers)
-                auth0_users = search_response.json()
-                
-                if auth0_users:
-                    auth0_user_id = auth0_users[0]['user_id']
-                    
-                    # Update Auth0 user
-                    update_url = f'https://{domain}/api/v2/users/{auth0_user_id}'
-                    update_headers = {
-                        'Authorization': f'Bearer {management_token}',
-                        'Content-Type': 'application/json'
-                    }
-                    
-                    update_payload = {}
-                    if 'first_name' in data:
-                        update_payload['given_name'] = data['first_name']
-                    if 'last_name' in data:
-                        update_payload['family_name'] = data['last_name']
-                    
-                    if update_payload:
-                        requests.patch(update_url, headers=update_headers, json=update_payload)
-            
-            except Exception as e:
-                # Log the error but don't fail the request
-                print(f"Failed to update user in Auth0: {str(e)}")
-            
-            return Response({
-                'message': 'User updated successfully',
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'username': user.username,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'is_active': user.is_active
-                }
-            })
-        
-        elif request.method == 'DELETE':
-            # Delete user from both Django and Auth0
-            email = user.email
-            
-            # Delete from Auth0 first
-            try:
-                management_token = get_auth0_management_token()
-                domain = settings.AUTH0_DOMAIN
-                
-                # Find Auth0 user by email
-                search_url = f'https://{domain}/api/v2/users-by-email?email={email}'
-                search_headers = {
-                    'Authorization': f'Bearer {management_token}'
-                }
-                
-                search_response = requests.get(search_url, headers=search_headers)
-                auth0_users = search_response.json()
-                
-                if auth0_users:
-                    auth0_user_id = auth0_users[0]['user_id']
-                    
-                    # Delete Auth0 user
-                    delete_url = f'https://{domain}/api/v2/users/{auth0_user_id}'
-                    delete_headers = {
-                        'Authorization': f'Bearer {management_token}'
-                    }
-                    
-                    requests.delete(delete_url, headers=delete_headers)
-            
-            except Exception as e:
-                # Log the error but don't fail the request
-                print(f"Failed to delete user from Auth0: {str(e)}")
-            
-            # Delete from Django
-            user.delete()
-            
-            return Response({'message': 'User deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
-    
-    except Exception as e:
-        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # Allow unauthenticated access for coupon validation
 def validate_coupon(request):
     """
-    Validate a coupon code and return discount information
+    Validate Stripe coupon code and return discount information
+    Phase 4 of registration flow - supports dynamic pricing
     """
     try:
-        import stripe
-        from django.conf import settings
-        
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        
-        coupon_code = request.data.get('coupon_code')
-        plan = request.data.get('plan', 'monthly')
+        data = request.data
+        coupon_code = data.get('coupon_code', '').strip()
+        plan = data.get('plan', 'monthly')  # 'monthly' or 'annual'
         
         if not coupon_code:
-            return Response({
-                'valid': False,
-                'message': 'Coupon code is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': 'Coupon code is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
+        print(f"🔄 Validating coupon: {coupon_code} for plan: {plan}")
+        
+        # Try to retrieve coupon from Stripe
         try:
-            # Retrieve coupon from Stripe
             coupon = stripe.Coupon.retrieve(coupon_code)
+            print(f"✅ Coupon found: {coupon.id}")
             
             # Check if coupon is valid
             if not coupon.valid:
                 return Response({
                     'valid': False,
                     'message': 'This coupon is no longer valid'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                })
             
-            # Check if coupon has expired
-            if coupon.redeem_by and coupon.redeem_by < int(time.time()):
-                return Response({
-                    'valid': False,
-                    'message': 'This coupon has expired'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Check if max redemptions reached
+            # Check if coupon has usage limits
             if coupon.max_redemptions and coupon.times_redeemed >= coupon.max_redemptions:
                 return Response({
                     'valid': False,
                     'message': 'This coupon has reached its usage limit'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                })
             
-            # Determine discount type and value
+            # Check if coupon is expired
+            if coupon.redeem_by and coupon.redeem_by < int(time.time()):
+                return Response({
+                    'valid': False,
+                    'message': 'This coupon has expired'
+                })
+            
+            # Get base price for calculation
+            base_price = 99 if plan == 'monthly' else 999  # Default prices
+            
+            # Calculate discount
+            discount_amount = 0
             discount_type = 'percentage' if coupon.percent_off else 'fixed'
-            discount_value = coupon.percent_off if coupon.percent_off else (coupon.amount_off / 100)  # Convert cents to dollars
             
-            # Create description
-            if discount_type == 'percentage':
-                description = f"{discount_value}% off"
+            if coupon.percent_off:
+                discount_amount = coupon.percent_off
+                discounted_price = base_price * (1 - coupon.percent_off / 100)
             else:
-                description = f"${discount_value} off"
+                # Handle amount_off (in cents)
+                discount_amount = coupon.amount_off / 100  # Convert cents to dollars
+                discounted_price = max(0, base_price - discount_amount)
             
-            if coupon.duration == 'repeating':
-                description += f" for {coupon.duration_in_months} months"
-            elif coupon.duration == 'once':
-                description += " (first payment only)"
-            
-            return Response({
+            # Prepare response
+            response_data = {
                 'valid': True,
                 'coupon_id': coupon.id,
-                'name': coupon.name or f"Coupon {coupon_code}",
-                'description': description,
+                'name': coupon.name or f"Coupon {coupon.id}",
+                'description': f"Save {coupon.percent_off}%" if coupon.percent_off else f"Save ${discount_amount}",
                 'discount_type': discount_type,
-                'discount_value': discount_value,
-                'duration': coupon.duration,
-                'duration_in_months': coupon.duration_in_months
-            })
+                'discount_value': discount_amount,
+                'original_price': base_price,
+                'discounted_price': round(discounted_price, 2),
+                'currency': coupon.currency or 'usd'
+            }
             
-        except stripe.error.InvalidRequestError:
-            return Response({
-                'valid': False,
-                'message': 'Invalid coupon code'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            print(f"✅ Coupon valid: {response_data}")
+            return Response(response_data)
             
+        except stripe.error.StripeError as e:
+            error_code = getattr(e, 'code', '')
+            if error_code == 'resource_missing':
+                return Response({
+                    'valid': False,
+                    'message': 'Invalid coupon code'
+                })
+            else:
+                print(f"❌ Stripe coupon validation error: {str(e)}")
+                return Response({
+                    'valid': False,
+                    'message': 'Unable to validate coupon. Please try again.'
+                })
+                
     except Exception as e:
         print(f"❌ Coupon validation error: {str(e)}")
-        return Response({
-            'valid': False,
-            'message': 'Failed to validate coupon'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def reset_user_password(request, user_id):
+@permission_classes([AllowAny])
+def create_account(request):
     """
-    Send password reset email to user via Auth0
+    Create Auth0 account only (no authentication)
+    This avoids the Resource Owner Password Grant issues
     """
     try:
-        # Get the user
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        data = request.data
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '').strip()
         
-        # Send password reset via Auth0
-        domain = settings.AUTH0_DOMAIN
-        client_id = settings.AUTH0_CLIENT_ID
+        if not email or not password:
+            return Response({
+                'success': False,
+                'message': 'Email and password are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        reset_url = f'https://{domain}/dbconnections/change_password'
-        reset_payload = {
-            'client_id': client_id,
-            'email': user.email,
-            'connection': 'Username-Password-Authentication'
+        # Validate password strength (basic validation)
+        if len(password) < 8:
+            return Response({
+                'success': False,
+                'message': 'Password must be at least 8 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"🔄 Creating Auth0 account (no auth): {email}")
+        
+        # Call Auth0's /dbconnections/signup endpoint
+        auth0_domain = settings.AUTH0_DOMAIN
+        signup_url = f"https://{auth0_domain}/dbconnections/signup"
+        
+        signup_data = {
+            "client_id": settings.AUTH0_CLIENT_ID,
+            "connection": "Username-Password-Authentication",
+            "email": email,
+            "password": password,
+            "user_metadata": {
+                "signup_source": "embedded_form",
+                "signup_timestamp": str(int(time.time()))
+            }
         }
         
-        reset_response = requests.post(reset_url, json=reset_payload)
+        headers = {
+            'Content-Type': 'application/json'
+        }
         
-        if reset_response.status_code == 200:
-            return Response({'message': 'Password reset email sent successfully'})
+        # Make request to Auth0
+        auth0_response = requests.post(signup_url, json=signup_data, headers=headers, timeout=30)
+        
+        if auth0_response.status_code in [200, 201]:
+            print(f"✅ Auth0 account created successfully: {email}")
+            
+            return Response({
+                'success': True,
+                'message': 'Account created successfully',
+                'email': email
+            })
         else:
-            return Response(
-                {'message': 'Failed to send password reset email', 'details': reset_response.text}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
+            print(f"❌ Auth0 signup failed: {auth0_response.status_code}")
+            auth0_error = auth0_response.json() if auth0_response.headers.get('content-type', '').startswith('application/json') else {}
+            print(f"📋 Auth0 error details: {auth0_error}")
+            
+            # Handle different error message formats
+            if 'name' in auth0_error and auth0_error['name'] == 'PasswordStrengthError':
+                return Response({
+                    'success': False,
+                    'message': 'Password does not meet requirements. Please use at least 8 characters with a mix of uppercase, lowercase, numbers, and special characters.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Handle "Invalid sign up" - usually means user already exists
+            if 'code' in auth0_error and auth0_error['code'] == 'invalid_signup':
+                return Response({
+                    'success': True,  # Treat as success since account exists
+                    'message': 'Account already exists, proceeding with registration',
+                    'email': email
+                })
+            
+            # Extract error message
+            error_message = auth0_error.get('description', auth0_error.get('error_description', auth0_error.get('message', 'Account creation failed')))
+            if isinstance(error_message, dict):
+                error_message = auth0_error.get('message', 'Account creation failed')
+            
+            return Response({
+                'success': False,
+                'message': error_message
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except requests.exceptions.Timeout:
+        print("❌ Auth0 API request timed out")
+        return Response({
+            'success': False,
+            'message': 'Request timed out. Please try again.'
+        }, status=status.HTTP_408_REQUEST_TIMEOUT)
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Auth0 API request failed: {str(e)}")
+        return Response({
+            'success': False,
+            'message': 'Unable to connect to authentication service. Please try again.'
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
     except Exception as e:
-        return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+        print(f"❌ Account creation error: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({
+            'success': False,
+            'message': 'An unexpected error occurred. Please try again.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def embedded_signup(request):
+    """
+    Embedded Auth0 signup using Auth0 Authentication API
+    Creates user directly without redirect to Auth0 hosted pages
+    """
+    try:
+        data = request.data
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '').strip()
+        
+        if not email or not password:
+            return Response({
+                'success': False,
+                'message': 'Email and password are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate password strength (basic validation)
+        if len(password) < 8:
+            return Response({
+                'success': False,
+                'message': 'Password must be at least 8 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"🔄 Creating user via Auth0 API: {email}")
+        
+        # Call Auth0's /dbconnections/signup endpoint
+        auth0_domain = settings.AUTH0_DOMAIN
+        signup_url = f"https://{auth0_domain}/dbconnections/signup"
+        
+        signup_data = {
+            "client_id": settings.AUTH0_CLIENT_ID,
+            "connection": "Username-Password-Authentication",
+            "email": email,
+            "password": password,
+            "user_metadata": {
+                "signup_source": "embedded_form",
+                "signup_timestamp": str(int(time.time()))
+            }
+        }
+        
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        
+        # Make request to Auth0
+        auth0_response = requests.post(signup_url, json=signup_data, headers=headers, timeout=30)
+        
+        if auth0_response.status_code == 200:
+            auth0_data = auth0_response.json()
+            print(f"✅ Auth0 user created successfully: {email}")
+            
+            # Now authenticate the user to get tokens
+            # Use Auth0's Resource Owner Password Grant (if enabled)
+            token_url = f"https://{auth0_domain}/oauth/token"
+            
+            token_data = {
+                "grant_type": "password",
+                "username": email,
+                "password": password,
+                "client_id": settings.AUTH0_CLIENT_ID,
+                "client_secret": settings.AUTH0_CLIENT_SECRET,
+                "connection": "Username-Password-Authentication",
+                "scope": "openid profile email"
+            }
+            
+            token_response = requests.post(token_url, json=token_data, headers=headers, timeout=30)
+            
+            if token_response.status_code == 200:
+                token_data = token_response.json()
+                access_token = token_data.get('access_token')
+                
+                # Get user profile from Auth0
+                profile_url = f"https://{auth0_domain}/userinfo"
+                profile_headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                profile_response = requests.get(profile_url, headers=profile_headers, timeout=30)
+                
+                if profile_response.status_code == 200:
+                    auth0_profile = profile_response.json()
+                    
+                    # Create or update local Django user
+                    user, created = User.objects.get_or_create(
+                        email=email,
+                        defaults={
+                            'username': email,
+                            'first_name': auth0_profile.get('given_name', ''),
+                            'last_name': auth0_profile.get('family_name', ''),
+                            'auth0_sub': auth0_profile.get('sub'),
+                            'is_active': True
+                        }
+                    )
+                    
+                    if not created:
+                        # Update existing user's Auth0 info
+                        user.auth0_sub = auth0_profile.get('sub')
+                        user.save()
+                    
+                    print(f"✅ Django user {'created' if created else 'updated'}: {email}")
+                    
+                    # Generate Django JWT tokens
+                    jwt_tokens = create_jwt_pair_for_user(user)
+                    
+                    return Response({
+                        'success': True,
+                        'message': 'Account created successfully',
+                        'access': jwt_tokens['access'],
+                        'refresh': jwt_tokens['refresh'],
+                        'user': get_enhanced_user_data(user),
+                        'is_new_user': created,
+                        'registration_complete': False  # Still need to complete registration steps
+                    })
+                else:
+                    print(f"❌ Failed to get user profile: {profile_response.status_code}")
+                    return Response({
+                        'success': False,
+                        'message': 'Account created but failed to retrieve profile'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                print(f"❌ Failed to authenticate user: {token_response.status_code}")
+                error_data = token_response.json() if token_response.headers.get('content-type', '').startswith('application/json') else {}
+                error_message = error_data.get('error_description', 'Failed to authenticate')
+                
+                return Response({
+                    'success': False,
+                    'message': f'Account created but authentication failed: {error_message}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            print(f"❌ Auth0 signup failed: {auth0_response.status_code}")
+            auth0_error = auth0_response.json() if auth0_response.headers.get('content-type', '').startswith('application/json') else {}
+            print(f"📋 Auth0 error details: {auth0_error}")
+            
+            # Handle different error message formats
+            if 'name' in auth0_error and auth0_error['name'] == 'PasswordStrengthError':
+                return Response({
+                    'success': False,
+                    'message': 'Password does not meet requirements. Please use at least 8 characters with a mix of uppercase, lowercase, numbers, and special characters.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Handle "Invalid sign up" - usually means user already exists
+            if 'code' in auth0_error and auth0_error['code'] == 'invalid_signup':
+                print(f"🔍 User may already exist, attempting login for: {email}")
+                
+                # Try to authenticate the existing user instead
+                token_url = f"https://{auth0_domain}/oauth/token"
+                token_data = {
+                    "grant_type": "password",
+                    "username": email,
+                    "password": password,
+                    "client_id": settings.AUTH0_CLIENT_ID,
+                    "client_secret": settings.AUTH0_CLIENT_SECRET,
+                    "connection": "Username-Password-Authentication",
+                    "scope": "openid profile email"
+                }
+                
+                token_response = requests.post(token_url, json=token_data, headers=headers, timeout=30)
+                
+                if token_response.status_code == 200:
+                    print(f"✅ User authenticated successfully: {email}")
+                    token_data = token_response.json()
+                    access_token = token_data.get('access_token')
+                    
+                    # Get user profile from Auth0
+                    profile_url = f"https://{auth0_domain}/userinfo"
+                    profile_headers = {
+                        'Authorization': f'Bearer {access_token}',
+                        'Content-Type': 'application/json'
+                    }
+                    
+                    profile_response = requests.get(profile_url, headers=profile_headers, timeout=30)
+                    
+                    if profile_response.status_code == 200:
+                        auth0_profile = profile_response.json()
+                        print(f"✅ Retrieved user profile: {auth0_profile.get('email')}")
+                        
+                        # Create or update local Django user
+                        user, created = User.objects.get_or_create(
+                            email=email,
+                            defaults={
+                                'username': email,
+                                'first_name': auth0_profile.get('given_name', ''),
+                                'last_name': auth0_profile.get('family_name', ''),
+                                'auth0_sub': auth0_profile.get('sub'),
+                                'is_active': True
+                            }
+                        )
+                        
+                        if not created:
+                            # Update existing user's Auth0 info
+                            user.auth0_sub = auth0_profile.get('sub')
+                            user.save()
+                        
+                        print(f"✅ Django user {'created' if created else 'found'}: {email}")
+                        
+                        # Generate Django JWT tokens
+                        jwt_tokens = create_jwt_pair_for_user(user)
+                        
+                        return Response({
+                            'success': True,
+                            'message': 'Account accessed successfully',
+                            'access': jwt_tokens['access'],
+                            'refresh': jwt_tokens['refresh'],
+                            'user': get_enhanced_user_data(user),
+                            'is_new_user': created,
+                            'registration_complete': False  # Still need to complete registration steps
+                        })
+                    else:
+                        print(f"❌ Failed to get user profile: {profile_response.status_code}")
+                else:
+                    print(f"❌ Failed to authenticate existing user: {token_response.status_code}")
+                    return Response({
+                        'success': False,
+                        'message': 'An account with this email already exists, but the password is incorrect. Please check your password or use the forgot password option.'
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Extract error message (handle both string and dict formats)
+            error_message = auth0_error.get('description', auth0_error.get('error_description', auth0_error.get('message', 'Signup failed')))
+            if isinstance(error_message, dict):
+                error_message = auth0_error.get('message', 'Signup failed')
+            
+            print(f"📋 Extracted error message: {error_message}")
+            
+            # Handle specific error cases
+            if isinstance(error_message, str):
+                if 'user already exists' in error_message.lower():
+                    return Response({
+                        'success': False,
+                        'message': 'An account with this email already exists. Please try logging in instead.'
+                    }, status=status.HTTP_409_CONFLICT)
+                elif auth0_response.status_code == 400:
+                    # For 400 errors, provide more specific messaging
+                    if 'password' in error_message.lower():
+                        return Response({
+                            'success': False,
+                            'message': 'Password does not meet requirements. Please choose a stronger password.'
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    elif 'email' in error_message.lower():
+                        return Response({
+                            'success': False,
+                            'message': 'Please enter a valid email address.'
+                        }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                'success': False,
+                'message': error_message
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except requests.exceptions.Timeout:
+        print("❌ Auth0 API request timed out")
+        return Response({
+            'success': False,
+            'message': 'Request timed out. Please try again.'
+        }, status=status.HTTP_408_REQUEST_TIMEOUT)
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Auth0 API request failed: {str(e)}")
+        return Response({
+            'success': False,
+            'message': 'Unable to connect to authentication service. Please try again.'
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+    except Exception as e:
+        print(f"❌ Embedded signup error: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({
+            'success': False,
+            'message': 'An unexpected error occurred. Please try again.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

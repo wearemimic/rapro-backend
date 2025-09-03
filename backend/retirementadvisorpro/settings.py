@@ -70,6 +70,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.SubscriptionMiddleware',  # Enforce payment requirement
+    # 'core.middleware.AdminAccessMiddleware',   # Admin access control - DISABLED: Conflicts with JWT auth
+    'core.middleware.AdminAuditMiddleware',    # Admin audit logging
     'core.performance_middleware.PerformanceMonitoringMiddleware',
     'core.performance_middleware.SystemHealthMonitoringMiddleware',
 ]
@@ -92,7 +95,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'core.authentication.CustomJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -173,6 +176,7 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ("Bearer",),
+    'TOKEN_OBTAIN_SERIALIZER': 'core.authentication.CustomTokenObtainPairSerializer',
 }
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

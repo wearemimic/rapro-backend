@@ -21,8 +21,7 @@
               <button 
                 type="button" 
                 class="btn btn-primary btn-lg d-flex justify-content-center align-items-center"
-                @click="() => { console.log('🔵 Google button clicked'); loginWithAuth0('google'); }"
-                style="cursor: pointer; pointer-events: auto;"
+                @click="loginWithGoogle"
               >
                 <img src="/assets/svg/brands/google-icon.svg" class="me-2" width="20" alt="Google">
                 Continue with Google
@@ -31,7 +30,7 @@
               <button 
                 type="button" 
                 class="btn btn-outline-primary btn-lg d-flex justify-content-center align-items-center"
-                @click="() => { console.log('🔵 Facebook button clicked'); loginWithAuth0('facebook-oauth2'); }"
+                @click="loginWithFacebook"
               >
                 <img src="/assets/svg/brands/facebook-icon.svg" class="me-2" width="20" alt="Facebook">
                 Continue with Facebook
@@ -40,7 +39,7 @@
               <button 
                 type="button" 
                 class="btn btn-outline-primary btn-lg d-flex justify-content-center align-items-center"
-                @click="() => { console.log('🔵 Apple button clicked'); loginWithAuth0('apple'); }"
+                @click="loginWithApple"
               >
                 <img src="/assets/svg/brands/apple.svg.png" class="me-2" width="20" alt="Apple">
                 Continue with Apple
@@ -49,10 +48,28 @@
               <button 
                 type="button" 
                 class="btn btn-outline-secondary btn-lg"
-                @click="() => { console.log('🔵 Email button clicked'); loginWithAuth0(); }"
+                @click="showEmbeddedEmailLogin"
               >
                 Continue with Email
               </button>
+            </div>
+            
+            <!-- Embedded Auth0 Email Login -->
+            <div v-if="showEmailLogin" class="mt-4 p-4 border rounded">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Sign in with Email</h5>
+                <button type="button" class="btn-close" @click="showEmailLogin = false"></button>
+              </div>
+              <div class="text-center mb-3">
+                <div class="btn-group" role="group">
+                  <input type="radio" class="btn-check" name="authMode" id="loginMode" v-model="authMode" value="login" autocomplete="off">
+                  <label class="btn btn-outline-primary" for="loginMode">Sign In</label>
+                  
+                  <input type="radio" class="btn-check" name="authMode" id="registerMode" v-model="authMode" value="register" autocomplete="off">
+                  <label class="btn btn-outline-primary" for="registerMode">Sign Up</label>
+                </div>
+              </div>
+              <div id="auth0-lock-container"></div>
             </div>
             
             <!-- Legacy Login Form (Collapsed) -->
@@ -101,53 +118,234 @@
   </main>
 </template>
 
+<style scoped>
+/* Hide Auth0 branding and customize embedded login */
+#auth0-lock-container >>> .auth0-lock-header-logo,
+#auth0-lock-container >>> .auth0-lock-header-avatar,
+#auth0-lock-container >>> .auth0-lock-header,
+#auth0-lock-container >>> .auth0-lock-badge-bottom {
+  display: none !important;
+}
+
+/* Hide signup-related elements */
+#auth0-lock-container >>> .auth0-lock-sign-up-terms,
+#auth0-lock-container >>> .auth0-lock-alternative-link,
+#auth0-lock-container >>> .auth0-lock-alternative,
+#auth0-lock-container >>> [data-auth0-lock-action="sign-up"],
+#auth0-lock-container >>> .auth0-lock-tabs,
+#auth0-lock-container >>> .auth0-lock-tab {
+  display: none !important;
+}
+
+/* Customize login button - remove icon and set text */
+#auth0-lock-container >>> .auth0-lock-submit .auth0-lock-submit-label::before {
+  display: none !important;  /* Hide any icon */
+}
+
+#auth0-lock-container >>> .auth0-lock-submit .auth0-lock-submit-label {
+  background-image: none !important;  /* Remove background icon */
+}
+
+#auth0-lock-container >>> .auth0-lock-submit {
+  background-image: none !important;  /* Remove button icon */
+}
+
+#auth0-lock-container >>> .auth0-lock-submit::before {
+  display: none !important;  /* Hide pseudo-element icons */
+}
+
+#auth0-lock-container >>> .auth0-lock {
+  box-shadow: none !important;
+  border: 1px solid #e7eaf3;
+}
+
+#auth0-lock-container >>> .auth0-lock-widget {
+  box-shadow: none !important;
+}
+
+#auth0-lock-container >>> .auth0-lock-form {
+  padding-top: 10px !important;
+}
+</style>
+
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { clearAuthData, initAuthState, storeAuthState } from '@/utils/authHelper';
-// import { useAuth0 } from '@auth0/auth0-vue';
+// Removed Auth0 Vue SDK import - using Django backend endpoints
 
 const router = useRouter();
 const authStore = useAuthStore();
-// const { loginWithRedirect, getAccessTokenSilently, user, isAuthenticated, isLoading } = useAuth0();
-// Auth0 Vue plugin is disabled for debugging
-const loginWithRedirect = null;
-const isAuthenticated = ref(false);
-const isLoading = ref(false);
-const user = ref(null);
-const getAccessTokenSilently = null;
+// Removed Auth0 Vue SDK usage - using Django backend endpoints
 
 const email = ref('');
 const password = ref('');
 const showLegacyLogin = ref(false); // Can be toggled based on environment or user role
+const showEmailLogin = ref(false);
+const authMode = ref('login'); // 'login' or 'register'
+let auth0Lock = null;
 
-onMounted(async () => {
-  console.log('🔧 Login component mounted');
-  console.log('🔧 Auth0 state:', {
-    isLoading: isLoading.value,
-    isAuthenticated: isAuthenticated.value,
-    hasUser: !!user.value,
-    loginWithRedirect: !!loginWithRedirect
+// Frontend Auth0 login - redirect to Auth0 from frontend, callback to frontend
+const loginWithGoogle = () => {
+  console.log('🔍 Starting Google login from frontend');
+  // Set login flow in localStorage
+  localStorage.setItem('auth0_flow', 'login');
+  
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+  const callbackUrl = 'http://localhost:3000/auth/callback';
+  
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    scope: 'openid profile email',
+    connection: 'google-oauth2',
+    state: 'login',
+    prompt: 'login'
   });
   
-  // Check if user is authenticated with Auth0
-  if (isAuthenticated.value && user.value) {
-    try {
-      // Get the access token
-      const accessToken = await getAccessTokenSilently();
-      
-      // Exchange Auth0 token for our backend token
-      const success = await authStore.loginWithAuth0(accessToken);
-      
-      if (success) {
-        router.push('/dashboard');
-      }
-    } catch (error) {
-      console.error('Error handling Auth0 authentication:', error);
-    }
+  window.location.href = `https://${domain}/authorize?${params.toString()}`;
+};
+
+const showEmbeddedEmailLogin = () => {
+  // Set login flow in localStorage (will be updated based on authMode)
+  localStorage.setItem('auth0_flow', 'login');
+  showEmailLogin.value = true;
+  
+  // Dynamically load Auth0 Lock if not already loaded
+  if (!window.Auth0Lock) {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.auth0.com/js/lock/11.32.2/lock.min.js';
+    script.onload = initAuth0Lock;
+    document.head.appendChild(script);
+  } else {
+    initAuth0Lock();
   }
-});
+};
+
+const initAuth0Lock = () => {
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+  
+  // Update localStorage based on current authMode
+  localStorage.setItem('auth0_flow', authMode.value === 'register' ? 'registration' : 'login');
+  
+  const isRegistrationMode = authMode.value === 'register';
+  
+  auth0Lock = new window.Auth0Lock(clientId, domain, {
+    container: 'auth0-lock-container',
+    auth: {
+      redirectUrl: 'http://localhost:3000/auth/callback',
+      responseType: 'code',
+      params: {
+        scope: 'openid profile email',
+        state: isRegistrationMode ? 'registration' : 'login'
+      }
+    },
+    allowedConnections: ['Username-Password-Authentication'],
+    socialButtonStyle: 'small',
+    allowSignUp: isRegistrationMode,  // Enable signup for registration mode
+    allowForgotPassword: !isRegistrationMode,  // Hide forgot password for registration
+    initialScreen: isRegistrationMode ? 'signUp' : 'login',  // Set initial screen based on mode
+    languageDictionary: {
+      title: '',
+      signUpTerms: '',  // Hide signup terms
+      databaseAlternativeSignUpInstructions: '',  // Hide signup instructions
+      loginSubmitLabel: isRegistrationMode ? 'Sign Up' : 'Sign In',
+      signUpSubmitLabel: 'Sign Up',
+      loginLabel: isRegistrationMode ? 'Sign Up' : 'Sign In'
+    },
+    theme: {
+      primaryColor: '#377dff',
+      logo: '',  // Hide Auth0 logo
+      labeledSubmitButton: false
+    },
+    avatar: null,
+    closable: false,
+    focusInput: true,
+    gravatar: false,
+    usernameStyle: 'email'
+  });
+  
+  auth0Lock.on('authenticated', (authResult) => {
+    console.log('Auth0 Lock authentication successful:', authResult);
+    // The callback will be handled by our existing Auth0CallbackSimple.vue
+    const stateParam = isRegistrationMode ? 'registration' : 'login';
+    window.location.href = `http://localhost:3000/auth/callback?code=${authResult.accessToken}&state=${stateParam}`;
+  });
+  
+  auth0Lock.show();
+};
+
+const loginWithEmail = () => {
+  // Fallback to redirect method if embedded fails
+  console.log('🔍 Starting email-only login from frontend');
+  // Set login flow in localStorage
+  localStorage.setItem('auth0_flow', 'login');
+  
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+  const callbackUrl = 'http://localhost:3000/auth/callback';
+  
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    scope: 'openid profile email',
+    state: 'login',
+    prompt: 'login',
+    connection: 'Username-Password-Authentication',
+    screen_hint: 'login'
+  });
+  
+  window.location.href = `https://${domain}/authorize?${params.toString()}`;
+};
+
+const loginWithFacebook = () => {
+  console.log('🔵 Starting Facebook login from frontend');
+  // Set login flow in localStorage
+  localStorage.setItem('auth0_flow', 'login');
+  
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+  const callbackUrl = 'http://localhost:3000/auth/callback';
+  
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    scope: 'openid profile email',
+    connection: 'facebook-oauth2',
+    state: 'login',
+    prompt: 'login'
+  });
+  
+  window.location.href = `https://${domain}/authorize?${params.toString()}`;
+};
+
+const loginWithApple = () => {
+  console.log('🔵 Starting Apple login from frontend');
+  // Set login flow in localStorage
+  localStorage.setItem('auth0_flow', 'login');
+  
+  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+  const callbackUrl = 'http://localhost:3000/auth/callback';
+  
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    scope: 'openid profile email',
+    connection: 'apple',
+    state: 'login',
+    prompt: 'login'
+  });
+  
+  window.location.href = `https://${domain}/authorize?${params.toString()}`;
+};
 
 const handleLegacyLogin = async () => {
   try {
@@ -177,90 +375,6 @@ const handleLegacyLogin = async () => {
   }
 };
 
-const testAuth0Direct = () => {
-  console.log('🔬 Testing Auth0 direct redirect...');
-  
-  // Generate state and nonce for security
-  const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-  sessionStorage.setItem('auth0_state', state);
-  sessionStorage.setItem('auth0_nonce', nonce);
-  localStorage.setItem('auth0_flow', 'login');
-  
-  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
-  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
-  
-  const authUrl = `https://${domain}/authorize?` +
-    `client_id=${clientId}&` +
-    `response_type=code&` +
-    `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
-    `scope=openid profile email&` +
-    `state=${state}&` +
-    `nonce=${nonce}&` +
-    `connection=google-oauth2`;
-  
-  console.log('🔬 Redirecting to:', authUrl);
-  window.location.href = authUrl;
-};
-
-const loginWithAuth0 = async (connection) => {
-  console.log('🔵 loginWithAuth0 called with connection:', connection);
-  
-  try {
-    // Clear any stale authentication data first
-    clearAuthData();
-    
-    // Store that this is a login flow (not registration)
-    localStorage.setItem('auth0_flow', 'login');
-    console.log('🔄 Set auth0_flow to login');
-    
-    // For now, use the direct method since Auth0 Vue plugin has issues
-    console.log('🔄 Using direct Auth0 redirect method...');
-    
-    // Initialize fresh auth state
-    const { state, nonce } = initAuthState();
-    console.log('🔐 Generated and stored fresh state parameter');
-    
-    // Map common connection names to Auth0 connection names
-    const connectionMap = {
-      'google': 'google-oauth2',
-      'facebook': 'facebook',
-      'apple': 'apple'
-    };
-    
-    const actualConnection = connectionMap[connection] || connection;
-    console.log(`🔵 Using connection: ${connection} -> ${actualConnection}`);
-    
-    const domain = import.meta.env.VITE_AUTH0_DOMAIN;
-    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-    const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
-    
-    let authUrl = `https://${domain}/authorize?` +
-      `client_id=${clientId}&` +
-      `response_type=code&` +
-      `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
-      `scope=openid profile email&` +
-      `state=${state}&` +
-      `nonce=${nonce}`;
-    
-    // Add connection if specified
-    if (actualConnection) {
-      authUrl += `&connection=${actualConnection}`;
-    } else {
-      // For email login, we need to show the Auth0 login page
-      // Adding prompt=login forces Auth0 to show the login screen
-      authUrl += `&prompt=login`;
-    }
-    
-    console.log('🔵 Redirecting to:', authUrl);
-    window.location.href = authUrl;
-    
-  } catch (error) {
-    console.error('❌ Auth0 login error:', error);
-    alert(`Auth0 login failed: ${error.message}`);
-  }
-};
 </script>
 
 <style scoped>

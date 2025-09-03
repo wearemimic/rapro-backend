@@ -2306,7 +2306,7 @@ class DocumentSecurityValidator:
 - [ ] Create client messaging interface
 - [ ] Add appointment booking for clients
 
-**Acceptance Criteria:**
+**Acceptance Criteria:**ok n
 - Client portal is user-friendly and secure
 - Clients can access all authorized information
 - Messaging system facilitates communication
