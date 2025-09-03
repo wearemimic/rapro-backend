@@ -4,6 +4,7 @@
     <Sidebar />
     <div class="main-content">
       <Header />
+      <ImpersonationBanner />
       <main style="background-color:rgb(242, 242, 242);">
        <router-view v-slot="{ Component }">
           <transition name="fade">
@@ -20,6 +21,7 @@
 import Sidebar from '@/components/Sidebar.vue'
 import Header from '@/components/Header.vue'
 import Footer from '@/components/Footer.vue'
+import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 </script>
 
 <style scoped>

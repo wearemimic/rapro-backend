@@ -23,6 +23,7 @@ app.use(router);
 import { useAuthStore } from './stores/auth';
 const authStore = useAuthStore();
 authStore.init(); // ✅ Ensure axios always has the token
+authStore.restoreImpersonationState(); // ✅ Restore impersonation state if any
 
 // Toast configuration (optional customization)
 app.use(Toast, {

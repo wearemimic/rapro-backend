@@ -22,6 +22,7 @@ python-jose[cryptography]
 PyJWT[crypto]
 cryptography
 python-dotenv
+auth0-python
 
 # Email Integration Libraries
 google-auth

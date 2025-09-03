@@ -19,7 +19,7 @@ from .auth0_views import auth0_login_redirect, auth0_login_google, auth0_callbac
 from .admin_views import (
     admin_dashboard_stats, admin_user_list, update_user_admin_role, admin_analytics_overview, 
     admin_system_monitoring, admin_support_overview, start_user_impersonation, 
-    end_user_impersonation, get_active_impersonation_sessions,
+    end_user_impersonation, get_active_impersonation_sessions, delete_user_complete,
     admin_revenue_analytics, admin_recalculate_revenue_metrics, admin_user_engagement_analytics,
     admin_client_portfolio_analytics, admin_run_analytics_calculation, admin_billing_data,
     # Phase 2.3: System Performance Monitoring
@@ -228,6 +228,7 @@ urlpatterns = [
     path('admin/users/', admin_user_list, name='admin-user-list'),
     path('admin/users/<int:user_id>/admin-role/', update_user_admin_role, name='update-user-admin-role'),
     path('admin/users/<int:user_id>/impersonate/', start_user_impersonation, name='start-user-impersonation'),
+    path('admin/users/<int:user_id>/delete/', delete_user_complete, name='delete-user-complete'),
     path('admin/impersonation/<int:session_id>/end/', end_user_impersonation, name='end-user-impersonation'),
     path('admin/impersonation/active/', get_active_impersonation_sessions, name='get-active-impersonation-sessions'),
     path('admin/analytics/', admin_analytics_overview, name='admin-analytics-overview'),

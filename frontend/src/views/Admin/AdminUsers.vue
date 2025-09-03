@@ -247,6 +247,15 @@
                           <i class="bi-power me-2"></i>
                           {{ user.is_active ? 'Deactivate' : 'Activate' }}
                         </button>
+                        <div class="dropdown-divider"></div>
+                        <button 
+                          @click="deleteUser(user)"
+                          class="dropdown-item text-danger"
+                          :disabled="user.admin_role === 'super_admin' && user.id === authStore.user?.id"
+                          title="Permanently delete user account"
+                        >
+                          <i class="bi-trash me-2"></i>Delete Account
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -351,12 +360,14 @@
 <script>
 import { useAuthStore } from '@/stores/auth';
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import axios from 'axios';
 
 export default {
   name: 'AdminUsers',
   setup() {
     const authStore = useAuthStore();
+    const router = useRouter();
     const loading = ref(false);
     const error = ref(null);
     const users = ref([]);
@@ -605,31 +616,28 @@ export default {
         );
         
         if (proceedImpersonation) {
-          // Store impersonation data in session storage
-          sessionStorage.setItem('impersonation_session', JSON.stringify({
-            session_id: impersonationData.session_data.session_id,
-            session_key: impersonationData.session_data.session_key,
-            target_user: impersonationData.target_user,
-            started_at: impersonationData.session_data.started_at,
-            admin_user_id: impersonationData.session_data.admin_user_id
-          }));
-          
-          // Navigate to main dashboard as impersonated user
-          // In a full implementation, you would switch the user context
-          alert(
-            `You are now impersonating ${user.email}.\n\n` +
-            'Session ID: ' + impersonationData.session_data.session_id + '\n' +
-            'Remember to end the session when finished.'
-          );
-          
-          // For now, just show the session info
-          console.log('Impersonation started:', impersonationData);
-          
-          // TODO: Implement actual user context switching
-          // This would typically involve:
-          // 1. Updating the auth store with impersonated user data
-          // 2. Adding impersonation indicators to the UI
-          // 3. Redirecting to the main application as the impersonated user
+          try {
+            // Switch user context using auth store
+            await authStore.startImpersonation(
+              impersonationData.target_user,
+              impersonationData.session_data
+            );
+            
+            // Show success message
+            alert(
+              `✅ You are now impersonating ${user.email}!\n\n` +
+              'Session ID: ' + impersonationData.session_data.session_id + '\n' +
+              'You will be redirected to the dashboard as this user.\n' +
+              'Look for the impersonation banner at the top to end the session.'
+            );
+            
+            // Redirect to main dashboard as impersonated user
+            router.push('/dashboard');
+            
+          } catch (error) {
+            console.error('Failed to start impersonation context:', error);
+            alert('Failed to switch user context. Please try again.');
+          }
         }
         
       } catch (err) {
@@ -649,6 +657,51 @@ export default {
       // Implement user activation/deactivation
       console.log('Toggle status for:', user);
       // TODO: Implement user status toggle
+    };
+
+    const deleteUser = async (user) => {
+      // Prevent deleting current super admin user
+      if (user.admin_role === 'super_admin' && user.id === authStore.user?.id) {
+        alert('You cannot delete your own super admin account.');
+        return;
+      }
+      
+      // Show confirmation dialog
+      const confirmMessage = `Are you sure you want to permanently delete this user?\n\n` +
+        `Email: ${user.email}\n` +
+        `Name: ${user.first_name} ${user.last_name}\n` +
+        `Role: ${getRoleDisplayName(user.admin_role)}\n\n` +
+        `This action will:\n` +
+        `• Remove the user from the Django database\n` +
+        `• Delete the user from Auth0\n` +
+        `• Cancel any active subscriptions\n` +
+        `• This action CANNOT be undone!\n\n` +
+        `Type "DELETE" to confirm:`;
+      
+      const confirmation = prompt(confirmMessage);
+      
+      if (confirmation !== 'DELETE') {
+        if (confirmation !== null) {
+          alert('Deletion cancelled. You must type "DELETE" exactly to confirm.');
+        }
+        return;
+      }
+      
+      try {
+        // Call backend API to delete user from both Django and Auth0
+        await axios.delete(`http://localhost:8000/api/admin/users/${user.id}/delete/`);
+        
+        // Show success message
+        alert(`User ${user.email} has been permanently deleted from both Django and Auth0.`);
+        
+        // Refresh the users list
+        await fetchUsers();
+        
+      } catch (err) {
+        console.error('Error deleting user:', err);
+        const errorMessage = err.response?.data?.error || 'Failed to delete user';
+        alert(`Deletion failed: ${errorMessage}`);
+      }
     };
 
     onMounted(() => {
@@ -684,7 +737,8 @@ export default {
       viewUser,
       impersonateUser,
       resetPassword,
-      toggleUserStatus
+      toggleUserStatus,
+      deleteUser
     };
   }
 };
