@@ -87,11 +87,112 @@
                   <button 
                     type="button" 
                     class="btn btn-outline-secondary btn-lg"
-                    @click="signupWithAuth0()"
+                    @click="showEmbeddedEmailRegistration"
                     :disabled="isLoading"
                   >
                     Continue with Email
                   </button>
+                </div>
+                
+                <!-- Embedded Auth0 Email Registration -->
+                <div v-if="showEmailRegistration" class="mt-4 p-4 border rounded">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Sign up with Email</h5>
+                    <button type="button" class="btn-close" @click="showEmailRegistration = false"></button>
+                  </div>
+                  
+                  <!-- Fully Embedded Signup Form (No Redirect) -->
+                  <form @submit.prevent="handleEmbeddedSignup" v-if="!useAuth0Lock">
+                    <div class="mb-3">
+                      <label for="signup-email" class="form-label">Email address</label>
+                      <input 
+                        type="email" 
+                        class="form-control form-control-lg" 
+                        id="signup-email"
+                        v-model="embeddedForm.email"
+                        placeholder="Enter your email"
+                        required
+                        :disabled="isLoading"
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label for="signup-password" class="form-label">Password</label>
+                      <input 
+                        type="password" 
+                        class="form-control form-control-lg" 
+                        id="signup-password"
+                        v-model="embeddedForm.password"
+                        placeholder="Enter a secure password"
+                        required
+                        :disabled="isLoading"
+                        minlength="8"
+                        @input="updatePasswordStrength"
+                      >
+                      <!-- Dynamic Password Requirements -->
+                      <div class="password-requirements mt-2">
+                        <small class="d-block mb-1 fw-bold">Password must contain:</small>
+                        <div class="requirement-list">
+                          <div class="requirement-item" :class="{ 'requirement-met': passwordChecks.length }">
+                            <i class="bi" :class="passwordChecks.length ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
+                            <span class="ms-1">At least 8 characters</span>
+                          </div>
+                          <div class="requirement-item" :class="{ 'requirement-met': passwordChecks.lowercase }">
+                            <i class="bi" :class="passwordChecks.lowercase ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
+                            <span class="ms-1">Lowercase letters (a-z)</span>
+                          </div>
+                          <div class="requirement-item" :class="{ 'requirement-met': passwordChecks.uppercase }">
+                            <i class="bi" :class="passwordChecks.uppercase ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
+                            <span class="ms-1">Uppercase letters (A-Z)</span>
+                          </div>
+                          <div class="requirement-item" :class="{ 'requirement-met': passwordChecks.numbers }">
+                            <i class="bi" :class="passwordChecks.numbers ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
+                            <span class="ms-1">Numbers (0-9)</span>
+                          </div>
+                          <div class="requirement-item" :class="{ 'requirement-met': passwordChecks.special }">
+                            <i class="bi" :class="passwordChecks.special ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
+                            <span class="ms-1">Special characters (!@#$%^&*)</span>
+                          </div>
+                        </div>
+                        <div class="mt-2">
+                          <small class="fw-bold">
+                            <span :class="passwordStrengthClass">{{ passwordStrengthText }}</span>
+                            <span v-if="!isPasswordValid" class="text-muted"> (Need {{ 3 - passwordStrengthScore }} more type{{ 3 - passwordStrengthScore === 1 ? '' : 's' }})</span>
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mb-3">
+                      <label for="signup-confirm-password" class="form-label">Confirm Password</label>
+                      <input 
+                        type="password" 
+                        class="form-control form-control-lg" 
+                        id="signup-confirm-password"
+                        v-model="embeddedForm.confirmPassword"
+                        placeholder="Confirm your password"
+                        required
+                        :disabled="isLoading"
+                      >
+                    </div>
+                    <div v-if="signupError" class="alert alert-danger" role="alert">
+                      <i class="bi bi-exclamation-triangle"></i>
+                      {{ signupError }}
+                    </div>
+                    <div class="mb-3">
+                      <small class="text-muted">
+                        Your account will be created securely without leaving this page.
+                      </small>
+                    </div>
+                    <button 
+                      type="submit" 
+                      class="btn btn-primary btn-lg w-100"
+                      :disabled="isLoading || !canSubmitEmbedded"
+                    >
+                      {{ isLoading ? 'Creating Account...' : 'Create Account' }}
+                    </button>
+                  </form>
+                  
+                  <!-- Auth0 Lock container (hidden due to timeout issues) -->
+                  <div v-if="useAuth0Lock" id="auth0-register-lock-container"></div>
                 </div>
                 
                 <!-- Legacy Registration (Hidden) -->
@@ -188,17 +289,6 @@
                 </div>
 
                 <div class="mb-4">
-                  <label class="form-label" for="companyName">Company Name</label>
-                  <input 
-                    type="text" 
-                    class="form-control form-control-lg" 
-                    id="companyName"
-                    v-model="form.companyName"
-                    :disabled="isLoading"
-                  >
-                </div>
-
-                <div class="mb-4">
                   <label class="form-label" for="phone">Phone Number</label>
                   <input 
                     type="tel" 
@@ -209,73 +299,31 @@
                     :disabled="isLoading"
                   >
                 </div>
-
+                
+                <!-- SMS Consent Checkbox -->
                 <div class="mb-4">
-                  <label class="form-label" for="licenses">Professional Licenses/Certifications</label>
-                  <input 
-                    type="text" 
-                    class="form-control form-control-lg" 
-                    id="licenses"
-                    v-model="form.licenses" 
-                    placeholder="e.g., CFP, CFA, etc."
-                    :disabled="isLoading"
-                  >
-                </div>
-
-                <div class="mb-4">
-                  <label class="form-label" for="website">Website URL</label>
-                  <input 
-                    type="url" 
-                    class="form-control form-control-lg" 
-                    id="website"
-                    v-model="form.website"
-                    :disabled="isLoading"
-                  >
-                </div>
-
-                <div class="mb-4">
-                  <label class="form-label" for="address">Address</label>
-                  <input 
-                    type="text" 
-                    class="form-control form-control-lg" 
-                    id="address"
-                    v-model="form.address"
-                    :disabled="isLoading"
-                  >
-                </div>
-
-                <div class="row">
-                  <div class="col-sm-6 mb-4">
-                    <label class="form-label" for="city">City</label>
+                  <div class="form-check">
                     <input 
-                      type="text" 
-                      class="form-control form-control-lg" 
-                      id="city"
-                      v-model="form.city"
+                      class="form-check-input" 
+                      type="checkbox" 
+                      v-model="form.smsConsent" 
+                      id="smsConsent"
                       :disabled="isLoading"
                     >
+                    <label class="form-check-label" for="smsConsent">
+                      <small class="text-muted">
+                        I consent to receive text messages from RetirementAdvisorPro about product updates, 
+                        industry insights, and company information. Message and data rates may apply. 
+                        I understand I can opt out at any time by replying STOP.
+                        <span class="text-danger">*</span>
+                      </small>
+                    </label>
                   </div>
-
-                  <div class="col-sm-3 mb-4">
-                    <label class="form-label" for="state">State</label>
-                    <input 
-                      type="text" 
-                      class="form-control form-control-lg" 
-                      id="state"
-                      v-model="form.state"
-                      :disabled="isLoading"
-                    >
-                  </div>
-
-                  <div class="col-sm-3 mb-4">
-                    <label class="form-label" for="zipCode">ZIP Code</label>
-                    <input 
-                      type="text" 
-                      class="form-control form-control-lg" 
-                      id="zipCode"
-                      v-model="form.zipCode"
-                      :disabled="isLoading"
-                    >
+                  <div class="mt-1">
+                    <small class="text-muted">
+                      By checking this box, you agree to receive SMS messages. Standard messaging rates apply. 
+                      You can unsubscribe at any time by texting STOP.
+                    </small>
                   </div>
                 </div>
               </div>
@@ -414,7 +462,7 @@
                 </div>
 
                 <!-- Credit Card Information -->
-                <div class="mb-4">
+                <div class="mb-4" v-if="paymentRequired">
                   <h5 class="mb-3">Payment Information</h5>
                   
                   <!-- Cardholder Name -->
@@ -453,23 +501,8 @@
                   </div>
 
                   <!-- Billing Address -->
-                  <div class="mb-3">
-                    <div class="form-check">
-                      <input 
-                        class="form-check-input" 
-                        type="checkbox" 
-                        v-model="form.sameBillingAddress" 
-                        id="sameBillingAddress"
-                        :disabled="isLoading"
-                      >
-                      <label class="form-check-label" for="sameBillingAddress">
-                        Billing address is the same as professional address
-                      </label>
-                    </div>
-                  </div>
-
-                  <!-- Billing Address Fields (if different) -->
-                  <div v-if="!form.sameBillingAddress">
+                  <!-- Billing Address Fields -->
+                  <div>
                     <h6 class="mb-3">Billing Address</h6>
                     
                     <div class="mb-3">
@@ -521,6 +554,14 @@
                     </div>
                   </div>
                 </div>
+                
+                <!-- Zero Cost Message -->
+                <div v-if="!paymentRequired" class="mb-4">
+                  <div class="alert alert-success" role="alert">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <strong>Great news!</strong> Your coupon covers the full cost. No payment information required!
+                  </div>
+                </div>
               </div>
 
               <!-- Navigation Buttons -->
@@ -541,7 +582,7 @@
                 >
                   {{ 
                     isLoading ? 'Processing...' : 
-                    currentStep === 3 ? 'Complete Registration' : 'Next'
+                    currentStep === 3 ? (paymentRequired ? 'Complete Registration' : 'Activate Free Account') : 'Next'
                   }}
                 </button>
               </div>
@@ -560,14 +601,33 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useRegistrationStore } from '@/stores/registration';
 import { useAuthStore } from '@/stores/auth';
-import { useAuth0 } from '@auth0/auth0-vue';
 
 const router = useRouter();
 const registrationStore = useRegistrationStore();
 const authStore = useAuthStore();
-const { loginWithRedirect, getAccessTokenSilently, user, isAuthenticated } = useAuth0();
 const isLoading = ref(false);
 const showLegacyForm = ref(false);
+const showEmailRegistration = ref(false);
+const embeddedEmail = ref('');
+const useAuth0Lock = ref(false); // Set to false to use simple form instead
+let auth0RegisterLock = null;
+const signupError = ref('');
+
+// Embedded signup form data
+const embeddedForm = reactive({
+  email: '',
+  password: '',
+  confirmPassword: ''
+});
+
+// Password strength checking
+const passwordChecks = reactive({
+  length: false,
+  lowercase: false,
+  uppercase: false,
+  numbers: false,
+  special: false
+});
 
 // Coupon functionality
 const showCouponField = ref(false);
@@ -577,9 +637,77 @@ const appliedDiscount = ref(null);
 
 const currentStep = computed(() => registrationStore.currentStep);
 
+// Password strength computed properties
+const passwordStrengthScore = computed(() => {
+  let score = 0;
+  if (passwordChecks.lowercase) score++;
+  if (passwordChecks.uppercase) score++;
+  if (passwordChecks.numbers) score++;
+  if (passwordChecks.special) score++;
+  return score;
+});
+
+const isPasswordValid = computed(() => {
+  return passwordChecks.length && passwordStrengthScore.value >= 3;
+});
+
+const passwordStrengthText = computed(() => {
+  if (!embeddedForm.password) return '';
+  if (!passwordChecks.length) return 'Too short';
+  
+  const score = passwordStrengthScore.value;
+  if (score >= 3) return 'Strong password ✓';
+  if (score === 2) return 'Fair password';
+  if (score === 1) return 'Weak password';
+  return 'Very weak password';
+});
+
+const passwordStrengthClass = computed(() => {
+  if (!embeddedForm.password) return '';
+  if (!passwordChecks.length) return 'text-danger';
+  
+  const score = passwordStrengthScore.value;
+  if (score >= 3) return 'text-success';
+  if (score === 2) return 'text-warning';
+  return 'text-danger';
+});
+
+// Check if embedded form can be submitted
+const canSubmitEmbedded = computed(() => {
+  return embeddedForm.email && 
+         embeddedForm.password && 
+         embeddedForm.confirmPassword &&
+         isPasswordValid.value &&
+         embeddedForm.password === embeddedForm.confirmPassword;
+});
+
 // Check if user is completing registration after Auth0 authentication
 const isCompletingRegistration = computed(() => {
   return currentStep.value === 2 && localStorage.getItem('auth0_flow') === 'registration';
+});
+
+// Check if payment is required based on coupon discount
+const isZeroCost = computed(() => {
+  if (!appliedDiscount.value) return false;
+  
+  const plan = form.plan;
+  const basePrice = plan === 'monthly' ? 99 : 999;
+  
+  if (appliedDiscount.value.discounted_price !== undefined) {
+    return appliedDiscount.value.discounted_price === 0;
+  }
+  
+  // Fallback calculation
+  if (appliedDiscount.value.type === 'percentage') {
+    return appliedDiscount.value.value === 100;
+  } else {
+    return appliedDiscount.value.value >= basePrice;
+  }
+});
+
+// Check if payment info is required
+const paymentRequired = computed(() => {
+  return !isZeroCost.value;
 });
 
 // Price calculation with discounts
@@ -590,6 +718,16 @@ const getDisplayPrice = (plan) => {
     return basePrice;
   }
   
+  // If we have API data with calculated prices, use those
+  if (appliedDiscount.value.original_price && appliedDiscount.value.discounted_price) {
+    // Make sure we're showing the right price for the current plan
+    const discountPlan = appliedDiscount.value.original_price === 99 ? 'monthly' : 'annual';
+    if (discountPlan === plan) {
+      return Math.round(appliedDiscount.value.discounted_price);
+    }
+  }
+  
+  // Fallback to manual calculation
   if (appliedDiscount.value.type === 'percentage') {
     return Math.round(basePrice * (1 - appliedDiscount.value.value / 100));
   } else {
@@ -606,19 +744,12 @@ const form = reactive({
   // Step 2: Professional Info
   firstName: '',
   lastName: '',
-  companyName: '',
   phone: '',
-  licenses: '',
-  website: '',
-  address: '',
-  city: '',
-  state: '',
-  zipCode: '',
+  smsConsent: false,
 
   // Step 3: Payment
   plan: 'monthly',
   cardholderName: '',
-  sameBillingAddress: true,
   billingAddress: '',
   billingCity: '',
   billingState: '',
@@ -647,46 +778,55 @@ onMounted(async () => {
   
   // Check if user is already authenticated (from Auth0 callback)
   if (authStore.isAuthenticated && authStore.user) {
-    console.log('✅ User already authenticated, pre-filling form data');
+    console.log('✅ User already authenticated, checking registration status');
     
-    // Move to step 2 if not already there
-    if (registrationStore.currentStep === 1) {
-      registrationStore.currentStep = 2;
-    }
+    // Check registration completeness
+    const user = authStore.user;
+    const hasProfileInfo = user.phone_number && user.first_name && user.last_name;
+    const hasSubscription = user.subscription_status && user.stripe_customer_id;
     
-    // Pre-fill form with user data
-    form.email = authStore.user.email || '';
-    form.firstName = authStore.user.first_name || '';
-    form.lastName = authStore.user.last_name || '';
-    
-    console.log('✅ Form pre-filled with user data:', {
-      email: form.email,
-      firstName: form.firstName,
-      lastName: form.lastName
+    console.log('📋 Registration status check:', {
+      hasProfileInfo,
+      hasSubscription,
+      subscription_status: user.subscription_status
     });
+    
+    if (hasSubscription) {
+      // Registration already complete - redirect to dashboard
+      console.log('✅ Registration already complete, redirecting to dashboard');
+      router.push('/dashboard');
+      return;
+    } else if (hasProfileInfo && !hasSubscription) {
+      // Professional info complete but no payment - go to step 3
+      console.log('🔄 Professional info complete, moving to payment step');
+      registrationStore.currentStep = 3;
+      
+      // Pre-fill form with existing data
+      form.email = user.email || '';
+      form.firstName = user.first_name || '';
+      form.lastName = user.last_name || '';
+      form.phone = user.phone_number || '';
+    } else {
+      // New user or incomplete profile - go to step 2
+      console.log('🔄 New or incomplete registration, moving to professional info step');
+      if (registrationStore.currentStep === 1) {
+        registrationStore.currentStep = 2;
+      }
+      
+      // Pre-fill form with Auth0 user data
+      form.email = user.email || '';
+      form.firstName = user.first_name || '';
+      form.lastName = user.last_name || '';
+      
+      console.log('✅ Form pre-filled with user data:', {
+        email: form.email,
+        firstName: form.firstName,
+        lastName: form.lastName
+      });
+    }
   }
   
-  // Legacy Auth0 Vue plugin check (fallback)
-  if (isAuthenticated.value && user.value) {
-    try {
-      const accessToken = await getAccessTokenSilently();
-      const success = await authStore.loginWithAuth0(accessToken);
-      
-      if (success) {
-        if (registrationStore.currentStep === 1) {
-          registrationStore.currentStep = 2;
-        }
-        
-        if (user.value) {
-          form.email = user.value.email || '';
-          form.firstName = user.value.given_name || '';
-          form.lastName = user.value.family_name || '';
-        }
-      }
-    } catch (error) {
-      console.error('Error handling Auth0 authentication:', error);
-    }
-  }
+  // Auth0 SDK removed - using direct Auth0 redirects now
   
   // Initialize Stripe if already on step 3
   if (currentStep.value === 3) {
@@ -715,26 +855,37 @@ const validateStep2 = () => {
     alert('Please fill in all required fields');
     return false;
   }
+  
+  if (!form.smsConsent) {
+    alert('Please consent to receive SMS messages to continue. This helps us provide important updates about your account.');
+    return false;
+  }
+  
   return true;
 };
 
 const validateStep3 = () => {
-  if (!form.cardholderName.trim()) {
-    alert('Please enter the cardholder name');
-    return false;
-  }
-  
   if (!form.plan) {
     alert('Please select a subscription plan');
     return false;
   }
   
-  // Validate billing address if different from professional address
-  if (!form.sameBillingAddress) {
-    if (!form.billingAddress || !form.billingCity || !form.billingState || !form.billingZip) {
-      alert('Please fill in all billing address fields');
-      return false;
-    }
+  // Skip payment validation for zero-cost subscriptions
+  if (isZeroCost.value) {
+    console.log('✅ Zero-cost subscription detected, skipping payment validation');
+    return true;
+  }
+  
+  // Validate payment info for paid subscriptions
+  if (!form.cardholderName.trim()) {
+    alert('Please enter the cardholder name');
+    return false;
+  }
+  
+  // Validate billing address fields
+  if (!form.billingAddress || !form.billingCity || !form.billingState || !form.billingZip) {
+    alert('Please fill in all billing address fields');
+    return false;
   }
   
   return true;
@@ -751,11 +902,11 @@ const validateCoupon = async () => {
   
   try {
     // Call backend to validate coupon
-    const response = await fetch('http://localhost:8000/api/validate-coupon/', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/validate-coupon/`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authStore.token}`
+        'Content-Type': 'application/json'
+        // No Authorization header needed - endpoint allows anonymous access
       },
       body: JSON.stringify({
         coupon_code: form.couponCode.trim(),
@@ -771,7 +922,9 @@ const validateCoupon = async () => {
         name: data.name,
         description: data.description,
         type: data.discount_type, // 'percentage' or 'fixed'
-        value: data.discount_value
+        value: data.discount_value,
+        original_price: data.original_price,
+        discounted_price: data.discounted_price
       };
       
       couponStatus.value = {
@@ -806,6 +959,26 @@ const removeCoupon = () => {
   console.log('🗑️ Coupon removed');
 };
 
+// Password strength checking function
+const updatePasswordStrength = () => {
+  const password = embeddedForm.password;
+  
+  // Check length
+  passwordChecks.length = password.length >= 8;
+  
+  // Check for lowercase letters
+  passwordChecks.lowercase = /[a-z]/.test(password);
+  
+  // Check for uppercase letters
+  passwordChecks.uppercase = /[A-Z]/.test(password);
+  
+  // Check for numbers
+  passwordChecks.numbers = /[0-9]/.test(password);
+  
+  // Check for special characters
+  passwordChecks.special = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+};
+
 const nextStep = async () => {
   if (currentStep.value === 1) {
     if (validateStep1()) {
@@ -825,14 +998,8 @@ const nextStep = async () => {
         await registrationStore.registerStep2({
           firstName: form.firstName,
           lastName: form.lastName,
-          companyName: form.companyName,
           phoneNumber: form.phone,
-          licenses: form.licenses,
-          website: form.website,
-          address: form.address,
-          city: form.city,
-          state: form.state,
-          zipCode: form.zipCode
+          smsConsent: form.smsConsent
         });
       } catch (error) {
         alert(error.message || 'Error in step 2');
@@ -848,63 +1015,293 @@ const prevStep = () => {
   }
 };
 
-const signupWithAuth0 = async (connection) => {
-  console.log('🔵 signupWithAuth0 called with connection:', connection);
+const showEmbeddedEmailRegistration = () => {
+  console.log('🔵 Starting fully embedded email registration');
+  
+  // Set registration flow in localStorage
+  localStorage.setItem('auth0_flow', 'registration');
+  showEmailRegistration.value = true;
+  
+  // Clear the embedded form
+  embeddedForm.email = '';
+  embeddedForm.password = '';
+  embeddedForm.confirmPassword = '';
+  signupError.value = '';
+  
+  // Since Auth0 Lock has timeout issues, we'll use the simple form approach
+  if (useAuth0Lock.value) {
+    // Only load Auth0 Lock if we're using it (currently disabled due to timeout issues)
+    if (!window.Auth0Lock) {
+      console.log('📦 Loading Auth0 Lock script...');
+      const script = document.createElement('script');
+      script.src = 'https://cdn.auth0.com/js/lock/11.32.2/lock.min.js';
+      script.onload = () => {
+        console.log('✅ Auth0 Lock script loaded');
+        initAuth0RegisterLock();
+      };
+      script.onerror = (error) => {
+        console.error('❌ Failed to load Auth0 Lock script:', error);
+        alert('Failed to load authentication library. Please refresh and try again.');
+      };
+      document.head.appendChild(script);
+    } else {
+      console.log('✅ Auth0 Lock already loaded, initializing...');
+      initAuth0RegisterLock();
+    }
+  }
+};
+
+const handleEmbeddedSignup = async () => {
+  console.log('📧 Handling truly embedded signup - account creation only');
+  
+  // Clear any previous errors
+  signupError.value = '';
+  
+  // Validate form
+  if (!embeddedForm.email) {
+    signupError.value = 'Please enter your email address';
+    return;
+  }
+  
+  if (!embeddedForm.password || embeddedForm.password.length < 8) {
+    signupError.value = 'Password must be at least 8 characters long';
+    return;
+  }
+  
+  if (embeddedForm.password !== embeddedForm.confirmPassword) {
+    signupError.value = 'Passwords do not match';
+    return;
+  }
+  
+  // Validate password strength using our dynamic checker
+  if (!isPasswordValid.value) {
+    signupError.value = 'Password does not meet requirements. Please ensure it has at least 8 characters with uppercase, lowercase, numbers, and special characters.';
+    return;
+  }
   
   try {
-    // Use direct Auth0 redirect method for signup
-    console.log('🔄 Using direct Auth0 redirect method for signup...');
+    isLoading.value = true;
     
-    // Map common connection names to Auth0 connection names
+    console.log('🔄 Creating Auth0 account without immediate authentication...');
+    
+    // Call backend to create the account only (no authentication)
+    const signupResponse = await fetch(`${import.meta.env.VITE_API_URL}/auth0/create-account/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: embeddedForm.email.trim().toLowerCase(),
+        password: embeddedForm.password
+      })
+    });
+    
+    const signupData = await signupResponse.json();
+    
+    if (!signupResponse.ok || !signupData.success) {
+      console.error('❌ Account creation failed:', signupResponse.status, signupData);
+      signupError.value = signupData.message || 'Account creation failed. Please try again.';
+      return;
+    }
+    
+    console.log('✅ Auth0 account created successfully, proceeding to next step');
+    
+    // Store email and password for later authentication during final step
+    sessionStorage.setItem('registration_email', embeddedForm.email.trim().toLowerCase());
+    sessionStorage.setItem('registration_password', embeddedForm.password);
+    
+    // Clear the form
+    embeddedForm.email = '';
+    embeddedForm.password = '';
+    embeddedForm.confirmPassword = '';
+    
+    // Mark as registration flow and close the embedded form
+    localStorage.setItem('auth0_flow', 'registration');
+    showEmailRegistration.value = false;
+    
+    // Pre-fill form with email
+    form.email = signupData.email;
+    
+    // Move to step 2 (Professional Info)
+    registrationStore.currentStep = 2;
+    
+  } catch (error) {
+    console.error('❌ Embedded signup error:', error);
+    signupError.value = 'Network error. Please check your connection and try again.';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Legacy function for backward compatibility
+const handleEmailSignup = () => {
+  // This function is now replaced by handleEmbeddedSignup
+  handleEmbeddedSignup();
+};
+
+const initAuth0RegisterLock = () => {
+  try {
+    const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+    
+    console.log('🔧 Initializing Auth0 Lock with:', { domain, clientId });
+    
+    // Wait for the container to be rendered
+    setTimeout(() => {
+      const container = document.getElementById('auth0-register-lock-container');
+      if (!container) {
+        console.error('❌ Auth0 Lock container not found');
+        alert('Failed to load registration form. Please refresh and try again.');
+        return;
+      }
+      
+      console.log('✅ Container found, initializing Auth0 Lock...');
+      
+      auth0RegisterLock = new window.Auth0Lock(clientId, domain, {
+        container: 'auth0-register-lock-container',
+        auth: {
+          redirectUrl: 'http://localhost:3000/auth/callback',
+          responseType: 'code',
+          params: {
+            scope: 'openid profile email'
+          }
+        },
+        allowedConnections: ['Username-Password-Authentication'],
+        allowSignUp: true,  // Enable signup for registration
+        allowLogin: false,  // Disable login to force signup only
+        allowForgotPassword: false,  // Hide forgot password for registration
+        initialScreen: 'signUp',  // Force signup screen
+        languageDictionary: {
+          title: 'Create your account',
+          signUpSubmitLabel: 'Sign Up'
+        },
+        theme: {
+          primaryColor: '#377dff'
+        },
+        closable: false
+      });
+    
+      // Handle successful authentication/registration
+      auth0RegisterLock.on('authenticated', (authResult) => {
+        console.log('✅ Auth0 Lock authenticated:', authResult);
+        // The callback will be handled by our existing Auth0CallbackSimple.vue
+        window.location.href = `http://localhost:3000/auth/callback?code=${authResult.accessToken}&state=registration`;
+      });
+      
+      // Handle unrecoverable errors
+      auth0RegisterLock.on('unrecoverable_error', (error) => {
+        console.error('❌ Auth0 Lock unrecoverable error - Full object:', error);
+        console.error('Error details:', {
+          error: error.error,
+          errorDescription: error.error_description,
+          description: error.description,
+          message: error.message,
+          code: error.code,
+          statusCode: error.statusCode,
+          original: error.original
+        });
+        
+        // Try to get a meaningful error message
+        const errorMessage = error.error_description || 
+                           error.description || 
+                           error.error || 
+                           error.message || 
+                           'An error occurred. Please check the console for details.';
+        
+        alert(`Registration error: ${errorMessage}`);
+      });
+      
+      // Handle authorization errors
+      auth0RegisterLock.on('authorization_error', (error) => {
+        console.error('❌ Auth0 Lock authorization error:', error);
+        alert(`Authorization failed: ${error.error_description || error.error || 'Please try again'}`);
+      });
+      
+      // Handle signin event (even though we're in signup mode, this might fire)
+      auth0RegisterLock.on('signin submit', (options) => {
+        console.log('📝 Signin form submitted (unexpected in signup mode):', options);
+      });
+      
+      // Handle show event
+      auth0RegisterLock.on('show', () => {
+        console.log('✅ Auth0 Lock is now visible');
+      });
+      
+      // Handle hide event
+      auth0RegisterLock.on('hide', () => {
+        console.log('🔒 Auth0 Lock is now hidden');
+      });
+      
+      console.log('📱 Showing Auth0 Lock...');
+      auth0RegisterLock.show();
+      console.log('✅ Auth0 Lock initialized and shown');
+    }, 100); // Small delay to ensure DOM is ready
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize Auth0 Lock:', error);
+    alert(`Failed to initialize registration form: ${error.message || 'Unknown error'}`);
+    showEmailRegistration.value = false;
+  }
+};
+
+const signupWithAuth0 = async (connection) => {
+  console.log('🔵 Auth0 registration started with connection:', connection);
+  
+  try {
+    isLoading.value = true;
+    
+    // Store registration flow in localStorage for callback detection
+    localStorage.setItem('auth0_flow', 'registration');
+    console.log('✅ Set auth0_flow to registration');
+    console.log('🔍 localStorage auth0_flow after setting:', localStorage.getItem('auth0_flow'));
+    console.log('🔍 All localStorage items:', Object.keys(localStorage));
+    
+    // Build Auth0 authorization URL for registration
+    const domain = import.meta.env.VITE_AUTH0_DOMAIN;
+    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+    const callbackUrl = 'http://localhost:3000/auth/callback';
+    
+    // Generate state parameter for security
+    const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+    sessionStorage.setItem('auth0_state', state);
+    
+    // Map connection names to Auth0 connection identifiers
     const connectionMap = {
       'google': 'google-oauth2',
-      'facebook': 'facebook',
+      'facebook': 'facebook', 
       'apple': 'apple'
     };
     
     const actualConnection = connectionMap[connection] || connection;
-    console.log(`🔵 Using connection: ${connection} -> ${actualConnection}`);
     
-    // Store registration flow in localStorage
-    localStorage.setItem('auth0_flow', 'registration');
-    
-    // Generate a random state parameter for CSRF protection
-    const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-    // Store state in sessionStorage for verification on callback
-    sessionStorage.setItem('auth0_state', state);
-    console.log('🔐 Generated and stored state parameter');
-    
-    // Generate a nonce for additional security
-    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-    sessionStorage.setItem('auth0_nonce', nonce);
-    
-    const domain = import.meta.env.VITE_AUTH0_DOMAIN;
-    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-    const callbackUrl = import.meta.env.VITE_AUTH0_CALLBACK_URL || 'http://localhost:3000/auth/callback';
-    
+    // Build Auth0 URL with signup parameters
     let authUrl = `https://${domain}/authorize?` +
       `client_id=${clientId}&` +
       `response_type=code&` +
       `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
       `scope=openid profile email&` +
       `state=${state}&` +
-      `nonce=${nonce}&` +
-      `screen_hint=signup`;
+      `screen_hint=signup&` +  // This tells Auth0 to show signup form by default
+      `prompt=login`;  // Force Auth0 to show login/signup form even if user has existing session
     
-    // Add connection if specified
-    if (actualConnection) {
+    // Add connection parameter if specified
+    if (actualConnection && connection !== 'email') {
       authUrl += `&connection=${actualConnection}`;
-    } else {
-      // For email signup, force the signup screen
-      authUrl += `&prompt=login`;
+    } else if (connection === 'email') {
+      // For email registration, use Username-Password-Authentication to show only email/password form
+      authUrl += `&connection=Username-Password-Authentication`;
     }
     
-    console.log('🔵 Redirecting to:', authUrl);
+    console.log('🔗 Redirecting to Auth0 registration:', authUrl);
+    console.log('🔗 Using callback URL:', callbackUrl);
+    
+    // Redirect to Auth0
     window.location.href = authUrl;
     
   } catch (error) {
-    console.error('❌ Auth0 signup error:', error);
-    alert(`Auth0 signup failed: ${error.message}`);
+    console.error('❌ Auth0 registration error:', error);
+    alert(`Registration failed: ${error.message}`);
+    isLoading.value = false;
   }
 };
 
@@ -1020,57 +1417,73 @@ const handleSubmit = async () => {
     isLoading.value = true;
     try {
 
-      // Create billing details
-      const billingDetails = {
-        name: form.cardholderName,
-        address: {
-          line1: form.sameBillingAddress ? form.address : form.billingAddress,
-          city: form.sameBillingAddress ? form.city : form.billingCity,
-          state: form.sameBillingAddress ? form.state : form.billingState,
-          postal_code: form.sameBillingAddress ? form.zipCode : form.billingZip,
-          country: 'US'
+      let paymentMethodId = null;
+      let billingDetails = {};
+      
+      // Only create payment method for paid subscriptions
+      if (paymentRequired.value) {
+        // Create billing details
+        billingDetails = {
+          name: form.cardholderName,
+          address: {
+            line1: form.billingAddress,
+            city: form.billingCity,
+            state: form.billingState,
+            postal_code: form.billingZip,
+            country: 'US'
+          }
+        };
+
+        // Create payment method using the separate card elements
+        const { paymentMethod, error } = await stripe.createPaymentMethod({
+          type: 'card',
+          card: cardNumber,
+          billing_details: billingDetails
+        });
+
+        if (error) {
+          throw error;
         }
-      };
 
-      // Create payment method using the separate card elements
-      const { paymentMethod, error } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardNumber,
-        billing_details: billingDetails
-      });
-
-      if (error) {
-        throw error;
+        paymentMethodId = paymentMethod.id;
+        console.log('✅ Payment method created:', paymentMethodId);
+      } else {
+        console.log('✅ Skipping payment method creation for zero-cost subscription');
       }
 
-      console.log('✅ Payment method created:', paymentMethod.id);
+      // Get registration credentials
+      const email = sessionStorage.getItem('registration_email');
+      const password = sessionStorage.getItem('registration_password');
+      
+      if (!email || !password) {
+        throw new Error('Missing registration credentials. Please start registration again.');
+      }
+      
+      console.log('🔄 Completing registration with payment-first security flow...');
 
       // Complete Auth0 registration with professional info and payment
-      const response = await fetch('http://localhost:8000/api/auth0/complete-registration/', {
+      // Backend will authenticate AFTER payment succeeds (secure flow)
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth0/complete-registration/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authStore.token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          registrationEmail: email,
+          registrationPassword: password,
           professionalInfo: {
             firstName: form.firstName,
             lastName: form.lastName,
-            companyName: form.companyName,
             phone: form.phone,
-            licenses: form.licenses,
-            website: form.website,
-            address: form.address,
-            city: form.city,
-            state: form.state,
-            zipCode: form.zipCode
+            smsConsent: form.smsConsent
           },
           paymentInfo: {
-            paymentMethodId: paymentMethod.id,
+            paymentMethodId: paymentMethodId,
             plan: form.plan,
             billingDetails: billingDetails,
             couponCode: appliedDiscount.value ? form.couponCode : null,
-            appliedDiscount: appliedDiscount.value
+            appliedDiscount: appliedDiscount.value,
+            isZeroCost: isZeroCost.value
           }
         })
       });
@@ -1079,13 +1492,74 @@ const handleSubmit = async () => {
       
       if (data.status === 'success') {
         console.log('✅ Registration completed successfully');
+        
+        // Store authentication tokens returned after payment
+        if (data.access && data.refresh) {
+          authStore.setTokens({
+            access: data.access,
+            refresh: data.refresh
+          });
+          
+          authStore.setUser(data.user);
+          console.log('✅ Authentication tokens stored after payment');
+        }
+        
+        // Clear registration credentials
+        sessionStorage.removeItem('registration_email');
+        sessionStorage.removeItem('registration_password');
+        localStorage.removeItem('auth0_flow');
+        sessionStorage.removeItem('auth0_state');
+        
+        // Handle 3D Secure authentication if required
+        if (data.payment_intent && data.payment_intent.status === 'requires_action') {
+          console.log('🔄 Payment requires 3D Secure authentication');
+          
+          const { error: confirmError } = await stripe.confirmCardPayment(
+            data.payment_intent.client_secret
+          );
+          
+          if (confirmError) {
+            throw new Error(`Payment authentication failed: ${confirmError.message}`);
+          }
+        }
+        
+        // Show success message and redirect
+        alert('Registration completed successfully! Welcome to RetirementAdvisorPro.');
         router.push('/dashboard');
       } else {
         throw new Error(data.message || 'Registration failed');
       }
     } catch (error) {
       console.error('❌ Registration error:', error);
-      alert(error.message || 'An error occurred during registration');
+      
+      // Enhanced error handling with user-friendly messages
+      let errorMessage = 'An error occurred during registration. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('card_declined')) {
+          errorMessage = 'Your card was declined. Please check your payment information or try a different card.';
+        } else if (error.message.includes('invalid_expiry_month') || error.message.includes('invalid_expiry_year')) {
+          errorMessage = 'Please check your card expiration date and try again.';
+        } else if (error.message.includes('invalid_cvc')) {
+          errorMessage = 'Please check your card security code (CVC) and try again.';
+        } else if (error.message.includes('insufficient_funds')) {
+          errorMessage = 'Your card was declined due to insufficient funds. Please try a different card.';
+        } else if (error.message.includes('expired_card')) {
+          errorMessage = 'Your card has expired. Please use a different card.';
+        } else if (error.message.includes('incorrect_cvc')) {
+          errorMessage = 'The security code (CVC) you entered is incorrect. Please try again.';
+        } else if (error.message.includes('subscription creation failed')) {
+          errorMessage = 'We encountered an issue setting up your subscription. Your card was not charged. Please try again.';
+        } else if (error.message.includes('Payment setup failed')) {
+          errorMessage = 'There was an issue with your payment information. Please check your details and try again.';
+        } else if (error.message.includes('authentication_required')) {
+          errorMessage = 'Your bank requires additional authentication. Please try again or use a different card.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       isLoading.value = false;
     }
@@ -1218,5 +1692,91 @@ const handleSubmit = async () => {
 
 .bg-success.bg-opacity-10 {
   background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+/* Auth0 Lock Registration Styles */
+#auth0-register-lock-container >>> .auth0-lock-header-logo,
+#auth0-register-lock-container >>> .auth0-lock-header-avatar,
+#auth0-register-lock-container >>> .auth0-lock-header,
+#auth0-register-lock-container >>> .auth0-lock-badge-bottom {
+  display: none !important;
+}
+
+/* Hide login-related elements for registration */
+#auth0-register-lock-container >>> .auth0-lock-alternative-link,
+#auth0-register-lock-container >>> .auth0-lock-alternative,
+#auth0-register-lock-container >>> [data-auth0-lock-action="login"],
+#auth0-register-lock-container >>> .auth0-lock-tabs,
+#auth0-register-lock-container >>> .auth0-lock-tab {
+  display: none !important;
+}
+
+/* Customize signup button */
+#auth0-register-lock-container >>> .auth0-lock-submit .auth0-lock-submit-label::before {
+  display: none !important;
+}
+
+#auth0-register-lock-container >>> .auth0-lock-submit .auth0-lock-submit-label {
+  background-image: none !important;
+}
+
+#auth0-register-lock-container >>> .auth0-lock-submit {
+  background-image: none !important;
+}
+
+#auth0-register-lock-container >>> .auth0-lock-submit::before {
+  display: none !important;
+}
+
+#auth0-register-lock-container >>> .auth0-lock {
+  box-shadow: none !important;
+  border: 1px solid #e7eaf3;
+}
+
+#auth0-register-lock-container >>> .auth0-lock-widget {
+  box-shadow: none !important;
+}
+
+#auth0-register-lock-container >>> .auth0-lock-form {
+  padding-top: 10px !important;
+}
+
+/* Password Requirements Styling */
+.password-requirements {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.requirement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.requirement-item {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.requirement-item.requirement-met {
+  color: #198754;
+}
+
+.requirement-item:not(.requirement-met) {
+  color: #6c757d;
+}
+
+.requirement-item i {
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
+}
+
+.password-requirements .fw-bold {
+  font-weight: 600 !important;
 }
 </style> 

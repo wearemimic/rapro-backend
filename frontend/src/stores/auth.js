@@ -268,6 +268,9 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('user');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('isAuth0');
+      // Clear registration flow state
+      localStorage.removeItem('auth0_flow');
+      sessionStorage.removeItem('auth0_state');
       
       delete axios.defaults.headers.common['Authorization'];
     },

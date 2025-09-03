@@ -82,7 +82,16 @@ def admin_required(roles=None, section=None, permission=None):
                 )
             
             # Check if user has admin privileges
+            print(f"🔍 Admin check for user {request.user.id} ({request.user.email}):")
+            print(f"  - is_admin_user: {request.user.is_admin_user}")
+            print(f"  - is_platform_admin: {request.user.is_platform_admin}")
+            print(f"  - is_superuser: {request.user.is_superuser}")
+            print(f"  - is_staff: {request.user.is_staff}")
+            print(f"  - admin_role: {request.user.admin_role}")
+            print(f"  - hasattr is_admin_user: {hasattr(request.user, 'is_admin_user')}")
+            
             if not request.user.is_admin_user:
+                print(f"❌ Admin access denied for user {request.user.email}")
                 return JsonResponse(
                     {'error': 'Admin access required'}, 
                     status=403

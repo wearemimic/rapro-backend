@@ -13,6 +13,11 @@ class SubscriptionMiddleware:
             'token_obtain_pair',
             'token_refresh',
             'stripe_webhook',
+            'embedded_signup',        # Auth0 embedded registration
+            'create_account',         # Auth0 account creation only
+            'exchange_code',          # Auth0 code exchange
+            'logout',                # Auth0 logout
+            'validate_coupon',       # Coupon validation during registration
         ]
 
     def __call__(self, request):
@@ -78,7 +83,19 @@ class AdminAccessMiddleware:
                 return self.get_response(request)
             
             # Check if user is authenticated
+            print(f"🏭 Middleware auth check for {request.path}")
+            print(f"  - request.user: {request.user}")
+            print(f"  - is_authenticated: {request.user.is_authenticated}")
+            if request.user.is_authenticated:
+                print(f"  - user.id: {request.user.id}")
+                print(f"  - user.email: {request.user.email}")
+                print(f"  - user.is_admin_user: {request.user.is_admin_user}")
+                print(f"  - user.is_superuser: {request.user.is_superuser}")
+                print(f"  - user.is_platform_admin: {request.user.is_platform_admin}")
+                print(f"  - user.admin_role: {request.user.admin_role}")
+            
             if not request.user.is_authenticated:
+                print("❌ Middleware: User not authenticated")
                 return JsonResponse({
                     'error': 'Authentication required',
                     'message': 'Admin access requires authentication.',
@@ -86,6 +103,11 @@ class AdminAccessMiddleware:
                 }, status=401)
             
             # Check if user has admin access
+            if not request.user.is_admin_user:
+                print(f"❌ Middleware: User {request.user.email} is not admin user")
+            else:
+                print(f"✅ Middleware: User {request.user.email} has admin access")
+                
             if not request.user.is_admin_user:
                 return JsonResponse({
                     'error': 'Admin access required',
