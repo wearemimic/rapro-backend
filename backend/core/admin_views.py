@@ -11,6 +11,8 @@ from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from datetime import datetime, timedelta
 import json
+from auth0.management import Auth0
+import os
 
 from .models import (
     Client, Scenario, Communication, Task, Lead, CustomUser,
@@ -699,13 +701,21 @@ def start_user_impersonation(request, user_id):
             risk_level='high' if target_user.is_admin_user else 'medium'
         )
         
-        # Create impersonation token (simplified - would use JWT in production)
+        # Create impersonation JWT token for the target user
+        from .authentication import create_jwt_pair_for_user
+        
+        # Generate JWT tokens for the impersonated user
+        tokens = create_jwt_pair_for_user(target_user)
+        
+        # Add impersonation metadata to the token payload
         impersonation_data = {
             'session_id': impersonation_log.id,
             'session_key': session_key,
             'admin_user_id': admin_user.id,
             'target_user_id': target_user.id,
-            'started_at': impersonation_log.start_timestamp.isoformat()
+            'started_at': impersonation_log.start_timestamp.isoformat(),
+            'access_token': tokens['access'],
+            'refresh_token': tokens['refresh']
         }
         
         return Response({
@@ -714,7 +724,14 @@ def start_user_impersonation(request, user_id):
             'target_user': {
                 'id': target_user.id,
                 'email': target_user.email,
-                'name': f"{target_user.first_name} {target_user.last_name}".strip() or target_user.email
+                'first_name': target_user.first_name,
+                'last_name': target_user.last_name,
+                'name': f"{target_user.first_name} {target_user.last_name}".strip() or target_user.email,
+                'company_name': target_user.company_name or '',
+                'subscription_status': target_user.subscription_status,
+                'is_admin_user': False,  # Impersonated users should not have admin access
+                'admin_role': None,
+                'admin_permissions': {}
             },
             'expires_in_minutes': 60,  # Default 1 hour session
             'warning': 'All actions performed during impersonation will be logged.'
@@ -733,18 +750,25 @@ def start_user_impersonation(request, user_id):
 
 
 @api_view(['POST'])
-@admin_required()
+@permission_classes([IsAuthenticated])
 def end_user_impersonation(request, session_id):
     """End user impersonation session"""
     from .models import UserImpersonationLog, AdminAuditLog
     
     try:
-        # Find active impersonation session
+        # Find active impersonation session by ID only 
+        # (don't require admin_user=request.user since request.user is the impersonated user)
         impersonation_log = UserImpersonationLog.objects.get(
             id=session_id,
-            admin_user=request.user,
             is_active=True
         )
+        
+        # Security check: Verify the current user is either the admin or the target user
+        if request.user != impersonation_log.admin_user and request.user != impersonation_log.target_user:
+            return JsonResponse({
+                'error': 'Permission denied',
+                'message': 'You can only end impersonation sessions you are involved in'
+            }, status=403)
         
         # Get session actions from request
         actions_performed = request.data.get('actions_performed', [])
@@ -756,9 +780,9 @@ def end_user_impersonation(request, session_id):
             pages=pages_accessed
         )
         
-        # Create audit log entry
+        # Create audit log entry (use the original admin user, not current request user)
         AdminAuditLog.log_action(
-            admin_user=request.user,
+            admin_user=impersonation_log.admin_user,
             action_type='user_impersonated',
             description=f'Ended impersonation of {impersonation_log.target_user_email}',
             target_user=impersonation_log.target_user,
@@ -3720,6 +3744,137 @@ def admin_billing_data(request):
         
         return Response({
             'error': str(e),
+            'success': False
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_user_complete(request, user_id):
+    """
+    Completely delete a user from both Django and Auth0
+    This action is irreversible and will:
+    1. Cancel any active Stripe subscriptions
+    2. Delete the user from Auth0 
+    3. Delete the user from Django database
+    """
+    try:
+        # Check if the requesting user has admin access
+        if not hasattr(request.user, 'is_admin_user') or not request.user.is_admin_user:
+            return Response({
+                'error': 'Admin access required',
+                'message': 'You do not have permission to delete users.',
+                'success': False
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get the user to delete
+        try:
+            user_to_delete = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found',
+                'success': False
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Prevent deletion of current super admin user
+        if (user_to_delete.admin_role == 'super_admin' and 
+            user_to_delete.id == request.user.id):
+            return Response({
+                'error': 'You cannot delete your own super admin account',
+                'success': False
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        print(f"🗑️ Starting complete deletion of user: {user_to_delete.email}")
+        
+        # Step 1: Cancel Stripe subscriptions if they exist
+        subscription_cancelled = False
+        if hasattr(user_to_delete, 'stripe_customer_id') and user_to_delete.stripe_customer_id:
+            try:
+                import stripe
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                
+                # Get all subscriptions for this customer
+                subscriptions = stripe.Subscription.list(
+                    customer=user_to_delete.stripe_customer_id,
+                    status='all'
+                )
+                
+                # Cancel active subscriptions
+                for subscription in subscriptions.data:
+                    if subscription.status in ['active', 'trialing', 'past_due']:
+                        stripe.Subscription.delete(subscription.id)
+                        subscription_cancelled = True
+                        print(f"🎫 Cancelled Stripe subscription: {subscription.id}")
+                
+                # Delete the Stripe customer
+                stripe.Customer.delete(user_to_delete.stripe_customer_id)
+                print(f"👤 Deleted Stripe customer: {user_to_delete.stripe_customer_id}")
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Could not cancel Stripe subscription: {str(e)}")
+        
+        # Step 2: Delete user from Auth0
+        auth0_deleted = False
+        if hasattr(user_to_delete, 'auth0_user_id') and user_to_delete.auth0_user_id:
+            try:
+                # Initialize Auth0 Management API client
+                domain = settings.AUTH0_DOMAIN
+                client_id = settings.AUTH0_CLIENT_ID
+                client_secret = settings.AUTH0_CLIENT_SECRET
+                
+                # Get a Management API token
+                token_url = f'https://{domain}/oauth/token'
+                token_data = {
+                    'grant_type': 'client_credentials',
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'audience': f'https://{domain}/api/v2/'
+                }
+                
+                import requests
+                token_response = requests.post(token_url, json=token_data)
+                token_response.raise_for_status()
+                access_token = token_response.json()['access_token']
+                
+                # Initialize Auth0 Management client
+                auth0_client = Auth0(domain, access_token)
+                
+                # Delete user from Auth0
+                auth0_client.users.delete(user_to_delete.auth0_user_id)
+                auth0_deleted = True
+                print(f"🔑 Deleted Auth0 user: {user_to_delete.auth0_user_id}")
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Could not delete from Auth0: {str(e)}")
+        
+        # Step 3: Delete user from Django database
+        user_email = user_to_delete.email
+        user_name = f"{user_to_delete.first_name} {user_to_delete.last_name}"
+        
+        # Delete the user (this will cascade to related objects)
+        user_to_delete.delete()
+        
+        print(f"✅ Successfully deleted user {user_email} from Django database")
+        
+        return Response({
+            'success': True,
+            'message': f'User {user_email} has been completely deleted',
+            'details': {
+                'user_email': user_email,
+                'user_name': user_name,
+                'django_deleted': True,
+                'auth0_deleted': auth0_deleted,
+                'subscription_cancelled': subscription_cancelled
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"❌ Error in delete_user_complete: {str(e)}")
+        print(traceback.format_exc())
+        
+        return Response({
+            'error': f'Failed to delete user: {str(e)}',
             'success': False
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

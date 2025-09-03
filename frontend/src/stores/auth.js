@@ -14,6 +14,10 @@ export const useAuthStore = defineStore('auth', {
     maxRefreshAttempts: 3,
     isRefreshing: false,
     failedRequestsQueue: [],
+    // Impersonation state
+    isImpersonating: false,
+    originalUser: null,
+    impersonationSession: null,
   }),
   persist: true,
   getters: {
@@ -48,6 +52,19 @@ export const useAuthStore = defineStore('auth', {
     isSuperAdmin: (state) => {
       return state.user?.admin_role === 'super_admin';
     },
+    
+    // Impersonation getters
+    isImpersonating: (state) => state.isImpersonating,
+    
+    impersonatedUser: (state) => {
+      return state.isImpersonating ? state.user : null;
+    },
+    
+    realAdminUser: (state) => {
+      return state.isImpersonating ? state.originalUser : state.user;
+    },
+    
+    impersonationSessionInfo: (state) => state.impersonationSession,
   },
   actions: {
     init() {
@@ -264,10 +281,16 @@ export const useAuthStore = defineStore('auth', {
       this.isRefreshing = false;
       this.failedRequestsQueue = [];
       
+      // Clear impersonation state
+      this.isImpersonating = false;
+      this.originalUser = null;
+      this.impersonationSession = null;
+      
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('isAuth0');
+      localStorage.removeItem('impersonation_session');
       // Clear registration flow state
       localStorage.removeItem('auth0_flow');
       sessionStorage.removeItem('auth0_state');
@@ -505,6 +528,158 @@ export const useAuthStore = defineStore('auth', {
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to fetch admin stats');
+      }
+    },
+    
+    // Impersonation actions
+    async startImpersonation(targetUser, sessionData) {
+      try {
+        // Store original admin user and tokens
+        this.originalUser = { ...this.user };
+        const originalToken = this.token;
+        const originalRefreshToken = localStorage.getItem('refresh_token');
+        
+        // Switch to impersonated user context
+        this.user = {
+          ...targetUser,
+          // Keep some admin properties for backend compatibility
+          is_admin_user: false, // Impersonated user shouldn't have admin access
+          admin_role: null,
+          admin_permissions: {}
+        };
+        
+        // Update tokens to impersonated user's tokens
+        this.token = sessionData.access_token;
+        
+        // Update axios default headers
+        axios.defaults.headers.common['Authorization'] = `Bearer ${sessionData.access_token}`;
+        
+        // Store tokens in localStorage
+        localStorage.setItem('token', sessionData.access_token);
+        localStorage.setItem('refresh_token', sessionData.refresh_token);
+        localStorage.setItem('user', JSON.stringify(this.user));
+        
+        // Set impersonation state
+        this.isImpersonating = true;
+        this.impersonationSession = sessionData;
+        
+        // Store in localStorage for persistence including original tokens
+        localStorage.setItem('impersonation_session', JSON.stringify({
+          isImpersonating: true,
+          originalUser: this.originalUser,
+          originalToken: originalToken,
+          originalRefreshToken: originalRefreshToken,
+          impersonatedUser: this.user,
+          sessionData: sessionData
+        }));
+        
+        console.log('✅ Impersonation context switched to:', this.user.email);
+        console.log('✅ Using new JWT token for:', this.user.email);
+        
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to start impersonation:', error);
+        throw error;
+      }
+    },
+    
+    async endImpersonation() {
+      try {
+        // Get original tokens from impersonation session data
+        const impersonationData = localStorage.getItem('impersonation_session');
+        let originalToken = this.token;
+        let originalRefreshToken = localStorage.getItem('refresh_token');
+        
+        if (impersonationData) {
+          const data = JSON.parse(impersonationData);
+          originalToken = data.originalToken;
+          originalRefreshToken = data.originalRefreshToken;
+        }
+        
+        // Call backend to end session (using current impersonation token)
+        if (this.impersonationSession) {
+          await axios.post(`http://localhost:8000/api/admin/impersonation/${this.impersonationSession.session_id}/end/`, {
+            actions_performed: [], // Could track actions if needed
+            pages_accessed: [] // Could track pages if needed
+          });
+        }
+        
+        // Restore original admin user
+        if (this.originalUser) {
+          this.user = { ...this.originalUser };
+        }
+        
+        // Restore original tokens
+        this.token = originalToken;
+        axios.defaults.headers.common['Authorization'] = `Bearer ${originalToken}`;
+        localStorage.setItem('token', originalToken);
+        localStorage.setItem('refresh_token', originalRefreshToken);
+        localStorage.setItem('user', JSON.stringify(this.user));
+        
+        // Clear impersonation state
+        this.isImpersonating = false;
+        this.originalUser = null;
+        this.impersonationSession = null;
+        
+        // Clear localStorage
+        localStorage.removeItem('impersonation_session');
+        
+        console.log('✅ Impersonation ended, restored to:', this.user.email);
+        console.log('✅ Restored original JWT token for:', this.user.email);
+        
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to end impersonation:', error);
+        
+        // Even if backend fails, restore local state
+        const impersonationData = localStorage.getItem('impersonation_session');
+        if (impersonationData) {
+          const data = JSON.parse(impersonationData);
+          if (data.originalToken && data.originalUser) {
+            this.token = data.originalToken;
+            this.user = data.originalUser;
+            axios.defaults.headers.common['Authorization'] = `Bearer ${data.originalToken}`;
+            localStorage.setItem('token', data.originalToken);
+            localStorage.setItem('refresh_token', data.originalRefreshToken || '');
+            localStorage.setItem('user', JSON.stringify(data.originalUser));
+          }
+        }
+        
+        this.isImpersonating = false;
+        this.originalUser = null;
+        this.impersonationSession = null;
+        localStorage.removeItem('impersonation_session');
+        
+        throw error;
+      }
+    },
+    
+    // Restore impersonation state on app reload
+    restoreImpersonationState() {
+      try {
+        const impersonationData = localStorage.getItem('impersonation_session');
+        if (impersonationData) {
+          const data = JSON.parse(impersonationData);
+          if (data.isImpersonating) {
+            this.isImpersonating = true;
+            this.originalUser = data.originalUser;
+            this.user = data.impersonatedUser;
+            this.impersonationSession = data.sessionData;
+            
+            // Ensure we're using the impersonated user's token
+            if (data.sessionData && data.sessionData.access_token) {
+              this.token = data.sessionData.access_token;
+              axios.defaults.headers.common['Authorization'] = `Bearer ${data.sessionData.access_token}`;
+            }
+            
+            console.log('🔄 Restored impersonation state for:', this.user.email);
+            console.log('🔄 Using impersonated JWT token');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Failed to restore impersonation state:', error);
+        // Clear corrupted data
+        localStorage.removeItem('impersonation_session');
       }
     }
   }
