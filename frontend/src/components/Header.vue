@@ -46,6 +46,7 @@
             </a>
             <ul class="dropdown-menu" aria-labelledby="navbarUserDropdown">
               <li><a class="dropdown-item" href="/profile">Profile</a></li>
+              <li><a class="dropdown-item" href="/billing">Billing</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><button class="dropdown-item" @click="logout">Logout</button></li>
             </ul>
