@@ -48,29 +48,12 @@
               <button 
                 type="button" 
                 class="btn btn-outline-secondary btn-lg"
-                @click="showEmbeddedEmailLogin"
+                @click="loginWithEmail"
               >
                 Continue with Email
               </button>
             </div>
             
-            <!-- Embedded Auth0 Email Login -->
-            <div v-if="showEmailLogin" class="mt-4 p-4 border rounded">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Sign in with Email</h5>
-                <button type="button" class="btn-close" @click="showEmailLogin = false"></button>
-              </div>
-              <div class="text-center mb-3">
-                <div class="btn-group" role="group">
-                  <input type="radio" class="btn-check" name="authMode" id="loginMode" v-model="authMode" value="login" autocomplete="off">
-                  <label class="btn btn-outline-primary" for="loginMode">Sign In</label>
-                  
-                  <input type="radio" class="btn-check" name="authMode" id="registerMode" v-model="authMode" value="register" autocomplete="off">
-                  <label class="btn btn-outline-primary" for="registerMode">Sign Up</label>
-                </div>
-              </div>
-              <div id="auth0-lock-container"></div>
-            </div>
             
             <!-- Legacy Login Form (Collapsed) -->
             <div class="text-center">
@@ -118,55 +101,6 @@
   </main>
 </template>
 
-<style scoped>
-/* Hide Auth0 branding and customize embedded login */
-#auth0-lock-container >>> .auth0-lock-header-logo,
-#auth0-lock-container >>> .auth0-lock-header-avatar,
-#auth0-lock-container >>> .auth0-lock-header,
-#auth0-lock-container >>> .auth0-lock-badge-bottom {
-  display: none !important;
-}
-
-/* Hide signup-related elements */
-#auth0-lock-container >>> .auth0-lock-sign-up-terms,
-#auth0-lock-container >>> .auth0-lock-alternative-link,
-#auth0-lock-container >>> .auth0-lock-alternative,
-#auth0-lock-container >>> [data-auth0-lock-action="sign-up"],
-#auth0-lock-container >>> .auth0-lock-tabs,
-#auth0-lock-container >>> .auth0-lock-tab {
-  display: none !important;
-}
-
-/* Customize login button - remove icon and set text */
-#auth0-lock-container >>> .auth0-lock-submit .auth0-lock-submit-label::before {
-  display: none !important;  /* Hide any icon */
-}
-
-#auth0-lock-container >>> .auth0-lock-submit .auth0-lock-submit-label {
-  background-image: none !important;  /* Remove background icon */
-}
-
-#auth0-lock-container >>> .auth0-lock-submit {
-  background-image: none !important;  /* Remove button icon */
-}
-
-#auth0-lock-container >>> .auth0-lock-submit::before {
-  display: none !important;  /* Hide pseudo-element icons */
-}
-
-#auth0-lock-container >>> .auth0-lock {
-  box-shadow: none !important;
-  border: 1px solid #e7eaf3;
-}
-
-#auth0-lock-container >>> .auth0-lock-widget {
-  box-shadow: none !important;
-}
-
-#auth0-lock-container >>> .auth0-lock-form {
-  padding-top: 10px !important;
-}
-</style>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
@@ -182,9 +116,7 @@ const authStore = useAuthStore();
 const email = ref('');
 const password = ref('');
 const showLegacyLogin = ref(false); // Can be toggled based on environment or user role
-const showEmailLogin = ref(false);
-const authMode = ref('login'); // 'login' or 'register'
-let auth0Lock = null;
+// Removed embedded Auth0 Lock - using redirect approach
 
 // Frontend Auth0 login - redirect to Auth0 from frontend, callback to frontend
 const loginWithGoogle = () => {
@@ -209,78 +141,8 @@ const loginWithGoogle = () => {
   window.location.href = `https://${domain}/authorize?${params.toString()}`;
 };
 
-const showEmbeddedEmailLogin = () => {
-  // Set login flow in localStorage (will be updated based on authMode)
-  localStorage.setItem('auth0_flow', 'login');
-  showEmailLogin.value = true;
-  
-  // Dynamically load Auth0 Lock if not already loaded
-  if (!window.Auth0Lock) {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.auth0.com/js/lock/11.32.2/lock.min.js';
-    script.onload = initAuth0Lock;
-    document.head.appendChild(script);
-  } else {
-    initAuth0Lock();
-  }
-};
-
-const initAuth0Lock = () => {
-  const domain = import.meta.env.VITE_AUTH0_DOMAIN;
-  const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  
-  // Update localStorage based on current authMode
-  localStorage.setItem('auth0_flow', authMode.value === 'register' ? 'registration' : 'login');
-  
-  const isRegistrationMode = authMode.value === 'register';
-  
-  auth0Lock = new window.Auth0Lock(clientId, domain, {
-    container: 'auth0-lock-container',
-    auth: {
-      redirectUrl: 'http://localhost:3000/auth/callback',
-      responseType: 'code',
-      params: {
-        scope: 'openid profile email',
-        state: isRegistrationMode ? 'registration' : 'login'
-      }
-    },
-    allowedConnections: ['Username-Password-Authentication'],
-    socialButtonStyle: 'small',
-    allowSignUp: isRegistrationMode,  // Enable signup for registration mode
-    allowForgotPassword: !isRegistrationMode,  // Hide forgot password for registration
-    initialScreen: isRegistrationMode ? 'signUp' : 'login',  // Set initial screen based on mode
-    languageDictionary: {
-      title: '',
-      signUpTerms: '',  // Hide signup terms
-      databaseAlternativeSignUpInstructions: '',  // Hide signup instructions
-      loginSubmitLabel: isRegistrationMode ? 'Sign Up' : 'Sign In',
-      signUpSubmitLabel: 'Sign Up',
-      loginLabel: isRegistrationMode ? 'Sign Up' : 'Sign In'
-    },
-    theme: {
-      primaryColor: '#377dff',
-      logo: '',  // Hide Auth0 logo
-      labeledSubmitButton: false
-    },
-    avatar: null,
-    closable: false,
-    focusInput: true,
-    gravatar: false,
-    usernameStyle: 'email'
-  });
-  
-  auth0Lock.on('authenticated', (authResult) => {
-    console.log('Auth0 Lock authentication successful:', authResult);
-    // The callback will be handled by our existing Auth0CallbackSimple.vue
-    const stateParam = isRegistrationMode ? 'registration' : 'login';
-    window.location.href = `http://localhost:3000/auth/callback?code=${authResult.accessToken}&state=${stateParam}`;
-  });
-  
-  auth0Lock.show();
-};
 
 const loginWithEmail = () => {
-  // Fallback to redirect method if embedded fails
   console.log('🔍 Starting email-only login from frontend');
   // Set login flow in localStorage
   localStorage.setItem('auth0_flow', 'login');
@@ -297,7 +159,10 @@ const loginWithEmail = () => {
     state: 'login',
     prompt: 'login',
     connection: 'Username-Password-Authentication',
-    screen_hint: 'login'
+    screen_hint: 'login',
+    // Add custom branding parameters
+    ui_locales: 'en',
+    login_hint: '', // Could pre-fill email if needed
   });
   
   window.location.href = `https://${domain}/authorize?${params.toString()}`;
