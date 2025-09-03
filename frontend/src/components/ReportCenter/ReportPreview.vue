@@ -141,7 +141,7 @@
                       <div class="text-center">
                         <h1 class="display-4 mb-4">{{ previewItem?.name || 'Report Title' }}</h1>
                         <div class="mb-4">
-                          <img src="/images/logo-placeholder.png" alt="Logo" class="company-logo mb-3">
+                          <img src="/assets/img/logo.png" alt="Logo" class="company-logo mb-3">
                         </div>
                         <div class="client-info">
                           <h3 v-if="previewItem?.client_name">{{ previewItem.client_name }}</h3>
