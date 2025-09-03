@@ -566,3 +566,126 @@ docker compose -f docker/docker-compose.yml restart backend
 - **Clear visual feedback**: Loading states, progress bars, error messages
 - **Responsive design**: Works across different screen sizes and devices
 - **Accessibility**: Proper ARIA labels and keyboard navigation support
+
+## Billing System Implementation (September 2025)
+
+### Complete Stripe Integration for Subscription Management
+**Implemented comprehensive billing system with real-time Stripe API integration:**
+
+#### **Backend Implementation:**
+- **API Endpoints**: Complete set of billing management endpoints in `backend/core/billing_views.py`
+- **Live Stripe Data**: All subscription data pulled directly from Stripe API (no database caching)
+- **Dual Format Support**: Handles both old (plan-based) and new (items-based) Stripe subscription formats
+- **Comprehensive Error Handling**: Proper Stripe API error handling and logging
+
+#### **Key API Endpoints:**
+- `/api/billing/subscription/` - Get subscription details, invoices, and payment methods
+- `/api/billing/cancel-subscription/` - Cancel subscription at period end with reason tracking
+- `/api/billing/reactivate-subscription/` - Reactivate canceled subscriptions
+- `/api/billing/update-payment-method/` - Create setup intent for payment method updates
+- `/api/billing/download-invoice/<invoice_id>/` - Get invoice download URLs
+
+#### **Frontend Implementation:**
+- **Complete Billing Page**: `frontend/src/views/Billing.vue` with subscription overview, billing history, and actions
+- **Real-time Status Updates**: Live data fetched from Stripe on every page load
+- **Custom Vue Modal**: Implemented cancellation modal without Bootstrap JS dependencies
+- **Responsive Design**: Mobile-friendly layout with Bootstrap components
+
+#### **Key Features:**
+1. **Subscription Status Display:**
+   - Current plan details with pricing and billing cycle
+   - Payment method information with masked card details
+   - Subscription status badges with color coding
+   - Next billing date and period information
+
+2. **Cancellation System:**
+   - Modal-based cancellation with reason collection
+   - Immediate Stripe API updates with `cancel_at_period_end=true`
+   - Cancellation feedback tracking in Stripe metadata
+   - Visual indicators for pending cancellations
+
+3. **Billing History:**
+   - Last 12 invoices with status and amounts
+   - Direct PDF download links from Stripe
+   - Hosted invoice URLs for online viewing
+   - Invoice status tracking and display
+
+4. **Subscription Actions:**
+   - Cancel subscription with reason tracking
+   - Reactivate canceled subscriptions
+   - Update payment method (setup intent creation)
+   - Context-aware action buttons based on subscription state
+
+#### **Effective Status System:**
+- **Real-time Status Calculation**: Backend determines `effective_status` from live Stripe data
+- **Canceled Pending State**: Detects when subscription is active but set to cancel at period end
+- **Visual Indicators**: Prominent warning banner and status badge updates for pending cancellations
+- **Status Logic**:
+  ```python
+  effective_status = subscription.status
+  if subscription.status == 'active' and getattr(subscription, 'cancel_at_period_end', False):
+      effective_status = 'canceled_pending'
+  ```
+
+#### **User Experience Enhancements:**
+- **Cancellation Banner**: Prominent alert showing cancellation status and end date
+- **Status Badge Updates**: "CANCELED (ACTIVE UNTIL END)" for pending cancellations
+- **Action Button Logic**: Context-aware buttons based on subscription state
+- **Proper Z-index**: Ensures banners appear above navigation elements
+- **Debug Information**: Temporary debug section for development troubleshooting
+
+#### **Navigation Integration:**
+- **Header Dropdown**: Added "Billing" option to user dropdown menu in `frontend/src/components/Header.vue`
+- **Router Integration**: Added billing route with authentication requirements
+- **Protected Route**: Requires authentication to access billing information
+
+#### **Technical Implementation Details:**
+- **API Architecture**: RESTful endpoints following Django REST Framework patterns
+- **Authentication**: JWT token-based authentication for all billing endpoints
+- **Error Handling**: Comprehensive error handling for Stripe API failures
+- **Logging**: Detailed logging for debugging and audit trails
+- **Security**: Customer data verification to prevent unauthorized access
+
+#### **Stripe Data Flow:**
+1. **Frontend Request**: User visits billing page, frontend calls `/api/billing/subscription/`
+2. **Backend Processing**: Django authenticates user, retrieves Stripe subscription data
+3. **Live API Calls**: Fresh Stripe API calls for subscription, invoices, and payment methods
+4. **Status Calculation**: Backend calculates effective status from Stripe data
+5. **Response**: Structured JSON response with all billing information
+6. **Frontend Display**: Vue.js renders subscription details, history, and action buttons
+
+#### **Files Created/Modified:**
+- `backend/core/billing_views.py` - Complete billing API implementation
+- `backend/core/urls.py` - Added billing URL patterns
+- `frontend/src/views/Billing.vue` - Complete billing page component
+- `frontend/src/components/Header.vue` - Added billing dropdown option
+- `frontend/src/router/index.js` - Added billing route
+- `backend/core/management/commands/check_stripe_customer.py` - Stripe customer verification tool
+- `backend/core/management/commands/check_cancel_status.py` - Detailed cancellation status checker
+
+#### **Admin User Impersonation System Fixes:**
+- **Exit Impersonation**: Fixed `end_user_impersonation` endpoint to allow impersonated users to exit
+- **Banner Visibility**: Fixed z-index and condition issues with impersonation banner
+- **Permission Logic**: Removed admin requirement from exit endpoint while maintaining security
+- **Status Detection**: Fixed `isImpersonating` flag logic to use `originalUser` presence
+
+#### **Testing and Verification:**
+- **Stripe Integration**: Verified with live Stripe data for customer mark@irmaacertifiedplanner.com
+- **Cancellation Flow**: Tested cancel subscription functionality updates Stripe properly
+- **Status Detection**: Confirmed `cancel_at_period_end=true` properly detected and displayed
+- **API Endpoints**: All billing endpoints tested and working with proper authentication
+
+#### **Current Status:**
+- ✅ **Complete billing system implemented**
+- ✅ **Stripe integration working with live data**
+- ✅ **Cancellation system functional**
+- ✅ **Visual indicators for canceled subscriptions**
+- ✅ **Navigation integration complete**
+- ✅ **Admin impersonation system fixed**
+- 🔄 **Awaiting user testing of cancellation banner visibility**
+
+#### **Known Configuration:**
+- **Live Stripe Environment**: Using production Stripe keys
+- **Customer Verified**: mark@irmaacertifiedplanner.com exists in Stripe with active subscription
+- **Cancellation Confirmed**: Subscription shows `cancel_at_period_end=true` in Stripe
+- **API Data Flow**: Real-time data from Stripe API, no database caching

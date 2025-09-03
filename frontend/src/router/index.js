@@ -41,6 +41,7 @@ const routes = [
     children: [
       { path: 'dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
       { path: 'profile', name: 'UserProfile', component: UserProfile, meta: { requiresAuth: true } },
+      { path: 'billing', name: 'Billing', component: () => import('@/views/Billing.vue'), meta: { requiresAuth: true } },
       { path: 'clients', name: 'Clients', component: ClientList, meta: { requiresAuth: true } },
       { path: 'clients/create', name: 'ClientsCreate', component: ClientsCreate, meta: { requiresAuth: true } },
       { path: 'clients/:id', name: 'ClientDetail', component: () => import('@/views/ClientDetail.vue'), meta: { requiresAuth: true } },
@@ -86,6 +87,12 @@ const routes = [
         path: 'users', 
         name: 'AdminUsers', 
         component: () => import('@/views/Admin/AdminUsers.vue'), 
+        meta: { requiresAuth: true, requiresAdmin: true, adminSection: 'user_management' } 
+      },
+      { 
+        path: 'impersonation', 
+        name: 'AdminImpersonation', 
+        component: () => import('@/views/Admin/AdminImpersonation.vue'), 
         meta: { requiresAuth: true, requiresAdmin: true, adminSection: 'user_management' } 
       },
       { 

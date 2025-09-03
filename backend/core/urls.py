@@ -16,10 +16,15 @@ from .webhooks import stripe_webhook
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
 from .auth0_views import auth0_login_redirect, auth0_login_google, auth0_callback, auth0_logout, auth0_exchange_code, complete_professional_info, auth0_complete_registration, validate_coupon, embedded_signup, create_account
+from .billing_views import (
+    subscription_details, cancel_subscription, reactivate_subscription,
+    update_payment_method, download_invoice
+)
 from .admin_views import (
     admin_dashboard_stats, admin_user_list, update_user_admin_role, admin_analytics_overview, 
     admin_system_monitoring, admin_support_overview, start_user_impersonation, 
-    end_user_impersonation, get_active_impersonation_sessions, delete_user_complete,
+    end_user_impersonation, get_active_impersonation_sessions, get_impersonation_logs, 
+    get_impersonation_session_detail, delete_user_complete,
     admin_revenue_analytics, admin_recalculate_revenue_metrics, admin_user_engagement_analytics,
     admin_client_portfolio_analytics, admin_run_analytics_calculation, admin_billing_data,
     # Phase 2.3: System Performance Monitoring
@@ -231,6 +236,8 @@ urlpatterns = [
     path('admin/users/<int:user_id>/delete/', delete_user_complete, name='delete-user-complete'),
     path('admin/impersonation/<int:session_id>/end/', end_user_impersonation, name='end-user-impersonation'),
     path('admin/impersonation/active/', get_active_impersonation_sessions, name='get-active-impersonation-sessions'),
+    path('admin/impersonation/logs/', get_impersonation_logs, name='get-impersonation-logs'),
+    path('admin/impersonation/logs/<int:session_id>/', get_impersonation_session_detail, name='get-impersonation-session-detail'),
     path('admin/analytics/', admin_analytics_overview, name='admin-analytics-overview'),
     path('admin/monitoring/', admin_system_monitoring, name='admin-system-monitoring'),
     path('admin/support/', admin_support_overview, name='admin-support-overview'),
@@ -244,6 +251,13 @@ urlpatterns = [
     
     # Billing Management API endpoints
     path('admin/billing/', admin_billing_data, name='admin-billing-data'),
+    
+    # User Billing API endpoints  
+    path('billing/subscription/', subscription_details, name='billing-subscription'),
+    path('billing/cancel-subscription/', cancel_subscription, name='billing-cancel-subscription'),
+    path('billing/reactivate-subscription/', reactivate_subscription, name='billing-reactivate-subscription'),
+    path('billing/update-payment-method/', update_payment_method, name='billing-update-payment-method'),
+    path('billing/invoice/<str:invoice_id>/download/', download_invoice, name='billing-download-invoice'),
     
     # Phase 2.3: System Performance Monitoring
     path('admin/performance/metrics/', admin_performance_metrics, name='admin-performance-metrics'),

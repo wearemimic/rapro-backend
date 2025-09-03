@@ -162,6 +162,9 @@
                   <router-link v-if="canAccessSection('user_management')" class="nav-link" to="/admin/users">
                     <i class="bi-people nav-icon me-2"></i>User Management
                   </router-link>
+                  <router-link v-if="canAccessSection('user_management')" class="nav-link" to="/admin/impersonation">
+                    <i class="bi-person-check nav-icon me-2"></i>Impersonation Logs
+                  </router-link>
                   <router-link v-if="canAccessSection('analytics')" class="nav-link" to="/admin/analytics">
                     <i class="bi-bar-chart nav-icon me-2"></i>Analytics
                   </router-link>

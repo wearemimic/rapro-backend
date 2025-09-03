@@ -862,6 +862,247 @@ def get_active_impersonation_sessions(request):
         )
 
 
+@api_view(['GET'])
+@admin_required(section='user_management')
+def get_impersonation_logs(request):
+    """Get impersonation session history with filtering and pagination"""
+    from .models import UserImpersonationLog
+    from django.db.models import Q, Count, Avg
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    
+    try:
+        # Get query parameters
+        page = int(request.GET.get('page', 1))
+        per_page = min(int(request.GET.get('per_page', 25)), 100)  # Max 100 per page
+        admin_user_id = request.GET.get('admin_user_id')
+        target_user_id = request.GET.get('target_user_id')
+        is_active = request.GET.get('is_active')
+        flagged_only = request.GET.get('flagged_only') == 'true'
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        search = request.GET.get('search', '').strip()
+        
+        # Base queryset with related data
+        queryset = UserImpersonationLog.objects.select_related(
+            'admin_user', 'target_user', 'approved_by', 'reviewed_by'
+        ).order_by('-start_timestamp')
+        
+        # Apply filters
+        if admin_user_id:
+            queryset = queryset.filter(admin_user_id=admin_user_id)
+        
+        if target_user_id:
+            queryset = queryset.filter(target_user_id=target_user_id)
+            
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        if flagged_only:
+            queryset = queryset.filter(flagged_for_review=True)
+            
+        if date_from:
+            try:
+                from datetime import datetime
+                date_from_parsed = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                queryset = queryset.filter(start_timestamp__gte=date_from_parsed)
+            except ValueError:
+                pass
+                
+        if date_to:
+            try:
+                from datetime import datetime
+                date_to_parsed = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                queryset = queryset.filter(start_timestamp__lte=date_to_parsed)
+            except ValueError:
+                pass
+                
+        # Search in email addresses and reasons
+        if search:
+            queryset = queryset.filter(
+                Q(admin_user__email__icontains=search) |
+                Q(target_user_email__icontains=search) |
+                Q(reason__icontains=search)
+            )
+        
+        # Get total count before pagination
+        total_count = queryset.count()
+        
+        # Paginate
+        paginator = Paginator(queryset, per_page)
+        try:
+            sessions_page = paginator.page(page)
+        except PageNotAnInteger:
+            sessions_page = paginator.page(1)
+        except EmptyPage:
+            sessions_page = paginator.page(paginator.num_pages)
+        
+        # Serialize sessions
+        sessions_data = []
+        for session in sessions_page.object_list:
+            duration_minutes = None
+            if session.end_timestamp:
+                duration_minutes = int(
+                    (session.end_timestamp - session.start_timestamp).total_seconds() / 60
+                )
+            elif session.is_active:
+                duration_minutes = int(
+                    (timezone.now() - session.start_timestamp).total_seconds() / 60
+                )
+            
+            sessions_data.append({
+                'id': session.id,
+                'session_key': session.session_key,
+                'admin_user': {
+                    'id': session.admin_user.id if session.admin_user else None,
+                    'email': session.admin_user.email if session.admin_user else 'Deleted User',
+                    'name': f"{session.admin_user.first_name} {session.admin_user.last_name}".strip() if session.admin_user else 'Deleted User'
+                },
+                'target_user': {
+                    'id': session.target_user.id if session.target_user else None,
+                    'email': session.target_user_email,
+                    'name': f"{session.target_user.first_name} {session.target_user.last_name}".strip() if session.target_user else session.target_user_email
+                },
+                'start_timestamp': session.start_timestamp.isoformat(),
+                'end_timestamp': session.end_timestamp.isoformat() if session.end_timestamp else None,
+                'duration_minutes': duration_minutes,
+                'is_active': session.is_active,
+                'ip_address': session.ip_address,
+                'user_agent': session.user_agent,
+                'reason': session.reason,
+                'approved_by': {
+                    'id': session.approved_by.id if session.approved_by else None,
+                    'email': session.approved_by.email if session.approved_by else None,
+                    'name': f"{session.approved_by.first_name} {session.approved_by.last_name}".strip() if session.approved_by else None
+                } if session.approved_by else None,
+                'actions_count': len(session.actions_performed),
+                'pages_count': len(session.pages_accessed),
+                'risk_score': session.risk_score,
+                'flagged_for_review': session.flagged_for_review,
+                'reviewed_by': {
+                    'id': session.reviewed_by.id if session.reviewed_by else None,
+                    'email': session.reviewed_by.email if session.reviewed_by else None,
+                    'name': f"{session.reviewed_by.first_name} {session.reviewed_by.last_name}".strip() if session.reviewed_by else None
+                } if session.reviewed_by else None,
+                'review_notes': session.review_notes
+            })
+        
+        # Get summary statistics
+        active_sessions_count = UserImpersonationLog.objects.filter(is_active=True).count()
+        flagged_sessions_count = UserImpersonationLog.objects.filter(flagged_for_review=True).count()
+        total_sessions_today = UserImpersonationLog.objects.filter(
+            start_timestamp__date=timezone.now().date()
+        ).count()
+        
+        # Average session duration (completed sessions only)
+        avg_duration = UserImpersonationLog.objects.filter(
+            is_active=False,
+            end_timestamp__isnull=False
+        ).aggregate(
+            avg_duration=Avg(F('end_timestamp') - F('start_timestamp'))
+        )['avg_duration']
+        
+        avg_duration_minutes = None
+        if avg_duration:
+            avg_duration_minutes = int(avg_duration.total_seconds() / 60)
+        
+        return Response({
+            'sessions': sessions_data,
+            'pagination': {
+                'current_page': sessions_page.number,
+                'total_pages': paginator.num_pages,
+                'total_count': total_count,
+                'per_page': per_page,
+                'has_next': sessions_page.has_next(),
+                'has_previous': sessions_page.has_previous()
+            },
+            'summary_stats': {
+                'active_sessions': active_sessions_count,
+                'flagged_sessions': flagged_sessions_count,
+                'sessions_today': total_sessions_today,
+                'avg_duration_minutes': avg_duration_minutes
+            }
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch impersonation logs: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@admin_required(section='user_management')
+def get_impersonation_session_detail(request, session_id):
+    """Get detailed information about a specific impersonation session"""
+    from .models import UserImpersonationLog
+    
+    try:
+        session = UserImpersonationLog.objects.select_related(
+            'admin_user', 'target_user', 'approved_by', 'reviewed_by'
+        ).get(id=session_id)
+        
+        duration_minutes = None
+        if session.end_timestamp:
+            duration_minutes = int(
+                (session.end_timestamp - session.start_timestamp).total_seconds() / 60
+            )
+        elif session.is_active:
+            duration_minutes = int(
+                (timezone.now() - session.start_timestamp).total_seconds() / 60
+            )
+        
+        session_data = {
+            'id': session.id,
+            'session_key': session.session_key,
+            'admin_user': {
+                'id': session.admin_user.id if session.admin_user else None,
+                'email': session.admin_user.email if session.admin_user else 'Deleted User',
+                'name': f"{session.admin_user.first_name} {session.admin_user.last_name}".strip() if session.admin_user else 'Deleted User'
+            },
+            'target_user': {
+                'id': session.target_user.id if session.target_user else None,
+                'email': session.target_user_email,
+                'name': f"{session.target_user.first_name} {session.target_user.last_name}".strip() if session.target_user else session.target_user_email
+            },
+            'start_timestamp': session.start_timestamp.isoformat(),
+            'end_timestamp': session.end_timestamp.isoformat() if session.end_timestamp else None,
+            'duration_minutes': duration_minutes,
+            'is_active': session.is_active,
+            'ip_address': session.ip_address,
+            'user_agent': session.user_agent,
+            'reason': session.reason,
+            'approved_by': {
+                'id': session.approved_by.id if session.approved_by else None,
+                'email': session.approved_by.email if session.approved_by else None,
+                'name': f"{session.approved_by.first_name} {session.approved_by.last_name}".strip() if session.approved_by else None
+            } if session.approved_by else None,
+            'actions_performed': session.actions_performed,
+            'pages_accessed': session.pages_accessed,
+            'risk_score': session.risk_score,
+            'flagged_for_review': session.flagged_for_review,
+            'reviewed_by': {
+                'id': session.reviewed_by.id if session.reviewed_by else None,
+                'email': session.reviewed_by.email if session.reviewed_by else None,
+                'name': f"{session.reviewed_by.first_name} {session.reviewed_by.last_name}".strip() if session.reviewed_by else None
+            } if session.reviewed_by else None,
+            'review_notes': session.review_notes,
+            'compliance_data': session.compliance_data
+        }
+        
+        return Response(session_data)
+        
+    except UserImpersonationLog.DoesNotExist:
+        return Response(
+            {'error': 'Impersonation session not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch session details: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 # ============================================================================
 # Phase 2: Step 2.3 - System Performance Monitoring API Endpoints
 # ============================================================================
