@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia';
+import { API_CONFIG } from '@/config';
 import axios from 'axios';
 import router from '@/router';
 import { isTokenValid, isTokenExpiringSoon, getTokenExpirationInMinutes } from '@/utils/tokenUtils';
+import { API_CONFIG } from '@/config';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -155,7 +157,7 @@ export const useAuthStore = defineStore('auth', {
               const delay = Math.min(1000 * Math.pow(2, this.refreshAttempts - 1), 10000);
               await new Promise(resolve => setTimeout(resolve, delay));
 
-              const res = await axios.post('http://localhost:8000/api/token/refresh/', {
+              const res = await axios.post(`${API_CONFIG.API_URL}/token/refresh/`, {
                 refresh: localStorage.getItem('refresh_token'),
               });
 
@@ -229,7 +231,7 @@ export const useAuthStore = defineStore('auth', {
       console.log('Starting preemptive token refresh');
 
       try {
-        const res = await axios.post('http://localhost:8000/api/token/refresh/', {
+        const res = await axios.post(`${API_CONFIG.API_URL}/token/refresh/`, {
           refresh: refreshToken,
         });
 
@@ -308,7 +310,7 @@ export const useAuthStore = defineStore('auth', {
       this.error = null;
       try {
         console.log('Making request to backend with Auth0 token...');
-        const response = await axios.post('http://localhost:8000/api/auth0/login/', {
+        const response = await axios.post(`${API_CONFIG.API_URL}/auth0/login/', {
           auth0Token: auth0Token
         });
 
@@ -347,7 +349,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const response = await axios.post('http://localhost:8000/api/auth0/signup/', credentials);
+        const response = await axios.post(`${API_CONFIG.API_URL}/auth0/signup/', credentials);
         this.token = response.data.access;
         this.user = response.data.user;
         this.isAuth0 = true;
@@ -370,7 +372,7 @@ export const useAuthStore = defineStore('auth', {
     // User Management Functions
     async getUsers(params = {}) {
       try {
-        const response = await axios.get('http://localhost:8000/api/users/', { params });
+        const response = await axios.get(`${API_CONFIG.API_URL}/users/', { params });
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to fetch users');
@@ -379,7 +381,7 @@ export const useAuthStore = defineStore('auth', {
 
     async getUserById(userId) {
       try {
-        const response = await axios.get(`http://localhost:8000/api/users/${userId}/`);
+        const response = await axios.get(`${API_CONFIG.API_URL}/users/${userId}/`);
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to fetch user');
@@ -388,7 +390,7 @@ export const useAuthStore = defineStore('auth', {
 
     async updateUser(userId, userData) {
       try {
-        const response = await axios.put(`http://localhost:8000/api/users/${userId}/`, userData);
+        const response = await axios.put(`${API_CONFIG.API_URL}/users/${userId}/`, userData);
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to update user');
@@ -397,7 +399,7 @@ export const useAuthStore = defineStore('auth', {
 
     async deleteUser(userId) {
       try {
-        await axios.delete(`http://localhost:8000/api/users/${userId}/`);
+        await axios.delete(`${API_CONFIG.API_URL}/users/${userId}/`);
         return true;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to delete user');
@@ -406,7 +408,7 @@ export const useAuthStore = defineStore('auth', {
 
     async resetUserPassword(userId) {
       try {
-        const response = await axios.post(`http://localhost:8000/api/users/${userId}/reset-password/`);
+        const response = await axios.post(`${API_CONFIG.API_URL}/users/${userId}/reset-password/`);
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to reset password');
@@ -439,7 +441,7 @@ export const useAuthStore = defineStore('auth', {
       if (!this.token) return;
       try {
         console.log('Fetching profile with token:', this.token);
-        const response = await axios.get('http://localhost:8000/api/profile/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/profile/', {
           headers: { Authorization: `Bearer ${this.token}` }
         });
         console.log('Profile response:', response.data);
@@ -507,7 +509,7 @@ export const useAuthStore = defineStore('auth', {
       }
       
       try {
-        const response = await axios.put(`http://localhost:8000/api/admin/users/${userId}/admin-role/`, {
+        const response = await axios.put(`${API_CONFIG.API_URL}/admin/users/${userId}/admin-role/`, {
           admin_role: adminRole,
           admin_permissions: adminPermissions,
           is_platform_admin: !!adminRole
@@ -524,7 +526,7 @@ export const useAuthStore = defineStore('auth', {
       }
       
       try {
-        const response = await axios.get('http://localhost:8000/api/admin/stats/');
+        const response = await axios.get(`${API_CONFIG.API_URL}/admin/stats/');
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to fetch admin stats');
@@ -598,7 +600,7 @@ export const useAuthStore = defineStore('auth', {
         
         // Call backend to end session (using current impersonation token)
         if (this.impersonationSession) {
-          await axios.post(`http://localhost:8000/api/admin/impersonation/${this.impersonationSession.session_id}/end/`, {
+          await axios.post(`${API_CONFIG.API_URL}/admin/impersonation/${this.impersonationSession.session_id}/end/`, {
             actions_performed: [], // Could track actions if needed
             pages_accessed: [] // Could track pages if needed
           });

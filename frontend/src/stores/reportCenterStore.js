@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 import { useAuthStore } from './auth';
+import { API_CONFIG } from '@/config';
 
 export const useReportCenterStore = defineStore('reportCenter', {
   state: () => ({
@@ -106,7 +107,7 @@ export const useReportCenterStore = defineStore('reportCenter', {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
-        const response = await axios.get('http://localhost:8000/api/report-center/templates/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/report-center/templates/`, {
           headers,
           params: {
             page: this.templatesPagination.page,
@@ -200,7 +201,7 @@ export const useReportCenterStore = defineStore('reportCenter', {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
-        const response = await axios.get('http://localhost:8000/api/report-center/reports/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/report-center/reports/`, {
           headers,
           params: {
             page: this.reportsPagination.page,
@@ -234,7 +235,7 @@ export const useReportCenterStore = defineStore('reportCenter', {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
-        const response = await axios.post('http://localhost:8000/api/report-center/reports/', reportData, { headers });
+        const response = await axios.post(`${API_CONFIG.API_URL}/report-center/reports/`, reportData, { headers });
         this.reports.unshift(response.data);
         return response.data;
       } catch (error) {
@@ -283,7 +284,7 @@ export const useReportCenterStore = defineStore('reportCenter', {
           throw new Error('Report not found in local store');
         }
         
-        const response = await axios.post(`http://localhost:8000/api/report-center/reports/${reportId}/generate/`, {
+        const response = await axios.post(`${API_CONFIG.API_URL}/report-center/reports/${reportId}/generate/`, {
           format,
           client_id: report.client_id,
           scenario_ids: report.scenario_ids || [],
@@ -321,7 +322,7 @@ export const useReportCenterStore = defineStore('reportCenter', {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
-        const response = await axios.get(`http://localhost:8000/api/report-center/reports/${reportId}/status/`, { headers });
+        const response = await axios.get(`${API_CONFIG.API_URL}/report-center/reports/${reportId}/status/`, { headers });
         
         // Update local report data
         const reportIndex = this.reports.findIndex(r => r.id === reportId);
@@ -452,7 +453,7 @@ export const useReportCenterStore = defineStore('reportCenter', {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
         
-        const response = await axios.get(`http://localhost:8000/api/report-center/reports/${reportId}/download/?format=${format}`, {
+        const response = await axios.get(`${API_CONFIG.API_URL}/report-center/reports/${reportId}/download/?format=${format}`, {
           headers,
           responseType: 'blob' // Important for file downloads
         });

@@ -1,0 +1,98 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:logs:*:*:*",
+        "arn:aws:logs:us-east-1:794038228127:log-group:/aws/codebuild/rapro-prod-*",
+        "arn:aws:logs:us-east-1:794038228127:log-group:/aws/codebuild/rapro-prod-*:*"
+      ]
+    },
+    {
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:GetAuthorizationToken"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    },
+    {
+      "Action": [
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:ecr:us-east-1:794038228127:repository/rapro-prod-frontend",
+        "arn:aws:ecr:us-east-1:794038228127:repository/rapro-prod-backend"
+      ]
+    },
+    {
+      "Action": [
+        "s3:GetBucketAcl",
+        "s3:GetBucketLocation",
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:s3:::rapro-prod-codepipeline-artifacts",
+        "arn:aws:s3:::rapro-prod-codepipeline-artifacts/*",
+        "arn:aws:s3:::rapro-prod-static-assets",
+        "arn:aws:s3:::rapro-prod-static-assets/*"
+      ]
+    },
+    {
+      "Action": [
+        "ecs:DescribeTaskDefinition",
+        "ecs:RegisterTaskDefinition"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    },
+    {
+      "Action": [
+        "ecs:UpdateService",
+        "ecs:DescribeServices"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:ecs:us-east-1:794038228127:service/rapro-prod-cluster/rapro-prod-frontend",
+        "arn:aws:ecs:us-east-1:794038228127:service/rapro-prod-cluster/rapro-prod-backend",
+        "arn:aws:ecs:us-east-1:794038228127:service/rapro-prod-cluster/rapro-prod-celery-worker",
+        "arn:aws:ecs:us-east-1:794038228127:service/rapro-prod-cluster/rapro-prod-celery-beat"
+      ]
+    },
+    {
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:iam::794038228127:role/rapro-prod-ecs-task-execution-role",
+        "arn:aws:iam::794038228127:role/rapro-prod-ecs-task-role"
+      ]
+    },
+    {
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:ssm:us-east-1:794038228127:parameter/rapro-prod/*"
+    }
+  ]
+}

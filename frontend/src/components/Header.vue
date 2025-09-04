@@ -70,6 +70,7 @@ import { useAuthStore } from '@/stores/auth';
 import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue3-toastify'; // or whatever toast lib you're using
 import 'vue3-toastify/dist/index.css';
+import { API_CONFIG } from '@/config';
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -147,11 +148,11 @@ const customLogoUrl = computed(() => {
   if (logo.startsWith('http://') || logo.startsWith('https://')) {
     url = logo;
   } else if (logo.startsWith('/media/')) {
-    url = `http://localhost:8000${logo}`;
+    url = `${API_CONFIG.BASE_URL}${logo}`;
   } else if (logo.startsWith('logos/')) {
-    url = `http://localhost:8000/media/${logo}`;
+    url = `${API_CONFIG.BASE_URL}/media/${logo}`;
   } else {
-    url = `http://localhost:8000/media/${logo}`;
+    url = `${API_CONFIG.BASE_URL}/media/${logo}`;
   }
   
   // Add cache-busting query param with a unique timestamp

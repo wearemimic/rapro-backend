@@ -303,6 +303,7 @@
 <script>
 import { ref, onMounted, nextTick, computed } from 'vue';
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 import { Chart, registerables } from 'chart.js';
 
 Chart.register(...registerables);
@@ -331,7 +332,7 @@ export default {
         loading.value = true;
         error.value = null;
         
-        const response = await axios.get('http://localhost:8000/api/admin/monitoring/');
+        const response = await axios.get('${API_CONFIG.API_URL}/admin/monitoring/');
         systemData.value = response.data;
         
         // Use the events from the API response

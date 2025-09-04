@@ -327,6 +327,7 @@ import axios from 'axios'
 import { hasCRMAccess } from '@/utils/permissions'
 import ActivityStream from '@/components/CRM/ActivityStream.vue'
 import TaskList from '@/components/TaskList.vue'
+import { API_CONFIG } from '@/config'
 // TestChart removed
 
 const token = localStorage.getItem('token')
@@ -412,7 +413,7 @@ export default {
         this.isLoading = true
         this.error = null
         try {
-            const response = await axios.get('http://localhost:8000/api/clients/') // ← simpler, no params yet
+            const response = await axios.get(`${API_CONFIG.API_URL}/clients/`) // ← simpler, no params yet
             this.clients = response.data
             console.log('Fetched clients:', this.clients.length)  // Debug
         } catch (err) {
@@ -494,7 +495,7 @@ export default {
       
       this.searchLoading = true;
       try {
-        const response = await axios.get('http://localhost:8000/api/clients/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/clients/`, {
           params: {
             search: this.clientSearchQuery,
             limit: 10 // Limit search results
@@ -532,7 +533,7 @@ export default {
     async loadRecentTasks() {
       this.tasksLoading = true;
       try {
-        const response = await axios.get('http://localhost:8000/api/tasks/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/tasks/`, {
           params: {
             limit: 5,
             ordering: '-created_at'

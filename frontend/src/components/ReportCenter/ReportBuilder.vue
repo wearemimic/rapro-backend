@@ -549,6 +549,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useReportCenterStore } from '@/stores/reportCenterStore'
 import axios from 'axios'
+import { API_CONFIG } from '@/config'
 
 export default {
   name: 'ReportBuilder',
@@ -583,8 +584,8 @@ export default {
         const token = localStorage.getItem('token')
         console.log('🔑 Token exists:', !!token)
         const headers = { Authorization: `Bearer ${token}` }
-        console.log('📡 Making API call to http://localhost:8000/api/clients/')
-        const response = await axios.get('http://localhost:8000/api/clients/', { headers })
+        console.log('📡 Making API call to ${API_CONFIG.API_URL}/clients/')
+        const response = await axios.get('${API_CONFIG.API_URL}/clients/', { headers })
         console.log('📥 API Response:', response.status, response.data)
         availableClients.value = response.data || []
         console.log('👥 Available clients count:', availableClients.value.length)
@@ -610,7 +611,7 @@ export default {
         
         // Fetch client detail which includes scenarios
         console.log('📡 Fetching client details with scenarios...')
-        const response = await axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers })
+        const response = await axios.get(`${API_CONFIG.API_URL}/clients/${clientId}/`, { headers })
         console.log('📥 Client detail response:', response.data)
         
         const scenarios = response.data?.scenarios || []

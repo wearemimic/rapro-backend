@@ -328,6 +328,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import axios from 'axios'
+import { API_CONFIG } from '@/config'
 import { formatCurrencyDisplay } from '../utils/currencyFormatter'
 
 const props = defineProps({
@@ -499,7 +500,7 @@ const fetchFederalStandardDeduction = async () => {
     const token = localStorage.getItem('access_token')
     const headers = token ? { Authorization: `Bearer ${token}` } : {}
     
-    const response = await axios.get('http://localhost:8000/api/tax/federal-standard-deduction/', {
+    const response = await axios.get(`${API_CONFIG.API_URL}/tax/federal-standard-deduction/`, {
       params: {
         filing_status: props.clientTaxStatus
       },

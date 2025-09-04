@@ -1,0 +1,307 @@
+{
+    "pipeline": {
+        "name": "rapro-prod-pipeline",
+        "roleArn": "arn:aws:iam::794038228127:role/rapro-prod-codepipeline-role",
+        "artifactStore": {
+            "type": "S3",
+            "location": "rapro-prod-codepipeline-artifacts"
+        },
+        "stages": [
+            {
+                "name": "Source",
+                "actions": [
+                    {
+                        "name": "GitHub_Source",
+                        "actionTypeId": {
+                            "category": "Source",
+                            "owner": "ThirdParty",
+                            "provider": "GitHub",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "Branch": "main",
+                            "OAuthToken": "****",
+                            "Owner": "wearemimic",
+                            "Repo": "retirementadvisorpro"
+                        },
+                        "outputArtifacts": [
+                            {
+                                "name": "source_output"
+                            }
+                        ],
+                        "inputArtifacts": []
+                    }
+                ]
+            },
+            {
+                "name": "Build",
+                "actions": [
+                    {
+                        "name": "Build_Frontend",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ProjectName": "rapro-prod-frontend-build"
+                        },
+                        "outputArtifacts": [
+                            {
+                                "name": "frontend_build_output"
+                            }
+                        ],
+                        "inputArtifacts": [
+                            {
+                                "name": "source_output"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Build_Backend",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ProjectName": "rapro-prod-backend-build"
+                        },
+                        "outputArtifacts": [
+                            {
+                                "name": "backend_build_output"
+                            }
+                        ],
+                        "inputArtifacts": [
+                            {
+                                "name": "source_output"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Deploy_to_Staging",
+                "actions": [
+                    {
+                        "name": "Deploy_Frontend_Staging",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "ECS",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ClusterName": "rapro-prod-staging",
+                            "FileName": "imagedefinitions.json",
+                            "ServiceName": "rapro-prod-frontend-staging"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "frontend_build_output"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Deploy_Backend_Staging",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "ECS",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ClusterName": "rapro-prod-staging",
+                            "FileName": "imagedefinitions.json",
+                            "ServiceName": "rapro-prod-backend-staging"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "backend_build_output"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Deploy_Celery_Staging",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "ECS",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ClusterName": "rapro-prod-staging",
+                            "FileName": "imagedefinitions_celery.json",
+                            "ServiceName": "rapro-prod-celery-worker-staging"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "backend_build_output"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Test_Staging",
+                "actions": [
+                    {
+                        "name": "Run_Integration_Tests",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ProjectName": "rapro-prod-integration-tests"
+                        },
+                        "outputArtifacts": [
+                            {
+                                "name": "test_output"
+                            }
+                        ],
+                        "inputArtifacts": [
+                            {
+                                "name": "source_output"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Approve_Production_Deployment",
+                "actions": [
+                    {
+                        "name": "Manual_Approval",
+                        "actionTypeId": {
+                            "category": "Approval",
+                            "owner": "AWS",
+                            "provider": "Manual",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "CustomData": "Please review staging deployment and approve for production. Staging URL: https://rapro-prod-staging-573782540.us-east-1.elb.amazonaws.com",
+                            "NotificationArn": "arn:aws:sns:us-east-1:794038228127:rapro-prod-pipeline-approval"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": []
+                    }
+                ]
+            },
+            {
+                "name": "Deploy_to_Production",
+                "actions": [
+                    {
+                        "name": "Deploy_Frontend_Production",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "ECS",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ClusterName": "rapro-prod-cluster",
+                            "FileName": "imagedefinitions.json",
+                            "ServiceName": "rapro-prod-frontend"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "frontend_build_output"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Deploy_Backend_Production",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "ECS",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ClusterName": "rapro-prod-cluster",
+                            "FileName": "imagedefinitions.json",
+                            "ServiceName": "rapro-prod-backend"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "backend_build_output"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Deploy_Celery_Production",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "ECS",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ClusterName": "rapro-prod-cluster",
+                            "FileName": "imagedefinitions_celery.json",
+                            "ServiceName": "rapro-prod-celery-worker"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "backend_build_output"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Validate_Production",
+                "actions": [
+                    {
+                        "name": "Smoke_Tests",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ProjectName": "rapro-prod-smoke-tests"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "source_output"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "version": 1,
+        "executionMode": "SUPERSEDED",
+        "pipelineType": "V1"
+    },
+    "metadata": {
+        "pipelineArn": "arn:aws:codepipeline:us-east-1:794038228127:rapro-prod-pipeline",
+        "created": "2025-09-03T13:07:56.979000-04:00",
+        "updated": "2025-09-03T13:07:56.979000-04:00"
+    }
+}

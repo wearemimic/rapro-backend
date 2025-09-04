@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useAuthStore } from './auth';
+import { API_CONFIG } from '@/config';
 
 export const useRegistrationStore = defineStore('registration', () => {
   const registrationData = ref({
@@ -57,7 +58,7 @@ export const useRegistrationStore = defineStore('registration', () => {
       };
 
       // Send registration request to backend
-      const response = await fetch('http://localhost:8000/api/register-advisor/', {
+      const response = await fetch('${API_CONFIG.API_URL}/register-advisor/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

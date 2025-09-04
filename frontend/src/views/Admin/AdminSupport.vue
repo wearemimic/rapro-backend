@@ -327,6 +327,7 @@
 <script>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 
 export default {
   name: 'AdminSupport',
@@ -350,7 +351,7 @@ export default {
         loading.value = true;
         error.value = null;
         
-        const response = await axios.get('http://localhost:8000/api/admin/support/');
+        const response = await axios.get('${API_CONFIG.API_URL}/admin/support/');
         supportData.value = response.data;
         
         // Set recent issues from the API response

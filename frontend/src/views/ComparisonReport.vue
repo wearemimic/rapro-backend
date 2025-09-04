@@ -188,6 +188,8 @@
 </template>
 
 <script>
+import { API_CONFIG } from '@/config'
+
 export default {
   name: 'ComparisonReport',
   data() {
@@ -253,7 +255,7 @@ export default {
       }
 
       try {
-        const response = await fetch(`http://localhost:8000/api/clients/${this.clientId}/`, {
+        const response = await fetch(`${API_CONFIG.API_URL}/clients/${this.clientId}/`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -279,7 +281,7 @@ export default {
       if (!token || !this.clientId) return;
       
       try {
-        const response = await fetch(`http://localhost:8000/api/clients/${this.clientId}/comparison-preferences/`, {
+        const response = await fetch(`${API_CONFIG.API_URL}/clients/${this.clientId}/comparison-preferences/`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -306,7 +308,7 @@ export default {
       if (!token || !this.clientId) return;
       
       try {
-        await fetch(`http://localhost:8000/api/clients/${this.clientId}/comparison-preferences/`, {
+        await fetch(`${API_CONFIG.API_URL}/clients/${this.clientId}/comparison-preferences/`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -333,7 +335,7 @@ export default {
       }
 
       const token = localStorage.getItem('token');
-      const url = `http://localhost:8000/api/scenarios/${scenarioId}/comparison-data/`;
+      const url = `${API_CONFIG.API_URL}/scenarios/${scenarioId}/comparison-data/`;
       console.log(`📞 Making API call to: ${url}`);
       console.log(`🔑 Using token: ${token ? 'Present' : 'Missing'}`);
       

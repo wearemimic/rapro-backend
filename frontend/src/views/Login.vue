@@ -107,6 +107,7 @@ import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { clearAuthData, initAuthState, storeAuthState } from '@/utils/authHelper';
+import { API_CONFIG } from '@/config';
 // Removed Auth0 Vue SDK import - using Django backend endpoints
 
 const router = useRouter();
@@ -126,7 +127,7 @@ const loginWithGoogle = () => {
   
   const domain = import.meta.env.VITE_AUTH0_DOMAIN;
   const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  const callbackUrl = 'http://localhost:3000/auth/callback';
+  const callbackUrl = `${API_CONFIG.FRONTEND_URL}/auth/callback`;
   
   const params = new URLSearchParams({
     response_type: 'code',
@@ -149,7 +150,7 @@ const loginWithEmail = () => {
   
   const domain = import.meta.env.VITE_AUTH0_DOMAIN;
   const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  const callbackUrl = 'http://localhost:3000/auth/callback';
+  const callbackUrl = `${API_CONFIG.FRONTEND_URL}/auth/callback`;
   
   const params = new URLSearchParams({
     response_type: 'code',
@@ -175,7 +176,7 @@ const loginWithFacebook = () => {
   
   const domain = import.meta.env.VITE_AUTH0_DOMAIN;
   const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  const callbackUrl = 'http://localhost:3000/auth/callback';
+  const callbackUrl = `${API_CONFIG.FRONTEND_URL}/auth/callback`;
   
   const params = new URLSearchParams({
     response_type: 'code',
@@ -197,7 +198,7 @@ const loginWithApple = () => {
   
   const domain = import.meta.env.VITE_AUTH0_DOMAIN;
   const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  const callbackUrl = 'http://localhost:3000/auth/callback';
+  const callbackUrl = `${API_CONFIG.FRONTEND_URL}/auth/callback`;
   
   const params = new URLSearchParams({
     response_type: 'code',
@@ -215,7 +216,7 @@ const loginWithApple = () => {
 const handleLegacyLogin = async () => {
   try {
     // Call traditional login endpoint directly for legacy users
-    const response = await fetch('http://localhost:8000/api/login/', {
+    const response = await fetch(`${API_CONFIG.API_URL}/login/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

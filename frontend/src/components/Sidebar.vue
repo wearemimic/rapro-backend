@@ -216,6 +216,7 @@ import { useCommunicationStore } from '@/stores/communicationStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useCalendarStore } from '@/stores/calendarStore';
 import { hasCRMAccess } from '@/utils/permissions';
+import { API_CONFIG } from '@/config';
 
 export default {
   name: 'Sidebar',
@@ -450,7 +451,7 @@ export default {
       const headers = { Authorization: `Bearer ${token}` };
       
       // Fetch client data which includes scenarios
-      fetch(`http://localhost:8000/api/clients/${this.currentClientId}/`, { headers })
+      fetch(`${API_CONFIG.API_URL}/clients/${this.currentClientId}/`, { headers })
         .then(response => response.json())
         .then(data => {
           if (data && data.scenarios) {

@@ -383,6 +383,7 @@
 
 <script>
 import axios from 'axios'
+import { API_CONFIG } from '@/config'
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -506,7 +507,7 @@ export default {
         console.log('Loading client and scenario data...');
         
         // First, load client data to get scenarios
-        const clientResponse = await axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers });
+        const clientResponse = await axios.get(`${API_CONFIG.API_URL}/clients/${clientId}/`, { headers });
         this.client = clientResponse.data;
         this.scenarios = clientResponse.data.scenarios || [];
         this.scenario = this.scenarios.find(s => s.id === parseInt(scenarioId));
@@ -608,7 +609,7 @@ export default {
           return;
         }
         
-        const response = await fetch(`http://localhost:8000/api/scenarios/${this.scenario.id}/update/`, {
+        const response = await fetch(`${API_CONFIG.API_URL}/scenarios/${this.scenario.id}/update/`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -846,7 +847,7 @@ export default {
       // Use clientId from route params (not from scenario.client)
       const clientId = this.$route.params.id;
       if (clientId) {
-        axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers })
+        axios.get(`${API_CONFIG.API_URL}/clients/${clientId}/`, { headers })
           .then(response => {
             this.client = response.data;
             this.scenarios = response.data.scenarios || [];
@@ -876,7 +877,7 @@ export default {
         this.chartInstance = null;
       }
       
-      axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/calculate/`, { headers })
+      axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/calculate/`, { headers })
         .then(response => {
           console.log('🎯 SCENARIO_DEBUG [SCENARIO_DETAIL]: API response length:', response.data?.length);
           if (response.data && response.data.length) {
@@ -906,7 +907,7 @@ export default {
       
       console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: fetchScenarioDetails called for scenario:', scenarioId);
       
-      axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/detail/`, { headers })
+      axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/detail/`, { headers })
         .then(response => {
           console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Detailed scenario data received:', response.data);
           console.log('🔍 SS2_DEBUG [SCENARIO_DETAIL]: Income sources in response:', response.data?.income_sources?.length || 0);
@@ -983,7 +984,7 @@ export default {
       
       // Send update to backend
       axios.put(
-        `http://localhost:8000/api/scenarios/${scenarioId}/update-percentages/`,
+        `${API_CONFIG.API_URL}/scenarios/${scenarioId}/update-percentages/`,
         {
           income_vs_cost_percent: incomeVsCostPercent,
           medicare_irmaa_percent: medicareIrmaaPercent
@@ -1146,7 +1147,7 @@ export default {
     },
     fetchAssetDetails() {
       const scenarioId = this.$route.params.scenarioid;
-      axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/assets/`, { headers })
+      axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/assets/`, { headers })
         .then(response => {
           this.assetDetails = response.data;
           console.log('Asset Details:', this.assetDetails);
@@ -1193,7 +1194,7 @@ export default {
 
         const newSharingState = !this.scenario.share_with_client;
         
-        const response = await fetch(`http://localhost:8000/api/scenarios/${this.scenario.id}/toggle-sharing/`, {
+        const response = await fetch(`${API_CONFIG.API_URL}/scenarios/${this.scenario.id}/toggle-sharing/`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1243,7 +1244,7 @@ export default {
         }
         
         // Start async calculation
-        const response = await axios.post(`http://localhost:8000/api/scenarios/${scenarioId}/calculate-async/`, {}, { 
+        const response = await axios.post(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/calculate-async/`, {}, { 
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
@@ -1271,7 +1272,7 @@ export default {
       if (!this.currentTaskId) return;
       
       try {
-        const response = await axios.get(`http://localhost:8000/api/tasks/${this.currentTaskId}/status/`, {
+        const response = await axios.get(`${API_CONFIG.API_URL}/tasks/${this.currentTaskId}/status/`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
@@ -1334,7 +1335,7 @@ export default {
       if (!this.currentTaskId) return;
       
       try {
-        await axios.delete(`http://localhost:8000/api/tasks/${this.currentTaskId}/cancel/`, {
+        await axios.delete(`${API_CONFIG.API_URL}/tasks/${this.currentTaskId}/cancel/`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',

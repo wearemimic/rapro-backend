@@ -355,6 +355,7 @@
 
 <script>
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 import Sortable from 'sortablejs';
 import { useCommunicationStore } from '@/stores/communicationStore';
 import { hasCRMAccess } from '@/utils/permissions';
@@ -413,7 +414,7 @@ export default {
       }
       
       try {
-        const response = await axios.get(`http://localhost:8000/api/clients/${id}/`, { headers });
+        const response = await axios.get(`${API_CONFIG.API_URL}/clients/${id}/`, { headers });
         this.client = response.data;
         await this.loadUnreadCount();
         await this.fetchClientTasks();
@@ -440,7 +441,7 @@ export default {
         }
         
         console.log('Fetching client data for ID:', id)
-        const response = await axios.get(`http://localhost:8000/api/clients/${id}/`, { headers });
+        const response = await axios.get(`${API_CONFIG.API_URL}/clients/${id}/`, { headers });
         console.log('API response:', response.data)
         this.client = response.data;
         console.log('Client data reloaded, portal_access_enabled:', this.client.portal_access_enabled);
@@ -513,7 +514,7 @@ export default {
       this.loadingTasks = true;
       try {
         console.log('Fetching tasks for client:', this.client.id);
-        const response = await axios.get(`http://localhost:8000/api/tasks/?client=${this.client.id}`);
+        const response = await axios.get(`${API_CONFIG.API_URL}/tasks/?client=${this.client.id}`);
         console.log('Client tasks response:', response.data);
         this.clientTasks = response.data || [];
       } catch (error) {

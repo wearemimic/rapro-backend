@@ -187,6 +187,7 @@ import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import * as d3 from 'd3';
 import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
+import { API_CONFIG } from '@/config';
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
 
@@ -428,7 +429,7 @@ export default {
       try {
         const token = localStorage.getItem('access_token');
         const response = await fetch(
-          `http://localhost:8000/api/tax/irmaa-thresholds/?filing_status=${filingStatus}&start_year=${startYear}&end_year=${endYear}`,
+          `${API_CONFIG.API_URL}/tax/irmaa-thresholds/?filing_status=${filingStatus}&start_year=${startYear}&end_year=${endYear}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,

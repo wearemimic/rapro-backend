@@ -129,6 +129,7 @@
 
 <script>
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 
 export default {
   name: "ClientEdit",
@@ -227,7 +228,7 @@ export default {
       const headers = { Authorization: `Bearer ${token}` };
 
       try {
-        const response = await axios.get(`http://localhost:8000/api/clients/${clientId}/`, { headers });
+        const response = await axios.get(`${API_CONFIG.API_URL}/clients/${clientId}/`, { headers });
         this.form = {
           ...response.data,
           spouse_first_name: response.data.spouse?.first_name || "",
@@ -286,7 +287,7 @@ export default {
       }
 
       try {
-        await axios.patch(`http://localhost:8000/api/clients/${clientId}/edit/`, payload, { headers });
+        await axios.patch(`${API_CONFIG.API_URL}/clients/${clientId}/edit/`, payload, { headers });
         this.$router.push(`/clients/${clientId}`);
       } catch (error) {
         if (error.response?.data) {

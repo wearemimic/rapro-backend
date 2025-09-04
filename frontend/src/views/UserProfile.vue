@@ -191,6 +191,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { API_CONFIG } from '@/config'
 import { useToast } from 'vue-toastification'
 import ImageDropzone from '../components/ImageDropzone.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -226,7 +227,7 @@ const successMessage = ref('')
 const errorMessage = ref('')
 
 // API base URL - change this to match your environment
-const apiBaseUrl = 'http://localhost:8000/api'
+const apiBaseUrl = API_CONFIG.API_URL
 
 // Helper to get token
 const getAuthHeaders = (isMultipart = false) => {

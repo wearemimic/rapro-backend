@@ -555,6 +555,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 import { v4 as uuidv4 } from 'uuid';
 import InvestmentModal from '../components/InvestmentModal.vue';
 import ScenarioHeader from '../components/ScenarioHeader.vue';
@@ -811,7 +812,7 @@ async function loadClientData() {
   if (clientData.value) return; // Already loaded
   
   try {
-    const response = await axios.get(`http://localhost:8000/api/clients/${clientId}/`);
+    const response = await axios.get(`${API_CONFIG.API_URL}/clients/${clientId}/`);
     const client = response.data;
     clientData.value = client;
     console.log('ScenarioCreate: Client data loaded for age calculations:', {
@@ -827,7 +828,7 @@ async function loadClientData() {
 async function loadMedicareInflationRates() {
   try {
     const token = localStorage.getItem('token');
-    const response = await axios.get(`http://localhost:8000/api/medicare/inflation-rates/`, {
+    const response = await axios.get(`${API_CONFIG.API_URL}/medicare/inflation-rates/`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     medicareInflationRates.value = response.data.inflation_rates;
@@ -976,11 +977,11 @@ async function submitScenario() {
       // Update existing scenario - only in edit mode
       console.log("💰 INCOME_EDIT: Updating existing scenario with ID:", isEditMode);
       console.log("💰 INCOME_EDIT: About to make PUT request with payload:", payload);
-      console.log("💰 INCOME_EDIT: URL:", `http://localhost:8000/api/scenarios/${isEditMode}/update/`);
+      console.log("💰 INCOME_EDIT: URL:", `${API_CONFIG.API_URL}/scenarios/${isEditMode}/update/`);
       
       try {
         response = await axios.put(
-          `http://localhost:8000/api/scenarios/${isEditMode}/update/`,
+          `${API_CONFIG.API_URL}/scenarios/${isEditMode}/update/`,
           payload
         );
         console.log("💰 INCOME_EDIT: ✅ PUT request successful:", response.data);
@@ -997,7 +998,7 @@ async function submitScenario() {
         console.log("✨ Creating new scenario from scratch");
       }
       response = await axios.post(
-        `http://localhost:8000/api/clients/${clientId}/scenarios/create/`,
+        `${API_CONFIG.API_URL}/clients/${clientId}/scenarios/create/`,
         payload
       );
     }
@@ -1071,7 +1072,7 @@ async function loadScenarioForDuplication(scenarioId) {
   try {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/edit/?mode=duplicate`, { headers });
+    const response = await axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/edit/?mode=duplicate`, { headers });
     const scenarioData = response.data;
     
     // Define investment account types
@@ -1115,7 +1116,7 @@ async function loadScenarioForEditing(scenarioId) {
   try {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
-    const response = await axios.get(`http://localhost:8000/api/scenarios/${scenarioId}/edit/?mode=edit`, { headers });
+    const response = await axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/edit/?mode=edit`, { headers });
     const scenarioData = response.data;
     
     // Define investment account types

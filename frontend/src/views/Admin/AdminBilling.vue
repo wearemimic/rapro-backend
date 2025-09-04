@@ -270,6 +270,7 @@
 <script>
 import { ref, onMounted, nextTick } from 'vue';
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 import { Chart, registerables } from 'chart.js';
 
 Chart.register(...registerables);
@@ -302,7 +303,7 @@ export default {
         
         // Fetch billing-specific data from dedicated endpoint
         const token = localStorage.getItem('access_token');
-        const response = await axios.get('http://localhost:8000/api/admin/billing/', {
+        const response = await axios.get('${API_CONFIG.API_URL}/admin/billing/', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

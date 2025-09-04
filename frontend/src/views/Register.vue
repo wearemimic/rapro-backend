@@ -601,6 +601,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useRegistrationStore } from '@/stores/registration';
 import { useAuthStore } from '@/stores/auth';
+import { API_CONFIG } from '@/config';
 
 const router = useRouter();
 const registrationStore = useRegistrationStore();
@@ -1160,7 +1161,7 @@ const initAuth0RegisterLock = () => {
       auth0RegisterLock = new window.Auth0Lock(clientId, domain, {
         container: 'auth0-register-lock-container',
         auth: {
-          redirectUrl: 'http://localhost:3000/auth/callback',
+          redirectUrl: `${API_CONFIG.FRONTEND_URL}/auth/callback`,
           responseType: 'code',
           params: {
             scope: 'openid profile email'
@@ -1185,7 +1186,7 @@ const initAuth0RegisterLock = () => {
       auth0RegisterLock.on('authenticated', (authResult) => {
         console.log('✅ Auth0 Lock authenticated:', authResult);
         // The callback will be handled by our existing Auth0CallbackSimple.vue
-        window.location.href = `http://localhost:3000/auth/callback?code=${authResult.accessToken}&state=registration`;
+        window.location.href = `${API_CONFIG.FRONTEND_URL}/auth/callback?code=${authResult.accessToken}&state=registration`;
       });
       
       // Handle unrecoverable errors
@@ -1259,7 +1260,7 @@ const signupWithAuth0 = async (connection) => {
     // Build Auth0 authorization URL for registration
     const domain = import.meta.env.VITE_AUTH0_DOMAIN;
     const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-    const callbackUrl = 'http://localhost:3000/auth/callback';
+    const callbackUrl = `${API_CONFIG.FRONTEND_URL}/auth/callback`;
     
     // Generate state parameter for security
     const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));

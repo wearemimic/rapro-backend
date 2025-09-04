@@ -450,6 +450,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { API_CONFIG } from '@/config'
 
 // Reactive data
 const loading = ref(false)
@@ -542,7 +543,7 @@ const fetchSessions = async (page = 1) => {
     if (filters.value.flagged_only) params.append('flagged_only', 'true')
     if (searchTerm.value.trim()) params.append('search', searchTerm.value.trim())
 
-    const response = await axios.get(`http://localhost:8000/api/admin/impersonation/logs/?${params}`)
+    const response = await axios.get(`${API_CONFIG.API_URL}/admin/impersonation/logs/?${params}`)
     const data = response.data
 
     sessions.value = data.sessions
@@ -559,7 +560,7 @@ const fetchSessions = async (page = 1) => {
 
 const fetchActiveSessions = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/admin/impersonation/active/')
+    const response = await axios.get('${API_CONFIG.API_URL}/admin/impersonation/active/')
     activeSessions.value = response.data.active_sessions
   } catch (error) {
     console.error('Failed to fetch active sessions:', error)
@@ -568,7 +569,7 @@ const fetchActiveSessions = async () => {
 
 const viewSessionDetail = async (sessionId) => {
   try {
-    const response = await axios.get(`http://localhost:8000/api/admin/impersonation/logs/${sessionId}/`)
+    const response = await axios.get(`${API_CONFIG.API_URL}/admin/impersonation/logs/${sessionId}/`)
     selectedSession.value = response.data
     showDetailModal.value = true
   } catch (error) {
@@ -581,7 +582,7 @@ const endSession = async (sessionId) => {
   if (!confirm('Are you sure you want to end this impersonation session?')) return
 
   try {
-    await axios.post(`http://localhost:8000/api/admin/impersonation/${sessionId}/end/`)
+    await axios.post(`${API_CONFIG.API_URL}/admin/impersonation/${sessionId}/end/`)
     alert('Session ended successfully')
     await refreshData()
     if (showDetailModal.value && selectedSession.value?.id === sessionId) {

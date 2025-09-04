@@ -362,6 +362,7 @@ import { useAuthStore } from '@/stores/auth';
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+import { API_CONFIG } from '@/config';
 
 export default {
   name: 'AdminUsers',
@@ -416,7 +417,7 @@ export default {
           status: filters.value.status
         };
         
-        const response = await axios.get('http://localhost:8000/api/admin/users/', { params });
+        const response = await axios.get('${API_CONFIG.API_URL}/admin/users/', { params });
         
         users.value = response.data.users;
         pagination.value = {
@@ -556,7 +557,7 @@ export default {
       try {
         roleFormLoading.value = true;
         
-        await axios.put(`http://localhost:8000/api/admin/users/${selectedUser.value.id}/admin-role/`, {
+        await axios.put(`${API_CONFIG.API_URL}/admin/users/${selectedUser.value.id}/admin-role/`, {
           admin_role: roleForm.value.is_platform_admin ? roleForm.value.admin_role : '',
           admin_permissions: roleForm.value.admin_permissions,
           is_platform_admin: roleForm.value.is_platform_admin
@@ -601,7 +602,7 @@ export default {
       
       try {
         // Start impersonation session
-        const response = await axios.post(`http://localhost:8000/api/admin/users/${user.id}/impersonate/`, {
+        const response = await axios.post(`${API_CONFIG.API_URL}/admin/users/${user.id}/impersonate/`, {
           reason: reason.trim()
         });
         
@@ -689,7 +690,7 @@ export default {
       
       try {
         // Call backend API to delete user from both Django and Auth0
-        await axios.delete(`http://localhost:8000/api/admin/users/${user.id}/delete/`);
+        await axios.delete(`${API_CONFIG.API_URL}/admin/users/${user.id}/delete/`);
         
         // Show success message
         alert(`User ${user.email} has been permanently deleted from both Django and Auth0.`);
