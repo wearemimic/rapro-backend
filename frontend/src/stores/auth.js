@@ -310,7 +310,7 @@ export const useAuthStore = defineStore('auth', {
       this.error = null;
       try {
         console.log('Making request to backend with Auth0 token...');
-        const response = await axios.post(`${API_CONFIG.API_URL}/auth0/login/', {
+        const response = await axios.post(`${API_CONFIG.API_URL}/auth0/login/`, {
           auth0Token: auth0Token
         });
 
@@ -372,7 +372,7 @@ export const useAuthStore = defineStore('auth', {
     // User Management Functions
     async getUsers(params = {}) {
       try {
-        const response = await axios.get(`${API_CONFIG.API_URL}/users/', { params });
+        const response = await axios.get(`${API_CONFIG.API_URL}/users/`, { params });
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to fetch users');
@@ -441,7 +441,7 @@ export const useAuthStore = defineStore('auth', {
       if (!this.token) return;
       try {
         console.log('Fetching profile with token:', this.token);
-        const response = await axios.get(`${API_CONFIG.API_URL}/profile/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/profile/`, {
           headers: { Authorization: `Bearer ${this.token}` }
         });
         console.log('Profile response:', response.data);
@@ -526,7 +526,7 @@ export const useAuthStore = defineStore('auth', {
       }
       
       try {
-        const response = await axios.get(`${API_CONFIG.API_URL}/admin/stats/');
+        const response = await axios.get(`${API_CONFIG.API_URL}/admin/stats/`);
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.message || 'Failed to fetch admin stats');

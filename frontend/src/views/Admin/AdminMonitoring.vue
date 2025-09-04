@@ -332,7 +332,7 @@ export default {
         loading.value = true;
         error.value = null;
         
-        const response = await axios.get('${API_CONFIG.API_URL}/admin/monitoring/');
+        const response = await axios.get(`${API_CONFIG.API_URL}/admin/monitoring/`);
         systemData.value = response.data;
         
         // Use the events from the API response

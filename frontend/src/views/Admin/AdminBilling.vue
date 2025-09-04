@@ -303,7 +303,7 @@ export default {
         
         // Fetch billing-specific data from dedicated endpoint
         const token = localStorage.getItem('access_token');
-        const response = await axios.get('${API_CONFIG.API_URL}/admin/billing/', {
+        const response = await axios.get(`${API_CONFIG.API_URL}/admin/billing/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

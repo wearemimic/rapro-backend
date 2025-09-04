@@ -58,7 +58,7 @@ export const useRegistrationStore = defineStore('registration', () => {
       };
 
       // Send registration request to backend
-      const response = await fetch('${API_CONFIG.API_URL}/register-advisor/', {
+      const response = await fetch(`${API_CONFIG.API_URL}/register-advisor/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

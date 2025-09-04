@@ -417,7 +417,7 @@ export default {
           status: filters.value.status
         };
         
-        const response = await axios.get('${API_CONFIG.API_URL}/admin/users/', { params });
+        const response = await axios.get(`${API_CONFIG.API_URL}/admin/users/`, { params });
         
         users.value = response.data.users;
         pagination.value = {

@@ -308,7 +308,7 @@ const fetchBillingData = async () => {
   loading.value = true
   try {
     console.log('📡 Making API call to /api/billing/subscription/')
-    const response = await axios.get('${API_CONFIG.API_URL}/billing/subscription/')
+    const response = await axios.get(`${API_CONFIG.API_URL}/billing/subscription/`)
     console.log('✅ API response received:', response.status, response.data)
     const data = response.data
     
@@ -351,7 +351,7 @@ const confirmCancelSubscription = () => {
 const cancelSubscription = async () => {
   cancelling.value = true
   try {
-    await axios.post('${API_CONFIG.API_URL}/billing/cancel-subscription/', {
+    await axios.post(`${API_CONFIG.API_URL}/billing/cancel-subscription/`, {
       reason: cancelReason.value,
       feedback: cancelFeedback.value
     })
@@ -373,7 +373,7 @@ const cancelSubscription = async () => {
 // Reactivate subscription
 const reactivateSubscription = async () => {
   try {
-    await axios.post('${API_CONFIG.API_URL}/billing/reactivate-subscription/')
+    await axios.post(`${API_CONFIG.API_URL}/billing/reactivate-subscription/`)
     await fetchBillingData()
     alert('Your subscription has been reactivated successfully.')
   } catch (error) {

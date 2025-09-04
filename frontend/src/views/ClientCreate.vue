@@ -254,7 +254,7 @@ export default {
         // 🧪 Log payload before sending
         console.log("Payload being sent:", payload);
 
-        const response = await axios.post("${API_CONFIG.API_URL}/clients/create/", payload, { headers });
+        const response = await axios.post(`${API_CONFIG.API_URL}/clients/create/`, payload, { headers });
         this.$router.push(`/clients/${response.data.id}`);
       } catch (error) {
         // 🧪 Log backend response clearly

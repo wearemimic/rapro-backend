@@ -560,7 +560,7 @@ const fetchSessions = async (page = 1) => {
 
 const fetchActiveSessions = async () => {
   try {
-    const response = await axios.get('${API_CONFIG.API_URL}/admin/impersonation/active/')
+    const response = await axios.get(`${API_CONFIG.API_URL}/admin/impersonation/active/`)
     activeSessions.value = response.data.active_sessions
   } catch (error) {
     console.error('Failed to fetch active sessions:', error)

@@ -351,7 +351,7 @@ export default {
         loading.value = true;
         error.value = null;
         
-        const response = await axios.get('${API_CONFIG.API_URL}/admin/support/');
+        const response = await axios.get(`${API_CONFIG.API_URL}/admin/support/`);
         supportData.value = response.data;
         
         // Set recent issues from the API response
