@@ -349,7 +349,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const response = await axios.post(`${API_CONFIG.API_URL}/auth0/signup/', credentials);
+        const response = await axios.post(`${API_CONFIG.API_URL}/auth0/signup/`, credentials);
         this.token = response.data.access;
         this.user = response.data.user;
         this.isAuth0 = true;
