@@ -3,7 +3,6 @@ import { API_CONFIG } from '@/config';
 import axios from 'axios';
 import router from '@/router';
 import { isTokenValid, isTokenExpiringSoon, getTokenExpirationInMinutes } from '@/utils/tokenUtils';
-import { API_CONFIG } from '@/config';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
