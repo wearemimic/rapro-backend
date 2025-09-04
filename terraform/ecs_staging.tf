@@ -408,6 +408,12 @@ resource "aws_ecs_task_definition" "backend_staging" {
           value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
         },
         
+        # Frontend URL for redirects
+        {
+          name  = "FRONTEND_URL"
+          value = "http://${aws_lb.staging.dns_name}"
+        },
+        
         # Auth0 Configuration
         {
           name  = "AUTH0_DOMAIN"

@@ -281,6 +281,12 @@ resource "aws_ecs_task_definition" "backend" {
           value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
         },
         
+        # Frontend URL for redirects
+        {
+          name  = "FRONTEND_URL"
+          value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
+        },
+        
         # Auth0 Configuration
         {
           name  = "AUTH0_DOMAIN"
@@ -519,6 +525,12 @@ resource "aws_ecs_task_definition" "celery_worker" {
         {
           name  = "CELERY_RESULT_BACKEND"
           value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+        },
+        
+        # Frontend URL for redirects
+        {
+          name  = "FRONTEND_URL"
+          value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
         },
         
         # Auth0 Configuration

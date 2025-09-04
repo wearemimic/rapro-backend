@@ -89,12 +89,12 @@ def auth0_callback(request):
         error_description = request.GET.get('error_description', 'Unknown error')
         print(f"❌ Auth0 error: {error} - {error_description}")
         # Redirect to frontend with error
-        frontend_url = f'http://localhost:3000/login?error={quote(f"{error}: {error_description}")}'
+        frontend_url = f'{settings.FRONTEND_URL}/login?error={quote(f"{error}: {error_description}")}'
         return redirect(frontend_url)
     
     if not code:
         print("❌ No authorization code received")
-        frontend_url = 'http://localhost:3000/login?error=no_code'
+        frontend_url = f'{settings.FRONTEND_URL}/login?error=no_code'
         return redirect(frontend_url)
     
     try:
@@ -121,7 +121,7 @@ def auth0_callback(request):
         if token_response.status_code != 200:
             print(f"❌ Token exchange failed: {token_response.status_code}")
             print(f"Response: {token_response.text}")
-            frontend_url = f'http://localhost:3000/login?error=token_exchange_failed'
+            frontend_url = ff'{settings.FRONTEND_URL}/login?error=token_exchange_failed'
             return redirect(frontend_url)
         
         tokens = token_response.json()
@@ -134,7 +134,7 @@ def auth0_callback(request):
         
         if userinfo_response.status_code != 200:
             print(f"❌ Failed to get user info: {userinfo_response.status_code}")
-            frontend_url = f'http://localhost:3000/login?error=user_info_failed'
+            frontend_url = ff'{settings.FRONTEND_URL}/login?error=user_info_failed'
             return redirect(frontend_url)
         
         user_info = userinfo_response.json()
@@ -143,7 +143,7 @@ def auth0_callback(request):
         
         if not email:
             print("❌ No email in user info")
-            frontend_url = 'http://localhost:3000/login?error=no_email'
+            frontend_url = f'{settings.FRONTEND_URL}/login?error=no_email'
             return redirect(frontend_url)
         
         # Check if Django user already exists with active subscription
@@ -180,7 +180,7 @@ def auth0_callback(request):
                 
                 # Redirect to frontend with tokens and user data
                 frontend_url = (
-                    f'http://localhost:3000/auth/success?'
+                    ff'{settings.FRONTEND_URL}/auth/success?'
                     f'access_token={jwt_tokens["access"]}&'
                     f'refresh_token={jwt_tokens["refresh"]}&'
                     f'user={quote(json.dumps(user_data))}'
@@ -190,14 +190,14 @@ def auth0_callback(request):
             else:
                 print(f"❌ Existing user without active subscription: {email}")
                 # Redirect to registration to complete payment
-                frontend_url = f'http://localhost:3000/register?email={quote(email)}&social_login=true&message=Please complete your subscription to access the platform'
+                frontend_url = ff'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&message=Please complete your subscription to access the platform'
                 return redirect(frontend_url)
                 
         except User.DoesNotExist:
             print(f"🔄 New social login user needs to complete registration: {email}")
             # SECURITY: New users must complete registration with payment
             # Store their Auth0 info temporarily and redirect to registration
-            frontend_url = f'http://localhost:3000/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&auth0_sub={quote(user_info.get("sub", ""))}'
+            frontend_url = ff'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&auth0_sub={quote(user_info.get("sub", ""))}'
             print(f"✅ Redirecting new user to complete registration: {frontend_url[:100]}...")
             return redirect(frontend_url)
         
@@ -205,7 +205,7 @@ def auth0_callback(request):
         print(f"❌ Auth0 callback error: {str(e)}")
         import traceback
         print(f"❌ Full traceback: {traceback.format_exc()}")
-        frontend_url = f'http://localhost:3000/login?error={quote(str(e))}'
+        frontend_url = ff'{settings.FRONTEND_URL}/login?error={quote(str(e))}'
         return redirect(frontend_url)
 
 @api_view(['GET'])
@@ -216,7 +216,7 @@ def auth0_logout(request):
     """
     domain = settings.AUTH0_DOMAIN
     client_id = settings.AUTH0_CLIENT_ID
-    return_url = 'http://localhost:3000/login'
+    return_url = f'{settings.FRONTEND_URL}/login'
     
     logout_params = {
         'client_id': client_id,
@@ -242,7 +242,7 @@ def auth0_exchange_code(request):
             return Response({'message': 'Authorization code is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Use the same redirect_uri that was used in the authorization request
-        redirect_uri = 'http://localhost:3000/auth/callback'
+        redirect_uri = f'{settings.FRONTEND_URL}/auth/callback'
         
         print(f"Exchanging authorization code for {flow_type} flow: {code[:10]}...")
         

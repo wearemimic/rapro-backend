@@ -77,19 +77,35 @@ MIDDLEWARE = [
     'core.performance_middleware.SystemHealthMonitoringMiddleware',
 ]
 
+# Get frontend URL from environment
+FRONTEND_BASE_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
+    FRONTEND_BASE_URL,
+    "http://localhost:3000",  # Keep for local dev
 ]
 
 # For CORS headers (if using the django-cors-headers package)
 CORS_ALLOWED_ORIGINS = [
+    FRONTEND_BASE_URL,
     "http://localhost:5173",  # Vite default development server
     "http://localhost:8080",
-    "http://localhost:3000",  # <-- added for frontend dev server
+    "http://localhost:3000",  # Keep for local dev
     "http://192.168.1.83:5173",  # Local IP with Vite
     "http://192.168.1.83:8080",
     "http://192.168.1.83:3000",
 ]
+
+# Add staging/production URLs if configured
+if os.environ.get('ALLOWED_HOSTS'):
+    additional_origins = os.environ.get('ALLOWED_HOSTS').split(',')
+    for origin in additional_origins:
+        if origin and not origin.startswith('localhost'):
+            # Add both http and https versions
+            CORS_ALLOWED_ORIGINS.append(f"http://{origin}")
+            CORS_ALLOWED_ORIGINS.append(f"https://{origin}")
+            CSRF_TRUSTED_ORIGINS.append(f"http://{origin}")
+            CSRF_TRUSTED_ORIGINS.append(f"https://{origin}")
 
 CORS_ALLOW_CREDENTIALS = True
 
