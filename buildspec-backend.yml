@@ -1,0 +1,32 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo Pre-build started on `date`
+      - echo Setting up Docker buildx for multi-platform builds...
+      - docker buildx create --use --name multiarch --driver docker-container || true
+      - docker buildx inspect --bootstrap
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building Django Docker image for linux/amd64...
+      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend -t $IMAGE_REPO_NAME:$IMAGE_TAG --load .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing Docker image to ECR...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - printf '[{"name":"backend","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"name":"celery-worker","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions_celery.json
+      - cat imagedefinitions.json
+      - cat imagedefinitions_celery.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - imagedefinitions_celery.json
+  name: backend-build-$(date +%Y-%m-%d)
