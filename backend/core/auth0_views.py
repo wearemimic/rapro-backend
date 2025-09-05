@@ -121,7 +121,7 @@ def auth0_callback(request):
         if token_response.status_code != 200:
             print(f"❌ Token exchange failed: {token_response.status_code}")
             print(f"Response: {token_response.text}")
-            frontend_url = ff'{settings.FRONTEND_URL}/login?error=token_exchange_failed'
+            frontend_url = f'{settings.FRONTEND_URL}/login?error=token_exchange_failed'
             return redirect(frontend_url)
         
         tokens = token_response.json()
@@ -134,7 +134,7 @@ def auth0_callback(request):
         
         if userinfo_response.status_code != 200:
             print(f"❌ Failed to get user info: {userinfo_response.status_code}")
-            frontend_url = ff'{settings.FRONTEND_URL}/login?error=user_info_failed'
+            frontend_url = f'{settings.FRONTEND_URL}/login?error=user_info_failed'
             return redirect(frontend_url)
         
         user_info = userinfo_response.json()
@@ -180,7 +180,7 @@ def auth0_callback(request):
                 
                 # Redirect to frontend with tokens and user data
                 frontend_url = (
-                    ff'{settings.FRONTEND_URL}/auth/success?'
+                    f'{settings.FRONTEND_URL}/auth/success?'
                     f'access_token={jwt_tokens["access"]}&'
                     f'refresh_token={jwt_tokens["refresh"]}&'
                     f'user={quote(json.dumps(user_data))}'
@@ -190,14 +190,14 @@ def auth0_callback(request):
             else:
                 print(f"❌ Existing user without active subscription: {email}")
                 # Redirect to registration to complete payment
-                frontend_url = ff'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&message=Please complete your subscription to access the platform'
+                frontend_url = f'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&message=Please complete your subscription to access the platform'
                 return redirect(frontend_url)
                 
         except User.DoesNotExist:
             print(f"🔄 New social login user needs to complete registration: {email}")
             # SECURITY: New users must complete registration with payment
             # Store their Auth0 info temporarily and redirect to registration
-            frontend_url = ff'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&auth0_sub={quote(user_info.get("sub", ""))}'
+            frontend_url = f'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&auth0_sub={quote(user_info.get("sub", ""))}'
             print(f"✅ Redirecting new user to complete registration: {frontend_url[:100]}...")
             return redirect(frontend_url)
         
@@ -205,7 +205,7 @@ def auth0_callback(request):
         print(f"❌ Auth0 callback error: {str(e)}")
         import traceback
         print(f"❌ Full traceback: {traceback.format_exc()}")
-        frontend_url = ff'{settings.FRONTEND_URL}/login?error={quote(str(e))}'
+        frontend_url = f'{settings.FRONTEND_URL}/login?error={quote(str(e))}'
         return redirect(frontend_url)
 
 @api_view(['GET'])
