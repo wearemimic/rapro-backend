@@ -488,6 +488,15 @@ WEBP_ENABLED = os.environ.get('WEBP_ENABLED', 'True').lower() == 'true'
 # LOGGING CONFIGURATION
 # =============================================================================
 
+# Determine if we should use file logging (only in development)
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+USE_FILE_LOGGING = os.path.exists(LOG_DIR) and not os.environ.get('USE_S3', False)
+
+# Build handlers list dynamically
+LOG_HANDLERS = ['console']
+if USE_FILE_LOGGING:
+    LOG_HANDLERS.append('file')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -508,7 +517,7 @@ LOGGING = {
         },
         'file': {
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
+            'filename': os.path.join(BASE_DIR, 'logs', 'django.log') if USE_FILE_LOGGING else '/dev/null',
             'formatter': 'verbose',
         },
     },
@@ -518,22 +527,22 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': LOG_HANDLERS,
             'level': 'INFO',
             'propagate': False,
         },
         'celery': {
-            'handlers': ['console', 'file'],
+            'handlers': LOG_HANDLERS,
             'level': 'INFO',
             'propagate': False,
         },
         'celery.tasks': {
-            'handlers': ['console', 'file'],
+            'handlers': LOG_HANDLERS,
             'level': 'INFO',
             'propagate': False,
         },
         'core.services': {
-            'handlers': ['console', 'file'],
+            'handlers': LOG_HANDLERS,
             'level': 'INFO',
             'propagate': False,
         },
