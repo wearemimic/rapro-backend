@@ -39,9 +39,9 @@ RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     chown -R nginx:nginx /etc/nginx/conf.d && \
-    touch /var/run/nginx.pid && \
-    chown nginx:nginx /var/run/nginx.pid && \
-    chmod 755 /tmp
+    mkdir -p /var/run/nginx && \
+    chown -R nginx:nginx /var/run/nginx && \
+    chmod -R 755 /var/run/nginx
 
 # Switch to non-root user
 USER nginx
