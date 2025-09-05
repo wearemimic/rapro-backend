@@ -114,6 +114,8 @@ workflow_router.register(r'admin/search', SearchViewSet, basename='search')
 workflow_router.register(r'admin/search/filter-presets', FilterPresetViewSet, basename='filterpreset')
 
 urlpatterns = [
+    # Health check endpoint for ECS load balancer
+    path('health/', lambda request: HttpResponse('OK', status=200), name='health'),
     path('logout/', logout_view, name='logout'),
     path('register/', register_view, name='register'),
     path('profile/', profile_view, name='profile'),
