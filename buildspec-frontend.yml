@@ -19,7 +19,8 @@ phases:
         else
           API_URL="https://rapro.retirementadvisorpro.com"
         fi
-      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$API_URL --load .
+      - echo "Using production Dockerfile with nginx for better stability"
+      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$API_URL --load .
       - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
   post_build:
     commands:
