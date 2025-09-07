@@ -260,6 +260,77 @@
                   </button>
                 </div>
                 
+                <!-- Filter Controls -->
+                <div class="card mb-3">
+                  <div class="card-body">
+                    <div class="row align-items-end">
+                      <div class="col-md-3">
+                        <label class="form-label">Search</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          placeholder="Search tasks..."
+                          v-model="taskFilters.search"
+                        >
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" v-model="taskFilters.status">
+                          <option value="">All Tasks</option>
+                          <option value="active">All Active</option>
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" v-model="taskFilters.priority">
+                          <option value="">All Priority</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label">Sort By</label>
+                        <select class="form-select" v-model="taskSortBy">
+                          <option value="-created_at">Newest First</option>
+                          <option value="created_at">Oldest First</option>
+                          <option value="due_date">Due Date</option>
+                          <option value="-due_date">Due Date (Desc)</option>
+                          <option value="priority">Priority</option>
+                          <option value="title">Title A-Z</option>
+                          <option value="-title">Title Z-A</option>
+                        </select>
+                      </div>
+                      <div class="col-md-2">
+                        <div class="form-check mt-4">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="overdueOnly"
+                            v-model="taskFilters.overdue"
+                          >
+                          <label class="form-check-label" for="overdueOnly">
+                            Overdue Only
+                          </label>
+                        </div>
+                      </div>
+                      <div class="col-md-1">
+                        <button 
+                          class="btn btn-outline-secondary w-100 mt-4"
+                          @click="clearFilters"
+                          title="Clear Filters"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 <div v-if="loadingTasks" class="text-center py-4">
                   <div class="spinner-border" role="status">
                     <span class="visually-hidden">Loading tasks...</span>
@@ -274,45 +345,83 @@
                   </button>
                 </div>
                 
+                <div v-else-if="filteredAndSortedTasks.length === 0" class="text-center py-4 text-muted">
+                  <i class="bi bi-funnel display-1"></i>
+                  <p class="mt-2">No tasks match your filters</p>
+                  <button @click="clearFilters" class="btn btn-outline-secondary">
+                    Clear Filters
+                  </button>
+                </div>
+                
                 <div v-else>
-                  <div class="row">
-                    <div class="col-md-4" v-for="status in ['pending', 'in_progress', 'completed']" :key="status">
-                      <div class="card mb-3">
-                        <div class="card-header">
-                          <h6 class="mb-0 text-capitalize">{{ status.replace('_', ' ') }}</h6>
-                          <small class="text-muted">{{ getTasksByStatus(status).length }} tasks</small>
-                        </div>
-                        <div class="card-body p-2">
-                          <div v-for="task in getTasksByStatus(status)" :key="task.id" 
-                               class="card mb-2 task-card">
-                            <div class="card-body p-2">
-                              <h6 class="card-title mb-1">{{ task.title }}</h6>
-                              <p class="card-text small text-muted mb-1">{{ task.description }}</p>
-                              <div class="d-flex justify-content-between align-items-center">
-                                <span class="badge" :class="getPriorityClass(task.priority)">
-                                  {{ task.priority }}
-                                </span>
-                                <div class="btn-group" role="group">
-                                  <button @click="editTask(task)" class="btn btn-sm btn-outline-secondary">
-                                    <i class="bi bi-pencil"></i>
-                                  </button>
-                                  <button v-if="task.status !== 'completed'" 
-                                          @click="markTaskComplete(task)" 
-                                          class="btn btn-sm btn-outline-success">
-                                    <i class="bi bi-check"></i>
-                                  </button>
-                                </div>
+                  <!-- Task count and results info -->
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">
+                      Showing {{ filteredAndSortedTasks.length }} of {{ clientTasks.length }} tasks
+                    </small>
+                  </div>
+                  
+                  <!-- Task List Table -->
+                  <div class="card">
+                    <div class="table-responsive">
+                      <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                          <tr>
+                            <th scope="col" style="width: 40%">Task</th>
+                            <th scope="col" style="width: 15%">Status</th>
+                            <th scope="col" style="width: 15%">Priority</th>
+                            <th scope="col" style="width: 15%">Due Date</th>
+                            <th scope="col" style="width: 15%">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="task in filteredAndSortedTasks" :key="task.id" 
+                              class="task-row"
+                              :class="{ 'table-danger-light': task.is_overdue }">
+                            <td>
+                              <div>
+                                <h6 class="mb-0" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
+                                  {{ task.title }}
+                                </h6>
+                                <small class="text-muted">{{ truncateText(task.description, 100) }}</small>
                               </div>
-                              <div v-if="task.due_date" class="mt-1">
-                                <small class="text-muted">
-                                  <i class="bi bi-calendar"></i> 
-                                  Due: {{ formatDate(task.due_date) }}
-                                </small>
+                            </td>
+                            <td>
+                              <span class="badge" :class="getStatusBadgeClass(task.status)">
+                                {{ getStatusLabel(task.status) }}
+                              </span>
+                            </td>
+                            <td>
+                              <span class="badge" :class="getPriorityClass(task.priority)">
+                                {{ task.priority || 'Medium' }}
+                              </span>
+                            </td>
+                            <td>
+                              <small>{{ task.due_date ? formatDate(task.due_date) : '-' }}</small>
+                            </td>
+                            <td>
+                              <div class="btn-group" role="group">
+                                <button @click="editTask(task)" 
+                                        class="btn btn-sm btn-outline-secondary" 
+                                        title="Edit Task">
+                                  <i class="bi bi-pencil"></i>
+                                </button>
+                                <button v-if="task.status !== 'completed'" 
+                                        @click="markTaskComplete(task)" 
+                                        class="btn btn-sm btn-outline-success"
+                                        title="Mark Complete">
+                                  <i class="bi bi-check"></i>
+                                </button>
+                                <button @click="deleteTask(task)" 
+                                        class="btn btn-sm btn-outline-danger"
+                                        title="Delete Task">
+                                  <i class="bi bi-trash"></i>
+                                </button>
                               </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
@@ -389,6 +498,14 @@ export default {
       showTaskForm: false,
       selectedTask: null,
       clientDocumentCount: 0,
+      // Task filtering
+      taskFilters: {
+        search: '',
+        status: 'active',  // Default to showing only active tasks
+        priority: '',
+        overdue: false
+      },
+      taskSortBy: '-created_at'
     };
   },
   computed: {
@@ -400,6 +517,12 @@ export default {
       } catch (error) {
         return hasCRMAccess(null);
       }
+    },
+    
+    filteredAndSortedTasks() {
+      // Backend now handles all filtering and sorting
+      // Just return the tasks as-is since they're already filtered by the API
+      return this.clientTasks;
     }
   },
   async created() {
@@ -516,8 +639,29 @@ export default {
       
       this.loadingTasks = true;
       try {
-        console.log('Fetching tasks for client:', this.client.id);
-        const response = await axios.get(`${API_CONFIG.API_URL}/tasks/?client=${this.client.id}`);
+        // Build query parameters including filters
+        const params = {
+          client: this.client.id,
+          status: this.taskFilters.status || undefined,
+          priority: this.taskFilters.priority || undefined,
+          search: this.taskFilters.search || undefined,
+          overdue: this.taskFilters.overdue ? 'true' : undefined,
+          ordering: this.taskSortBy
+        };
+        
+        // Remove undefined values
+        Object.keys(params).forEach(key => {
+          if (params[key] === undefined) {
+            delete params[key];
+          }
+        });
+        
+        console.log('Fetching tasks with params:', params);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_CONFIG.API_URL}/tasks/`, {
+          params,
+          headers: { Authorization: `Bearer ${token}` }
+        });
         console.log('Client tasks response:', response.data);
         this.clientTasks = response.data || [];
       } catch (error) {
@@ -542,6 +686,44 @@ export default {
       }
     },
 
+    getStatusBadgeClass(status) {
+      switch (status) {
+        case 'completed': return 'bg-success';
+        case 'in_progress': return 'bg-primary';
+        case 'pending': return 'bg-secondary';
+        case 'cancelled': return 'bg-danger';
+        default: return 'bg-secondary';
+      }
+    },
+
+    getStatusLabel(status) {
+      switch (status) {
+        case 'in_progress': return 'In Progress';
+        case 'completed': return 'Completed';
+        case 'pending': return 'Pending';
+        case 'cancelled': return 'Cancelled';
+        default: return status;
+      }
+    },
+
+    getTaskItemClass(task) {
+      const classes = ['task-item-hover'];
+      
+      if (task.is_overdue) {
+        classes.push('border-danger');
+      } else if (task.priority === 'high') {
+        classes.push('border-warning');
+      } else if (task.status === 'completed') {
+        classes.push('border-success');
+      }
+      
+      return classes;
+    },
+
+    truncateText(text, length) {
+      return text && text.length > length ? text.substring(0, length) + '...' : text;
+    },
+
     formatDate(date) {
       return new Date(date).toLocaleDateString();
     },
@@ -558,9 +740,12 @@ export default {
 
     async markTaskComplete(task) {
       try {
-        const response = await axios.patch(`/api/tasks/${task.id}/`, { 
-          status: 'completed' 
-        });
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+        const response = await axios.patch(`${API_CONFIG.API_URL}/tasks/${task.id}/`, 
+          { status: 'completed' },
+          { headers }
+        );
         // Update the task in the local array
         const taskIndex = this.clientTasks.findIndex(t => t.id === task.id);
         if (taskIndex !== -1) {
@@ -568,6 +753,20 @@ export default {
         }
       } catch (error) {
         console.error('Error completing task:', error);
+      }
+    },
+
+    async deleteTask(task) {
+      if (confirm(`Are you sure you want to delete the task "${task.title}"?`)) {
+        try {
+          const token = localStorage.getItem('token');
+          const headers = { Authorization: `Bearer ${token}` };
+          await axios.delete(`${API_CONFIG.API_URL}/tasks/${task.id}/`, { headers });
+          // Remove the task from the local array
+          this.clientTasks = this.clientTasks.filter(t => t.id !== task.id);
+        } catch (error) {
+          console.error('Error deleting task:', error);
+        }
       }
     },
 
@@ -603,6 +802,16 @@ export default {
     handleActionExecuted({ action, activity }) {
       console.log('Action executed:', action, 'for activity:', activity);
       // Handle action executed event
+    },
+
+    clearFilters() {
+      this.taskFilters = {
+        search: '',
+        status: 'active',  // Reset to showing only active tasks
+        priority: '',
+        overdue: false
+      };
+      this.taskSortBy = '-created_at';
     }
   }
 };
@@ -668,15 +877,21 @@ export default {
   min-width: 100px;
 }
 
-/* Task card styling */
-.task-card {
-  transition: all 0.2s ease;
-  cursor: pointer;
+/* Task table styling */
+.task-row {
+  transition: background-color 0.2s ease;
 }
 
-.task-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transform: translateY(-2px);
+.task-row:hover {
+  background-color: #f8f9fa;
+}
+
+.table-danger-light {
+  background-color: #fff5f5 !important;
+}
+
+.table-danger-light:hover {
+  background-color: #ffe5e5 !important;
 }
 
 .info-value {

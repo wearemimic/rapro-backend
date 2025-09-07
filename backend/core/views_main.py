@@ -319,6 +319,15 @@ def create_scenario(request, client_id):
     serializer = ScenarioCreateSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         scenario = serializer.save()
+        
+        # Log scenario creation to activity log
+        from .services.activity_service import ActivityService
+        ActivityService.log_scenario_created(
+            user=request.user,
+            scenario=scenario,
+            client=client
+        )
+        
         return Response({'id': scenario.id}, status=201)
     else:
         return Response(serializer.errors, status=400)  
@@ -2934,10 +2943,24 @@ class TaskViewSet(viewsets.ModelViewSet):
                 models.Q(client__last_name__icontains=search)
             )
         
-        # Filter by status
+        # Filter by status (including special 'active' status)
         status_filter = self.request.query_params.get('status')
         if status_filter:
-            queryset = queryset.filter(status=status_filter)
+            if status_filter == 'active':
+                # Show only active tasks (exclude completed and cancelled)
+                queryset = queryset.exclude(status__in=['completed', 'cancelled'])
+            else:
+                queryset = queryset.filter(status=status_filter)
+        
+        # Exclude old completed tasks by default (unless explicitly requesting completed status)
+        exclude_old_completed = self.request.query_params.get('exclude_old_completed', 'true')
+        if exclude_old_completed == 'true' and status_filter != 'completed':
+            # Exclude completed tasks older than 30 days
+            thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
+            queryset = queryset.exclude(
+                status='completed',
+                completed_at__lt=thirty_days_ago
+            )
         
         # Filter by priority
         priority = self.request.query_params.get('priority')
