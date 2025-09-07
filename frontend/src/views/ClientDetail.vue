@@ -242,7 +242,7 @@
                   :max-items="20"
                   :auto-refresh="false"
                   :refresh-interval="30000"
-                  :lazy-load="true"
+                  :lazy-load="false"
                   @activity-click="handleActivityClick"
                   @action-executed="handleActionExecuted"
                 />
