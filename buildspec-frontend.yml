@@ -15,12 +15,16 @@ phases:
       - echo Building Vue.js Docker image for linux/amd64...
       - |
         if [ "$IMAGE_TAG" = "staging" ]; then
-          API_URL="https://rapro-staging.retirementadvisorpro.com"
+          API_URL="https://staging.retirementadvisorpro.com"
+          FRONTEND_URL="https://staging.retirementadvisorpro.com"
         else
-          API_URL="https://rapro.retirementadvisorpro.com"
+          API_URL="https://app.retirementadvisorpro.com"
+          FRONTEND_URL="https://app.retirementadvisorpro.com"
         fi
       - echo "Using production Dockerfile with nginx for better stability"
-      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$API_URL --load .
+      - echo "API_URL: $API_URL"
+      - echo "FRONTEND_URL: $FRONTEND_URL"
+      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$API_URL --build-arg VITE_FRONTEND_URL=$FRONTEND_URL --load .
       - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
   post_build:
     commands:

@@ -174,6 +174,11 @@ resource "aws_ecs_service" "frontend_staging" {
 
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 50
+  
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   tags = merge(local.common_tags, {
     Name        = "${local.name_prefix}-frontend-staging"
@@ -210,6 +215,11 @@ resource "aws_ecs_service" "backend_staging" {
 
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 50
+  
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   tags = merge(local.common_tags, {
     Name        = "${local.name_prefix}-backend-staging"
@@ -240,6 +250,11 @@ resource "aws_ecs_service" "celery_worker_staging" {
 
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 0
+  
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   tags = merge(local.common_tags, {
     Name        = "${local.name_prefix}-celery-worker-staging"
@@ -289,15 +304,15 @@ resource "aws_ecs_task_definition" "frontend_staging" {
         },
         {
           name  = "VITE_API_URL"
-          value = "http://${aws_lb.staging.dns_name}/api"
+          value = "https://staging.retirementadvisorpro.com/api"
         },
         {
           name  = "VITE_API_BASE_URL"
-          value = "http://${aws_lb.staging.dns_name}"
+          value = "https://staging.retirementadvisorpro.com"
         },
         {
           name  = "VITE_FRONTEND_URL"
-          value = "http://${aws_lb.staging.dns_name}"
+          value = "https://staging.retirementadvisorpro.com"
         }
       ]
       
@@ -411,7 +426,7 @@ resource "aws_ecs_task_definition" "backend_staging" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = "http://${aws_lb.staging.dns_name}"
+          value = "https://staging.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
@@ -496,7 +511,7 @@ resource "aws_ecs_task_definition" "backend_staging" {
         
         {
           name  = "ALLOWED_HOSTS"
-          value = "${aws_lb.staging.dns_name},localhost"
+          value = "staging.retirementadvisorpro.com,${aws_lb.staging.dns_name},localhost"
         }
       ]
       

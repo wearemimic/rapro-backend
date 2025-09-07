@@ -182,11 +182,15 @@ resource "aws_ecs_task_definition" "frontend" {
         },
         {
           name  = "VITE_API_URL"
-          value = var.domain_name != "" ? "https://${var.domain_name}/api" : "http://${aws_lb.main.dns_name}/api"
+          value = "https://app.retirementadvisorpro.com/api"
         },
         {
           name  = "VITE_API_BASE_URL"
-          value = var.domain_name != "" ? "https://${var.domain_name}" : "http://${aws_lb.main.dns_name}"
+          value = "https://app.retirementadvisorpro.com"
+        },
+        {
+          name  = "VITE_FRONTEND_URL"
+          value = "https://app.retirementadvisorpro.com"
         }
       ]
 
@@ -284,7 +288,7 @@ resource "aws_ecs_task_definition" "backend" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
+          value = "https://app.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
@@ -401,6 +405,10 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "AWS_S3_CUSTOM_DOMAIN"
           value = var.enable_cloudfront ? aws_cloudfront_distribution.frontend[0].domain_name : aws_s3_bucket.static_assets.bucket_domain_name
+        },
+        {
+          name  = "ALLOWED_HOSTS"
+          value = "app.retirementadvisorpro.com,${aws_lb.main.dns_name},localhost"
         }
       ]
 
@@ -530,7 +538,7 @@ resource "aws_ecs_task_definition" "celery_worker" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
+          value = "https://app.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
