@@ -12,37 +12,48 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Building Vue.js Docker image for linux/amd64...
-      - |
-        if [ "$IMAGE_TAG" = "staging" ]; then
-          API_URL="https://staging.retirementadvisorpro.com"
-          FRONTEND_URL="https://staging.retirementadvisorpro.com"
-        else
-          API_URL="https://app.retirementadvisorpro.com"
-          FRONTEND_URL="https://app.retirementadvisorpro.com"
-        fi
-        echo "Using production Dockerfile with nginx for better stability"
-        echo "API_URL: $API_URL"
-        echo "FRONTEND_URL: $FRONTEND_URL"
-      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG \
-          --build-arg VITE_API_BASE_URL=$API_URL \
-          --build-arg VITE_API_URL=$API_URL/api \
-          --build-arg VITE_FRONTEND_URL=$FRONTEND_URL \
+      - echo Building Vue.js Docker images for staging and production...
+      
+      # Build staging image
+      - echo "Building staging image..."
+      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:staging \
+          --build-arg VITE_API_BASE_URL=https://staging.retirementadvisorpro.com \
+          --build-arg VITE_API_URL=https://staging.retirementadvisorpro.com/api \
+          --build-arg VITE_FRONTEND_URL=https://staging.retirementadvisorpro.com \
           --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN \
           --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID \
           --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE \
           --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY \
           --load .
-      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - docker tag $IMAGE_REPO_NAME:staging $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging
+      
+      # Build production image
+      - echo "Building production image..."
+      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:latest \
+          --build-arg VITE_API_BASE_URL=https://app.retirementadvisorpro.com \
+          --build-arg VITE_API_URL=https://app.retirementadvisorpro.com/api \
+          --build-arg VITE_FRONTEND_URL=https://app.retirementadvisorpro.com \
+          --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN \
+          --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID \
+          --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE \
+          --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY \
+          --load .
+      - docker tag $IMAGE_REPO_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
   post_build:
     commands:
       - echo Build completed on `date`
-      - echo Pushing Docker image to ECR...
-      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
-      - printf '[{"name":"frontend","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json
+      - echo Pushing Docker images to ECR...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
+      # Use staging image for staging deployment
+      - printf '[{"name":"frontend","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging > imagedefinitions-staging.json
+      # Use latest image for production deployment
+      - printf '[{"name":"frontend","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest > imagedefinitions.json
       - cat imagedefinitions.json
+      - cat imagedefinitions-staging.json
 
 artifacts:
   files:
     - imagedefinitions.json
+    - imagedefinitions-staging.json
   name: frontend-build-$(date +%Y-%m-%d)
