@@ -1,210 +1,92 @@
 <template>
   <div class="activity-stream">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+
+    <!-- Full Activity Table -->
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-header bg-transparent border-bottom">
         <div class="d-flex align-items-center">
-          <i class="bi bi-activity me-2 text-primary"></i>
-          <h6 class="mb-0">Recent Activity</h6>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <!-- Live indicator -->
-          <div v-if="isLive" class="d-flex align-items-center text-success">
-            <div class="live-dot me-1"></div>
-            <small>Live</small>
-          </div>
-          
-          <!-- Refresh button -->
-          <button 
-            class="btn btn-sm btn-outline-secondary"
-            @click="refreshActivities"
-            :disabled="loading.refresh"
-          >
-            <i class="bi bi-arrow-clockwise" :class="{ 'spin': loading.refresh }"></i>
-          </button>
-
-          <!-- Filter dropdown -->
-          <div class="dropdown">
-            <button 
-              class="btn btn-sm btn-outline-secondary dropdown-toggle" 
-              data-bs-toggle="dropdown"
-            >
-              {{ selectedFilter }}
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li><button class="dropdown-item" @click="setFilter('All')">All Activities</button></li>
-              <li><button class="dropdown-item" @click="setFilter('Communications')">Communications</button></li>
-              <li><button class="dropdown-item" @click="setFilter('AI Analysis')">AI Analysis</button></li>
-              <li><button class="dropdown-item" @click="setFilter('Email Sync')">Email Sync</button></li>
-              <li><button class="dropdown-item" @click="setFilter('System')">System Events</button></li>
-            </ul>
-          </div>
+          <i class="bi bi-table me-2 text-primary"></i>
+          <h6 class="mb-0">Complete Activity Log</h6>
+          <span class="badge bg-secondary ms-2">{{ rawActivities.length }} Total</span>
         </div>
       </div>
-
       <div class="card-body p-0">
-        <!-- Loading State -->
-        <div v-if="loading.initial" class="text-center py-4">
-          <div class="spinner-border spinner-border-sm text-primary mb-2" role="status">
-            <span class="visually-hidden">Loading activities...</span>
-          </div>
-          <p class="text-muted mb-0 small">Loading recent activities...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div v-else-if="filteredActivities.length === 0" class="text-center py-4">
-          <i class="bi bi-clock-history text-muted display-4 mb-2"></i>
-          <p class="text-muted mb-0">No recent activity</p>
-          <small class="text-muted">Activities will appear here as they happen</small>
-        </div>
-
-        <!-- Activity List -->
-        <div v-else class="activity-list">
-          <div 
-            v-for="activity in filteredActivities" 
-            :key="activity.id"
-            class="activity-item border-bottom"
-            :class="{ 'activity-new': activity.isNew }"
-          >
-            <div class="d-flex align-items-start p-3">
-              <!-- Activity Icon -->
-              <div class="flex-shrink-0 me-3">
-                <div 
-                  class="avatar avatar-sm avatar-circle"
-                  :class="getActivityAvatarClass(activity.type, activity.subtype)"
-                >
-                  <i :class="getActivityIcon(activity.type, activity.subtype)"></i>
-                </div>
-              </div>
-
-              <!-- Activity Content -->
-              <div class="flex-grow-1 min-w-0">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                  <h6 class="mb-0 text-truncate activity-title">
-                    {{ activity.title }}
-                  </h6>
-                  <div class="d-flex align-items-center gap-1">
-                    <!-- Priority indicator -->
-                    <span 
-                      v-if="activity.priority === 'high'"
-                      class="badge bg-danger badge-sm"
-                      title="High Priority"
-                    >
-                      <i class="bi bi-exclamation-triangle-fill"></i>
-                    </span>
-                    
-                    <!-- AI indicator -->
-                    <span 
-                      v-if="activity.hasAI"
-                      class="badge bg-info badge-sm"
-                      title="AI Processed"
-                    >
-                      <i class="bi bi-robot"></i>
-                    </span>
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Date/Time</th>
+                <th scope="col">Activity Type</th>
+                <th scope="col">Description</th>
+                <th scope="col">Client</th>
+                <th scope="col">User</th>
+                <th scope="col">Metadata</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="loading.initial">
+                <td colspan="7" class="text-center py-4">
+                  <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                   </div>
-                </div>
-
-                <!-- Activity Description -->
-                <p class="mb-1 text-muted small activity-description">
-                  {{ activity.description }}
-                </p>
-
-                <!-- Activity Metadata -->
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="d-flex align-items-center gap-2">
-                    <!-- Client/Lead info -->
-                    <span 
-                      v-if="activity.client || activity.lead"
-                      class="badge bg-light text-dark badge-sm"
-                    >
-                      <i :class="activity.client ? 'bi-person-fill' : 'bi-person-plus'" class="me-1"></i>
-                      {{ activity.client?.name || activity.lead?.name }}
-                    </span>
-
-                    <!-- Activity type badge -->
-                    <span 
-                      class="badge badge-sm"
-                      :class="getActivityTypeBadgeClass(activity.type)"
-                    >
-                      {{ activity.type }}
-                    </span>
-                  </div>
-
-                  <!-- Timestamp -->
-                  <small class="text-muted">{{ formatActivityTime(activity.timestamp) }}</small>
-                </div>
-
-                <!-- Quick Actions -->
-                <div v-if="activity.actions && activity.actions.length > 0" class="mt-2">
-                  <div class="d-flex gap-1">
-                    <button 
-                      v-for="action in activity.actions.slice(0, 2)" 
-                      :key="action.id"
-                      class="btn btn-xs btn-outline-primary"
-                      @click="executeAction(action, activity)"
-                    >
-                      <i :class="action.icon" class="me-1"></i>
-                      {{ action.label }}
-                    </button>
-                    
-                    <div v-if="activity.actions.length > 2" class="dropdown">
-                      <button 
-                        class="btn btn-xs btn-outline-secondary dropdown-toggle" 
-                        data-bs-toggle="dropdown"
-                      >
-                        More
-                      </button>
-                      <ul class="dropdown-menu">
-                        <li v-for="action in activity.actions.slice(2)" :key="action.id">
-                          <button 
-                            class="dropdown-item"
-                            @click="executeAction(action, activity)"
-                          >
-                            <i :class="action.icon" class="me-2"></i>
-                            {{ action.label }}
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Load More -->
-          <div v-if="hasMore" class="text-center p-3 border-top">
-            <button 
-              class="btn btn-sm btn-outline-primary"
-              @click="loadMoreActivities"
-              :disabled="loading.more"
-            >
-              <i class="bi bi-arrow-down me-1" :class="{ 'spin': loading.more }"></i>
-              {{ loading.more ? 'Loading...' : 'Load More' }}
-            </button>
-          </div>
+                </td>
+              </tr>
+              <tr v-else-if="rawActivities.length === 0">
+                <td colspan="7" class="text-center py-4 text-muted">
+                  No activities found
+                </td>
+              </tr>
+              <tr v-else v-for="activity in rawActivities" :key="activity.id">
+                <th scope="row">{{ activity.id }}</th>
+                <td>
+                  <small>{{ formatFullDateTime(activity.created_at) }}</small>
+                </td>
+                <td>
+                  <span class="badge" :class="getActivityTypeBadgeClass(getActivityTypeGroup(activity.activity_type))">
+                    {{ activity.activity_type_display || activity.activity_type }}
+                  </span>
+                </td>
+                <td>{{ activity.description }}</td>
+                <td>
+                  <span v-if="activity.client_name" class="text-primary">
+                    {{ activity.client_name }}
+                  </span>
+                  <span v-else class="text-muted">-</span>
+                </td>
+                <td>
+                  <small>{{ activity.user_name || 'System' }}</small>
+                </td>
+                <td>
+                  <button 
+                    v-if="activity.metadata && Object.keys(activity.metadata).length > 0"
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="showMetadata(activity)"
+                  >
+                    <i class="bi bi-info-circle"></i> View
+                  </button>
+                  <span v-else class="text-muted">-</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
+    </div>
 
-      <!-- Footer with summary stats -->
-      <div class="card-footer bg-light border-top">
-        <div class="row text-center">
-          <div class="col-4">
-            <div class="d-flex flex-column">
-              <small class="text-muted">Today</small>
-              <strong class="text-primary">{{ todayCount }}</strong>
-            </div>
+    <!-- Metadata Modal -->
+    <div v-if="selectedMetadata" class="modal fade show d-block" tabindex="-1" @click.self="selectedMetadata = null">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Activity Metadata</h5>
+            <button type="button" class="btn-close" @click="selectedMetadata = null"></button>
           </div>
-          <div class="col-4">
-            <div class="d-flex flex-column">
-              <small class="text-muted">Unread</small>
-              <strong class="text-warning">{{ unreadCount }}</strong>
-            </div>
+          <div class="modal-body">
+            <pre class="bg-light p-3 rounded">{{ JSON.stringify(selectedMetadata, null, 2) }}</pre>
           </div>
-          <div class="col-4">
-            <div class="d-flex flex-column">
-              <small class="text-muted">High Priority</small>
-              <strong class="text-danger">{{ highPriorityCount }}</strong>
-            </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="selectedMetadata = null">Close</button>
           </div>
         </div>
       </div>
@@ -215,6 +97,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCommunicationStore } from '@/stores/communicationStore'
+import axios from 'axios'
 
 // Props
 const props = defineProps({
@@ -224,7 +107,7 @@ const props = defineProps({
   },
   autoRefresh: {
     type: Boolean,
-    default: true
+    default: false  // Changed default to false
   },
   refreshInterval: {
     type: Number,
@@ -233,6 +116,10 @@ const props = defineProps({
   clientFilter: {
     type: [String, Number],
     default: null
+  },
+  lazyLoad: {
+    type: Boolean,
+    default: true  // Only load when visible
   }
 })
 
@@ -244,11 +131,14 @@ const communicationStore = useCommunicationStore()
 
 // Component state
 const activities = ref([])
+const rawActivities = ref([]) // Store raw activities for table
 const selectedFilter = ref('All')
 const isLive = ref(false)
 const hasMore = ref(true)
 const currentPage = ref(1)
 const lastActivityTime = ref(null)
+const selectedMetadata = ref(null) // For metadata modal
+const debugError = ref(null) // For debugging
 
 const loading = ref({
   initial: false,
@@ -284,6 +174,10 @@ const unreadCount = computed(() => {
 const highPriorityCount = computed(() => {
   return activities.value.filter(activity => activity.priority === 'high').length
 })
+
+// Visibility tracking for lazy loading - declare before use
+const isVisible = ref(false)
+const hasLoadedOnce = ref(false)
 
 // Methods
 const generateMockActivities = () => {
@@ -402,35 +296,98 @@ const generateActivityActions = (type, subtype) => {
 }
 
 const loadActivities = async (append = false) => {
-  if (append) {
-    loading.value.more = true
-  } else {
-    loading.value.initial = true
-  }
+  loading.value.initial = true
   
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const newActivities = generateMockActivities()
-    
-    if (append) {
-      activities.value.push(...newActivities.slice(activities.value.length))
-      currentPage.value++
-    } else {
-      activities.value = newActivities
-      lastActivityTime.value = newActivities[0]?.timestamp
+    // Filter by client if provided
+    const params = {}
+    if (props.clientFilter) {
+      params.client_id = props.clientFilter
     }
     
-    // Mark as live after successful load
-    isLive.value = props.autoRefresh
+    // Add authentication headers
+    const token = localStorage.getItem('access_token')
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+    const response = await axios.get(`${apiUrl}/activities/`, { 
+      params,
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    })
+    
+    // Handle the response - it's an array
+    const activityData = response.data || []
+    
+    // Store raw activities for the table
+    if (append) {
+      rawActivities.value.push(...activityData)
+    } else {
+      rawActivities.value = activityData
+    }
+    
+    // Transform to display format for the stream
+    const transformedActivities = activityData.map(activity => ({
+      id: activity.id,
+      type: getActivityTypeGroup(activity.activity_type),
+      subtype: activity.activity_type,
+      title: activity.activity_type_display || activity.description,
+      description: activity.metadata?.file_name 
+        ? `File: ${activity.metadata.file_name} (${formatFileSize(activity.metadata.file_size)})` 
+        : activity.description,
+      timestamp: activity.created_at,
+      user: activity.user_name || 'System',
+      client: activity.client_name ? { name: activity.client_name } : null,
+      priority: 'normal',
+      read: true,
+      isNew: false,
+      hasAI: false,
+      metadata: activity.metadata,
+      actions: generateActivityActions('System', activity.activity_type)
+    }))
+    
+    if (append) {
+      activities.value.push(...transformedActivities)
+    } else {
+      activities.value = transformedActivities
+    }
     
   } catch (error) {
     console.error('Failed to load activities:', error)
+    debugError.value = error.message || 'Unknown error'
+    activities.value = []
+    rawActivities.value = []
   } finally {
     loading.value.initial = false
     loading.value.more = false
   }
+}
+
+// Helper function to format file size
+const formatFileSize = (bytes) => {
+  if (!bytes) return ''
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+// Helper function to map activity types to groups
+const getActivityTypeGroup = (activityType) => {
+  const typeMap = {
+    'email_received': 'Communications',
+    'email_sent': 'Communications',
+    'sms_received': 'Communications',
+    'sms_sent': 'Communications',
+    'call_logged': 'Communications',
+    'meeting_scheduled': 'Communications',
+    'document_uploaded': 'System',
+    'scenario_created': 'System',
+    'report_generated': 'System',
+    'task_created': 'System',
+    'task_completed': 'System',
+    'note_added': 'System',
+    'lead_converted': 'System'
+  }
+  return typeMap[activityType] || 'System'
 }
 
 const refreshActivities = async () => {
@@ -505,14 +462,37 @@ const executeAction = async (action, activity) => {
 }
 
 const getActivityIcon = (type, subtype) => {
+  // Handle specific subtypes first
+  switch (subtype) {
+    case 'email_received':
+    case 'email_sent':
+      return 'bi-envelope'
+    case 'sms_received':
+    case 'sms_sent':
+      return 'bi-chat-dots'
+    case 'call_logged':
+      return 'bi-telephone'
+    case 'meeting_scheduled':
+      return 'bi-calendar-event'
+    case 'document_uploaded':
+      return 'bi-file-earmark-arrow-up'
+    case 'scenario_created':
+      return 'bi-diagram-3'
+    case 'report_generated':
+      return 'bi-file-earmark-pdf'
+    case 'task_created':
+    case 'task_completed':
+      return 'bi-check2-square'
+    case 'note_added':
+      return 'bi-sticky'
+    case 'lead_converted':
+      return 'bi-person-check'
+  }
+  
+  // Fall back to type-based icons
   switch (type) {
     case 'Communications':
-      switch (subtype) {
-        case 'email': return 'bi-envelope'
-        case 'sms': return 'bi-chat-dots'
-        case 'call': return 'bi-telephone'
-        default: return 'bi-chat'
-      }
+      return 'bi-chat'
     case 'AI Analysis':
       return 'bi-robot'
     case 'Email Sync':
@@ -575,6 +555,31 @@ const formatActivityTime = (timestamp) => {
   })
 }
 
+const formatFullDateTime = (timestamp) => {
+  const date = new Date(timestamp)
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+const showMetadata = (activity) => {
+  selectedMetadata.value = activity.metadata
+}
+
+const forceLoadActivities = async () => {
+  console.log('FORCE LOADING ACTIVITIES')
+  debugError.value = null
+  rawActivities.value = []
+  activities.value = []
+  await loadActivities()
+  console.log('FORCE LOAD COMPLETE. Raw count:', rawActivities.value.length)
+}
+
 const startAutoRefresh = () => {
   if (props.autoRefresh && !refreshInterval) {
     refreshInterval = setInterval(() => {
@@ -591,17 +596,62 @@ const stopAutoRefresh = () => {
   }
 }
 
+// Public method for parent component to trigger refresh
+const refreshIfNeeded = () => {
+  console.log('refreshIfNeeded called, hasLoadedOnce:', hasLoadedOnce.value, 'lazyLoad:', props.lazyLoad)
+  // If we haven't loaded yet, load now
+  if (!hasLoadedOnce.value) {
+    loadActivities()
+    hasLoadedOnce.value = true
+  } else {
+    // Otherwise refresh
+    refreshActivities()
+  }
+}
+
+// Intersection Observer for visibility detection
+let observer = null
+
+const checkVisibility = () => {
+  // Only load if we haven't loaded yet and lazyLoad is enabled
+  if (props.lazyLoad && !hasLoadedOnce.value && isVisible.value) {
+    loadActivities()
+    hasLoadedOnce.value = true
+    
+    if (props.autoRefresh) {
+      startAutoRefresh()
+    }
+  } else if (!props.lazyLoad && !hasLoadedOnce.value) {
+    // If lazyLoad is disabled, load immediately
+    loadActivities()
+    hasLoadedOnce.value = true
+    
+    if (props.autoRefresh) {
+      startAutoRefresh()
+    }
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
+  // JUST FUCKING LOAD THE DATA
   await loadActivities()
-  
-  if (props.autoRefresh) {
-    startAutoRefresh()
-  }
 })
 
 onUnmounted(() => {
   stopAutoRefresh()
+  
+  // Clean up observer
+  if (observer) {
+    observer.disconnect()
+    observer = null
+  }
+})
+
+// Expose methods to parent component - must be at the end after all functions are defined
+defineExpose({
+  refreshIfNeeded,
+  refreshActivities
 })
 </script>
 
@@ -751,5 +801,21 @@ onUnmounted(() => {
   .card-footer small {
     font-size: 0.7rem;
   }
+}
+
+/* Modal backdrop styles */
+.modal.show {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.table-responsive {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+pre {
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.875rem;
 }
 </style>

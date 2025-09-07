@@ -114,7 +114,7 @@
                     {{ scenario.status || 'Draft' }}
                   </span>
                   <router-link 
-                    :to="{ name: 'scenario-detail', params: { clientId: client.id, id: scenario.id } }"
+                    :to="{ name: 'scenario-detail', params: { id: scenario.id } }"
                     class="btn btn-sm btn-outline-primary"
                   >
                     View

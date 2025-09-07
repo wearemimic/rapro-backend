@@ -337,6 +337,14 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     compliance_relevant=True,
                     success=True
                 )
+                
+                # Log to unified activity log
+                from ..services.activity_service import ActivityService
+                ActivityService.log_document_upload(
+                    user=request.user,
+                    document=document,
+                    client=client
+                )
 
             # Return document details
             serializer = DocumentSerializer(document)

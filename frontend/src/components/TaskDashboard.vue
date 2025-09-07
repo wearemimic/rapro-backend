@@ -75,171 +75,185 @@
       </div>
     </div>
 
-    <!-- Quick Filters -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center">
-          <h4 class="card-header-title">Quick Filters</h4>
-          <button
-            class="btn btn-sm btn-outline-secondary"
-            @click="taskStore.clearFilters()"
-          >
-            Clear All
-          </button>
-        </div>
-      </div>
+    <!-- Filter Controls -->
+    <div class="card mb-3">
       <div class="card-body">
-        <div class="row">
-          <div class="col-md-3 mb-3">
-            <label class="form-label">Search Tasks</label>
+        <div class="row align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Search</label>
             <input
               type="text"
               class="form-control"
-              placeholder="Search by title or description..."
+              placeholder="Search tasks..."
               v-model="searchQuery"
               @input="handleSearch"
             >
           </div>
-          <div class="col-md-2 mb-3">
+          <div class="col-md-2">
             <label class="form-label">Status</label>
-            <select
-              class="form-select"
-              v-model="taskStore.filters.status"
-              @change="taskStore.updateFilter('status', taskStore.filters.status)"
-            >
-              <option value="">All Status</option>
+            <select class="form-select" v-model="taskStore.filters.status" @change="taskStore.updateFilter('status', taskStore.filters.status)">
+              <option value="">All Tasks</option>
+              <option value="active">All Active</option>
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
-          <div class="col-md-2 mb-3">
+          <div class="col-md-2">
             <label class="form-label">Priority</label>
-            <select
-              class="form-select"
-              v-model="taskStore.filters.priority"
-              @change="taskStore.updateFilter('priority', taskStore.filters.priority)"
-            >
+            <select class="form-select" v-model="taskStore.filters.priority" @change="taskStore.updateFilter('priority', taskStore.filters.priority)">
               <option value="">All Priority</option>
               <option value="high">High</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
           </div>
-          <div class="col-md-2 mb-3">
-            <label class="form-label">Assigned To</label>
-            <select
-              class="form-select"
-              v-model="taskStore.filters.assigned_to"
-              @change="taskStore.updateFilter('assigned_to', taskStore.filters.assigned_to)"
-            >
-              <option value="">All Users</option>
-              <option value="me">My Tasks</option>
-              <option value="unassigned">Unassigned</option>
+          <div class="col-md-2">
+            <label class="form-label">Sort By</label>
+            <select class="form-select" v-model="sortBy" @change="handleSort">
+              <option value="-created_at">Newest First</option>
+              <option value="created_at">Oldest First</option>
+              <option value="due_date">Due Date</option>
+              <option value="-due_date">Due Date (Desc)</option>
+              <option value="priority">Priority</option>
+              <option value="title">Title A-Z</option>
+              <option value="-title">Title Z-A</option>
             </select>
           </div>
-          <div class="col-md-3 mb-3">
-            <label class="form-label">Options</label>
-            <div class="d-flex gap-3">
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="overdue"
-                  v-model="taskStore.filters.overdue"
-                  @change="taskStore.updateFilter('overdue', taskStore.filters.overdue)"
-                >
-                <label class="form-check-label" for="overdue">
-                  Overdue Only
-                </label>
-              </div>
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="showCompleted"
-                  v-model="taskStore.showCompleted"
-                  @change="taskStore.toggleShowCompleted()"
-                >
-                <label class="form-check-label" for="showCompleted">
-                  Show Completed
-                </label>
-              </div>
+          <div class="col-md-2">
+            <div class="form-check mt-4">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="overdueOnly"
+                v-model="taskStore.filters.overdue"
+                @change="taskStore.updateFilter('overdue', taskStore.filters.overdue)"
+              >
+              <label class="form-check-label" for="overdueOnly">
+                Overdue Only
+              </label>
             </div>
+          </div>
+          <div class="col-md-1">
+            <button 
+              class="btn btn-outline-secondary w-100 mt-4"
+              @click="taskStore.clearFilters()"
+              title="Clear Filters"
+            >
+              Clear
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- View Mode Toggle -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div class="btn-group" role="group">
-        <input
-          type="radio"
-          class="btn-check"
-          name="viewMode"
-          id="listView"
-          value="list"
-          v-model="taskStore.viewMode"
-          @change="taskStore.setViewMode('list')"
-        >
-        <label class="btn btn-outline-primary" for="listView">
-          <i class="bi-list me-1"></i>List
-        </label>
-
-        <input
-          type="radio"
-          class="btn-check"
-          name="viewMode"
-          id="kanbanView"
-          value="kanban"
-          v-model="taskStore.viewMode"
-          @change="taskStore.setViewMode('kanban')"
-        >
-        <label class="btn btn-outline-primary" for="kanbanView">
-          <i class="bi-columns me-1"></i>Kanban
-        </label>
-
-        <input
-          type="radio"
-          class="btn-check"
-          name="viewMode"
-          id="calendarView"
-          value="calendar"
-          v-model="taskStore.viewMode"
-          @change="taskStore.setViewMode('calendar')"
-        >
-        <label class="btn btn-outline-primary" for="calendarView">
-          <i class="bi-calendar me-1"></i>Calendar
-        </label>
-      </div>
-
-      <!-- Bulk Actions -->
-      <div v-if="taskStore.hasSelectedTasks" class="d-flex gap-2">
-        <select
-          class="form-select form-select-sm"
-          v-model="bulkAction"
-          style="width: auto;"
-        >
-          <option value="">Bulk Actions</option>
-          <option value="status">Update Status</option>
-          <option value="priority">Update Priority</option>
-          <option value="assign">Assign To</option>
-          <option value="delete">Delete Tasks</option>
-        </select>
-        <button
-          class="btn btn-sm btn-primary"
-          @click="performBulkAction"
-          :disabled="!bulkAction"
-        >
-          Apply ({{ taskStore.selectedTasks.length }})
-        </button>
-      </div>
+    <!-- Task count and results info -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted">
+        Showing {{ taskStore.filteredTasks.length }} of {{ taskStore.tasks.length }} tasks
+      </small>
     </div>
 
-    <!-- Task Content -->
-    <div class="task-content">
+    <!-- Task Table -->
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" v-if="!taskStore.loading.tasks">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" style="width: 40%">Task</th>
+              <th scope="col" style="width: 10%">Status</th>
+              <th scope="col" style="width: 10%">Priority</th>
+              <th scope="col" style="width: 12%">Assigned To</th>
+              <th scope="col" style="width: 10%">Due Date</th>
+              <th scope="col" style="width: 8%">Created</th>
+              <th scope="col" style="width: 10%">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="task in taskStore.filteredTasks" 
+                :key="task.id" 
+                class="task-row"
+                :class="{ 'table-danger-light': task.is_overdue }"
+                @click="openTaskDetail(task)">
+              <td>
+                <div>
+                  <h6 class="mb-0" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
+                    {{ task.title }}
+                    <span v-if="task.is_overdue" class="badge bg-danger ms-1">Overdue</span>
+                  </h6>
+                  <small class="text-muted">{{ truncateText(task.description, 100) }}</small>
+                  <div v-if="task.client_name || task.lead_name" class="mt-1">
+                    <small class="text-muted">
+                      <i v-if="task.client_name" class="bi bi-person me-1"></i>{{ task.client_name }}
+                      <i v-if="task.lead_name" class="bi bi-person-plus ms-2 me-1"></i>{{ task.lead_name }}
+                    </small>
+                  </div>
+                  <div v-if="task.tags && task.tags.length > 0" class="mt-1">
+                    <span
+                      v-for="tag in task.tags.slice(0, 3)"
+                      :key="tag"
+                      class="badge bg-secondary me-1"
+                      style="font-size: 0.7em;"
+                    >
+                      {{ tag }}
+                    </span>
+                    <span v-if="task.tags.length > 3" class="badge bg-secondary" style="font-size: 0.7em;">
+                      +{{ task.tags.length - 3 }}
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge" :class="getStatusBadgeClass(task.status)">
+                  {{ getStatusLabel(task.status) }}
+                </span>
+              </td>
+              <td>
+                <span class="badge" :class="getPriorityBadgeClass(task.priority)">
+                  {{ task.priority || 'Medium' }}
+                </span>
+              </td>
+              <td>
+                <small>{{ task.assigned_to_name || '-' }}</small>
+              </td>
+              <td>
+                <small>{{ task.due_date ? formatDate(task.due_date) : '-' }}</small>
+              </td>
+              <td>
+                <small>{{ formatRelativeDate(task.created_at) }}</small>
+              </td>
+              <td @click.stop>
+                <div class="btn-group" role="group">
+                  <button
+                    class="btn btn-sm btn-outline-primary"
+                    @click.stop="openTaskDetail(task)"
+                    title="Edit Task"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    v-if="task.status !== 'completed'"
+                    class="btn btn-sm btn-outline-success"
+                    @click.stop="handleTaskUpdate(task.id, { status: 'completed' })"
+                    title="Mark Complete"
+                  >
+                    <i class="bi bi-check"></i>
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline-danger"
+                    @click.stop="handleTaskDelete(task.id)"
+                    title="Delete Task"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- Loading State -->
       <div v-if="taskStore.loading.tasks" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
@@ -248,47 +262,29 @@
         <p class="mt-2">Loading tasks...</p>
       </div>
 
+      <!-- Empty State -->
+      <div v-if="!taskStore.loading.tasks && taskStore.filteredTasks.length === 0" class="text-center py-5">
+        <i class="bi bi-clipboard-check fa-3x text-muted mb-3"></i>
+        <h5 class="text-muted">No tasks found</h5>
+        <p class="text-muted">
+          {{ taskStore.tasks.length > 0 ? 'No tasks match your filters' : 'Create your first task to get started' }}
+        </p>
+        <button v-if="taskStore.tasks.length > 0" class="btn btn-outline-secondary" @click="taskStore.clearFilters()">
+          Clear Filters
+        </button>
+        <button v-else class="btn btn-primary" @click="openCreateTask">
+          Create First Task
+        </button>
+      </div>
+
       <!-- Error State -->
-      <div v-else-if="taskStore.error" class="alert alert-danger">
+      <div v-if="taskStore.error" class="alert alert-danger m-3">
         <h5>Error Loading Tasks</h5>
         <p>{{ taskStore.error }}</p>
         <button class="btn btn-danger" @click="taskStore.fetchTasks()">
           Retry
         </button>
       </div>
-
-      <!-- List View -->
-      <TaskList
-        v-else-if="taskStore.viewMode === 'list'"
-        :tasks="taskStore.filteredTasks"
-        :loading="taskStore.loading.updating"
-        @task-click="openTaskDetail"
-        @task-update="handleTaskUpdate"
-        @task-delete="handleTaskDelete"
-        @task-select="taskStore.toggleTaskSelection"
-      />
-
-      <!-- Kanban View -->
-      <TaskKanban
-        v-else-if="taskStore.viewMode === 'kanban'"
-        :tasks="taskStore.tasksByStatus"
-        :loading="taskStore.loading.updating"
-        @task-click="openTaskDetail"
-        @task-update="handleTaskUpdate"
-        @task-delete="handleTaskDelete"
-      />
-
-      <!-- Calendar View -->
-      <TaskCalendar
-        v-else-if="taskStore.viewMode === 'calendar'"
-        :tasks="taskStore.calendarTasks"
-        :current-date="taskStore.calendarView.currentDate"
-        :view-type="taskStore.calendarView.viewType"
-        @task-click="openTaskDetail"
-        @task-update="handleTaskUpdate"
-        @date-change="taskStore.setCalendarDate"
-        @view-change="taskStore.setCalendarViewType"
-      />
     </div>
 
     <!-- Pagination -->
@@ -350,16 +346,13 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTaskStore } from '@/stores/taskStore.js'
-import TaskList from '@/components/TaskList.vue'
-import TaskKanban from '@/components/TaskKanban.vue'
-import TaskCalendar from '@/components/TaskCalendar.vue'
 import TaskForm from '@/components/TaskForm.vue'
 import TaskTemplateModal from '@/components/TaskTemplateModal.vue'
 
 const taskStore = useTaskStore()
 
 const searchQuery = ref('')
-const bulkAction = ref('')
+const sortBy = ref('-created_at')
 const showTaskModal = ref(false)
 const showTemplateModal = ref(false)
 const selectedTask = ref(null)
@@ -391,6 +384,10 @@ const handleSearch = () => {
   searchTimeout = setTimeout(() => {
     taskStore.setSearch(searchQuery.value)
   }, 500)
+}
+
+const handleSort = () => {
+  taskStore.updateFilter('ordering', sortBy.value)
 }
 
 const openCreateTask = () => {
@@ -436,51 +433,59 @@ const handleTemplateUsed = (templateId, taskData) => {
   showTemplateModal.value = false
 }
 
-const performBulkAction = () => {
-  if (!bulkAction.value || !taskStore.hasSelectedTasks) return
+// Helper methods for status and priority badges
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case 'completed': return 'bg-success'
+    case 'in_progress': return 'bg-primary'
+    case 'pending': return 'bg-secondary'
+    case 'cancelled': return 'bg-danger'
+    default: return 'bg-secondary'
+  }
+}
 
-  const selectedIds = taskStore.selectedTasks
+const getStatusLabel = (status) => {
+  switch (status) {
+    case 'in_progress': return 'In Progress'
+    case 'completed': return 'Completed'
+    case 'pending': return 'Pending'
+    case 'cancelled': return 'Cancelled'
+    default: return status
+  }
+}
+
+const getPriorityBadgeClass = (priority) => {
+  switch (priority) {
+    case 'high': return 'bg-danger'
+    case 'medium': return 'bg-warning text-dark'
+    case 'low': return 'bg-info'
+    default: return 'bg-secondary'
+  }
+}
+
+const truncateText = (text, length) => {
+  return text && text.length > length ? text.substring(0, length) + '...' : text
+}
+
+const formatDate = (date) => {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+const formatRelativeDate = (date) => {
+  const now = new Date()
+  const taskDate = new Date(date)
+  const diffInHours = Math.abs(now - taskDate) / (1000 * 60 * 60)
   
-  switch (bulkAction.value) {
-    case 'status':
-      showBulkStatusModal(selectedIds)
-      break
-    case 'priority':
-      showBulkPriorityModal(selectedIds)
-      break
-    case 'assign':
-      showBulkAssignModal(selectedIds)
-      break
-    case 'delete':
-      handleBulkDelete(selectedIds)
-      break
-  }
-  
-  bulkAction.value = ''
-}
-
-const showBulkStatusModal = (taskIds) => {
-  const status = prompt('Enter new status (pending, in_progress, completed, cancelled):')
-  if (status && ['pending', 'in_progress', 'completed', 'cancelled'].includes(status)) {
-    taskStore.bulkUpdateTasks(taskIds, { status })
-  }
-}
-
-const showBulkPriorityModal = (taskIds) => {
-  const priority = prompt('Enter new priority (high, medium, low):')
-  if (priority && ['high', 'medium', 'low'].includes(priority)) {
-    taskStore.bulkUpdateTasks(taskIds, { priority })
-  }
-}
-
-const showBulkAssignModal = (taskIds) => {
-  const assignedTo = prompt('Enter user ID to assign to (or leave empty for unassigned):')
-  taskStore.bulkUpdateTasks(taskIds, { assigned_to: assignedTo || null })
-}
-
-const handleBulkDelete = (taskIds) => {
-  if (confirm(`Are you sure you want to delete ${taskIds.length} tasks?`)) {
-    taskIds.forEach(id => taskStore.deleteTask(id))
+  if (diffInHours < 24) {
+    return diffInHours < 1 ? 'just now' : `${Math.floor(diffInHours)}h ago`
+  } else if (diffInHours < 168) { // 7 days
+    return `${Math.floor(diffInHours / 24)}d ago`
+  } else {
+    return formatDate(date)
   }
 }
 
@@ -523,8 +528,22 @@ watch(() => taskStore.filters.search, (newValue) => {
   margin-bottom: 0;
 }
 
-.task-content {
-  min-height: 400px;
+/* Task table styling */
+.task-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.task-row:hover {
+  background-color: #f8f9fa;
+}
+
+.table-danger-light {
+  background-color: #fff5f5 !important;
+}
+
+.table-danger-light:hover {
+  background-color: #ffe5e5 !important;
 }
 
 /* Using default Bootstrap card styles */
@@ -547,17 +566,8 @@ watch(() => taskStore.filters.search, (newValue) => {
   margin-bottom: 0.5rem;
 }
 
-.btn-check:checked + .btn {
-  background-color: var(--bs-primary);
-  border-color: var(--bs-primary);
-}
-
 .pagination {
   margin-bottom: 0;
-}
-
-.form-select-sm {
-  min-width: 150px;
 }
 
 .spinner-border {

@@ -55,6 +55,7 @@ const routes = [
       { path: 'integrations', name: 'Integrations', component: () => import('@/views/Integrations.vue'), meta: { requiresAuth: true } },
       { path: 'users', name: 'UserManagement', component: UserManagement, meta: { requiresAuth: true } },
       { path: 'documents', name: 'DocumentCenter', component: () => import('@/components/DocumentCenter.vue'), meta: { requiresAuth: true } },
+      { path: 'activity-test', name: 'ActivityTest', component: () => import('@/views/ActivityTest.vue'), meta: { requiresAuth: true } },
       
       // Report Center Routes
       { path: 'report-center', name: 'ReportCenter', component: () => import('@/views/ReportCenter/ReportCenterDashboard.vue'), meta: { requiresAuth: true } },

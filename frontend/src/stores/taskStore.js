@@ -14,7 +14,7 @@ export const useTaskStore = defineStore('task', {
     
     // Filtering and search
     filters: {
-      status: '',
+      status: 'active',  // Default to showing only active tasks
       priority: '',
       assigned_to: '',
       client: '',
@@ -86,60 +86,9 @@ export const useTaskStore = defineStore('task', {
   getters: {
     // Task filtering getters
     filteredTasks: (state) => {
-      let filtered = [...state.tasks]
-      
-      // Apply filters
-      if (state.filters.status) {
-        filtered = filtered.filter(task => task.status === state.filters.status)
-      }
-      
-      if (state.filters.priority) {
-        filtered = filtered.filter(task => task.priority === state.filters.priority)
-      }
-      
-      if (state.filters.assigned_to) {
-        if (state.filters.assigned_to === 'me') {
-          const authStore = useAuthStore()
-          filtered = filtered.filter(task => task.assigned_to === authStore.user?.id)
-        } else if (state.filters.assigned_to === 'unassigned') {
-          filtered = filtered.filter(task => !task.assigned_to)
-        } else {
-          filtered = filtered.filter(task => task.assigned_to === parseInt(state.filters.assigned_to))
-        }
-      }
-      
-      if (state.filters.client) {
-        filtered = filtered.filter(task => task.client === parseInt(state.filters.client))
-      }
-      
-      if (state.filters.lead) {
-        filtered = filtered.filter(task => task.lead === parseInt(state.filters.lead))
-      }
-      
-      if (state.filters.task_type) {
-        filtered = filtered.filter(task => task.task_type === state.filters.task_type)
-      }
-      
-      if (state.filters.search) {
-        const searchLower = state.filters.search.toLowerCase()
-        filtered = filtered.filter(task => 
-          task.title.toLowerCase().includes(searchLower) ||
-          task.description.toLowerCase().includes(searchLower) ||
-          (task.client_name && task.client_name.toLowerCase().includes(searchLower)) ||
-          (task.lead_name && task.lead_name.toLowerCase().includes(searchLower))
-        )
-      }
-      
-      if (state.filters.overdue) {
-        filtered = filtered.filter(task => task.is_overdue)
-      }
-      
-      // Hide completed tasks if showCompleted is false
-      if (!state.showCompleted) {
-        filtered = filtered.filter(task => task.status !== 'completed')
-      }
-      
-      return filtered
+      // Backend now handles all filtering, including 'active' status
+      // Just return the tasks as-is since they're already filtered by the API
+      return state.tasks
     },
     
     // Task grouping getters
@@ -548,7 +497,7 @@ export const useTaskStore = defineStore('task', {
     
     clearFilters() {
       this.filters = {
-        status: '',
+        status: 'active',  // Reset to showing only active tasks
         priority: '',
         assigned_to: '',
         client: '',

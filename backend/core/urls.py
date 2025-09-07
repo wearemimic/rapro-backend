@@ -5,7 +5,8 @@ from .views_main import login_view, logout_view, register_view, profile_view, Ad
 from . import report_views
 from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, start_scenario_calculation_async, get_task_status, cancel_task, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years, medicare_inflation_rates
 from .views_main import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
-from .views_main import EmailAccountViewSet, CommunicationViewSet, LeadViewSet, LeadSourceViewSet, ActivityLogViewSet, TaskViewSet, TaskTemplateViewSet, CalendarAccountViewSet, CalendarEventViewSet, MeetingTemplateViewSet
+from .views_main import EmailAccountViewSet, CommunicationViewSet, LeadViewSet, LeadSourceViewSet, TaskViewSet, TaskTemplateViewSet, CalendarAccountViewSet, CalendarEventViewSet, MeetingTemplateViewSet
+from .views.activity_views import ActivityLogViewSet
 from .views.document_views import DocumentViewSet, DocumentCategoryViewSet, DocumentVersionViewSet, DocumentAuditLogViewSet, DocumentTemplateViewSet, DocumentRetentionPolicyViewSet, bulk_document_action
 from .views_main import gmail_auth_url, gmail_oauth_callback, outlook_auth_url, outlook_oauth_callback, send_email, sync_all_emails, oauth_settings_status, google_calendar_auth_url, google_calendar_oauth_callback, outlook_calendar_auth_url, outlook_calendar_oauth_callback, calendar_settings_status, create_video_meeting, update_video_meeting, delete_video_meeting, get_meeting_join_info, send_meeting_reminder, video_settings_status, get_jump_ai_meeting_insights
 from .views_main import analyze_communication, bulk_analyze_communications, ai_analysis_stats, high_priority_communications, trigger_auto_analysis
