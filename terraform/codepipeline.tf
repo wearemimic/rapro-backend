@@ -250,17 +250,17 @@ resource "aws_codebuild_project" "frontend" {
     # For production builds, use production URLs
     environment_variable {
       name  = "VITE_API_BASE_URL"
-      value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
+      value = "http://app.retirementadvisorpro.com"
     }
     
     environment_variable {
       name  = "VITE_API_URL"
-      value = var.domain_name != "" ? "https://${var.domain_name}/api" : "https://${aws_lb.main.dns_name}/api"
+      value = "http://app.retirementadvisorpro.com/api"
     }
     
     environment_variable {
       name  = "VITE_FRONTEND_URL"
-      value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
+      value = "http://app.retirementadvisorpro.com"
     }
 
     dynamic "environment_variable" {
@@ -294,16 +294,13 @@ resource "aws_codebuild_project" "frontend" {
             "echo Current directory: $(pwd)",
             "echo Node version: $(node --version)",
             "echo NPM version: $(npm --version)",
-            "echo Checking if vite is available:",
-            "which vite || echo 'vite not in PATH'",
-            "npx vite --version || echo 'npx vite failed'",
             "echo Running npm run build...",
             "npm run build",
-            "echo Uploading static assets to S3...",
-            "aws s3 sync dist/ s3://$STATIC_BUCKET --delete --cache-control \"public, max-age=31536000\"",
-            "aws s3 cp s3://$STATIC_BUCKET/index.html s3://$STATIC_BUCKET/index.html --cache-control \"public, max-age=0, must-revalidate\" --metadata-directive REPLACE",
             "echo Building Docker image for frontend...",
-            "cd .. && ls -la && ls -la docker/ && docker build -f ./docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG .",
+            "cd ..",
+            "echo Current directory: $(pwd)",
+            "ls -la",
+            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$VITE_API_BASE_URL --build-arg VITE_API_URL=$VITE_API_URL --build-arg VITE_FRONTEND_URL=$VITE_FRONTEND_URL .",
             "docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG"
           ]
         }
