@@ -14,6 +14,14 @@ phases:
       - echo Build started on `date`
       - echo Building Vue.js Docker images for staging and production...
       
+      # Debug environment variables
+      - echo "=== Environment Variables ==="
+      - echo "VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN"
+      - echo "VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID"
+      - echo "VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE"
+      - echo "VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY"
+      - echo "=========================="
+      
       # Build staging image
       - echo "Building staging image..."
       - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:staging \
