@@ -224,7 +224,7 @@ const props = defineProps({
   },
   autoRefresh: {
     type: Boolean,
-    default: true
+    default: false  // Changed default to false
   },
   refreshInterval: {
     type: Number,
@@ -233,6 +233,10 @@ const props = defineProps({
   clientFilter: {
     type: [String, Number],
     default: null
+  },
+  lazyLoad: {
+    type: Boolean,
+    default: true  // Only load when visible
   }
 })
 
@@ -283,6 +287,20 @@ const unreadCount = computed(() => {
 
 const highPriorityCount = computed(() => {
   return activities.value.filter(activity => activity.priority === 'high').length
+})
+
+// Public method for parent component to trigger refresh
+const refreshIfNeeded = () => {
+  // Only refresh if we've already loaded once and lazy loading is enabled
+  if (hasLoadedOnce.value && props.lazyLoad) {
+    refreshActivities()
+  }
+}
+
+// Expose method to parent component
+defineExpose({
+  refreshIfNeeded,
+  refreshActivities
 })
 
 // Methods
@@ -409,17 +427,51 @@ const loadActivities = async (append = false) => {
   }
   
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // Fetch real activities from API
+    const params = {
+      days: 30,
+      limit: props.maxItems * 2 // Get more than we display for filtering
+    }
     
-    const newActivities = generateMockActivities()
+    if (props.clientFilter) {
+      params.client_id = props.clientFilter
+    }
+    
+    const response = await fetch(`/api/activities/?${new URLSearchParams(params)}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch activities')
+    }
+    
+    const data = await response.json()
+    
+    // Transform API data to match component expectations
+    const transformedActivities = data.results ? data.results.map(activity => ({
+      id: activity.id,
+      type: getActivityTypeGroup(activity.activity_type),
+      subtype: activity.activity_type,
+      title: activity.description,
+      description: activity.metadata?.details || activity.description,
+      timestamp: activity.created_at,
+      user: activity.user_name || 'System',
+      client: activity.client_name,
+      priority: activity.metadata?.priority || 'normal',
+      read: false,
+      isNew: false,
+      hasAI: false,
+      metadata: activity.metadata
+    })) : []
     
     if (append) {
-      activities.value.push(...newActivities.slice(activities.value.length))
+      activities.value.push(...transformedActivities)
       currentPage.value++
     } else {
-      activities.value = newActivities
-      lastActivityTime.value = newActivities[0]?.timestamp
+      activities.value = transformedActivities
+      lastActivityTime.value = transformedActivities[0]?.timestamp
     }
     
     // Mark as live after successful load
@@ -427,10 +479,34 @@ const loadActivities = async (append = false) => {
     
   } catch (error) {
     console.error('Failed to load activities:', error)
+    // Don't fall back to mock data - show empty state instead
+    if (!append) {
+      activities.value = []
+    }
   } finally {
     loading.value.initial = false
     loading.value.more = false
   }
+}
+
+// Helper function to map activity types to groups
+const getActivityTypeGroup = (activityType) => {
+  const typeMap = {
+    'email_received': 'Communications',
+    'email_sent': 'Communications',
+    'sms_received': 'Communications',
+    'sms_sent': 'Communications',
+    'call_logged': 'Communications',
+    'meeting_scheduled': 'Communications',
+    'document_uploaded': 'System',
+    'scenario_created': 'System',
+    'report_generated': 'System',
+    'task_created': 'System',
+    'task_completed': 'System',
+    'note_added': 'System',
+    'lead_converted': 'System'
+  }
+  return typeMap[activityType] || 'System'
 }
 
 const refreshActivities = async () => {
@@ -505,14 +581,37 @@ const executeAction = async (action, activity) => {
 }
 
 const getActivityIcon = (type, subtype) => {
+  // Handle specific subtypes first
+  switch (subtype) {
+    case 'email_received':
+    case 'email_sent':
+      return 'bi-envelope'
+    case 'sms_received':
+    case 'sms_sent':
+      return 'bi-chat-dots'
+    case 'call_logged':
+      return 'bi-telephone'
+    case 'meeting_scheduled':
+      return 'bi-calendar-event'
+    case 'document_uploaded':
+      return 'bi-file-earmark-arrow-up'
+    case 'scenario_created':
+      return 'bi-diagram-3'
+    case 'report_generated':
+      return 'bi-file-earmark-pdf'
+    case 'task_created':
+    case 'task_completed':
+      return 'bi-check2-square'
+    case 'note_added':
+      return 'bi-sticky'
+    case 'lead_converted':
+      return 'bi-person-check'
+  }
+  
+  // Fall back to type-based icons
   switch (type) {
     case 'Communications':
-      switch (subtype) {
-        case 'email': return 'bi-envelope'
-        case 'sms': return 'bi-chat-dots'
-        case 'call': return 'bi-telephone'
-        default: return 'bi-chat'
-      }
+      return 'bi-chat'
     case 'AI Analysis':
       return 'bi-robot'
     case 'Email Sync':
@@ -591,17 +690,71 @@ const stopAutoRefresh = () => {
   }
 }
 
+// Visibility tracking for lazy loading
+const isVisible = ref(false)
+const hasLoadedOnce = ref(false)
+
+// Intersection Observer for visibility detection
+let observer = null
+
+const checkVisibility = () => {
+  // Only load if we haven't loaded yet and lazyLoad is enabled
+  if (props.lazyLoad && !hasLoadedOnce.value && isVisible.value) {
+    loadActivities()
+    hasLoadedOnce.value = true
+    
+    if (props.autoRefresh) {
+      startAutoRefresh()
+    }
+  } else if (!props.lazyLoad && !hasLoadedOnce.value) {
+    // If lazyLoad is disabled, load immediately
+    loadActivities()
+    hasLoadedOnce.value = true
+    
+    if (props.autoRefresh) {
+      startAutoRefresh()
+    }
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
-  await loadActivities()
-  
-  if (props.autoRefresh) {
-    startAutoRefresh()
+  // Set up intersection observer for lazy loading
+  if (props.lazyLoad) {
+    observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        isVisible.value = entry.isIntersecting
+        if (entry.isIntersecting) {
+          checkVisibility()
+        }
+      })
+    }, {
+      threshold: 0.1 // Trigger when 10% visible
+    })
+    
+    // Start observing the component's root element
+    const rootElement = document.querySelector('.activity-stream')
+    if (rootElement) {
+      observer.observe(rootElement)
+    }
+  } else {
+    // Load immediately if lazy loading is disabled
+    await loadActivities()
+    
+    if (props.autoRefresh) {
+      startAutoRefresh()
+    }
   }
 })
 
 onUnmounted(() => {
   stopAutoRefresh()
+  
+  // Clean up observer
+  if (observer) {
+    observer.disconnect()
+    observer = null
+  }
 })
 </script>
 

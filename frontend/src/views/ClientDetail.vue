@@ -38,7 +38,8 @@
               <li class="nav-item" v-if="hasCRMAccess">
                 <a class="nav-link" id="activity-tab" data-bs-toggle="tab" 
                   href="#activity-pane" role="tab" 
-                  aria-controls="activity-pane" aria-selected="false">
+                  aria-controls="activity-pane" aria-selected="false"
+                  @click="handleActivityTabClick">
                   Activity
                 </a>
               </li>
@@ -191,7 +192,7 @@
                                   <div class="btn-group" role="group">
                                     <router-link :to="{ 
                                       name: 'ScenarioDetail',
-                                      params: { clientId: client.id, scenarioid: scenario.id },
+                                      params: { id: client.id, scenarioid: scenario.id },
                                       state: { scenarios: client.scenarios }
                                       }"
                                       class="btn btn-sm btn-outline-primary">
@@ -236,10 +237,12 @@
                  aria-labelledby="activity-tab" v-if="hasCRMAccess">
               <div>
                 <ActivityStream 
+                  ref="activityStreamRef"
                   :client-filter="client ? client.id : null"
                   :max-items="20"
-                  :auto-refresh="true"
+                  :auto-refresh="false"
                   :refresh-interval="30000"
+                  :lazy-load="true"
                   @activity-click="handleActivityClick"
                   @action-executed="handleActionExecuted"
                 />
@@ -580,6 +583,26 @@ export default {
 
     updateDocumentCount(count) {
       this.clientDocumentCount = count;
+    },
+
+    handleActivityTabClick() {
+      // Trigger refresh when activity tab is clicked
+      // Use nextTick to ensure the DOM is updated and the component is visible
+      this.$nextTick(() => {
+        if (this.$refs.activityStreamRef) {
+          this.$refs.activityStreamRef.refreshIfNeeded();
+        }
+      });
+    },
+
+    handleActivityClick(activity) {
+      console.log('Activity clicked:', activity);
+      // Handle activity click event
+    },
+
+    handleActionExecuted({ action, activity }) {
+      console.log('Action executed:', action, 'for activity:', activity);
+      // Handle action executed event
     }
   }
 };
