@@ -215,6 +215,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCommunicationStore } from '@/stores/communicationStore'
+import axios from 'axios'
 
 // Props
 const props = defineProps({
@@ -427,17 +428,8 @@ const loadActivities = async (append = false) => {
       params.client_id = props.clientFilter
     }
     
-    const response = await fetch(`/api/activities/?${new URLSearchParams(params)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch activities')
-    }
-    
-    const data = await response.json()
+    const response = await axios.get('/api/activities/', { params })
+    const data = response.data
     
     // Transform API data to match component expectations
     const transformedActivities = data.results ? data.results.map(activity => ({
