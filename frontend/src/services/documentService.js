@@ -10,6 +10,19 @@ import { apiService } from './api.js'
 
 class DocumentService {
   
+  /**
+   * Get axios config with authentication headers
+   */
+  getAuthConfig() {
+    const token = localStorage.getItem('token')
+    return {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    }
+  }
+  
   // =============================================================================
   // DOCUMENT OPERATIONS
   // =============================================================================
@@ -19,7 +32,9 @@ class DocumentService {
    */
   async getDocuments(params = {}) {
     try {
-      const response = await axios.get(apiService.getUrl('/api/documents/'), { params })
+      const config = this.getAuthConfig()
+      config.params = params
+      const response = await axios.get(apiService.getUrl('/api/documents/'), config)
       return response.data
     } catch (error) {
       console.error('Error fetching documents:', error)
@@ -32,7 +47,7 @@ class DocumentService {
    */
   async getDocument(documentId) {
     try {
-      const response = await axios.get(apiService.getUrl(`/api/documents/${documentId}/`))
+      const response = await axios.get(apiService.getUrl(`/api/documents/${documentId}/`), this.getAuthConfig())
       return response.data
     } catch (error) {
       console.error('Error fetching document:', error)
@@ -45,9 +60,11 @@ class DocumentService {
    */
   async uploadDocument(formData, progressCallback = null) {
     try {
+      const token = localStorage.getItem('token')
       const config = {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         }
       }
       
@@ -72,9 +89,11 @@ class DocumentService {
    */
   async bulkUpload(formData, progressCallback = null) {
     try {
+      const token = localStorage.getItem('token')
       const config = {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         }
       }
       
@@ -98,7 +117,7 @@ class DocumentService {
    */
   async updateDocument(documentId, updateData) {
     try {
-      const response = await axios.patch(apiService.getUrl(`/api/documents/${documentId}/`), updateData)
+      const response = await axios.patch(apiService.getUrl(`/api/documents/${documentId}/`), updateData, this.getAuthConfig())
       return response.data
     } catch (error) {
       console.error('Error updating document:', error)
@@ -111,7 +130,7 @@ class DocumentService {
    */
   async downloadDocument(documentId) {
     try {
-      const response = await axios.get(apiService.getUrl(`/api/documents/${documentId}/download/`))
+      const response = await axios.get(apiService.getUrl(`/api/documents/${documentId}/download/`), this.getAuthConfig())
       return response.data
     } catch (error) {
       console.error('Error downloading document:', error)
@@ -150,7 +169,7 @@ class DocumentService {
    */
   async deleteDocument(documentId) {
     try {
-      const response = await axios.delete(apiService.getUrl(`/api/documents/${documentId}/`))
+      const response = await axios.delete(apiService.getUrl(`/api/documents/${documentId}/`), this.getAuthConfig())
       return response.data
     } catch (error) {
       console.error('Error deleting document:', error)
@@ -210,7 +229,7 @@ class DocumentService {
    */
   async getCategories() {
     try {
-      const response = await axios.get(apiService.getUrl('/api/document-categories/'))
+      const response = await axios.get(apiService.getUrl('/api/document-categories/'), this.getAuthConfig())
       return response.data
     } catch (error) {
       console.error('Error fetching categories:', error)
