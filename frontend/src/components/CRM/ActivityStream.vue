@@ -293,20 +293,6 @@ const highPriorityCount = computed(() => {
 const isVisible = ref(false)
 const hasLoadedOnce = ref(false)
 
-// Public method for parent component to trigger refresh
-const refreshIfNeeded = () => {
-  // Only refresh if we've already loaded once and lazy loading is enabled
-  if (hasLoadedOnce.value && props.lazyLoad) {
-    refreshActivities()
-  }
-}
-
-// Expose method to parent component
-defineExpose({
-  refreshIfNeeded,
-  refreshActivities
-})
-
 // Methods
 const generateMockActivities = () => {
   const now = new Date()
@@ -694,6 +680,14 @@ const stopAutoRefresh = () => {
   }
 }
 
+// Public method for parent component to trigger refresh
+const refreshIfNeeded = () => {
+  // Only refresh if we've already loaded once and lazy loading is enabled
+  if (hasLoadedOnce.value && props.lazyLoad) {
+    refreshActivities()
+  }
+}
+
 // Intersection Observer for visibility detection
 let observer = null
 
@@ -755,6 +749,12 @@ onUnmounted(() => {
     observer.disconnect()
     observer = null
   }
+})
+
+// Expose methods to parent component - must be at the end after all functions are defined
+defineExpose({
+  refreshIfNeeded,
+  refreshActivities
 })
 </script>
 
