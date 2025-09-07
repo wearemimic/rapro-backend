@@ -418,53 +418,43 @@ const loadActivities = async (append = false) => {
   }
   
   try {
-    // Fetch real activities from API
+    // Just fucking get the activities for this client
     const params = {
-      days: 30,
-      limit: props.maxItems * 2 // Get more than we display for filtering
-    }
-    
-    if (props.clientFilter) {
-      params.client_id = props.clientFilter
+      client_id: props.clientFilter
     }
     
     const response = await axios.get('/api/activities/', { params })
-    const data = response.data
+    console.log('Activities response:', response.data)
     
-    // Transform API data to match component expectations
-    const transformedActivities = data.results ? data.results.map(activity => ({
+    // If it's an array, use it directly. If it has results, use that
+    const activityData = Array.isArray(response.data) ? response.data : (response.data.results || [])
+    
+    // Transform to display format
+    const transformedActivities = activityData.map(activity => ({
       id: activity.id,
-      type: getActivityTypeGroup(activity.activity_type),
+      type: 'System',
       subtype: activity.activity_type,
       title: activity.description,
-      description: activity.metadata?.details || activity.description,
+      description: activity.metadata?.file_name ? `File: ${activity.metadata.file_name}` : activity.description,
       timestamp: activity.created_at,
       user: activity.user_name || 'System',
       client: activity.client_name,
-      priority: activity.metadata?.priority || 'normal',
+      priority: 'normal',
       read: false,
       isNew: false,
       hasAI: false,
       metadata: activity.metadata
-    })) : []
+    }))
     
     if (append) {
       activities.value.push(...transformedActivities)
-      currentPage.value++
     } else {
       activities.value = transformedActivities
-      lastActivityTime.value = transformedActivities[0]?.timestamp
     }
-    
-    // Mark as live after successful load
-    isLive.value = props.autoRefresh
     
   } catch (error) {
     console.error('Failed to load activities:', error)
-    // Don't fall back to mock data - show empty state instead
-    if (!append) {
-      activities.value = []
-    }
+    activities.value = []
   } finally {
     loading.value.initial = false
     loading.value.more = false
