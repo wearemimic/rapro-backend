@@ -106,16 +106,26 @@
           <div class="file-metadata">
             <div class="row g-2">
               <div class="col-12">
+                <label class="form-label text-danger mb-1">
+                  <i class="bi bi-folder-fill me-1"></i>
+                  Category <span class="text-danger">*</span>
+                  <small class="text-muted ms-1">(determines retention period)</small>
+                </label>
                 <select 
                   v-model="fileItem.category_id" 
-                  class="form-select form-select-sm"
+                  class="form-select"
+                  :class="{ 'is-invalid': !fileItem.category_id && fileItem.showValidation }"
                   :disabled="fileItem.uploaded"
+                  required
                 >
-                  <option value="">Select Category</option>
+                  <option value="">-- Select Document Category (Required) --</option>
                   <option v-for="category in categories" :key="category.id" :value="category.id">
-                    {{ category.name }}
+                    {{ category.name }} {{ getCategoryRetention(category) }}
                   </option>
                 </select>
+                <div v-if="!fileItem.category_id && fileItem.showValidation" class="invalid-feedback">
+                  Please select a category for compliance and retention purposes
+                </div>
               </div>
               <div class="col-12">
                 <input
@@ -209,6 +219,10 @@ const props = defineProps({
   clientName: {
     type: String,
     default: 'Client'
+  },
+  initialFiles: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -297,7 +311,8 @@ const processFiles = (files) => {
       uploading: false,
       uploaded: false,
       progress: 0,
-      error: null
+      error: null,
+      showValidation: false
     })
   })
   
@@ -324,6 +339,20 @@ const clearQueue = () => {
 
 const uploadAllFiles = async () => {
   if (uploading.value || fileQueue.value.length === 0) return
+  
+  // Validate that all files have categories selected
+  let hasInvalidFiles = false
+  for (const fileItem of fileQueue.value) {
+    if (!fileItem.uploaded && !fileItem.category_id) {
+      fileItem.showValidation = true
+      hasInvalidFiles = true
+    }
+  }
+  
+  if (hasInvalidFiles) {
+    errorMessage.value = 'Please select a category for all documents. Categories are required for compliance and retention management.'
+    return
+  }
   
   uploading.value = true
   errorMessage.value = ''
@@ -409,9 +438,22 @@ const formatFileSize = (bytes) => {
   return documentService.formatFileSize(bytes)
 }
 
+const getCategoryRetention = (category) => {
+  // Display the actual retention years from the category
+  if (category.default_retention_years) {
+    return `(${category.default_retention_years} years)`
+  }
+  return ''
+}
+
 // Lifecycle
 onMounted(async () => {
   await loadCategories()
+  
+  // If initial files were provided, add them to the queue
+  if (props.initialFiles && props.initialFiles.length > 0) {
+    processFiles(props.initialFiles)
+  }
   
   // Listen for files dropped from parent
   const handleDroppedFiles = (event) => {
@@ -594,5 +636,32 @@ onMounted(async () => {
   .file-actions {
     min-width: 100%;
   }
+}
+
+/* Category Selection Styling */
+.file-metadata .form-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.file-metadata select.form-select {
+  border: 2px solid #dee2e6;
+  background-color: #fffbf0;
+  font-weight: 500;
+}
+
+.file-metadata select.form-select:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+.file-metadata select.is-invalid {
+  border-color: #dc3545;
+  background-color: #fff5f5;
+}
+
+.file-metadata .invalid-feedback {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
 }
 </style>

@@ -1330,20 +1330,22 @@ class DocumentCategory(models.Model):
     description = models.TextField(blank=True)
     default_retention_years = models.IntegerField(default=7)  # FINRA standard
     requires_encryption = models.BooleanField(default=True)
-    advisor = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    advisor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)  # Optional for global categories
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         verbose_name_plural = "Document Categories"
-        unique_together = ['advisor', 'name']
+        unique_together = ['advisor', 'name', 'category_type']  # Allow same name for different advisors
         indexes = [
             models.Index(fields=['advisor', 'category_type']),
             models.Index(fields=['is_active']),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.advisor.email})"
+        if self.advisor:
+            return f"{self.name} ({self.advisor.email})"
+        return f"{self.name} (Global)"
 
 
 class Document(models.Model):

@@ -17,8 +17,7 @@
         />
         <button 
           class="btn btn-primary btn-sm"
-          @click="triggerFileInput"
-          :disabled="uploadingFiles"
+          @click="openUploadModal"
         >
           <div v-if="uploadingFiles" class="d-flex align-items-center">
             <div class="spinner-border spinner-border-sm me-2" role="status">
@@ -42,10 +41,10 @@
       @dragover.prevent="isDragging = true"
       @dragleave.prevent="isDragging = false"
       :class="{ 'drag-active': isDragging }"
-      @click="triggerFileInput"
+      @click="openUploadModal"
     >
       <i class="bi bi-cloud-upload me-2"></i>
-      <span>Drop files here or click to upload</span>
+      <span>Drop files here or click to upload (with category selection)</span>
     </div>
     
     <!-- Upload Progress -->
@@ -163,8 +162,8 @@
       </div>
     </div>
 
-    <!-- Upload Modal (kept for potential future use) -->
-    <Teleport to="body" v-if="false">
+    <!-- Upload Modal -->
+    <Teleport to="body">
       <div v-if="showUploadModal" class="modal-overlay">
         <div class="modal" style="display: block;" tabindex="-1">
           <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -180,6 +179,7 @@
                 <ClientDocumentUpload 
                   :clientId="clientId"
                   :clientName="clientName"
+                  :initialFiles="pendingFiles"
                   @close="closeUploadModal"
                   @uploaded="handleDocumentUploaded"
                 />
@@ -241,6 +241,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['document-count-updated'])
+
 const documentStore = useDocumentStore()
 
 // State
@@ -250,6 +252,7 @@ const loading = ref(false)
 const showUploadModal = ref(false)
 const viewingDocument = ref(null)
 const selectedCategory = ref('all')
+const pendingFiles = ref([])
 const isDragging = ref(false)
 const fileInput = ref(null)
 const uploadingFiles = ref(false)
@@ -448,8 +451,14 @@ const handleDrop = async (e) => {
   
   const files = Array.from(e.dataTransfer.files)
   if (files.length > 0) {
-    await uploadFiles(files)
+    pendingFiles.value = files
+    showUploadModal.value = true
   }
+}
+
+const openUploadModal = () => {
+  pendingFiles.value = []
+  showUploadModal.value = true
 }
 
 const closeUploadModal = () => {

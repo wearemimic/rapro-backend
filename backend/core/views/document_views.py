@@ -7,6 +7,7 @@ with FINRA compliance, AWS S3 integration, and comprehensive audit logging.
 
 import logging
 import mimetypes
+import uuid
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
@@ -58,11 +59,12 @@ class DocumentCategoryViewSet(viewsets.ModelViewSet):
     ordering = ['name']
 
     def get_queryset(self):
-        """Filter categories to current advisor's data"""
+        """Get global categories and advisor-specific categories"""
+        from django.db.models import Q
         return DocumentCategory.objects.filter(
-            advisor=self.request.user,
+            Q(advisor=None) | Q(advisor=self.request.user),  # Global OR user-specific
             is_active=True
-        ).select_related('advisor')
+        ).select_related('advisor').order_by('name')
 
     def perform_create(self, serializer):
         """Set advisor when creating category"""
@@ -88,6 +90,31 @@ class DocumentViewSet(viewsets.ModelViewSet):
     search_fields = ['original_filename', 'title', 'description', 'tags']
     ordering_fields = ['original_filename', 'uploaded_at', 'last_accessed', 'file_size']
     ordering = ['-uploaded_at']
+    
+    def get_audit_context(self, request):
+        """
+        Extract audit context information from request for compliance logging
+        """
+        # Get IP address (handle X-Forwarded-For for proxy/load balancer)
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip_address = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip_address = request.META.get('REMOTE_ADDR')
+        
+        # Get user agent
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        
+        # Get or create session ID
+        if not request.session.session_key:
+            request.session.create()
+        session_id = request.session.session_key
+        
+        return {
+            'user_ip': ip_address,
+            'user_agent': user_agent,
+            'session_id': session_id
+        }
 
     def get_queryset(self):
         """Filter documents to current advisor's data"""
@@ -95,7 +122,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             advisor=self.request.user
         ).select_related(
             'advisor', 'category', 'client', 'uploaded_by'
-        ).prefetch_related('versions', 'permissions', 'audit_logs')
+        ).prefetch_related('versions', 'audit_logs')
 
         # Add client filter if specified
         client_id = self.request.query_params.get('client_id')
@@ -124,12 +151,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status='active'
             )
 
-            # Create audit log
+            # Create audit log with compliance tracking
+            audit_context = self.get_audit_context(self.request)
             DocumentAuditLog.objects.create(
                 document=document,
                 user=self.request.user,
                 action='created',
-                details=f'Document created: {document.original_filename}'
+                details={'filename': document.original_filename, 'method': 'api_create'},
+                user_ip=audit_context['user_ip'],
+                user_agent=audit_context['user_agent'],
+                session_id=audit_context['session_id'],
+                client_involved=document.client,
+                compliance_relevant=True,
+                success=True
             )
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
@@ -140,6 +174,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
         try:
             serializer = DocumentUploadSerializer(data=request.data)
             if not serializer.is_valid():
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Upload validation failed: {serializer.errors}")
+                logger.error(f"Request data: {request.data}")
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             file_obj = serializer.validated_data['file']
@@ -172,9 +210,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
             category = None
             if category_id:
                 try:
+                    from django.db.models import Q
                     category = DocumentCategory.objects.get(
+                        Q(advisor=None) | Q(advisor=request.user),  # Global OR user-specific
                         id=category_id, 
-                        advisor=request.user, 
                         is_active=True
                     )
                 except DocumentCategory.DoesNotExist:
@@ -210,45 +249,93 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 }
             )
 
-            # Create document record
-            with transaction.atomic():
-                document = Document.objects.create(
-                    advisor=request.user,
-                    uploaded_by=request.user,
-                    category=category,
-                    client=client,
-                    original_filename=file_obj.name,
-                    title=title,
-                    description=description,
-                    s3_key=upload_result['s3_key'],
-                    file_hash=upload_result['file_hash'],
-                    file_size=upload_result['file_size'],
-                    file_type=file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else 'unknown',
-                    mime_type=upload_result.get('content_type', content_type),
-                    s3_bucket=settings.AWS_STORAGE_BUCKET_NAME,  # Use configured bucket
-                    tags=tags,
-                    compliance_type=compliance_type,
-                    status='active'
-                )
-
-                # Create initial version
+            # Check if document with same hash already exists
+            existing_document = Document.objects.filter(
+                file_hash=upload_result['file_hash'],
+                advisor=request.user
+            ).first()
+            
+            if existing_document:
+                # Update existing document with new metadata instead of creating duplicate
+                existing_document.title = title or existing_document.title
+                existing_document.description = description or existing_document.description
+                existing_document.category = category or existing_document.category
+                existing_document.client = client or existing_document.client
+                existing_document.tags = tags or existing_document.tags
+                existing_document.compliance_type = compliance_type
+                existing_document.last_accessed = timezone.now()
+                existing_document.save()
+                
+                # Create a new version for the re-upload
+                version_count = existing_document.versions.count()
                 DocumentVersion.objects.create(
-                    document=document,
-                    version_number=1,
+                    document=existing_document,
+                    version_number=version_count + 1,
                     s3_key=upload_result['s3_key'],
                     s3_version_id=upload_result.get('version_id', ''),
                     file_hash=upload_result['file_hash'],
                     file_size=upload_result['file_size'],
                     changed_by=request.user,
-                    change_description='Initial upload'
+                    change_description=f'Re-uploaded file (duplicate of version 1)'
                 )
+                
+                document = existing_document
+                logger.info(f"Document with same hash already exists, updated metadata for document {document.id}")
+            else:
+                # Create new document record
+                with transaction.atomic():
+                    document = Document.objects.create(
+                        advisor=request.user,
+                        uploaded_by=request.user,
+                        category=category,
+                        client=client,
+                        original_filename=file_obj.name,
+                        title=title,
+                        description=description,
+                        s3_key=upload_result['s3_key'],
+                        file_hash=upload_result['file_hash'],
+                        file_size=upload_result['file_size'],
+                        file_type=file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else 'unknown',
+                        mime_type=upload_result.get('content_type', content_type),
+                        s3_bucket=settings.AWS_STORAGE_BUCKET_NAME,  # Use configured bucket
+                        tags=tags,
+                        compliance_type=compliance_type,
+                        status='active'
+                    )
 
-                # Create audit log
+                    # Create initial version
+                    DocumentVersion.objects.create(
+                        document=document,
+                        version_number=1,
+                        s3_key=upload_result['s3_key'],
+                        s3_version_id=upload_result.get('version_id', ''),
+                        file_hash=upload_result['file_hash'],
+                        file_size=upload_result['file_size'],
+                        changed_by=request.user,
+                        change_description='Initial upload'
+                    )
+
+                # Create audit log with full compliance tracking
+                audit_context = self.get_audit_context(request)
                 DocumentAuditLog.objects.create(
                     document=document,
                     user=request.user,
                     action='uploaded',
-                    details=f'File uploaded: {file_obj.name} ({upload_result["file_size"]} bytes)'
+                    details={
+                        'filename': file_obj.name,
+                        'file_size': upload_result['file_size'],
+                        's3_key': upload_result['s3_key'],
+                        'file_hash': upload_result['file_hash'],
+                        'title': title,
+                        'category_id': category_id,
+                        'client_id': client_id
+                    },
+                    user_ip=audit_context['user_ip'],
+                    user_agent=audit_context['user_agent'],
+                    session_id=audit_context['session_id'],
+                    client_involved=client,
+                    compliance_relevant=True,
+                    success=True
                 )
 
             # Return document details
@@ -257,9 +344,49 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         except ValidationError as e:
             logger.error(f"Document upload validation error: {str(e)}")
+            # Log failed upload attempt for compliance
+            if request.user.is_authenticated:
+                audit_context = self.get_audit_context(request)
+                DocumentAuditLog.objects.create(
+                    document=None,  # No document created
+                    user=request.user,
+                    action='uploaded',
+                    details={
+                        'error': 'validation_error',
+                        'error_message': str(e),
+                        'filename': request.data.get('file', {}).name if 'file' in request.data else 'unknown'
+                    },
+                    user_ip=audit_context['user_ip'],
+                    user_agent=audit_context['user_agent'],
+                    session_id=audit_context['session_id'],
+                    client_involved=Client.objects.filter(id=client_id).first() if client_id else None,
+                    compliance_relevant=True,
+                    success=False,
+                    error_message=str(e)
+                )
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Document upload error: {str(e)}")
+            # Log failed upload attempt for compliance
+            if request.user.is_authenticated:
+                audit_context = self.get_audit_context(request)
+                DocumentAuditLog.objects.create(
+                    document=None,  # No document created
+                    user=request.user,
+                    action='uploaded',
+                    details={
+                        'error': 'system_error',
+                        'error_type': type(e).__name__,
+                        'filename': request.data.get('file', {}).name if 'file' in request.data else 'unknown'
+                    },
+                    user_ip=audit_context['user_ip'],
+                    user_agent=audit_context['user_agent'],
+                    session_id=audit_context['session_id'],
+                    client_involved=Client.objects.filter(id=client_id).first() if client_id else None,
+                    compliance_relevant=True,
+                    success=False,
+                    error_message=str(e)[:500]  # Limit error message length
+                )
             return Response(
                 {'error': 'Failed to upload document. Please try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -288,12 +415,24 @@ class DocumentViewSet(viewsets.ModelViewSet):
             document.access_count += 1
             document.save(update_fields=['last_accessed', 'access_count'])
 
-            # Create audit log
+            # Create audit log with full compliance tracking
+            audit_context = self.get_audit_context(request)
             DocumentAuditLog.objects.create(
                 document=document,
                 user=request.user,
                 action='downloaded',
-                details=f'Document downloaded: {document.original_filename}'
+                details={
+                    'filename': document.original_filename,
+                    'file_size': document.file_size,
+                    's3_key': document.s3_key,
+                    'download_method': 'direct'
+                },
+                user_ip=audit_context['user_ip'],
+                user_agent=audit_context['user_agent'],
+                session_id=audit_context['session_id'],
+                client_involved=document.client,
+                compliance_relevant=True,
+                success=True
             )
 
             # Return file response
@@ -335,11 +474,22 @@ class DocumentViewSet(viewsets.ModelViewSet):
             
             # Create audit log
             action = 'shared_with_client' if is_client_visible else 'made_private'
+            audit_context = self.get_audit_context(request)
             DocumentAuditLog.objects.create(
                 document=document,
                 user=request.user,
                 action=action,
-                details=f'Document {"shared with client" if is_client_visible else "made private"}: {document.original_filename}'
+                details={
+                    'filename': document.original_filename,
+                    'visibility_changed_to': 'client_visible' if is_client_visible else 'private',
+                    'previous_visibility': 'private' if is_client_visible else 'client_visible'
+                },
+                user_ip=audit_context['user_ip'],
+                user_agent=audit_context['user_agent'],
+                session_id=audit_context['session_id'],
+                client_involved=document.client,
+                compliance_relevant=True,
+                success=True
             )
             
             return Response({
@@ -390,12 +540,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 expires_at=timezone.now() + timedelta(hours=expiration_hours)
             )
 
-            # Create audit log
+            # Create audit log with compliance tracking
+            audit_context = self.get_audit_context(request)
             DocumentAuditLog.objects.create(
                 document=document,
                 user=request.user,
                 action='shared',
-                details=f'Document shared with {expiration_hours}h expiration'
+                details={
+                    'filename': document.original_filename,
+                    'expiration_hours': expiration_hours,
+                    'share_method': 'presigned_url'
+                },
+                user_ip=audit_context['user_ip'],
+                user_agent=audit_context['user_agent'],
+                session_id=audit_context['session_id'],
+                client_involved=document.client,
+                compliance_relevant=True,
+                success=True
             )
 
             return Response({
@@ -428,12 +589,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
             document.archived_at = timezone.now()
             document.save(update_fields=['status', 'archived_at'])
 
-            # Create audit log
+            # Create audit log with compliance tracking
+            audit_context = self.get_audit_context(request)
             DocumentAuditLog.objects.create(
                 document=document,
                 user=request.user,
                 action='archived',
-                details=f'Document archived: {document.original_filename}'
+                details={
+                    'filename': document.original_filename,
+                    'previous_status': document.status,
+                    'archive_reason': request.data.get('reason', 'manual_archive')
+                },
+                user_ip=audit_context['user_ip'],
+                user_agent=audit_context['user_agent'],
+                session_id=audit_context['session_id'],
+                client_involved=document.client,
+                compliance_relevant=True,
+                success=True
             )
 
             return Response({'message': 'Document archived successfully'}, status=status.HTTP_200_OK)
@@ -666,12 +838,23 @@ def bulk_document_action(request):
                         document.archived_at = timezone.now()
                         document.save(update_fields=['status', 'archived_at'])
                         
-                        # Create audit log
+                        # Create audit log with compliance tracking
+                        audit_context = self.get_audit_context(request)
                         DocumentAuditLog.objects.create(
                             document=document,
                             user=request.user,
                             action='archived',
-                            details=f'Bulk archived: {document.original_filename}'
+                            details={
+                                'filename': document.original_filename,
+                                'operation': 'bulk_archive',
+                                'batch_size': len(document_ids)
+                            },
+                            user_ip=audit_context['user_ip'],
+                            user_agent=audit_context['user_agent'],
+                            session_id=audit_context['session_id'],
+                            client_involved=document.client,
+                            compliance_relevant=True,
+                            success=True
                         )
                         
                         results.append({'id': document.id, 'status': 'archived'})
