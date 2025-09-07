@@ -182,15 +182,15 @@ resource "aws_ecs_task_definition" "frontend" {
         },
         {
           name  = "VITE_API_URL"
-          value = "https://app.retirementadvisorpro.com/api"
+          value = "http://app.retirementadvisorpro.com/api"
         },
         {
           name  = "VITE_API_BASE_URL"
-          value = "https://app.retirementadvisorpro.com"
+          value = "http://app.retirementadvisorpro.com"
         },
         {
           name  = "VITE_FRONTEND_URL"
-          value = "https://app.retirementadvisorpro.com"
+          value = "http://app.retirementadvisorpro.com"
         }
       ]
 
@@ -288,7 +288,7 @@ resource "aws_ecs_task_definition" "backend" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = "https://app.retirementadvisorpro.com"
+          value = "http://app.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
@@ -538,7 +538,7 @@ resource "aws_ecs_task_definition" "celery_worker" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = "https://app.retirementadvisorpro.com"
+          value = "http://app.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration

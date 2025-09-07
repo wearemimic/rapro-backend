@@ -15,11 +15,11 @@ phases:
       - echo Building Vue.js Docker image for linux/amd64...
       - |
         if [ "$IMAGE_TAG" = "staging" ]; then
-          API_URL="https://staging.retirementadvisorpro.com"
-          FRONTEND_URL="https://staging.retirementadvisorpro.com"
+          API_URL="http://staging.retirementadvisorpro.com"
+          FRONTEND_URL="http://staging.retirementadvisorpro.com"
         else
-          API_URL="https://app.retirementadvisorpro.com"
-          FRONTEND_URL="https://app.retirementadvisorpro.com"
+          API_URL="http://app.retirementadvisorpro.com"
+          FRONTEND_URL="http://app.retirementadvisorpro.com"
         fi
       - echo "Using production Dockerfile with nginx for better stability"
       - echo "API_URL: $API_URL"
