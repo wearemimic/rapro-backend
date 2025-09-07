@@ -289,6 +289,10 @@ const highPriorityCount = computed(() => {
   return activities.value.filter(activity => activity.priority === 'high').length
 })
 
+// Visibility tracking for lazy loading - declare before use
+const isVisible = ref(false)
+const hasLoadedOnce = ref(false)
+
 // Public method for parent component to trigger refresh
 const refreshIfNeeded = () => {
   // Only refresh if we've already loaded once and lazy loading is enabled
@@ -689,10 +693,6 @@ const stopAutoRefresh = () => {
     isLive.value = false
   }
 }
-
-// Visibility tracking for lazy loading
-const isVisible = ref(false)
-const hasLoadedOnce = ref(false)
 
 // Intersection Observer for visibility detection
 let observer = null
