@@ -297,12 +297,12 @@ resource "aws_codebuild_project" "frontend" {
             "echo Running npm run build...",
             "npm run build",
             "echo Building Docker image for frontend...",
-            "cd ..",
-            "echo Current directory: $(pwd)",
+            "cd $CODEBUILD_SRC_DIR",
+            "echo Current directory after cd to CODEBUILD_SRC_DIR: $(pwd)",
             "ls -la",
             "echo Checking docker directory...",
             "ls -la docker/",
-            "docker build -f ./docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$VITE_API_BASE_URL --build-arg VITE_API_URL=$VITE_API_URL --build-arg VITE_FRONTEND_URL=$VITE_FRONTEND_URL .",
+            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$VITE_API_BASE_URL --build-arg VITE_API_URL=$VITE_API_URL --build-arg VITE_FRONTEND_URL=$VITE_FRONTEND_URL .",
             "docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG"
           ]
         }

@@ -37,16 +37,16 @@ class DocumentCategorySerializer(serializers.ModelSerializer):
 class DocumentVersionSerializer(serializers.ModelSerializer):
     """Serializer for DocumentVersion model"""
     
-    uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    changed_by_name = serializers.CharField(source='changed_by.get_full_name', read_only=True)
     file_size_mb = serializers.SerializerMethodField()
     
     class Meta:
         model = DocumentVersion
         fields = [
             'id', 'version_number', 's3_key', 'file_hash', 'file_size', 'file_size_mb',
-            'uploaded_by', 'uploaded_by_name', 'change_notes', 'created_at'
+            'changed_by', 'changed_by_name', 'change_description', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'uploaded_by_name', 'file_size_mb']
+        read_only_fields = ['id', 'created_at', 'changed_by_name', 'file_size_mb']
 
     def get_file_size_mb(self, obj):
         """Convert file size to MB"""
@@ -104,7 +104,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
         model = Document
         fields = [
             'id', 'original_filename', 'title', 'category', 'category_name',
-            'client', 'client_name', 'file_size', 'file_size_mb', 'content_type',
+            'client', 'client_name', 'file_size', 'file_size_mb', 'mime_type',
             'status', 'compliance_type', 'uploaded_by_name', 'uploaded_at',
             'last_accessed', 'access_count', 'version_count', 'tags'
         ]
@@ -150,7 +150,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'original_filename', 'title', 'description', 'category', 'category_name',
             'client', 'client_name', 's3_key', 'file_hash', 'file_size', 'file_size_mb',
-            'content_type', 'tags', 'status', 'compliance_type', 'retention_status',
+            'mime_type', 'tags', 'status', 'compliance_type', 'retention_status',
             'retention_end_date', 'contains_pii', 'contains_phi', 'encryption_status',
             'advisor', 'advisor_name', 'uploaded_by', 'uploaded_by_name',
             'uploaded_at', 'last_accessed', 'access_count', 'archived_at',
@@ -158,7 +158,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'can_edit', 'can_delete'
         ]
         read_only_fields = [
-            'id', 's3_key', 'file_hash', 'file_size', 'file_size_mb', 'content_type',
+            'id', 's3_key', 'file_hash', 'file_size', 'file_size_mb', 'mime_type',
             'uploaded_at', 'last_accessed', 'access_count', 'archived_at',
             'category_name', 'client_name', 'uploaded_by_name', 'advisor_name',
             'versions', 'permissions', 'recent_audit_logs', 'can_edit', 'can_delete',

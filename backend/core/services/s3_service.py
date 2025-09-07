@@ -36,7 +36,9 @@ class S3DocumentService:
                 aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
                 region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1')
             )
-            self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'retirementadvisorpro-documents')
+            self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+            if not self.bucket_name:
+                raise ValidationError("AWS_STORAGE_BUCKET_NAME is not configured")
             self.default_encryption = getattr(settings, 'AWS_S3_ENCRYPTION', 'AES256')
             self.max_file_size = getattr(settings, 'MAX_UPLOAD_SIZE', 50 * 1024 * 1024)  # 50MB default
             

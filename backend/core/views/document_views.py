@@ -224,8 +224,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     file_hash=upload_result['file_hash'],
                     file_size=upload_result['file_size'],
                     file_type=file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else 'unknown',
-                    mime_type=upload_result['content_type'],
-                    s3_bucket='retirementadvisorpro-documents',  # Default bucket
+                    mime_type=upload_result.get('content_type', content_type),
+                    s3_bucket=settings.AWS_STORAGE_BUCKET_NAME,  # Use configured bucket
                     tags=tags,
                     compliance_type=compliance_type,
                     status='active'
@@ -236,10 +236,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     document=document,
                     version_number=1,
                     s3_key=upload_result['s3_key'],
+                    s3_version_id=upload_result.get('version_id', ''),
                     file_hash=upload_result['file_hash'],
                     file_size=upload_result['file_size'],
-                    uploaded_by=request.user,
-                    change_notes='Initial upload'
+                    changed_by=request.user,
+                    change_description='Initial upload'
                 )
 
                 # Create audit log
