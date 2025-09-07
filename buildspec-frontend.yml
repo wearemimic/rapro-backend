@@ -24,7 +24,8 @@ phases:
       
       # Build staging image
       - echo "Building staging image..."
-      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:staging \
+      - |
+        docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:staging \
           --build-arg VITE_API_BASE_URL=https://staging.retirementadvisorpro.com \
           --build-arg VITE_API_URL=https://staging.retirementadvisorpro.com/api \
           --build-arg VITE_FRONTEND_URL=https://staging.retirementadvisorpro.com \
@@ -37,7 +38,8 @@ phases:
       
       # Build production image
       - echo "Building production image..."
-      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:latest \
+      - |
+        docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:latest \
           --build-arg VITE_API_BASE_URL=https://app.retirementadvisorpro.com \
           --build-arg VITE_API_URL=https://app.retirementadvisorpro.com/api \
           --build-arg VITE_FRONTEND_URL=https://app.retirementadvisorpro.com \
