@@ -163,6 +163,7 @@ def auth0_callback(request):
                 existing_user.first_name = user_info.get('given_name', existing_user.first_name)
                 existing_user.last_name = user_info.get('family_name', existing_user.last_name)
                 existing_user.auth0_sub = user_info.get('sub')
+                existing_user.auth_provider = auth_provider
                 existing_user.save()
                 
                 # Create Django JWT tokens for authenticated user
@@ -292,6 +293,24 @@ def auth0_exchange_code(request):
         user_info = userinfo_response.json()
         print(f"✅ User info retrieved: {user_info.get('email')}")
         
+        # Extract auth provider from the sub field
+        sub = user_info.get('sub', '')
+        auth_provider = 'password'  # default
+        if sub.startswith('google-oauth2|'):
+            auth_provider = 'google-oauth2'
+        elif sub.startswith('facebook|'):
+            auth_provider = 'facebook'
+        elif sub.startswith('apple|'):
+            auth_provider = 'apple'
+        elif sub.startswith('linkedin|'):
+            auth_provider = 'linkedin'
+        elif sub.startswith('windowslive|') or sub.startswith('microsoft|'):
+            auth_provider = 'microsoft'
+        elif sub.startswith('auth0|'):
+            auth_provider = 'password'
+        
+        print(f"Auth provider detected: {auth_provider} from sub: {sub[:20]}...")
+        
         email = user_info.get('email')
         if not email:
             return Response({'message': 'Email not found in user info'}, status=status.HTTP_400_BAD_REQUEST)
@@ -313,6 +332,7 @@ def auth0_exchange_code(request):
                 existing_user.first_name = user_info.get('given_name', existing_user.first_name)
                 existing_user.last_name = user_info.get('family_name', existing_user.last_name)
                 existing_user.auth0_sub = user_info.get('sub')
+                existing_user.auth_provider = auth_provider
                 existing_user.save()
                 
                 # Generate Django JWT tokens for authenticated user
@@ -438,6 +458,23 @@ def auth0_complete_registration(request):
         # Extract registration credentials (stored in sessionStorage)
         registration_email = data.get('registrationEmail')
         registration_password = data.get('registrationPassword')
+        auth0_sub = data.get('auth0Sub', '')  # For social logins
+        
+        # Determine auth provider from auth0_sub
+        auth_provider = 'password'  # default
+        if auth0_sub:
+            if auth0_sub.startswith('google-oauth2|'):
+                auth_provider = 'google-oauth2'
+            elif auth0_sub.startswith('facebook|'):
+                auth_provider = 'facebook'
+            elif auth0_sub.startswith('apple|'):
+                auth_provider = 'apple'
+            elif auth0_sub.startswith('linkedin|'):
+                auth_provider = 'linkedin'
+            elif auth0_sub.startswith('windowslive|') or auth0_sub.startswith('microsoft|'):
+                auth_provider = 'microsoft'
+            elif auth0_sub.startswith('auth0|'):
+                auth_provider = 'password'
         
         if not registration_email or not registration_password:
             return Response({
@@ -586,6 +623,7 @@ def auth0_complete_registration(request):
                 'stripe_subscription_id': subscription.id,
                 'subscription_status': subscription.status,
                 'subscription_plan': plan,
+                'auth_provider': auth_provider,
             }
             
             # Add subscription end date if available
@@ -607,6 +645,7 @@ def auth0_complete_registration(request):
                 user.stripe_subscription_id = subscription.id
                 user.subscription_status = subscription.status
                 user.subscription_plan = plan
+                user.auth_provider = auth_provider
                 if subscription_end_date:
                     user.subscription_end_date = subscription_end_date
                 user.save()
@@ -666,6 +705,136 @@ def auth0_complete_registration(request):
         print(f"Full traceback: {traceback.format_exc()}")
         return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """
+    Change password for Auth0 users with password authentication
+    """
+    try:
+        user = request.user
+        
+        # Check if user is using password authentication
+        if user.auth_provider != 'password':
+            return Response({
+                'message': 'Password change is only available for email/password authentication. Please use your social provider to change your password.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+        
+        # Validate passwords
+        if not new_password or not confirm_password:
+            return Response({
+                'message': 'Both new password and confirmation are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if new_password != confirm_password:
+            return Response({
+                'message': 'Passwords do not match'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if len(new_password) < 8:
+            return Response({
+                'message': 'Password must be at least 8 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get Auth0 Management API token
+        domain = settings.AUTH0_DOMAIN
+        client_id = settings.AUTH0_CLIENT_ID
+        client_secret = settings.AUTH0_CLIENT_SECRET
+        
+        # Get management API token
+        token_url = f'https://{domain}/oauth/token'
+        token_payload = {
+            'grant_type': 'client_credentials',
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'audience': f'https://{domain}/api/v2/'
+        }
+        
+        token_response = requests.post(token_url, json=token_payload)
+        
+        if token_response.status_code != 200:
+            print(f"Failed to get management token: {token_response.text}")
+            return Response({
+                'message': 'Failed to authenticate with Auth0'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        management_token = token_response.json()['access_token']
+        
+        # Get user's Auth0 ID
+        # First, search for user by email in Auth0
+        search_url = f'https://{domain}/api/v2/users-by-email'
+        search_headers = {
+            'Authorization': f'Bearer {management_token}'
+        }
+        search_params = {
+            'email': user.email
+        }
+        
+        search_response = requests.get(search_url, headers=search_headers, params=search_params)
+        
+        if search_response.status_code != 200 or not search_response.json():
+            print(f"Failed to find user in Auth0: {search_response.text}")
+            return Response({
+                'message': 'User not found in Auth0'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        auth0_users = search_response.json()
+        # Find the user with password connection
+        auth0_user = None
+        for u in auth0_users:
+            if u.get('identities'):
+                for identity in u['identities']:
+                    if identity.get('connection') == 'Username-Password-Authentication':
+                        auth0_user = u
+                        break
+            if auth0_user:
+                break
+        
+        if not auth0_user:
+            return Response({
+                'message': 'Password authentication not found for this user'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        auth0_user_id = auth0_user['user_id']
+        
+        # Update password in Auth0
+        update_url = f'https://{domain}/api/v2/users/{auth0_user_id}'
+        update_headers = {
+            'Authorization': f'Bearer {management_token}',
+            'Content-Type': 'application/json'
+        }
+        update_payload = {
+            'password': new_password,
+            'connection': 'Username-Password-Authentication'
+        }
+        
+        update_response = requests.patch(update_url, headers=update_headers, json=update_payload)
+        
+        if update_response.status_code != 200:
+            print(f"Failed to update password: {update_response.text}")
+            error_data = update_response.json() if update_response.text else {}
+            error_message = error_data.get('message', 'Failed to update password')
+            return Response({
+                'message': error_message
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"✅ Password updated successfully for user: {user.email}")
+        
+        return Response({
+            'message': 'Password updated successfully'
+        })
+        
+    except Exception as e:
+        print(f"Password change error: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return Response({
+            'message': 'An error occurred while changing your password'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])  # Allow unauthenticated access for coupon validation

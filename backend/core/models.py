@@ -79,6 +79,21 @@ class CustomUser(AbstractUser):
         help_text="Custom permissions dictionary for granular access control"
     )
     
+    # Authentication provider tracking
+    auth_provider = models.CharField(
+        max_length=50,
+        default='password',
+        choices=[
+            ('password', 'Email/Password'),
+            ('google-oauth2', 'Google'),
+            ('facebook', 'Facebook'),
+            ('apple', 'Apple'),
+            ('linkedin', 'LinkedIn'),
+            ('microsoft', 'Microsoft'),
+        ],
+        help_text="Authentication provider used for login"
+    )
+    
     # Communication preferences
     sms_consent = models.BooleanField(
         default=False, 

@@ -1,5 +1,15 @@
 <template>
-  <div class="container content-space-1" style="margin-top: 80px;">
+  <div class="container content-space-1" style="margin-top: 20px;">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+      <div class="row align-items-center">
+        <div class="col">
+          <h1 class="page-header-title">Your Profile Information</h1>
+          <p class="page-header-text text-muted">Manage your personal information, authentication settings, and preferences</p>
+        </div>
+      </div>
+    </div>
+    
     <div class="row">
       <div class="col-lg-3">
         <div id="navbarVerticalNavMenu" class="js-sticky-block card mb-5 mb-lg-0"
@@ -13,33 +23,28 @@
              }'>
           <ul class="js-scrollspy card card-navbar-nav nav nav-tabs nav-sm nav-vertical">
             <li class="nav-item">
-              <a class="nav-link active" href="#content">
+              <a class="nav-link active" href="#basicInfoSection" @click.prevent="scrollToSection('basicInfoSection', $event)">
                 <i class="bi-person nav-icon"></i> Basic information
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#emailSection">
-                <i class="bi-at nav-icon"></i> Email
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#passwordSection">
+            <li class="nav-item" v-if="form.auth_provider === 'password'">
+              <a class="nav-link" href="#passwordSection" @click.prevent="scrollToSection('passwordSection', $event)">
                 <i class="bi-key nav-icon"></i> Password
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#preferencesSection">
-                <i class="bi-gear nav-icon"></i> Preferences
+            <li class="nav-item" v-if="form.auth_provider !== 'password'">
+              <a class="nav-link" href="#authMethodSection" @click.prevent="scrollToSection('authMethodSection', $event)">
+                <i class="bi-shield-lock nav-icon"></i> Authentication
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#socialAccountsSection">
-                <i class="bi-instagram nav-icon"></i> White Label Options
+              <a class="nav-link" href="#whiteLabelSection" @click.prevent="scrollToSection('whiteLabelSection', $event)">
+                <i class="bi-palette nav-icon"></i> White Label Options
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#deleteAccountSection">
-                <i class="bi-trash nav-icon"></i> Delete account
+              <a class="nav-link" href="#customDisclosureSection" @click.prevent="scrollToSection('customDisclosureSection', $event)">
+                <i class="bi-file-text nav-icon"></i> Custom Disclosure
               </a>
             </li>
           </ul>
@@ -48,136 +53,215 @@
 
       <div class="col-lg-9">
         <div class="d-grid gap-3 gap-lg-5">
-          <div class="card">
+          <!-- Loading state -->
+          <div v-if="loading" class="card">
+            <div class="card-body text-center p-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading your profile...</p>
+            </div>
+          </div>
+
+          <!-- Basic Information Card -->
+          <div v-if="!loading" id="basicInfoSection" class="card">
             <div class="card-header">
               <h5 class="card-header-title">Basic information</h5>
             </div>
             <div class="card-body">
-              <div v-if="loading" class="text-center p-5">
-                <div class="spinner-border text-primary" role="status">
-                  <span class="visually-hidden">Loading...</span>
+              <div class="row">
+                <div class="col-sm-6 mb-4">
+                  <label for="firstName" class="form-label">First name</label>
+                  <input type="text" id="firstName" class="form-control" v-model="form.first_name">
                 </div>
-                <p class="mt-2">Loading your profile...</p>
+                <div class="col-sm-6 mb-4">
+                  <label for="lastName" class="form-label">Last name</label>
+                  <input type="text" id="lastName" class="form-control" v-model="form.last_name">
+                </div>
               </div>
-              <div v-else>
-                <div class="row">
-                  <div class="col-sm-6 mb-4">
-                    <label for="firstName" class="form-label">First name</label>
-                    <input type="text" id="firstName" class="form-control" v-model="form.first_name">
-                  </div>
-                  <div class="col-sm-6 mb-4">
-                    <label for="lastName" class="form-label">Last name</label>
-                    <input type="text" id="lastName" class="form-control" v-model="form.last_name">
-                  </div>
+              <div class="row">
+                <div class="col-sm-6 mb-4">
+                  <label for="email" class="form-label">Email</label>
+                  <input type="email" id="email" class="form-control" v-model="form.email" readonly>
+                  <small class="text-muted">Email cannot be changed</small>
                 </div>
-                <div class="row">
-                  <div class="col-sm-6 mb-4">
-                    <label for="email" class="form-label">Email</label>
-                    <input type="email" id="email" class="form-control" v-model="form.email" readonly>
-                    <small class="text-muted">Email cannot be changed</small>
-                  </div>
-                  <div class="col-sm-6 mb-4">
-                    <label for="phone" class="form-label">Phone number</label>
-                    <input type="text" id="phone" class="form-control" v-model="form.phone_number">
-                  </div>
+                <div class="col-sm-6 mb-4">
+                  <label for="phone" class="form-label">Phone number</label>
+                  <input type="text" id="phone" class="form-control" v-model="form.phone_number">
                 </div>
-                <div class="row">
-                  <div class="col-sm-6 mb-4">
-                    <label for="company" class="form-label">Company name</label>
-                    <input type="text" id="company" class="form-control" v-model="form.company_name">
-                  </div>
-                  <div class="col-sm-6 mb-4">
-                    <label for="website" class="form-label">Website URL</label>
-                    <input type="text" id="website" class="form-control" v-model="form.website_url" 
-                           placeholder="https://example.com (optional)">
-                    <small class="text-muted">Must include http:// or https://</small>
-                  </div>
-                </div>
-                <div class="row">
-                  <div class="col-sm-12 mb-4">
-                    <label for="address" class="form-label">Address</label>
-                    <input type="text" id="address" class="form-control" v-model="form.address">
-                  </div>
-                </div>
-                <div class="row">
-                  <div class="col-sm-4 mb-4">
-                    <label for="city" class="form-label">City</label>
-                    <input type="text" id="city" class="form-control" v-model="form.city">
-                  </div>
-                  <div class="col-sm-4 mb-4">
-                    <label for="state" class="form-label">State</label>
-                    <input type="text" id="state" class="form-control" v-model="form.state">
-                  </div>
-                  <div class="col-sm-4 mb-4">
-                    <label for="zip" class="form-label">Zip Code</label>
-                    <input type="text" id="zip" class="form-control" v-model="form.zip_code">
-                  </div>
-                </div>
+              </div>
+            </div>
+          </div>
 
-                <h5 class="mt-4 mb-3">White Label Settings</h5>
-                <div class="row">
-                  <div class="col-sm-6 mb-4">
-                    <label for="whiteLabelCompanyName" class="form-label">White Label Company</label>
-                    <input type="text" id="whiteLabelCompanyName" class="form-control" v-model="form.white_label_company_name">
-                  </div>
-                  <div class="col-sm-6 mb-4">
-                    <label for="supportEmail" class="form-label">Support Email</label>
-                    <input type="email" id="supportEmail" class="form-control" v-model="form.white_label_support_email">
-                  </div>
+          <!-- Password Change Card - Only show for password authentication -->
+          <div v-if="!loading && form.auth_provider === 'password'" id="passwordSection" class="card">
+            <div class="card-header">
+              <h5 class="card-header-title">Change Password</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-sm-6 mb-4">
+                  <label for="newPassword" class="form-label">New Password</label>
+                  <input type="password" id="newPassword" class="form-control" v-model="passwordForm.newPassword" 
+                         placeholder="Enter new password">
+                  <small class="text-muted">Password must be at least 8 characters</small>
                 </div>
-                <div class="row">
-                  <div class="col-sm-6 mb-4">
-                    <label for="primaryColor" class="form-label">Header Color</label>
-                    <div class="input-group">
-                      <input type="color" id="primaryColorPicker" class="form-control form-control-color" 
-                             v-model="form.primary_color" title="Choose header color">
-                      <input type="text" id="primaryColor" class="form-control" v-model="form.primary_color" 
-                             placeholder="#123456" style="flex: 1;">
-                      <span class="input-group-text" style="width: 40px; background-color: white;">
-                        <div :style="{ backgroundColor: form.primary_color || '#377dff', width: '20px', height: '20px', borderRadius: '3px' }"></div>
-                      </span>
-                    </div>
-                    <small class="text-muted">Choose a color for the header background</small>
-                  </div>
-                  <div class="col-sm-6 mb-4">
-                    <label for="logo" class="form-label">Company Logo</label>
-                    <ImageDropzone 
-                      v-model:value="logoFile" 
-                      :existingImageUrl="form.logo"
-                      @fileChanged="onLogoFileChanged"
-                    />
-                  </div>
+                <div class="col-sm-6 mb-4">
+                  <label for="confirmPassword" class="form-label">Confirm Password</label>
+                  <input type="password" id="confirmPassword" class="form-control" v-model="passwordForm.confirmPassword" 
+                         placeholder="Confirm new password">
+                  <small class="text-muted">Passwords must match</small>
                 </div>
-                
-                <h5 class="mt-4 mb-3">Custom Disclosure</h5>
-                <div class="row">
-                  <div class="col-12 mb-4">
-                    <label for="customDisclosure" class="form-label">
-                      Custom Disclosure Text
-                      <small class="text-muted ms-2">(Optional - will appear above default RetirementAdvisorPro disclosure)</small>
-                    </label>
-                    <textarea 
-                      id="customDisclosure" 
-                      class="form-control" 
-                      v-model="form.custom_disclosure"
-                      rows="5"
-                      placeholder="Enter your custom disclosure text here. This will appear on all scenario pages above the default RetirementAdvisorPro disclosure."
-                    ></textarea>
-                    <small class="text-muted">This disclosure will be displayed on all client scenario reports and pages.</small>
-                  </div>
+              </div>
+              <div class="mt-3">
+                <button class="btn btn-primary" @click="changePassword" :disabled="changingPassword">
+                  <span v-if="changingPassword" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  {{ changingPassword ? 'Changing...' : 'Change Password' }}
+                </button>
+                <div v-if="passwordSuccessMessage" class="alert alert-success mt-3">
+                  {{ passwordSuccessMessage }}
                 </div>
-                
-                <div class="mt-3">
-                  <button class="btn btn-primary" @click="updateProfile" :disabled="saving">
-                    <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    {{ saving ? 'Saving...' : 'Save changes' }}
-                  </button>
-                  <div v-if="successMessage" class="alert alert-success mt-3">
-                    {{ successMessage }}
+                <div v-if="passwordErrorMessage" class="alert alert-danger mt-3">
+                  {{ passwordErrorMessage }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Authentication Method Card - Only show for social login -->
+          <div v-if="!loading && form.auth_provider !== 'password'" id="authMethodSection" class="card">
+            <div class="card-header">
+              <h5 class="card-header-title">Authentication Method</h5>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                <span v-if="form.auth_provider === 'google-oauth2'">
+                  You are signed in with <strong>Google</strong>. To change your password, please visit your Google account settings.
+                </span>
+                <span v-else-if="form.auth_provider === 'facebook'">
+                  You are signed in with <strong>Facebook</strong>. To change your password, please visit your Facebook account settings.
+                </span>
+                <span v-else-if="form.auth_provider === 'apple'">
+                  You are signed in with <strong>Apple</strong>. To change your password, please visit your Apple ID account settings.
+                </span>
+                <span v-else-if="form.auth_provider === 'linkedin'">
+                  You are signed in with <strong>LinkedIn</strong>. To change your password, please visit your LinkedIn account settings.
+                </span>
+                <span v-else-if="form.auth_provider === 'microsoft'">
+                  You are signed in with <strong>Microsoft</strong>. To change your password, please visit your Microsoft account settings.
+                </span>
+                <span v-else>
+                  You are signed in with a social provider. Password changes must be made through your provider's account settings.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- White Label Settings Card -->
+          <div v-if="!loading" id="whiteLabelSection" class="card">
+            <div class="card-header">
+              <h5 class="card-header-title">White Label Settings</h5>
+            </div>
+            <div class="card-body">
+              <!-- Company Information -->
+              <h6 class="mb-3">Company Information</h6>
+              <div class="row">
+                <div class="col-sm-6 mb-4">
+                  <label for="company" class="form-label">Company Name</label>
+                  <input type="text" id="company" class="form-control" v-model="form.company_name">
+                </div>
+                <div class="col-sm-6 mb-4">
+                  <label for="website" class="form-label">Website URL</label>
+                  <input type="text" id="website" class="form-control" v-model="form.website_url" 
+                         placeholder="https://example.com (optional)">
+                  <small class="text-muted">Must include http:// or https://</small>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-sm-12 mb-4">
+                  <label for="address" class="form-label">Address</label>
+                  <input type="text" id="address" class="form-control" v-model="form.address">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-sm-4 mb-4">
+                  <label for="city" class="form-label">City</label>
+                  <input type="text" id="city" class="form-control" v-model="form.city">
+                </div>
+                <div class="col-sm-4 mb-4">
+                  <label for="state" class="form-label">State</label>
+                  <input type="text" id="state" class="form-control" v-model="form.state">
+                </div>
+                <div class="col-sm-4 mb-4">
+                  <label for="zip" class="form-label">Zip Code</label>
+                  <input type="text" id="zip" class="form-control" v-model="form.zip_code">
+                </div>
+              </div>
+              
+              <hr class="my-4">
+              
+              <!-- Branding -->
+              <h6 class="mb-3">Branding</h6>
+              <div class="row">
+                <div class="col-sm-6 mb-4">
+                  <label for="primaryColor" class="form-label">Header Color</label>
+                  <div class="input-group">
+                    <input type="color" id="primaryColorPicker" class="form-control form-control-color" 
+                           v-model="form.primary_color" title="Choose header color">
+                    <input type="text" id="primaryColor" class="form-control" v-model="form.primary_color" 
+                           placeholder="#123456" style="flex: 1;">
+                    <span class="input-group-text" style="width: 40px; background-color: white;">
+                      <div :style="{ backgroundColor: form.primary_color || '#377dff', width: '20px', height: '20px', borderRadius: '3px' }"></div>
+                    </span>
                   </div>
-                  <div v-if="errorMessage" class="alert alert-danger mt-3">
-                    {{ errorMessage }}
-                  </div>
+                  <small class="text-muted">Choose a color for the header background</small>
+                </div>
+                <div class="col-sm-6 mb-4">
+                  <label for="logo" class="form-label">Company Logo</label>
+                  <ImageDropzone 
+                    v-model:value="logoFile" 
+                    :existingImageUrl="form.logo"
+                    @fileChanged="onLogoFileChanged"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Custom Disclosure Card -->
+          <div v-if="!loading" id="customDisclosureSection" class="card">
+            <div class="card-header">
+              <h5 class="card-header-title">Custom Disclosure</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-12 mb-4">
+                  <label for="customDisclosure" class="form-label">
+                    Custom Disclosure Text
+                    <small class="text-muted ms-2">(Optional - will appear above default RetirementAdvisorPro disclosure)</small>
+                  </label>
+                  <textarea 
+                    id="customDisclosure" 
+                    class="form-control" 
+                    v-model="form.custom_disclosure"
+                    rows="5"
+                    placeholder="Enter your custom disclosure text here. This will appear on all scenario pages above the default RetirementAdvisorPro disclosure."
+                  ></textarea>
+                  <small class="text-muted">This disclosure will be displayed on all client scenario reports and pages.</small>
+                </div>
+              </div>
+              
+              <div class="mt-3">
+                <button class="btn btn-primary" @click="updateProfile" :disabled="saving">
+                  <span v-if="saving" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  {{ saving ? 'Saving...' : 'Save changes' }}
+                </button>
+                <div v-if="successMessage" class="alert alert-success mt-3">
+                  {{ successMessage }}
+                </div>
+                <div v-if="errorMessage" class="alert alert-danger mt-3">
+                  {{ errorMessage }}
                 </div>
               </div>
             </div>
@@ -189,7 +273,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import axios from 'axios'
 import { API_CONFIG } from '@/config'
 import { useToast } from 'vue-toastification'
@@ -217,7 +301,8 @@ const form = ref({
   white_label_support_email: '',
   primary_color: '',
   logo: '',
-  custom_disclosure: ''
+  custom_disclosure: '',
+  auth_provider: 'password'
 })
 
 const logoFile = ref(null)
@@ -225,6 +310,15 @@ const loading = ref(true)
 const saving = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+// Password change form
+const passwordForm = ref({
+  newPassword: '',
+  confirmPassword: ''
+})
+const changingPassword = ref(false)
+const passwordSuccessMessage = ref('')
+const passwordErrorMessage = ref('')
 
 // API base URL - change this to match your environment
 const apiBaseUrl = API_CONFIG.API_URL
@@ -412,8 +506,126 @@ const isValidUrl = (url) => {
   }
 }
 
+// Scroll to section function
+const scrollToSection = async (sectionId, event) => {
+  // Update active nav link
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active')
+  })
+  if (event && event.target) {
+    event.target.closest('.nav-link').classList.add('active')
+  }
+  
+  // Wait for next tick to ensure DOM is updated
+  await nextTick()
+  
+  // Try to find and scroll to the element
+  setTimeout(() => {
+    const targetElement = document.getElementById(sectionId)
+    console.log('Looking for section:', sectionId, 'Found:', targetElement)
+    
+    if (targetElement) {
+      // Use scrollIntoView for better compatibility
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      
+      // Add offset for header after scroll
+      setTimeout(() => {
+        window.scrollBy({ top: -100, behavior: 'smooth' })
+      }, 300)
+    } else {
+      console.error('Section not found:', sectionId)
+    }
+  }, 100) // Small delay to ensure everything is rendered
+}
+
+// Change password function
+const changePassword = async () => {
+  changingPassword.value = true
+  passwordSuccessMessage.value = ''
+  passwordErrorMessage.value = ''
+  
+  // Validate passwords
+  if (!passwordForm.value.newPassword || !passwordForm.value.confirmPassword) {
+    passwordErrorMessage.value = 'Please enter both password fields'
+    changingPassword.value = false
+    return
+  }
+  
+  if (passwordForm.value.newPassword.length < 8) {
+    passwordErrorMessage.value = 'Password must be at least 8 characters long'
+    changingPassword.value = false
+    return
+  }
+  
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    passwordErrorMessage.value = 'Passwords do not match'
+    changingPassword.value = false
+    return
+  }
+  
+  try {
+    const response = await axios.post(
+      `${apiBaseUrl}/change-password/`,
+      {
+        new_password: passwordForm.value.newPassword,
+        confirm_password: passwordForm.value.confirmPassword
+      },
+      getAuthHeaders()
+    )
+    
+    // Clear the form
+    passwordForm.value.newPassword = ''
+    passwordForm.value.confirmPassword = ''
+    
+    passwordSuccessMessage.value = 'Password changed successfully!'
+    toast.success('Password changed successfully')
+  } catch (error) {
+    console.error('Error changing password:', error)
+    if (error.response?.data?.detail) {
+      passwordErrorMessage.value = error.response.data.detail
+    } else if (error.response?.data) {
+      const errorData = error.response.data
+      const formattedErrors = []
+      Object.keys(errorData).forEach(field => {
+        if (Array.isArray(errorData[field])) {
+          formattedErrors.push(`${field}: ${errorData[field].join(', ')}`)
+        }
+      })
+      passwordErrorMessage.value = formattedErrors.length > 0 ? formattedErrors.join('. ') : 'Failed to change password'
+    } else {
+      passwordErrorMessage.value = error.message || 'Failed to change password'
+    }
+    toast.error('Failed to change password')
+  } finally {
+    changingPassword.value = false
+  }
+}
+
 // Load profile data when component mounts
 onMounted(() => {
   fetchUserProfile()
 })
 </script>
+
+<style scoped>
+/* Smooth scroll behavior for the entire page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Add some padding to sections to account for fixed header */
+.card[id] {
+  scroll-margin-top: 100px;
+}
+
+/* Style for active nav link */
+.nav-link.active {
+  font-weight: 600;
+  border-left: 3px solid #377dff;
+}
+
+/* Hover effect for nav links */
+.nav-link:hover {
+  background-color: rgba(55, 125, 255, 0.05);
+}
+</style>

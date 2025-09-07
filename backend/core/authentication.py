@@ -461,6 +461,7 @@ def get_enhanced_user_data(user):
         'subscription_status': user.subscription_status,
         'subscription_plan': user.subscription_plan,
         'is_subscription_active': user.is_subscription_active,
+        'auth_provider': user.auth_provider,
         # Admin fields
         'is_admin_user': user.is_admin_user,
         'admin_role': user.admin_role,
