@@ -10,7 +10,7 @@ domain_name    = "app.retirementadvisorpro.com"  # Set your custom domain when r
 # GitHub Configuration for CI/CD
 github_owner  = "wearemimic"  # Update with your GitHub username
 github_repo   = "retirementadvisorpro"
-github_branch = "feature/admin-area"
+github_branch = "main"
 github_token_secret_name = "github-token"
 
 # Network Configuration
