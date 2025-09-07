@@ -42,185 +42,174 @@
       </div>
     </div>
 
-    <!-- Task List -->
-    <div class="task-items">
-      <div
-        v-for="task in sortedTasks"
-        :key="task.id"
-        class="task-item card mb-2"
-        :class="getTaskItemClass(task)"
-        @click="handleTaskClick(task)"
-      >
-        <div class="card-body py-2 px-3">
-          <div class="d-flex align-items-start">
-            <!-- Selection Checkbox -->
-            <div class="form-check me-3">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                :id="`task-${task.id}`"
-                :checked="isTaskSelected(task.id)"
-                @click.stop
-                @change="$emit('task-select', task.id)"
-              >
-            </div>
-
-            <!-- Task Content - Single Line Layout -->
-            <div class="flex-grow-1 min-width-0">
-              <div class="d-flex justify-content-between align-items-center">
-                <!-- Left side: Title and all metadata in one line -->
-                <div class="d-flex align-items-center flex-wrap gap-2 flex-grow-1 min-width-0">
-                  <!-- Task Title -->
-                  <h6 class="task-title mb-0 me-3" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
+    <!-- Task Table -->
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" style="width: 3%">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="isAllSelected"
+                    :indeterminate.prop="isSomeSelected"
+                    @change="handleSelectAll"
+                  >
+                </div>
+              </th>
+              <th scope="col" style="width: 35%">Task</th>
+              <th scope="col" style="width: 10%">Status</th>
+              <th scope="col" style="width: 10%">Priority</th>
+              <th scope="col" style="width: 12%">Assigned To</th>
+              <th scope="col" style="width: 10%">Due Date</th>
+              <th scope="col" style="width: 10%">Created</th>
+              <th scope="col" style="width: 10%">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="task in sortedTasks" 
+                :key="task.id" 
+                class="task-row"
+                :class="{ 'table-danger-light': task.is_overdue }"
+                @click="handleTaskClick(task)">
+              <td @click.stop>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :id="`task-${task.id}`"
+                    :checked="isTaskSelected(task.id)"
+                    @change="$emit('task-select', task.id)"
+                  >
+                </div>
+              </td>
+              <td>
+                <div>
+                  <h6 class="mb-0" :class="{ 'text-decoration-line-through': task.status === 'completed' }">
                     {{ task.title }}
-                    <span v-if="task.is_overdue" class="badge bg-danger ms-1">
-                      <i class="fas fa-exclamation-triangle me-1"></i>Overdue
-                    </span>
+                    <span v-if="task.is_overdue" class="badge bg-danger ms-1">Overdue</span>
                   </h6>
-                  
-                  <!-- Status and Priority Badges -->
-                  <span class="badge me-1" :class="getStatusBadgeClass(task.status)">
-                    {{ getStatusLabel(task.status) }}
-                  </span>
-                  <span class="badge me-1" :class="getPriorityBadgeClass(task.priority)">
-                    {{ getPriorityLabel(task.priority) }}
-                  </span>
-                  <span v-if="task.task_type" class="badge bg-light text-dark me-1">
-                    {{ getTaskTypeLabel(task.task_type) }}
-                  </span>
-                  
-                  <!-- Task Description (truncated) -->
-                  <span v-if="task.description" class="text-muted me-3" style="font-size: 0.9em;">
-                    {{ truncateText(task.description, 80) }}
-                  </span>
-                  
-                  <!-- Task Details -->
-                  <div class="d-flex align-items-center gap-3 text-sm text-muted">
-                    <div v-if="task.due_date" class="d-flex align-items-center">
-                      <i class="fas fa-calendar me-1"></i>
-                      {{ formatDate(task.due_date) }}
-                    </div>
-                    
-                    <div v-if="task.assigned_to_name" class="d-flex align-items-center">
-                      <i class="fas fa-user me-1"></i>
-                      {{ task.assigned_to_name }}
-                    </div>
-                    
-                    <div v-if="task.client_name" class="d-flex align-items-center">
-                      <i class="fas fa-user-tie me-1"></i>
-                      {{ task.client_name }}
-                    </div>
-                    
-                    <div v-if="task.lead_name" class="d-flex align-items-center">
-                      <i class="fas fa-user-plus me-1"></i>
-                      {{ task.lead_name }}
-                    </div>
-                    
-                    <div class="d-flex align-items-center">
-                      <i class="fas fa-clock me-1"></i>
-                      {{ formatRelativeDate(task.created_at) }}
-                    </div>
-                    
-                    <div v-if="task.comments_count > 0" class="d-flex align-items-center">
-                      <i class="fas fa-comments me-1"></i>
-                      {{ task.comments_count }}
-                    </div>
-                    
-                    <!-- Tags inline -->
-                    <div v-if="task.tags && task.tags.length > 0" class="d-flex align-items-center gap-1">
-                      <span
-                        v-for="tag in task.tags.slice(0, 3)"
-                        :key="tag"
-                        class="badge bg-secondary"
-                        style="font-size: 0.65em;"
-                      >
-                        {{ tag }}
-                      </span>
-                      <span v-if="task.tags.length > 3" class="badge bg-secondary" style="font-size: 0.65em;">
-                        +{{ task.tags.length - 3 }}
-                      </span>
-                    </div>
+                  <small class="text-muted">{{ truncateText(task.description, 100) }}</small>
+                  <div v-if="task.client_name || task.lead_name" class="mt-1">
+                    <small class="text-muted">
+                      <i v-if="task.client_name" class="bi bi-person me-1"></i>{{ task.client_name }}
+                      <i v-if="task.lead_name" class="bi bi-person-plus ms-2 me-1"></i>{{ task.lead_name }}
+                    </small>
+                  </div>
+                  <div v-if="task.tags && task.tags.length > 0" class="mt-1">
+                    <span
+                      v-for="tag in task.tags.slice(0, 3)"
+                      :key="tag"
+                      class="badge bg-secondary me-1"
+                      style="font-size: 0.7em;"
+                    >
+                      {{ tag }}
+                    </span>
+                    <span v-if="task.tags.length > 3" class="badge bg-secondary" style="font-size: 0.7em;">
+                      +{{ task.tags.length - 3 }}
+                    </span>
                   </div>
                 </div>
-
-                <!-- Right side: Task Actions -->
-                <div class="task-actions ms-3">
+              </td>
+              <td>
+                <span class="badge" :class="getStatusBadgeClass(task.status)">
+                  {{ getStatusLabel(task.status) }}
+                </span>
+              </td>
+              <td>
+                <span class="badge" :class="getPriorityBadgeClass(task.priority)">
+                  {{ getPriorityLabel(task.priority) }}
+                </span>
+              </td>
+              <td>
+                <small>{{ task.assigned_to_name || '-' }}</small>
+              </td>
+              <td>
+                <small>{{ task.due_date ? formatDate(task.due_date) : '-' }}</small>
+              </td>
+              <td>
+                <small>{{ formatRelativeDate(task.created_at) }}</small>
+                <div v-if="task.comments_count > 0" class="text-muted">
+                  <small><i class="bi bi-chat me-1"></i>{{ task.comments_count }}</small>
+                </div>
+              </td>
+              <td @click.stop>
+                <div class="btn-group" role="group">
+                  <button
+                    class="btn btn-sm btn-outline-primary"
+                    @click.stop="$emit('task-click', task)"
+                    title="Edit Task"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  
                   <div class="btn-group btn-group-sm">
                     <button
-                      class="btn btn-outline-primary"
-                      @click.stop="$emit('task-click', task)"
-                      title="Edit Task"
+                      class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                      type="button"
+                      data-bs-toggle="dropdown"
                     >
-                      <i class="fas fa-edit"></i>
+                      <i class="bi bi-three-dots"></i>
                     </button>
-                    
-                    <div class="btn-group btn-group-sm">
-                      <button
-                        class="btn btn-outline-secondary dropdown-toggle"
-                        type="button"
-                        data-bs-toggle="dropdown"
-                        @click.stop
-                      >
-                        <i class="fas fa-ellipsis-h"></i>
-                      </button>
-                      <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                          <button
-                            class="dropdown-item"
-                            @click.stop="quickStatusUpdate(task, 'in_progress')"
-                            v-if="task.status === 'pending'"
-                          >
-                            <i class="fas fa-play me-2"></i>Start Task
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            class="dropdown-item"
-                            @click.stop="quickStatusUpdate(task, 'completed')"
-                            v-if="task.status !== 'completed'"
-                          >
-                            <i class="fas fa-check me-2"></i>Mark Complete
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            class="dropdown-item"
-                            @click.stop="quickStatusUpdate(task, 'pending')"
-                            v-if="task.status === 'in_progress'"
-                          >
-                            <i class="fas fa-pause me-2"></i>Mark Pending
-                          </button>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                          <button
-                            class="dropdown-item"
-                            @click.stop="duplicateTask(task)"
-                          >
-                            <i class="fas fa-copy me-2"></i>Duplicate
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            class="dropdown-item text-danger"
-                            @click.stop="$emit('task-delete', task.id)"
-                          >
-                            <i class="fas fa-trash me-2"></i>Delete
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li>
+                        <button
+                          class="dropdown-item"
+                          @click.stop="quickStatusUpdate(task, 'in_progress')"
+                          v-if="task.status === 'pending'"
+                        >
+                          <i class="bi bi-play me-2"></i>Start Task
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          class="dropdown-item"
+                          @click.stop="quickStatusUpdate(task, 'completed')"
+                          v-if="task.status !== 'completed'"
+                        >
+                          <i class="bi bi-check me-2"></i>Mark Complete
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          class="dropdown-item"
+                          @click.stop="quickStatusUpdate(task, 'pending')"
+                          v-if="task.status === 'in_progress'"
+                        >
+                          <i class="bi bi-pause me-2"></i>Mark Pending
+                        </button>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <button
+                          class="dropdown-item"
+                          @click.stop="duplicateTask(task)"
+                        >
+                          <i class="bi bi-files me-2"></i>Duplicate
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          class="dropdown-item text-danger"
+                          @click.stop="$emit('task-delete', task.id)"
+                        >
+                          <i class="bi bi-trash me-2"></i>Delete
+                        </button>
+                      </li>
+                    </ul>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- Empty State -->
-      <div v-if="tasks.length === 0" class="empty-state text-center py-5">
-        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+      <div v-if="tasks.length === 0 && !loading" class="text-center py-5">
+        <i class="bi bi-clipboard-check fa-3x text-muted mb-3"></i>
         <h5 class="text-muted">No tasks found</h5>
         <p class="text-muted">Create your first task to get started with task management.</p>
       </div>
@@ -416,63 +405,21 @@ watch(() => taskStore.filters.ordering, (newValue) => {
 </script>
 
 <style scoped>
-.task-item {
-  transition: all 0.2s ease;
+.task-row {
   cursor: pointer;
-  border-left: 4px solid transparent;
+  transition: background-color 0.2s ease;
 }
 
-.task-item-hover:hover {
-  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
+.task-row:hover {
+  background-color: #f8f9fa;
 }
 
-.task-title {
-  font-weight: 600;
-  color: #495057;
+.table-danger-light {
+  background-color: #fff5f5 !important;
 }
 
-.task-description {
-  line-height: 1.4;
-  margin-bottom: 0.75rem;
-}
-
-.task-meta .badge {
-  font-size: 0.7em;
-  font-weight: normal;
-}
-
-.task-details {
-  font-size: 0.85em;
-}
-
-.task-actions {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.task-item:hover .task-actions {
-  opacity: 1;
-}
-
-.text-sm {
-  font-size: 0.875rem;
-}
-
-.min-width-0 {
-  min-width: 0;
-}
-
-.border-danger {
-  border-left-color: #dc3545 !important;
-}
-
-.border-warning {
-  border-left-color: #ffc107 !important;
-}
-
-.border-success {
-  border-left-color: #28a745 !important;
+.table-danger-light:hover {
+  background-color: #ffe5e5 !important;
 }
 
 .empty-state {
@@ -488,19 +435,13 @@ watch(() => taskStore.filters.ordering, (newValue) => {
   font-size: 0.875rem;
 }
 
-.task-tags {
-  margin-top: 0.5rem;
-}
-
 @media (max-width: 768px) {
-  .task-actions {
-    opacity: 1;
+  .table {
+    font-size: 0.875rem;
   }
   
-  .task-details {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem !important;
+  th, td {
+    padding: 0.5rem;
   }
 }
 </style>

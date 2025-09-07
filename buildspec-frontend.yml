@@ -15,16 +15,24 @@ phases:
       - echo Building Vue.js Docker image for linux/amd64...
       - |
         if [ "$IMAGE_TAG" = "staging" ]; then
-          API_URL="http://staging.retirementadvisorpro.com"
-          FRONTEND_URL="http://staging.retirementadvisorpro.com"
+          API_URL="https://staging.retirementadvisorpro.com"
+          FRONTEND_URL="https://staging.retirementadvisorpro.com"
         else
-          API_URL="http://app.retirementadvisorpro.com"
-          FRONTEND_URL="http://app.retirementadvisorpro.com"
+          API_URL="https://app.retirementadvisorpro.com"
+          FRONTEND_URL="https://app.retirementadvisorpro.com"
         fi
         echo "Using production Dockerfile with nginx for better stability"
         echo "API_URL: $API_URL"
         echo "FRONTEND_URL: $FRONTEND_URL"
-      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$API_URL --build-arg VITE_FRONTEND_URL=$FRONTEND_URL --load .
+      - docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG \
+          --build-arg VITE_API_BASE_URL=$API_URL \
+          --build-arg VITE_API_URL=$API_URL/api \
+          --build-arg VITE_FRONTEND_URL=$FRONTEND_URL \
+          --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN \
+          --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID \
+          --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE \
+          --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY \
+          --load .
       - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
   post_build:
     commands:

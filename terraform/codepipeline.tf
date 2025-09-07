@@ -545,15 +545,10 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
   })
 }
 
-# GitHub connection (requires manual setup in AWS Console)
-# resource "aws_codestar_connection" "github" {
-#   name          = "${local.name_prefix}-github-connection"
-#   provider_type = "GitHub"
-
-#   tags = merge(local.common_tags, {
-#     Name = "${local.name_prefix}-github-connection"
-#   })
-# }
+# Use existing GitHub connection
+data "aws_codestar_connection" "github" {
+  arn = "arn:aws:codestar-connections:us-east-1:794038228127:connection/003257bb-26b7-47d0-8c64-091c85a34639"
+}
 
 # CodePipeline
 resource "aws_codepipeline" "main" {
