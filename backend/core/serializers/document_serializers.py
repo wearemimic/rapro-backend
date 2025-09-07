@@ -21,10 +21,10 @@ class DocumentCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentCategory
         fields = [
-            'id', 'name', 'description', 'category_type', 'color_code',
-            'icon', 'is_active', 'document_count', 'created_at', 'updated_at'
+            'id', 'name', 'description', 'category_type', 'default_retention_years',
+            'requires_encryption', 'is_active', 'document_count', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'document_count']
+        read_only_fields = ['id', 'created_at', 'document_count']
 
     def validate_category_type(self, value):
         """Validate category type is allowed"""
@@ -86,7 +86,7 @@ class DocumentAuditLogSerializer(serializers.ModelSerializer):
         model = DocumentAuditLog
         fields = [
             'id', 'user', 'user_name', 'action', 'details', 'document_filename',
-            'ip_address', 'user_agent', 'timestamp'
+            'user_ip', 'user_agent', 'timestamp'
         ]
         read_only_fields = ['id', 'timestamp', 'user_name', 'document_filename']
 
@@ -137,7 +137,6 @@ class DocumentSerializer(serializers.ModelSerializer):
     
     # Related objects
     versions = DocumentVersionSerializer(many=True, read_only=True)
-    permissions = DocumentPermissionSerializer(many=True, read_only=True)
     recent_audit_logs = serializers.SerializerMethodField()
     
     # Computed fields
@@ -151,17 +150,17 @@ class DocumentSerializer(serializers.ModelSerializer):
             'id', 'original_filename', 'title', 'description', 'category', 'category_name',
             'client', 'client_name', 's3_key', 'file_hash', 'file_size', 'file_size_mb',
             'mime_type', 'tags', 'status', 'compliance_type', 'retention_status',
-            'retention_end_date', 'contains_pii', 'contains_phi', 'encryption_status',
+            'retention_end_date', 'contains_pii', 'contains_phi',
             'advisor', 'advisor_name', 'uploaded_by', 'uploaded_by_name',
-            'uploaded_at', 'last_accessed', 'access_count', 'archived_at',
-            'versions', 'permissions', 'recent_audit_logs',
+            'uploaded_at', 'last_accessed', 'access_count',
+            'versions', 'recent_audit_logs',
             'can_edit', 'can_delete'
         ]
         read_only_fields = [
             'id', 's3_key', 'file_hash', 'file_size', 'file_size_mb', 'mime_type',
-            'uploaded_at', 'last_accessed', 'access_count', 'archived_at',
+            'uploaded_at', 'last_accessed', 'access_count',
             'category_name', 'client_name', 'uploaded_by_name', 'advisor_name',
-            'versions', 'permissions', 'recent_audit_logs', 'can_edit', 'can_delete',
+            'versions', 'recent_audit_logs', 'can_edit', 'can_delete',
             'retention_end_date'
         ]
 
@@ -192,13 +191,8 @@ class DocumentSerializer(serializers.ModelSerializer):
         if obj.advisor == request.user:
             return True
             
-        # Check explicit permissions
-        return obj.permissions.filter(
-            user=request.user,
-            permission_type__in=['edit', 'admin'],
-            is_active=True,
-            expires_at__gt=timezone.now()
-        ).exists()
+        # No additional permission system for now
+        return False
 
     def get_can_delete(self, obj):
         """Check if current user can delete document"""
@@ -246,7 +240,8 @@ class DocumentUploadSerializer(serializers.Serializer):
     tags = serializers.CharField(required=False, allow_blank=True)
     compliance_type = serializers.ChoiceField(
         choices=Document.COMPLIANCE_TYPES,
-        default='standard'
+        default='none',
+        required=False
     )
     contains_pii = serializers.BooleanField(default=False)
     contains_phi = serializers.BooleanField(default=False)
@@ -255,15 +250,45 @@ class DocumentUploadSerializer(serializers.Serializer):
         """Validate uploaded file"""
         # Check file size
         from django.conf import settings
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Validating file: {value.name}, size: {value.size}, content_type: {value.content_type}")
+        
         if value.size > settings.MAX_UPLOAD_SIZE:
             raise serializers.ValidationError(
                 f"File size {value.size} exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE} bytes"
             )
         
-        # Check content type
-        if value.content_type not in settings.ALLOWED_DOCUMENT_TYPES:
+        # Check content type - also check for common variations
+        allowed_types = settings.ALLOWED_DOCUMENT_TYPES
+        # Add common variations that browsers might send
+        if value.content_type == 'application/octet-stream':
+            # For octet-stream, check file extension
+            import os
+            ext = os.path.splitext(value.name)[1].lower()
+            ext_to_type = {
+                '.pdf': 'application/pdf',
+                '.doc': 'application/msword',
+                '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                '.xls': 'application/vnd.ms-excel',
+                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                '.txt': 'text/plain',
+                '.csv': 'text/csv',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.tiff': 'image/tiff',
+                '.tif': 'image/tiff'
+            }
+            if ext in ext_to_type:
+                logger.info(f"Allowing octet-stream with extension {ext}")
+                return value
+        
+        if value.content_type not in allowed_types:
+            logger.error(f"File type '{value.content_type}' not in allowed types: {allowed_types}")
             raise serializers.ValidationError(
-                f"File type '{value.content_type}' is not allowed"
+                f"File type '{value.content_type}' is not allowed. Allowed types: PDF, Word, Excel, Text, CSV, Images (JPEG, PNG, TIFF)"
             )
         
         return value
