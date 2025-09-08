@@ -175,16 +175,36 @@ WSGI_APPLICATION = 'retirementadvisorpro.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'retirementadvisorpro',
-        'USER': 'postgres',
-        'PASSWORD': 'password',
-        'HOST': 'db',  # Use 'db' if you're using Docker with a service named `db`
-        'PORT': '5432',
+# Check if we have a DATABASE_URL (production) or use local settings
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Parse the DATABASE_URL for production
+    from urllib.parse import urlparse
+    db_url = urlparse(DATABASE_URL)
+    
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_url.path[1:] if db_url.path else 'retirementadvisorpro',
+            'USER': db_url.username or 'postgres',
+            'PASSWORD': db_url.password or 'password',
+            'HOST': db_url.hostname or 'localhost',
+            'PORT': db_url.port or '5432',
+        }
     }
-}
+else:
+    # Local development settings
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'retirementadvisorpro',
+            'USER': 'postgres',
+            'PASSWORD': 'password',
+            'HOST': 'db',  # Use 'db' for Docker with a service named `db`
+            'PORT': '5432',
+        }
+    }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
