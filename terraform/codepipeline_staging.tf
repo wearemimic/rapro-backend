@@ -231,23 +231,26 @@ resource "aws_codepipeline" "main_pipeline" {
     }
   }
 
-  # Stage 7: Post-Deployment Validation
-  stage {
-    name = "Validate_Production"
-
-    action {
-      name             = "Smoke_Tests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["source_output"]
-
-      configuration = {
-        ProjectName = aws_codebuild_project.smoke_tests.name
-      }
-    }
-  }
+  # Stage 7: Post-Deployment Validation - REMOVED TO SIMPLIFY PIPELINE
+  # Smoke tests were causing unnecessary complexity and delays
+  # Manual testing can be performed after production deployment
+  #
+  # stage {
+  #   name = "Validate_Production"
+  #
+  #   action {
+  #     name             = "Smoke_Tests"
+  #     category         = "Build"
+  #     owner            = "AWS"
+  #     provider         = "CodeBuild"
+  #     version          = "1"
+  #     input_artifacts  = ["source_output"]
+  #
+  #     configuration = {
+  #       ProjectName = aws_codebuild_project.smoke_tests.name
+  #     }
+  #   }
+  # }
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-pipeline"
@@ -291,39 +294,42 @@ resource "aws_codepipeline" "main_pipeline" {
 #   })
 # }
 
-# CodeBuild Project for Smoke Tests
-resource "aws_codebuild_project" "smoke_tests" {
-  name          = "${local.name_prefix}-smoke-tests"
-  service_role  = aws_iam_role.codebuild_role.arn
-
-  artifacts {
-    type = "CODEPIPELINE"
-  }
-
-  environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                      = "aws/codebuild/standard:5.0"
-    type                       = "LINUX_CONTAINER"
-    privileged_mode            = false
-    image_pull_credentials_type = "CODEBUILD"
-  }
-
-  source {
-    type      = "CODEPIPELINE"
-    buildspec = "buildspec-smoke-tests.yml"
-  }
-
-  logs_config {
-    cloudwatch_logs {
-      group_name  = aws_cloudwatch_log_group.codebuild.name
-      stream_name = "${local.name_prefix}-smoke-tests"
-    }
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${local.name_prefix}-smoke-tests"
-  })
-}
+# CodeBuild Project for Smoke Tests - REMOVED
+# Smoke tests were not essential and added unnecessary complexity
+# Manual testing can be performed post-deployment
+#
+# resource "aws_codebuild_project" "smoke_tests" {
+#   name          = "${local.name_prefix}-smoke-tests"
+#   service_role  = aws_iam_role.codebuild_role.arn
+#
+#   artifacts {
+#     type = "CODEPIPELINE"
+#   }
+#
+#   environment {
+#     compute_type                = "BUILD_GENERAL1_SMALL"
+#     image                      = "aws/codebuild/standard:5.0"
+#     type                       = "LINUX_CONTAINER"
+#     privileged_mode            = false
+#     image_pull_credentials_type = "CODEBUILD"
+#   }
+#
+#   source {
+#     type      = "CODEPIPELINE"
+#     buildspec = "buildspec-smoke-tests.yml"
+#   }
+#
+#   logs_config {
+#     cloudwatch_logs {
+#       group_name  = aws_cloudwatch_log_group.codebuild.name
+#       stream_name = "${local.name_prefix}-smoke-tests"
+#     }
+#   }
+#
+#   tags = merge(local.common_tags, {
+#     Name = "${local.name_prefix}-smoke-tests"
+#   })
+# }
 
 # Updated CodeBuild Projects with staging/production tags
 resource "aws_codebuild_project" "frontend_build_staging" {

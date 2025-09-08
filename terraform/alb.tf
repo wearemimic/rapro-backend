@@ -71,7 +71,7 @@ resource "aws_lb_target_group" "backend" {
     unhealthy_threshold = 2
     timeout             = 5
     interval            = 30
-    path                = "/health/"  # Django health check endpoint
+    path                = "/api/health/"  # Django health check endpoint
     matcher             = "200"
     port                = "traffic-port"
     protocol            = "HTTP"

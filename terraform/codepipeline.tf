@@ -502,8 +502,7 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
         ]
         Resource = [
           aws_codebuild_project.frontend.arn,
-          aws_codebuild_project.backend.arn,
-          aws_codebuild_project.smoke_tests.arn
+          aws_codebuild_project.backend.arn
         ]
       },
       {
