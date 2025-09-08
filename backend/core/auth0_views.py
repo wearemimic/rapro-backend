@@ -331,53 +331,107 @@ def auth0_exchange_code(request):
                 (existing_user.subscription_end_date is None or existing_user.is_subscription_active)
             )
             
-            if has_active_subscription or existing_user.is_superuser:
-                print(f"✅ Existing user with active subscription: {email}")
+            # Handle based on flow type
+            if flow_type == 'registration':
+                # User is trying to register but already exists
+                if has_active_subscription or existing_user.is_superuser:
+                    print(f"⚠️ Registration flow but user already has active subscription: {email}")
+                    # They already have an account, log them in but notify frontend
+                    # Update user with latest Auth0 info
+                    existing_user.first_name = user_info.get('given_name', existing_user.first_name)
+                    existing_user.last_name = user_info.get('family_name', existing_user.last_name)
+                    existing_user.auth0_sub = user_info.get('sub')
+                    existing_user.auth_provider = auth_provider
+                    existing_user.save()
+                    
+                    # Generate Django JWT tokens for authenticated user
+                    jwt_tokens = create_jwt_pair_for_user(existing_user)
+                    
+                    # Prepare response data with flag indicating they already had an account
+                    response_data = {
+                        'access': jwt_tokens['access'],
+                        'refresh': jwt_tokens['refresh'],
+                        'user': get_enhanced_user_data(existing_user),
+                        'is_new_user': False,
+                        'registration_complete': True,
+                        'already_registered': True  # Flag to show they already had an account
+                    }
+                else:
+                    print(f"🔄 Registration flow: existing user without subscription: {email}")
+                    # Continue with registration flow to complete payment
+                    return Response({
+                        'message': 'Complete registration',
+                        'requires_registration': True,
+                        'email': email,
+                        'first_name': user_info.get('given_name', ''),
+                        'last_name': user_info.get('family_name', ''),
+                        'auth0_sub': user_info.get('sub'),
+                        'social_login': True,
+                        'is_new_user': False
+                    }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
+            else:  # login flow
+                if has_active_subscription or existing_user.is_superuser:
+                    print(f"✅ Login flow: existing user with active subscription: {email}")
+                    
+                    # Update user with latest Auth0 info
+                    existing_user.first_name = user_info.get('given_name', existing_user.first_name)
+                    existing_user.last_name = user_info.get('family_name', existing_user.last_name)
+                    existing_user.auth0_sub = user_info.get('sub')
+                    existing_user.auth_provider = auth_provider
+                    existing_user.save()
+                    
+                    # Generate Django JWT tokens for authenticated user
+                    jwt_tokens = create_jwt_pair_for_user(existing_user)
+                    
+                    # Prepare response data
+                    response_data = {
+                        'access': jwt_tokens['access'],
+                        'refresh': jwt_tokens['refresh'],
+                        'user': get_enhanced_user_data(existing_user),
+                        'is_new_user': False,
+                        'registration_complete': True
+                    }
+                else:
+                    print(f"❌ Login flow: existing user without active subscription: {email}")
+                    # Block login and tell them to complete registration
+                    return Response({
+                        'message': 'No active subscription. Please complete registration first.',
+                        'requires_registration': True,
+                        'email': email,
+                        'first_name': user_info.get('given_name', ''),
+                        'last_name': user_info.get('family_name', ''),
+                        'auth0_sub': user_info.get('sub'),
+                        'social_login': True
+                    }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
                 
-                # Update user with latest Auth0 info
-                existing_user.first_name = user_info.get('given_name', existing_user.first_name)
-                existing_user.last_name = user_info.get('family_name', existing_user.last_name)
-                existing_user.auth0_sub = user_info.get('sub')
-                existing_user.auth_provider = auth_provider
-                existing_user.save()
-                
-                # Generate Django JWT tokens for authenticated user
-                jwt_tokens = create_jwt_pair_for_user(existing_user)
-                
-                # Prepare response data
-                response_data = {
-                    'access': jwt_tokens['access'],
-                    'refresh': jwt_tokens['refresh'],
-                    'user': get_enhanced_user_data(existing_user),
-                    'is_new_user': False,
-                    'registration_complete': True
-                }
-            else:
-                print(f"❌ Existing user without active subscription: {email}")
-                # Return special response indicating registration needed
+        except User.DoesNotExist:
+            # New user - handle based on flow type
+            if flow_type == 'registration':
+                print(f"🔄 Registration flow: new user needs to complete registration: {email}")
+                # Continue with registration
                 return Response({
-                    'message': 'Registration required',
+                    'message': 'Complete registration',
                     'requires_registration': True,
                     'email': email,
                     'first_name': user_info.get('given_name', ''),
                     'last_name': user_info.get('family_name', ''),
                     'auth0_sub': user_info.get('sub'),
-                    'social_login': True
+                    'social_login': True,
+                    'is_new_user': True
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
-                
-        except User.DoesNotExist:
-            print(f"🔄 New social login user needs to complete registration: {email}")
-            # SECURITY: New users must complete registration with payment
-            return Response({
-                'message': 'Registration required',
-                'requires_registration': True,
-                'email': email,
-                'first_name': user_info.get('given_name', ''),
-                'last_name': user_info.get('family_name', ''),
-                'auth0_sub': user_info.get('sub'),
-                'social_login': True,
-                'is_new_user': True
-            }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
+            else:  # login flow
+                print(f"❌ Login flow: user doesn't exist: {email}")
+                # Block login - they need to register first
+                return Response({
+                    'message': 'No account found. Please register first.',
+                    'requires_registration': True,
+                    'email': email,
+                    'first_name': user_info.get('given_name', ''),
+                    'last_name': user_info.get('family_name', ''),
+                    'auth0_sub': user_info.get('sub'),
+                    'social_login': True,
+                    'is_new_user': True
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
         
         print(f"✅ Authenticated user response prepared")
         
@@ -468,7 +522,9 @@ def auth0_complete_registration(request):
         
         # Determine auth provider from auth0_sub
         auth_provider = 'password'  # default
+        is_social_login = False
         if auth0_sub:
+            is_social_login = True
             if auth0_sub.startswith('google-oauth2|'):
                 auth_provider = 'google-oauth2'
             elif auth0_sub.startswith('facebook|'):
@@ -481,10 +537,18 @@ def auth0_complete_registration(request):
                 auth_provider = 'microsoft'
             elif auth0_sub.startswith('auth0|'):
                 auth_provider = 'password'
+                is_social_login = False
         
-        if not registration_email or not registration_password:
+        # For social logins, we don't need a password (user already authenticated with provider)
+        if not registration_email:
             return Response({
-                'message': 'Registration credentials required'
+                'message': 'Registration email required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # For email/password registration, we need the password
+        if not is_social_login and not registration_password:
+            return Response({
+                'message': 'Registration password required for email registration'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         print(f"🔄 Processing payment for registration: {registration_email}")
@@ -632,6 +696,10 @@ def auth0_complete_registration(request):
                 'auth_provider': auth_provider,
             }
             
+            # Add auth0_sub for social logins
+            if auth0_sub:
+                user_defaults['auth0_sub'] = auth0_sub
+            
             # Add subscription end date if available
             if subscription_end_date:
                 user_defaults['subscription_end_date'] = subscription_end_date
@@ -652,6 +720,8 @@ def auth0_complete_registration(request):
                 user.subscription_status = subscription.status
                 user.subscription_plan = plan
                 user.auth_provider = auth_provider
+                if auth0_sub:
+                    user.auth0_sub = auth0_sub
                 if subscription_end_date:
                     user.subscription_end_date = subscription_end_date
                 user.save()

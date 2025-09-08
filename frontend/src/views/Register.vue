@@ -769,10 +769,19 @@ onMounted(async () => {
       registrationStore.currentStep = step;
       console.log(`🔄 Set registration step to ${step} from URL parameter`);
       
-      // Show a message if they're completing registration after Auth0 login
-      if (step === 2 && localStorage.getItem('auth0_flow') === 'registration') {
-        console.log('✅ User redirected to complete registration after Auth0 authentication');
-        // You could show a toast message here if you have a notification system
+      // Check if we have Auth0 user info from the callback
+      const auth0UserInfo = sessionStorage.getItem('auth0_user_info');
+      if (auth0UserInfo && step === 2) {
+        const userInfo = JSON.parse(auth0UserInfo);
+        console.log('✅ Pre-filling form with Auth0 user info:', userInfo);
+        
+        // Pre-fill the form with Auth0 data
+        form.email = userInfo.email || '';
+        form.firstName = userInfo.firstName || '';
+        form.lastName = userInfo.lastName || '';
+        
+        // Clear the stored info after using it
+        sessionStorage.removeItem('auth0_user_info');
       }
     }
   }
@@ -824,6 +833,20 @@ onMounted(async () => {
         firstName: form.firstName,
         lastName: form.lastName
       });
+    }
+  } else {
+    // Check if we have Auth0 user info from the callback (not authenticated yet)
+    const auth0UserInfo = sessionStorage.getItem('auth0_user_info');
+    if (auth0UserInfo) {
+      const userInfo = JSON.parse(auth0UserInfo);
+      console.log('✅ Pre-filling form with Auth0 user info (not authenticated):', userInfo);
+      
+      // Pre-fill the form with Auth0 data
+      form.email = userInfo.email || '';
+      form.firstName = userInfo.firstName || '';
+      form.lastName = userInfo.lastName || '';
+      
+      // Don't clear the info yet - we might need it for the final submission
     }
   }
   
@@ -1452,24 +1475,46 @@ const handleSubmit = async () => {
         console.log('✅ Skipping payment method creation for zero-cost subscription');
       }
 
-      // Get registration credentials
-      const email = sessionStorage.getItem('registration_email');
-      const password = sessionStorage.getItem('registration_password');
+      // Check if this is a social login registration or email registration
+      const auth0UserInfo = sessionStorage.getItem('auth0_user_info');
+      let registrationData = {};
       
-      if (!email || !password) {
-        throw new Error('Missing registration credentials. Please start registration again.');
-      }
-      
-      console.log('🔄 Completing registration with payment-first security flow...');
-
-      // Complete Auth0 registration with professional info and payment
-      // Backend will authenticate AFTER payment succeeds (secure flow)
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth0/complete-registration/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      if (auth0UserInfo) {
+        // Social login registration
+        const userInfo = JSON.parse(auth0UserInfo);
+        console.log('🔄 Completing social login registration with payment-first security flow...');
+        
+        registrationData = {
+          registrationEmail: userInfo.email,
+          registrationPassword: 'social_login_no_password', // Placeholder for social logins
+          auth0Sub: userInfo.auth0_sub, // This tells backend it's a social login
+          professionalInfo: {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            phone: form.phone,
+            smsConsent: form.smsConsent
+          },
+          paymentInfo: {
+            paymentMethodId: paymentMethodId,
+            plan: form.plan,
+            billingDetails: billingDetails,
+            couponCode: appliedDiscount.value ? form.couponCode : null,
+            appliedDiscount: appliedDiscount.value,
+            isZeroCost: isZeroCost.value
+          }
+        };
+      } else {
+        // Email/password registration
+        const email = sessionStorage.getItem('registration_email');
+        const password = sessionStorage.getItem('registration_password');
+        
+        if (!email || !password) {
+          throw new Error('Missing registration credentials. Please start registration again.');
+        }
+        
+        console.log('🔄 Completing email registration with payment-first security flow...');
+        
+        registrationData = {
           registrationEmail: email,
           registrationPassword: password,
           professionalInfo: {
@@ -1486,7 +1531,17 @@ const handleSubmit = async () => {
             appliedDiscount: appliedDiscount.value,
             isZeroCost: isZeroCost.value
           }
-        })
+        };
+      }
+
+      // Complete Auth0 registration with professional info and payment
+      // Backend will authenticate AFTER payment succeeds (secure flow)
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth0/complete-registration/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(registrationData)
       });
 
       const data = await response.json();
@@ -1508,6 +1563,7 @@ const handleSubmit = async () => {
         // Clear registration credentials
         sessionStorage.removeItem('registration_email');
         sessionStorage.removeItem('registration_password');
+        sessionStorage.removeItem('auth0_user_info');  // Clear social login info
         localStorage.removeItem('auth0_flow');
         sessionStorage.removeItem('auth0_state');
         

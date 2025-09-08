@@ -67,9 +67,42 @@ onMounted(async () => {
       })
     });
 
-    if (response.ok) {
-      const data = await response.json();
+    const data = await response.json();
+    
+    // Handle payment required (402) status for registration
+    if (response.status === 402) {
+      console.log('🔄 Registration required for this user');
       
+      if (isRegistrationFlow) {
+        // User wanted to register, continue with registration
+        console.log('✅ Continuing registration flow');
+        
+        // Store the Auth0 user info temporarily for registration completion
+        sessionStorage.setItem('auth0_user_info', JSON.stringify({
+          email: data.email,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          auth0_sub: data.auth0_sub
+        }));
+        
+        // Clear the flow flag and redirect to registration step 2
+        localStorage.removeItem('auth0_flow');
+        router.push('/register?step=2');
+      } else {
+        // User tried to login but needs to complete registration
+        console.log('❌ User tried to login but has no active subscription');
+        localStorage.removeItem('auth0_flow');
+        
+        // Show error and redirect to login
+        error.value = 'You need to complete your registration first. Please use the Register button.';
+        setTimeout(() => {
+          router.push('/login');
+        }, 3000);
+      }
+      return;
+    }
+    
+    if (response.ok) {
       // Store tokens from Django
       authStore.setTokens({
         access: data.access,
@@ -87,19 +120,22 @@ onMounted(async () => {
       if (isRegistrationFlow) {
         console.log('🔄 Registration flow detected');
         
-        // Check if registration is complete
-        if (data.registration_complete === false) {
-          console.log('🔄 Registration incomplete, redirecting to step 2');
-          // Clear the flow flag
+        // Check if this is an existing user trying to register again
+        if (data.already_registered) {
+          console.log('⚠️ Existing user with active subscription tried to register');
           localStorage.removeItem('auth0_flow');
-          // Redirect to registration step 2 (professional info)
+          alert('You already have an account. You have been logged in.');
+          router.push('/dashboard');
+        } else if (data.registration_complete === false) {
+          console.log('🔄 Registration incomplete, redirecting to step 2');
+          localStorage.removeItem('auth0_flow');
           router.push('/register?step=2');
         } else if (data.is_new_user) {
           console.log('🔄 New user, redirecting to step 2');
           localStorage.removeItem('auth0_flow');
           router.push('/register?step=2');
         } else {
-          console.log('✅ Registration complete or existing user, redirecting to dashboard');
+          console.log('✅ Registration complete, redirecting to dashboard');
           localStorage.removeItem('auth0_flow');
           router.push('/dashboard');
         }
@@ -108,8 +144,7 @@ onMounted(async () => {
         router.push('/dashboard');
       }
     } else {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Django token exchange failed');
+      throw new Error(data.message || 'Django token exchange failed');
     }
     
   } catch (err) {

@@ -177,21 +177,15 @@ WSGI_APPLICATION = 'retirementadvisorpro.wsgi.application'
 
 import dj_database_url
 
-# Default database configuration for local development
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'retirementadvisorpro',
-        'USER': 'postgres',
-        'PASSWORD': 'password',
-        'HOST': 'db',  # Use 'db' for Docker with a service named `db`
-        'PORT': '5432',
-    }
-}
-
-# Override with DATABASE_URL if it exists (for production)
+# Database configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Determine if we're in production/staging based on environment variables
+IS_PRODUCTION = os.environ.get('ENVIRONMENT') in ['production', 'staging'] or DATABASE_URL
+
 if DATABASE_URL:
+    # Production/Staging - use DATABASE_URL
+    DATABASES = {}
     try:
         # Try dj-database-url first
         DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
@@ -214,7 +208,19 @@ if DATABASE_URL:
             }
         else:
             print(f"Failed to parse DATABASE_URL: {e}")
-            # Keep default local settings as last resort
+            raise Exception(f"Failed to parse DATABASE_URL: {e}")
+else:
+    # Local development - use Docker service name 'db'
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'retirementadvisorpro',
+            'USER': 'postgres',
+            'PASSWORD': 'password',
+            'HOST': 'db',  # Use 'db' for Docker with a service named `db`
+            'PORT': '5432',
+        }
+    }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
