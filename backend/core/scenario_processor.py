@@ -665,6 +665,11 @@ class ScenarioProcessor:
         Calculate the Required Minimum Distribution (RMD) for a given asset in a specific year.
         Uses current IRS rules including different start ages and inherited account rules.
         """
+        # Skip RMD calculation for fully converted assets
+        if asset.get("fully_converted_to_roth", False):
+            self._log_debug(f"Year {year} - Asset {asset.get('investment_name', 'Unknown')} fully converted, no RMD required")
+            return Decimal('0')
+        
         # Check if this asset type requires RMD
         if not self._requires_rmd(asset):
             return 0
@@ -831,7 +836,12 @@ class ScenarioProcessor:
         
         # Update tracking information
         asset["last_processed_year"] = year
-        asset["previous_year_balance"] = current_balance
+        # Only update previous_year_balance if not fully converted
+        if not asset.get("fully_converted_to_roth", False):
+            asset["previous_year_balance"] = current_balance
+        else:
+            # If fully converted, set previous year balance to 0
+            asset["previous_year_balance"] = Decimal('0')
         asset["current_asset_balance"] = current_balance
         
         return current_balance
@@ -1206,11 +1216,9 @@ class ScenarioProcessor:
 
     def _calculate_roth_conversion(self, year):
         """
-        Implement the Roth Conversion Module (STEP 6)
-        - Accept advisor-defined joint conversion schedule: start year, duration, annual conversion amount.
-        - Apply pro-rata asset depletion across eligible balances (IRA, 401k, etc.).
-        - Conversion amount treated as additional taxable income & MAGI.
-        - Update Roth balances accordingly with growth.
+        Calculate Roth conversion amounts for the year without modifying balances.
+        Returns total conversion amount and stores per-asset conversion amounts.
+        Balance modifications happen in _apply_roth_conversions().
         """
         roth_conversion_start_year = self.scenario.roth_conversion_start_year
         roth_conversion_duration = self.scenario.roth_conversion_duration
@@ -1229,57 +1237,142 @@ class ScenarioProcessor:
             return Decimal('0')
 
         if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
-            # Apply pro-rata asset depletion across eligible balances
-            # New asset types eligible for Roth conversion (traditional/qualified accounts only)
-            eligible_balances = [asset for asset in self.assets if asset["income_type"] in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"]]
-            total_eligible_balance = sum(asset["current_asset_balance"] for asset in eligible_balances)
-            for asset in eligible_balances:
-                depletion_ratio = asset["current_asset_balance"] / total_eligible_balance
+            # Calculate pro-rata distribution WITHOUT modifying balances
+            eligible_assets = [asset for asset in self.assets if 
+                             asset["income_type"] in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"]
+                             and asset.get("current_asset_balance", 0) > 0]
+            
+            if not eligible_assets:
+                self._log_debug(f"Year {year} - No eligible assets for Roth conversion")
+                return Decimal('0')
+            
+            total_eligible_balance = sum(Decimal(str(asset.get("current_asset_balance", 0))) for asset in eligible_assets)
+            
+            if total_eligible_balance == 0:
+                self._log_debug(f"Year {year} - Total eligible balance is 0, no conversion possible")
+                return Decimal('0')
+            
+            # Store conversion amounts for each asset (will be applied later)
+            for asset in eligible_assets:
+                asset_balance = Decimal(str(asset.get("current_asset_balance", 0)))
+                depletion_ratio = asset_balance / total_eligible_balance
                 asset_conversion_amount = roth_conversion_annual_amount * depletion_ratio
-                asset["current_asset_balance"] -= asset_conversion_amount
-                asset["roth_conversion_amount"] = asset_conversion_amount
-
-            # Add conversion amount to taxable income and MAGI
+                # Store but don't apply yet
+                asset["pending_roth_conversion"] = min(asset_conversion_amount, asset_balance)
+            
+            # Return total conversion amount for tax calculations
             return roth_conversion_annual_amount
         else:
+            # Clear any pending conversions outside conversion window
+            for asset in self.assets:
+                asset["pending_roth_conversion"] = Decimal('0')
             return Decimal('0')
 
     def _calculate_asset_spend_down(self, year):
         """
         Implement the Asset Spend-Down & Growth Engine (STEP 7)
-        - Apply monthly contributions until retirement age.
-        - Apply growth rates annually.
-        - Apply withdrawals after retirement start year.
-        - Apply RMD override when applicable (IRS Uniform Lifetime Table).
-        - Apply Roth conversions as account depletion & Roth growth.
-        - Prevent negative balances.
-        - Survivor rules handle tax filing transitions.
+        Following IRS rules: RMDs must be taken before Roth conversions
+        Order of operations:
+        1. Update asset balances (growth, contributions)
+        2. Calculate and apply RMDs 
+        3. Apply Roth conversions
+        4. Prevent negative balances
         """
+        # Step 1: Update all asset balances (growth, contributions, regular withdrawals)
         for asset in self.assets:
             self._update_asset_balance(asset, year)
-
-            # Apply RMD override if calculated RMD > requested withdrawals
+        
+        # Step 2: Calculate and apply RMDs (must be done before conversions per IRS rules)
+        for asset in self.assets:
+            # Only calculate RMDs for assets that haven't been fully converted
+            if asset.get("fully_converted_to_roth", False):
+                asset["withdrawal_amount"] = Decimal('0')
+                continue
+                
             rmd_amount = self._calculate_rmd(asset, year)
             withdrawal_amount = Decimal(str(asset.get("withdrawal_amount", 0)))
             if rmd_amount > withdrawal_amount:
                 asset["withdrawal_amount"] = rmd_amount
-
-            # Apply Roth conversion depletion and growth
-            roth_conversion_amount = self._calculate_roth_conversion(year)
-            
-            # Ensure current_asset_balance is a Decimal
-            if "current_asset_balance" not in asset or asset["current_asset_balance"] is None:
-                asset["current_asset_balance"] = Decimal('0')
-            elif not isinstance(asset["current_asset_balance"], Decimal):
-                asset["current_asset_balance"] = Decimal(str(asset["current_asset_balance"]))
-                
-            # Subtract the Roth conversion amount (which is already a Decimal)
-            asset["current_asset_balance"] -= roth_conversion_amount
-
-        # Prevent negative balances
+                # Actually withdraw the RMD
+                asset["current_asset_balance"] = max(
+                    Decimal('0'), 
+                    Decimal(str(asset.get("current_asset_balance", 0))) - rmd_amount
+                )
+        
+        # Step 3: Calculate Roth conversions (this just calculates, doesn't apply)
+        total_conversion = self._calculate_roth_conversion(year)
+        
+        # Step 4: Apply the Roth conversions that were calculated
+        if total_conversion > 0:
+            self._apply_roth_conversions(year)
+        
+        # Step 5: Prevent negative balances
         for asset in self.assets:
-            if asset["current_asset_balance"] < 0:
+            if asset.get("current_asset_balance", 0) < 0:
                 asset["current_asset_balance"] = Decimal('0')
+
+    def _apply_roth_conversions(self, year):
+        """
+        Apply Roth conversions that were calculated earlier.
+        This method:
+        1. Depletes traditional account balances
+        2. Creates or updates Roth account balances
+        3. Marks fully converted accounts
+        """
+        # Find or create a Roth account to receive conversions
+        roth_account = None
+        for asset in self.assets:
+            if asset.get("income_type") == "Roth":
+                roth_account = asset
+                break
+        
+        # If no Roth account exists, create one
+        if roth_account is None:
+            roth_account = {
+                "income_type": "Roth",
+                "investment_name": "Roth IRA (Converted)",
+                "current_asset_balance": Decimal('0'),
+                "previous_year_balance": Decimal('0'),
+                "rate_of_return": Decimal('0.06'),  # Default 6% growth
+                "owned_by": "primary",
+                "is_converted_roth": True
+            }
+            self.assets.append(roth_account)
+            self._log_debug(f"Year {year} - Created new Roth account for conversions")
+        
+        # Apply conversions from each eligible asset
+        total_converted = Decimal('0')
+        for asset in self.assets:
+            if asset.get("pending_roth_conversion", 0) > 0:
+                conversion_amount = Decimal(str(asset["pending_roth_conversion"]))
+                current_balance = Decimal(str(asset.get("current_asset_balance", 0)))
+                
+                # Can't convert more than available balance
+                actual_conversion = min(conversion_amount, current_balance)
+                
+                # Deplete the traditional account
+                asset["current_asset_balance"] = current_balance - actual_conversion
+                
+                # Add to Roth account
+                roth_account["current_asset_balance"] = Decimal(str(roth_account.get("current_asset_balance", 0))) + actual_conversion
+                
+                # Track the conversion
+                asset["roth_conversion_amount"] = actual_conversion
+                total_converted += actual_conversion
+                
+                # Mark as fully converted if balance is now zero
+                if asset["current_asset_balance"] <= Decimal('0.01'):  # Allow for rounding
+                    asset["fully_converted_to_roth"] = True
+                    asset["current_asset_balance"] = Decimal('0')
+                    self._log_debug(f"Year {year} - Asset {asset.get('investment_name', 'Unknown')} fully converted to Roth")
+                
+                # Clear pending conversion
+                asset["pending_roth_conversion"] = Decimal('0')
+                
+                self._log_debug(f"Year {year} - Converted ${actual_conversion:,.2f} from {asset.get('investment_name', 'Unknown')}")
+        
+        self._log_debug(f"Year {year} - Total Roth conversion: ${total_converted:,.2f}")
+        return total_converted
 
     def _log_debug(self, message):
         if self.debug:

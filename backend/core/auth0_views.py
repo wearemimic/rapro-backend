@@ -162,7 +162,7 @@ def auth0_callback(request):
                 # Update user with latest Auth0 info
                 existing_user.first_name = user_info.get('given_name', existing_user.first_name)
                 existing_user.last_name = user_info.get('family_name', existing_user.last_name)
-                existing_user.auth0_sub = user_info.get('sub')
+                # Note: auth0_sub field doesn't exist in CustomUser model
                 existing_user.auth_provider = auth_provider
                 existing_user.save()
                 
@@ -198,7 +198,7 @@ def auth0_callback(request):
             print(f"🔄 New social login user needs to complete registration: {email}")
             # SECURITY: New users must complete registration with payment
             # Store their Auth0 info temporarily and redirect to registration
-            frontend_url = f'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&auth0_sub={quote(user_info.get("sub", ""))}'
+            frontend_url = f'{settings.FRONTEND_URL}/register?email={quote(email)}&social_login=true&first_name={quote(user_info.get("given_name", ""))}&last_name={quote(user_info.get("family_name", ""))}&provider={quote(auth_provider)}'
             print(f"✅ Redirecting new user to complete registration: {frontend_url[:100]}...")
             return redirect(frontend_url)
         
@@ -340,7 +340,7 @@ def auth0_exchange_code(request):
                     # Update user with latest Auth0 info
                     existing_user.first_name = user_info.get('given_name', existing_user.first_name)
                     existing_user.last_name = user_info.get('family_name', existing_user.last_name)
-                    existing_user.auth0_sub = user_info.get('sub')
+                    # Note: auth0_sub field doesn't exist in CustomUser model
                     existing_user.auth_provider = auth_provider
                     existing_user.save()
                     
@@ -365,7 +365,7 @@ def auth0_exchange_code(request):
                         'email': email,
                         'first_name': user_info.get('given_name', ''),
                         'last_name': user_info.get('family_name', ''),
-                        'auth0_sub': user_info.get('sub'),
+                        # auth0_sub not stored - field doesn't exist in model
                         'social_login': True,
                         'is_new_user': False
                     }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
@@ -376,7 +376,7 @@ def auth0_exchange_code(request):
                     # Update user with latest Auth0 info
                     existing_user.first_name = user_info.get('given_name', existing_user.first_name)
                     existing_user.last_name = user_info.get('family_name', existing_user.last_name)
-                    existing_user.auth0_sub = user_info.get('sub')
+                    # Note: auth0_sub field doesn't exist in CustomUser model
                     existing_user.auth_provider = auth_provider
                     existing_user.save()
                     
@@ -400,7 +400,7 @@ def auth0_exchange_code(request):
                         'email': email,
                         'first_name': user_info.get('given_name', ''),
                         'last_name': user_info.get('family_name', ''),
-                        'auth0_sub': user_info.get('sub'),
+                        # auth0_sub not stored - field doesn't exist in model
                         'social_login': True
                     }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
                 
@@ -415,7 +415,7 @@ def auth0_exchange_code(request):
                     'email': email,
                     'first_name': user_info.get('given_name', ''),
                     'last_name': user_info.get('family_name', ''),
-                    'auth0_sub': user_info.get('sub'),
+                    # auth0_sub not stored - field doesn't exist in model
                     'social_login': True,
                     'is_new_user': True
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
@@ -428,7 +428,7 @@ def auth0_exchange_code(request):
                     'email': email,
                     'first_name': user_info.get('given_name', ''),
                     'last_name': user_info.get('family_name', ''),
-                    'auth0_sub': user_info.get('sub'),
+                    # auth0_sub not stored - field doesn't exist in model
                     'social_login': True,
                     'is_new_user': True
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
@@ -696,9 +696,8 @@ def auth0_complete_registration(request):
                 'auth_provider': auth_provider,
             }
             
-            # Add auth0_sub for social logins
-            if auth0_sub:
-                user_defaults['auth0_sub'] = auth0_sub
+            # Note: auth0_sub field doesn't exist in CustomUser model
+            # We only store auth_provider to track the authentication method
             
             # Add subscription end date if available
             if subscription_end_date:
@@ -720,8 +719,7 @@ def auth0_complete_registration(request):
                 user.subscription_status = subscription.status
                 user.subscription_plan = plan
                 user.auth_provider = auth_provider
-                if auth0_sub:
-                    user.auth0_sub = auth0_sub
+                # Note: auth0_sub field doesn't exist in CustomUser model
                 if subscription_end_date:
                     user.subscription_end_date = subscription_end_date
                 user.save()
@@ -1213,14 +1211,14 @@ def embedded_signup(request):
                             'username': email,
                             'first_name': auth0_profile.get('given_name', ''),
                             'last_name': auth0_profile.get('family_name', ''),
-                            'auth0_sub': auth0_profile.get('sub'),
+                            # auth0_sub not stored - field doesn't exist in model
                             'is_active': True
                         }
                     )
                     
                     if not created:
                         # Update existing user's Auth0 info
-                        user.auth0_sub = auth0_profile.get('sub')
+                        # Note: auth0_sub field doesn't exist in CustomUser model
                         user.save()
                     
                     print(f"✅ Django user {'created' if created else 'updated'}: {email}")
@@ -1307,14 +1305,14 @@ def embedded_signup(request):
                                 'username': email,
                                 'first_name': auth0_profile.get('given_name', ''),
                                 'last_name': auth0_profile.get('family_name', ''),
-                                'auth0_sub': auth0_profile.get('sub'),
+                                # auth0_sub not stored - field doesn't exist in model
                                 'is_active': True
                             }
                         )
                         
                         if not created:
                             # Update existing user's Auth0 info
-                            user.auth0_sub = auth0_profile.get('sub')
+                            # Note: auth0_sub field doesn't exist in CustomUser model
                             user.save()
                         
                         print(f"✅ Django user {'created' if created else 'found'}: {email}")
