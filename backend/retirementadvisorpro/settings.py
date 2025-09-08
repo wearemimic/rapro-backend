@@ -190,10 +190,31 @@ DATABASES = {
 }
 
 # Override with DATABASE_URL if it exists (for production)
-# dj-database-url handles complex passwords with special characters correctly
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    try:
+        # Try dj-database-url first
+        DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    except Exception as e:
+        # Fallback to manual parsing for complex passwords
+        # Extract the password between : and @ 
+        import re
+        from urllib.parse import unquote
+        
+        # Match pattern: postgres://user:password@host:port/dbname
+        match = re.match(r'postgres(?:ql)?://([^:]+):([^@]+)@([^:]+):(\d+)/([^?]+)', DATABASE_URL)
+        if match:
+            DATABASES['default'] = {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': match.group(5),
+                'USER': match.group(1),
+                'PASSWORD': unquote(match.group(2)),  # URL decode the password
+                'HOST': match.group(3),
+                'PORT': match.group(4),
+            }
+        else:
+            print(f"Failed to parse DATABASE_URL: {e}")
+            # Keep default local settings as last resort
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
