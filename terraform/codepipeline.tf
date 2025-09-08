@@ -617,6 +617,124 @@ resource "aws_codepipeline" "main" {
     }
   }
 
+  # Stage 3: Deploy to Staging
+  stage {
+    name = "Deploy_to_Staging"
+
+    action {
+      name            = "Deploy_Frontend_Staging"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["frontend_build_output"]
+
+      configuration = {
+        ClusterName = aws_ecs_cluster.staging.name
+        ServiceName = aws_ecs_service.frontend_staging.name
+        FileName    = "imagedefinitions-staging.json"
+      }
+    }
+
+    action {
+      name            = "Deploy_Backend_Staging"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["backend_build_output"]
+
+      configuration = {
+        ClusterName = aws_ecs_cluster.staging.name
+        ServiceName = aws_ecs_service.backend_staging.name
+        FileName    = "imagedefinitions-staging.json"
+      }
+    }
+
+    action {
+      name            = "Deploy_Celery_Staging"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["backend_build_output"]
+
+      configuration = {
+        ClusterName = aws_ecs_cluster.staging.name
+        ServiceName = aws_ecs_service.celery_worker_staging.name
+        FileName    = "imagedefinitions_celery-staging.json"
+      }
+    }
+  }
+
+  # Stage 4: Manual Approval for Production
+  stage {
+    name = "Approve_Production_Deployment"
+
+    action {
+      name     = "Manual_Approval"
+      category = "Approval"
+      owner    = "AWS"
+      provider = "Manual"
+      version  = "1"
+
+      configuration = {
+        NotificationArn = aws_sns_topic.pipeline_approval.arn
+        CustomData      = "Please review staging deployment and approve for production. Staging URL: https://${aws_lb.staging.dns_name}"
+      }
+    }
+  }
+
+  # Stage 5: Deploy to Production
+  stage {
+    name = "Deploy_to_Production"
+
+    action {
+      name            = "Deploy_Frontend_Production"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["frontend_build_output"]
+
+      configuration = {
+        ClusterName = aws_ecs_cluster.main.name
+        ServiceName = aws_ecs_service.frontend.name
+        FileName    = "imagedefinitions.json"
+      }
+    }
+
+    action {
+      name            = "Deploy_Backend_Production"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["backend_build_output"]
+
+      configuration = {
+        ClusterName = aws_ecs_cluster.main.name
+        ServiceName = aws_ecs_service.backend.name
+        FileName    = "imagedefinitions.json"
+      }
+    }
+
+    action {
+      name            = "Deploy_Celery_Production"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "ECS"
+      version         = "1"
+      input_artifacts = ["backend_build_output"]
+
+      configuration = {
+        ClusterName = aws_ecs_cluster.main.name
+        ServiceName = aws_ecs_service.celery_worker.name
+        FileName    = "imagedefinitions_celery.json"
+      }
+    }
+  }
+
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-pipeline"
   })
