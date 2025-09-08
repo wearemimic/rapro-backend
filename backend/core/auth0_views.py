@@ -246,11 +246,17 @@ def auth0_exchange_code(request):
         redirect_uri = f'{settings.FRONTEND_URL}/auth/callback'
         
         print(f"Exchanging authorization code for {flow_type} flow: {code[:10]}...")
+        print(f"FRONTEND_URL from settings: {settings.FRONTEND_URL}")
+        print(f"Using redirect_uri: {redirect_uri}")
         
         # Exchange code for tokens with Auth0
         domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
         client_secret = settings.AUTH0_CLIENT_SECRET
+        
+        # Log client_id to verify it's correct
+        print(f"Client ID: {client_id}")
+        print(f"Auth0 Domain: {domain}")
         
         token_url = f'https://{domain}/oauth/token'
         token_payload = {
