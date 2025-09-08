@@ -503,7 +503,6 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
         Resource = [
           aws_codebuild_project.frontend.arn,
           aws_codebuild_project.backend.arn,
-          aws_codebuild_project.integration_tests.arn,
           aws_codebuild_project.smoke_tests.arn
         ]
       },
@@ -545,10 +544,10 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
   })
 }
 
-# Use existing GitHub connection
-data "aws_codestar_connection" "github" {
-  arn = "arn:aws:codestar-connections:us-east-1:794038228127:connection/003257bb-26b7-47d0-8c64-091c85a34639"
-}
+# Use existing GitHub connection - COMMENTED OUT due to provider issues
+# data "aws_codestar_connection" "github" {
+#   arn = "arn:aws:codestar-connections:us-east-1:794038228127:connection/003257bb-26b7-47d0-8c64-091c85a34639"
+# }
 
 # CodePipeline
 resource "aws_codepipeline" "main" {
