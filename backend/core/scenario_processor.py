@@ -247,6 +247,7 @@ class ScenarioProcessor:
         
         # Log initialization
         instance._log_debug(f"Initialized from dictionaries with {len(instance.assets)} assets")
+        instance._log_debug(f"Roth conversion parameters: start_year={getattr(instance.scenario, 'roth_conversion_start_year', None)}, duration={getattr(instance.scenario, 'roth_conversion_duration', None)}")
         
         # STEP 1: Scenario Initialization
         current_year = datetime.datetime.now().year
@@ -781,6 +782,12 @@ class ScenarioProcessor:
             # Grow the balance from current year to processing year
             if years_to_grow > 0:
                 current_balance = asset["previous_year_balance"]
+                
+                # Check if we need to apply Roth conversions during projection years
+                roth_conversion_start = getattr(self.scenario, 'roth_conversion_start_year', None)
+                roth_conversion_duration = getattr(self.scenario, 'roth_conversion_duration', None)
+                roth_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
+                
                 for yr in range(years_to_grow):
                     # Check if we should apply contributions for this year
                     projection_year = current_year + yr
@@ -794,7 +801,39 @@ class ScenarioProcessor:
                     # Apply growth
                     current_balance *= (1 + rate_of_return)
                     
+                    # Apply Roth conversions if this asset is eligible and we're in conversion window
+                    if (roth_conversion_start and roth_conversion_duration and roth_annual_amount > 0 and
+                        asset.get("income_type") in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"] and
+                        projection_year >= roth_conversion_start and 
+                        projection_year < roth_conversion_start + roth_conversion_duration):
+                        
+                        # Calculate this asset's share of the conversion
+                        # For simplicity during projection, assume this is the only eligible asset
+                        # The actual pro-rata calculation happens during the main calculation loop
+                        conversion_amount = Decimal(str(roth_annual_amount))
+                        
+                        # Don't convert more than available
+                        conversion_amount = min(conversion_amount, current_balance)
+                        current_balance -= conversion_amount
+                        
+                        self._log_debug(f"Projection Year {projection_year} - Applied Roth conversion: ${conversion_amount:,.2f}, New balance: ${current_balance:,.2f}")
+                        
+                        # Track that conversions happened
+                        if not hasattr(asset, 'pre_retirement_conversions'):
+                            asset['pre_retirement_conversions'] = Decimal('0')
+                        asset['pre_retirement_conversions'] += conversion_amount
+                    
                 asset["previous_year_balance"] = current_balance
+                
+                # If this account was fully converted, mark it
+                if current_balance <= Decimal('0.01'):
+                    asset["fully_converted_to_roth"] = True
+                    asset["current_asset_balance"] = Decimal('0')
+                    self._log_debug(f"Asset fully converted during pre-retirement years")
+                    
+                # If conversions happened, ensure we have a Roth account to track them
+                if asset.get('pre_retirement_conversions', 0) > 0:
+                    self._ensure_roth_account_exists(asset['pre_retirement_conversions'])
             
         # If we've already processed this asset but need to update for a new year
         elif asset["last_processed_year"] < year - 1:
@@ -1220,9 +1259,12 @@ class ScenarioProcessor:
         Returns total conversion amount and stores per-asset conversion amounts.
         Balance modifications happen in _apply_roth_conversions().
         """
-        roth_conversion_start_year = self.scenario.roth_conversion_start_year
-        roth_conversion_duration = self.scenario.roth_conversion_duration
+        roth_conversion_start_year = getattr(self.scenario, 'roth_conversion_start_year', None)
+        roth_conversion_duration = getattr(self.scenario, 'roth_conversion_duration', None)
         roth_conversion_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
+        
+        # Debug logging
+        self._log_debug(f"Year {year} - Roth conversion check: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}, annual_amount={roth_conversion_annual_amount}")
         
         # Convert to Decimal if it's not already
         if not isinstance(roth_conversion_annual_amount, Decimal):
@@ -1311,6 +1353,44 @@ class ScenarioProcessor:
             if asset.get("current_asset_balance", 0) < 0:
                 asset["current_asset_balance"] = Decimal('0')
 
+    def _ensure_roth_account_exists(self, initial_balance=Decimal('0')):
+        """
+        Ensure a Roth account exists to receive conversions.
+        If it doesn't exist, create it with the specified initial balance.
+        """
+        roth_account = None
+        for asset in self.assets:
+            if asset.get("income_type") in ["Roth", "roth_ira"]:
+                roth_account = asset
+                # Add to existing balance if account exists
+                if initial_balance > 0:
+                    roth_account["current_asset_balance"] = Decimal(str(roth_account.get("current_asset_balance", 0))) + initial_balance
+                    roth_account["previous_year_balance"] = roth_account["current_asset_balance"]
+                    self._log_debug(f"Added ${initial_balance:,.2f} to existing Roth account")
+                break
+        
+        if roth_account is None and initial_balance > 0:
+            # Create new Roth account with the converted balance
+            roth_account = {
+                "income_type": "roth_ira",
+                "investment_name": "Roth IRA (Converted)",
+                "income_name": "Roth IRA (Converted)",
+                "current_asset_balance": initial_balance,
+                "previous_year_balance": initial_balance,
+                "initial_asset_balance": initial_balance,
+                "rate_of_return": Decimal('0.06'),  # Default 6% growth
+                "owned_by": "primary",
+                "is_converted_roth": True,
+                "age_to_begin_withdrawal": 65,
+                "age_to_end_withdrawal": 90,
+                "monthly_amount": 0,
+                "monthly_contribution": 0,
+            }
+            self.assets.append(roth_account)
+            self._log_debug(f"Created new Roth account with initial balance ${initial_balance:,.2f}")
+        
+        return roth_account
+    
     def _apply_roth_conversions(self, year):
         """
         Apply Roth conversions that were calculated earlier.
@@ -1322,14 +1402,15 @@ class ScenarioProcessor:
         # Find or create a Roth account to receive conversions
         roth_account = None
         for asset in self.assets:
-            if asset.get("income_type") == "Roth":
+            # Check for both "Roth" and "roth_ira" to handle synthetic Roth assets
+            if asset.get("income_type") in ["Roth", "roth_ira"]:
                 roth_account = asset
                 break
         
         # If no Roth account exists, create one
         if roth_account is None:
             roth_account = {
-                "income_type": "Roth",
+                "income_type": "roth_ira",  # Use roth_ira to match RothConversionProcessor
                 "investment_name": "Roth IRA (Converted)",
                 "current_asset_balance": Decimal('0'),
                 "previous_year_balance": Decimal('0'),

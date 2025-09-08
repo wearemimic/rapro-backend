@@ -35,6 +35,8 @@ def create_test_scenario():
         'inflation_rate': Decimal('0.03'),
         'target_net_income': 60000,
         'joint_withdrawal_preference': 'proportional',
+        'mortality_age': 90,  # Add mortality age
+        'retirement_age': 65,  # Add retirement age
         
         # Roth conversion parameters - convert $100k/year for 5 years (full conversion of $500k account)
         'roth_conversion_start_year': 2024,
@@ -92,8 +94,6 @@ def test_roth_conversion():
         client=client,
         spouse=spouse,
         assets=assets,
-        incomes=incomes,
-        expenses=expenses,
         debug=True
     )
     

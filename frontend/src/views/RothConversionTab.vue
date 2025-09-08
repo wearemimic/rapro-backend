@@ -2016,65 +2016,75 @@ export default {
           return this.generateAssetLineData(); // Fallback
         }
         
-        // Extract years and initialize asset data
+        // Extract years from the data
         const years = yearByYearData.map(row => row.year);
-        const qualifiedBalances = [];
-        const rothBalances = [];
         
-        // Process each year's data
+        // Dynamically detect all asset types from the data
+        const assetTypes = new Set();
         yearByYearData.forEach(row => {
-          // Get asset balances from the row
-          const assetBalances = row.asset_balances || {};
-          
-          // Extract Qualified balance (401k)
-          const qualifiedBalance = parseFloat(assetBalances.Qualified_balance || 0);
-          qualifiedBalances.push(qualifiedBalance);
-          
-          // Extract Roth IRA balance
-          const rothBalance = parseFloat(assetBalances.roth_ira_balance || 0);
-          rothBalances.push(rothBalance);
+          Object.keys(row).forEach(key => {
+            if (key.endsWith('_balance')) {
+              const assetType = key.replace('_balance', '');
+              assetTypes.add(assetType);
+            }
+          });
         });
         
-        // Create datasets for the chart
+        console.log('📊 Detected asset types:', Array.from(assetTypes));
+        
+        // Create datasets for each asset type
         const datasets = [];
+        const colorMap = {
+          'Qualified': '#28a745',
+          'qualified': '#28a745', 
+          'roth_ira': '#6f42c1',
+          'social_security': '#20c997',
+          'brokerage': '#fd7e14',
+          'savings': '#ffc107',
+          'pension': '#dc3545'
+        };
         
-        // Add Qualified asset line
-        if (qualifiedBalances.some(v => v > 0)) {
-          // Try to find the actual qualified asset name from eligibleAssets
-          const qualifiedAsset = (this.eligibleAssets || []).find(asset => 
-            asset.income_type === 'Qualified' || asset.income_type === 'qualified'
-          );
-          const assetLabel = qualifiedAsset ? 
-            (qualifiedAsset.income_name || qualifiedAsset.investment_name || 'Qualified') : 
-            'Qualified';
+        // Process each asset type
+        Array.from(assetTypes).forEach((assetType, index) => {
+          const balanceKey = `${assetType}_balance`;
+          const balances = [];
+          
+          // Extract balances for this asset type across all years
+          yearByYearData.forEach(row => {
+            const balance = parseFloat(row[balanceKey] || 0);
+            balances.push(balance);
+          });
+          
+          // Only add dataset if there are non-zero balances
+          if (balances.some(v => v > 0)) {
+            // Try to find the actual asset name from eligibleAssets
+            const eligibleAsset = (this.eligibleAssets || []).find(asset => 
+              asset.income_type === assetType || 
+              asset.income_type === assetType.replace('_', ' ').toLowerCase() ||
+              asset.income_type.toLowerCase() === assetType.toLowerCase()
+            );
             
-          datasets.push({
-            label: assetLabel,
-            borderColor: '#28a745',
-            backgroundColor: 'rgba(40, 167, 69, 0.1)',
-            data: qualifiedBalances,
-            fill: false,
-            borderWidth: 2
-          });
-        }
-        
-        // Add Roth IRA line
-        if (rothBalances.some(v => v > 0)) {
-          datasets.push({
-            label: 'Roth IRA',
-            borderColor: '#6f42c1',
-            backgroundColor: 'rgba(111, 66, 193, 0.1)',
-            data: rothBalances,
-            fill: false,
-            borderWidth: 2
-          });
-        }
+            const assetLabel = eligibleAsset ? 
+              (eligibleAsset.income_name || eligibleAsset.investment_name || this.formatAssetTypeName(assetType)) : 
+              this.formatAssetTypeName(assetType);
+            
+            const color = colorMap[assetType] || this.getRandomColor();
+            
+            datasets.push({
+              label: assetLabel,
+              borderColor: color,
+              backgroundColor: this.hexToRgba(color, 0.1),
+              data: balances,
+              fill: false,
+              borderWidth: 2
+            });
+          }
+        });
         
         console.log('📊 Asset line data generated from year-by-year:', {
           years: years.length,
-          qualifiedSample: qualifiedBalances.slice(0, 5),
-          rothSample: rothBalances.slice(0, 5),
-          datasets: datasets
+          assetTypes: Array.from(assetTypes),
+          datasets: datasets.map(d => ({ label: d.label, dataPoints: d.data.length }))
         });
         
         // If no valid datasets, fallback to local generation

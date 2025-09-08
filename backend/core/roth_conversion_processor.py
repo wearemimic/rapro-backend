@@ -239,9 +239,12 @@ class RothConversionProcessor:
         total_conversion = Decimal('0')
         asset_conversion_map = {}
         
+        self._log_debug(f"Preparing assets for conversion. Years to convert: {self.years_to_convert}")
+        
         # Calculate total conversion amount from assets
         for asset in self.assets:
             max_to_convert = asset.get('max_to_convert')
+            self._log_debug(f"Asset {asset.get('income_name', asset.get('income_type'))}: max_to_convert = {max_to_convert}")
             if max_to_convert:
                 if not isinstance(max_to_convert, Decimal):
                     max_to_convert = Decimal(str(max_to_convert))
@@ -262,7 +265,9 @@ class RothConversionProcessor:
                 asset_conversion_map[asset_id] = max_to_convert
         
         # Calculate annual conversion amount
+        self._log_debug(f"Total conversion amount: ${total_conversion:,.2f}")
         annual_conversion = total_conversion / Decimal(str(self.years_to_convert))
+        self._log_debug(f"Annual conversion amount: ${annual_conversion:,.2f}")
         
         # Cap annual conversion at max_annual_amount if specified
         if self.max_annual_amount > 0 and annual_conversion > self.max_annual_amount:
@@ -276,6 +281,8 @@ class RothConversionProcessor:
         self.annual_conversion = annual_conversion
         self.total_conversion = total_conversion
         self.asset_conversion_map = asset_conversion_map
+        
+        self._log_debug(f"Stored annual_conversion: ${self.annual_conversion:,.2f}, total_conversion: ${self.total_conversion:,.2f}")
         
         # Create a synthetic Roth asset
         roth_asset = {
@@ -334,6 +341,11 @@ class RothConversionProcessor:
         
         # Set pre-retirement income
         conversion_scenario['pre_retirement_income'] = self.pre_retirement_income
+        
+        self._log_debug(f"Conversion scenario prepared with:")
+        self._log_debug(f"  - roth_conversion_start_year: {conversion_scenario['roth_conversion_start_year']}")
+        self._log_debug(f"  - roth_conversion_duration: {conversion_scenario['roth_conversion_duration']}")
+        self._log_debug(f"  - roth_conversion_annual_amount: {conversion_scenario['roth_conversion_annual_amount']}")
         
         return conversion_scenario
     
