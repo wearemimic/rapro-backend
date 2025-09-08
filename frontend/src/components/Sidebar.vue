@@ -7,10 +7,10 @@
           <div id="navbarVerticalMenu" class="nav nav-pills nav-vertical card-navbar-nav">
             <!-- Collapse -->
             <div class="nav-item">
-              <a class="nav-link" href="/dashboard" role="button" :title="isCollapsed ? 'Dashboard' : ''" aria-expanded="true" aria-controls="navbarVerticalMenuDashboards">
+              <router-link class="nav-link" to="/dashboard" role="button" :title="isCollapsed ? 'Dashboard' : ''" aria-expanded="true" aria-controls="navbarVerticalMenuDashboards">
                 <i class="bi-people nav-icon"></i>
                 <span class="nav-link-title" v-show="!isCollapsed">Dashboard</span>
-              </a>
+              </router-link>
             </div>
             <!-- End Collapse -->
             <!-- Collapse -->
@@ -28,8 +28,8 @@
                 </a>
 
                 <div id="navbarVerticalMenuPagesUsersMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
-                  <a class="nav-link " href="/clients">Overview</a>
-                  <a class="nav-link " href="/clients/create">Add Client <span class="badge bg-info rounded-pill ms-1">Hot</span></a>
+                  <router-link class="nav-link" to="/clients">Overview</router-link>
+                  <router-link class="nav-link" to="/clients/create">Add Client <span class="badge bg-info rounded-pill ms-1">Hot</span></router-link>
                 </div>
               </div>
               <!-- End Collapse -->
@@ -66,11 +66,11 @@
 
               <!-- Document Management -->
               <div class="nav-item">
-                <a class="nav-link" href="/documents" :title="isCollapsed ? 'Documents' : ''" role="button">
+                <router-link class="nav-link" to="/documents" :title="isCollapsed ? 'Documents' : ''" role="button">
                   <i class="bi-files nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Documents</span>
                   <span class="badge bg-info rounded-pill ms-1" v-show="!isCollapsed">New</span>
-                </a>
+                </router-link>
               </div>
               <!-- End Document Management -->
 
