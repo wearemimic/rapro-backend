@@ -22,10 +22,10 @@
         <ul class="navbar-nav">
           <!-- Notifications -->
           <li class="nav-item dropdown">
-            <a class="btn btn-ghost-secondary btn-icon" href="#" id="navbarNotificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="btn btn-ghost-secondary btn-icon" @click.prevent="toggleNotificationsDropdown" id="navbarNotificationsDropdown" role="button" :aria-expanded="notificationsDropdownOpen">
               <i class="bi-bell"></i>
             </a>
-            <div class="dropdown-menu dropdown-menu-end navbar-dropdown-menu navbar-dropdown-menu-borderless" aria-labelledby="navbarNotificationsDropdown">
+            <div class="dropdown-menu dropdown-menu-end navbar-dropdown-menu navbar-dropdown-menu-borderless" :class="{ 'show': notificationsDropdownOpen }" aria-labelledby="navbarNotificationsDropdown">
               <div class="dropdown-header d-flex align-items-center">
                 <h5 class="dropdown-header-title mb-0">Notifications</h5>
               </div>
@@ -38,15 +38,15 @@
 
           <!-- User Profile -->
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" id="navbarUserDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link dropdown-toggle" @click.prevent="toggleUserDropdown" id="navbarUserDropdown" role="button" :aria-expanded="userDropdownOpen">
               <span class="avatar avatar-sm avatar-circle bg-light text-dark fw-bold d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:1rem;">
                 {{ userInitial }}
               </span>
               <span class="d-none d-sm-inline-block ms-2">{{ displayName }}</span>
             </a>
-            <ul class="dropdown-menu" aria-labelledby="navbarUserDropdown">
-              <li><a class="dropdown-item" href="/profile">Profile</a></li>
-              <li><a class="dropdown-item" href="/billing">Billing</a></li>
+            <ul class="dropdown-menu" :class="{ 'show': userDropdownOpen }" aria-labelledby="navbarUserDropdown">
+              <li><router-link class="dropdown-item" to="/profile">Profile</router-link></li>
+              <li><router-link class="dropdown-item" to="/billing">Billing</router-link></li>
               <li><hr class="dropdown-divider"></li>
               <li><button class="dropdown-item" @click="logout">Logout</button></li>
             </ul>
@@ -74,6 +74,33 @@ import { API_CONFIG } from '@/config';
 
 const authStore = useAuthStore();
 const router = useRouter();
+
+// Dropdown state management
+const notificationsDropdownOpen = ref(false);
+const userDropdownOpen = ref(false);
+
+// Dropdown toggle functions
+const toggleNotificationsDropdown = () => {
+  notificationsDropdownOpen.value = !notificationsDropdownOpen.value;
+  // Close user dropdown if open
+  if (notificationsDropdownOpen.value) {
+    userDropdownOpen.value = false;
+  }
+};
+
+const toggleUserDropdown = () => {
+  userDropdownOpen.value = !userDropdownOpen.value;
+  // Close notifications dropdown if open
+  if (userDropdownOpen.value) {
+    notificationsDropdownOpen.value = false;
+  }
+};
+
+// Close dropdowns when clicking outside
+const closeDropdowns = () => {
+  notificationsDropdownOpen.value = false;
+  userDropdownOpen.value = false;
+};
 
 const displayName = computed(() => {
   const user = authStore.user;
@@ -160,6 +187,7 @@ const customLogoUrl = computed(() => {
 });
 
 const logout = async () => {
+  closeDropdowns(); // Close dropdown before logout
   await authStore.logout(); // calls the backend and clears token
   toast.success('You have been logged out.');
   router.push('/login');
@@ -174,6 +202,14 @@ onMounted(() => {
   console.log('localStorage user:', JSON.parse(localStorage.getItem('user')));
   
   authStore.fetchProfile();
+  
+  // Add click outside listener to close dropdowns
+  document.addEventListener('click', (event) => {
+    const header = document.getElementById('header');
+    if (header && !header.contains(event.target)) {
+      closeDropdowns();
+    }
+  });
 });
 
 // Header color computed property - only affects top navbar, not card headers
