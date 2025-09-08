@@ -106,7 +106,7 @@ resource "aws_codepipeline" "main_pipeline" {
       configuration = {
         ClusterName = aws_ecs_cluster.staging.name
         ServiceName = aws_ecs_service.frontend_staging.name
-        FileName    = "imagedefinitions.json"
+        FileName    = "imagedefinitions-staging.json"
       }
     }
 
@@ -121,7 +121,7 @@ resource "aws_codepipeline" "main_pipeline" {
       configuration = {
         ClusterName = aws_ecs_cluster.staging.name
         ServiceName = aws_ecs_service.backend_staging.name
-        FileName    = "imagedefinitions.json"
+        FileName    = "imagedefinitions-staging.json"
       }
     }
 
@@ -136,7 +136,7 @@ resource "aws_codepipeline" "main_pipeline" {
       configuration = {
         ClusterName = aws_ecs_cluster.staging.name
         ServiceName = aws_ecs_service.celery_worker_staging.name
-        FileName    = "imagedefinitions_celery.json"
+        FileName    = "imagedefinitions_celery-staging.json"
       }
     }
   }
