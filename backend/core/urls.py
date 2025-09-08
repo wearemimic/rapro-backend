@@ -17,6 +17,7 @@ from .webhooks import stripe_webhook
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
 from .auth0_views import auth0_login_redirect, auth0_login_google, auth0_callback, auth0_logout, auth0_exchange_code, complete_professional_info, auth0_complete_registration, validate_coupon, embedded_signup, create_account, change_password
+from .views_stripe import get_subscription_plans, validate_coupon_dynamic
 from .billing_views import (
     subscription_details, cancel_subscription, reactivate_subscription,
     update_payment_method, download_invoice
@@ -132,7 +133,11 @@ urlpatterns = [
     path('auth0/complete-professional-info/', complete_professional_info, name='complete_professional_info'),  # Professional info step
     path('auth0/complete-registration/', auth0_complete_registration, name='auth0_complete_registration'),  # Registration completion with Stripe
     path('change-password/', change_password, name='change_password'),  # Password change for Auth0 users
-    path('validate-coupon/', validate_coupon, name='validate_coupon'),  # Coupon validation
+    path('validate-coupon/', validate_coupon, name='validate_coupon'),  # Coupon validation (legacy)
+    
+    # Dynamic Stripe pricing endpoints
+    path('subscription-plans/', get_subscription_plans, name='subscription_plans'),  # Get dynamic subscription plans from Stripe
+    path('validate-coupon-dynamic/', validate_coupon_dynamic, name='validate_coupon_dynamic'),  # Validate coupon with dynamic pricing
     path('clients/', AdvisorClientListView.as_view(), name='advisor-client-list'),
     path('clients/create/', ClientCreateView.as_view(), name='client-create'),
     path('clients/<int:pk>/', ClientDetailView.as_view(), name='client-detail'),
