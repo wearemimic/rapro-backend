@@ -21,48 +21,71 @@
     <!-- Tabbed Interface -->
     <ul class="nav nav-segment mb-3" id="clientDetailTabs" role="tablist">
               <li class="nav-item">
-                <a class="nav-link active" id="overview-tab" data-bs-toggle="tab" 
+                <a class="nav-link" 
+                  :class="{ 'active': activeTab === 'overview' }"
+                  id="overview-tab" 
+                  @click.prevent="switchTab('overview')"
                   href="#overview-pane" role="tab" 
-                  aria-controls="overview-pane" aria-selected="true">
+                  aria-controls="overview-pane" 
+                  :aria-selected="activeTab === 'overview'">
                   Overview
                 </a>
               </li>
               <li class="nav-item" v-if="hasCRMAccess">
-                <a class="nav-link" id="communications-tab" data-bs-toggle="tab" 
+                <a class="nav-link" 
+                  :class="{ 'active': activeTab === 'communications' }"
+                  id="communications-tab" 
+                  @click.prevent="switchTab('communications')"
                   href="#communications-pane" role="tab" 
-                  aria-controls="communications-pane" aria-selected="false">
+                  aria-controls="communications-pane" 
+                  :aria-selected="activeTab === 'communications'">
                   Communications
                   <span v-if="unreadCount > 0" class="badge bg-primary ms-1">{{ unreadCount }}</span>
                 </a>
               </li>
               <li class="nav-item" v-if="hasCRMAccess">
-                <a class="nav-link" id="activity-tab" data-bs-toggle="tab" 
+                <a class="nav-link" 
+                  :class="{ 'active': activeTab === 'activity' }"
+                  id="activity-tab" 
+                  @click.prevent="switchTab('activity')"
                   href="#activity-pane" role="tab" 
-                  aria-controls="activity-pane" aria-selected="false"
-                  @click="handleActivityTabClick">
+                  aria-controls="activity-pane" 
+                  :aria-selected="activeTab === 'activity'">
                   Activity
                 </a>
               </li>
               <li class="nav-item" v-if="hasCRMAccess">
-                <a class="nav-link" id="tasks-tab" data-bs-toggle="tab" 
+                <a class="nav-link" 
+                  :class="{ 'active': activeTab === 'tasks' }"
+                  id="tasks-tab" 
+                  @click.prevent="switchTab('tasks')"
                   href="#tasks-pane" role="tab" 
-                  aria-controls="tasks-pane" aria-selected="false">
+                  aria-controls="tasks-pane" 
+                  :aria-selected="activeTab === 'tasks'">
                   Tasks
                   <span v-if="clientTasks.length > 0" class="badge bg-info ms-1">{{ clientTasks.length }}</span>
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" id="documents-tab" data-bs-toggle="tab" 
+                <a class="nav-link" 
+                  :class="{ 'active': activeTab === 'documents' }"
+                  id="documents-tab" 
+                  @click.prevent="switchTab('documents')"
                   href="#documents-pane" role="tab" 
-                  aria-controls="documents-pane" aria-selected="false">
+                  aria-controls="documents-pane" 
+                  :aria-selected="activeTab === 'documents'">
                   Documents
                   <span v-if="clientDocumentCount > 0" class="badge bg-secondary ms-1">{{ clientDocumentCount }}</span>
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" id="portal-access-tab" data-bs-toggle="tab" 
+                <a class="nav-link" 
+                  :class="{ 'active': activeTab === 'portal-access' }"
+                  id="portal-access-tab" 
+                  @click.prevent="switchTab('portal-access')"
                   href="#portal-access-pane" role="tab" 
-                  aria-controls="portal-access-pane" aria-selected="false">
+                  aria-controls="portal-access-pane" 
+                  :aria-selected="activeTab === 'portal-access'">
                   Portal Access
                   <span v-if="client?.portal_access_enabled" class="badge bg-success ms-1">Enabled</span>
                 </a>
@@ -72,7 +95,9 @@
     <!-- Tab Content -->
     <div class="tab-content">
             <!-- Overview Tab -->
-            <div class="tab-pane fade show active" id="overview-pane" role="tabpanel" 
+            <div class="tab-pane fade" 
+                 :class="{ 'show active': activeTab === 'overview' }"
+                 id="overview-pane" role="tabpanel" 
                  aria-labelledby="overview-tab">
               <!-- Two column layout with reduced spacing -->
               <div class="row gx-3">
@@ -219,7 +244,9 @@
             </div>
             
             <!-- Communications Tab -->
-            <div class="tab-pane fade" id="communications-pane" role="tabpanel" 
+            <div class="tab-pane fade" 
+                 :class="{ 'show active': activeTab === 'communications' }"
+                 id="communications-pane" role="tabpanel" 
                  aria-labelledby="communications-tab" v-if="hasCRMAccess">
               <div>
                 <CommunicationSummaryWidget :client="client" class="mb-4" />
@@ -233,7 +260,9 @@
             </div>
             
             <!-- Activity Tab -->
-            <div class="tab-pane fade" id="activity-pane" role="tabpanel" 
+            <div class="tab-pane fade" 
+                 :class="{ 'show active': activeTab === 'activity' }"
+                 id="activity-pane" role="tabpanel" 
                  aria-labelledby="activity-tab" v-if="hasCRMAccess">
               <div>
                 <ActivityStream 
@@ -250,7 +279,9 @@
             </div>
             
             <!-- Tasks Tab -->
-            <div class="tab-pane fade" id="tasks-pane" role="tabpanel" 
+            <div class="tab-pane fade" 
+                 :class="{ 'show active': activeTab === 'tasks' }"
+                 id="tasks-pane" role="tabpanel" 
                  aria-labelledby="tasks-tab" v-if="hasCRMAccess">
               <div>
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -429,7 +460,9 @@
             </div>
             
             <!-- Documents Tab -->
-            <div class="tab-pane fade" id="documents-pane" role="tabpanel" 
+            <div class="tab-pane fade" 
+                 :class="{ 'show active': activeTab === 'documents' }"
+                 id="documents-pane" role="tabpanel" 
                  aria-labelledby="documents-tab">
               <div>
                 <ClientDocuments 
@@ -442,7 +475,9 @@
             </div>
 
             <!-- Portal Access Tab -->
-            <div class="tab-pane fade" id="portal-access-pane" role="tabpanel" 
+            <div class="tab-pane fade" 
+                 :class="{ 'show active': activeTab === 'portal-access' }"
+                 id="portal-access-pane" role="tabpanel" 
                  aria-labelledby="portal-access-tab">
               <div>
                 <ClientPortalAccess 
@@ -505,7 +540,9 @@ export default {
         priority: '',
         overdue: false
       },
-      taskSortBy: '-created_at'
+      taskSortBy: '-created_at',
+      // Active tab tracking
+      activeTab: 'overview'
     };
   },
   computed: {
@@ -525,6 +562,25 @@ export default {
       return this.clientTasks;
     }
   },
+  mounted() {
+    // Check if there's a hash in the URL to set the initial tab
+    const hash = window.location.hash;
+    if (hash) {
+      const tabMap = {
+        '#overview-pane': 'overview',
+        '#communications-pane': 'communications',
+        '#activity-pane': 'activity',
+        '#tasks-pane': 'tasks',
+        '#documents-pane': 'documents',
+        '#portal-access-pane': 'portal-access'
+      };
+      const tabName = tabMap[hash];
+      if (tabName) {
+        this.activeTab = tabName;
+      }
+    }
+  },
+  
   async created() {
     this.communicationStore = useCommunicationStore();
     
@@ -784,14 +840,17 @@ export default {
       this.clientDocumentCount = count;
     },
 
-    handleActivityTabClick() {
-      // Trigger refresh when activity tab is clicked
-      // Use nextTick to ensure the DOM is updated and the component is visible
-      this.$nextTick(() => {
-        if (this.$refs.activityStreamRef) {
-          this.$refs.activityStreamRef.refreshIfNeeded();
-        }
-      });
+    switchTab(tabName) {
+      this.activeTab = tabName;
+      
+      // Special handling for activity tab
+      if (tabName === 'activity') {
+        this.$nextTick(() => {
+          if (this.$refs.activityStreamRef) {
+            this.$refs.activityStreamRef.refreshIfNeeded();
+          }
+        });
+      }
     },
 
     handleActivityClick(activity) {
