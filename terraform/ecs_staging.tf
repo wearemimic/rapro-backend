@@ -452,14 +452,6 @@ resource "aws_ecs_task_definition" "backend_staging" {
           name  = "STRIPE_PUBLISHABLE_KEY"
           value = var.stripe_public_key
         },
-        {
-          name  = "STRIPE_MONTHLY_PRICE_ID"
-          value = "${aws_ssm_parameter.stripe_monthly_price_id.value}"
-        },
-        {
-          name  = "STRIPE_ANNUAL_PRICE_ID"
-          value = "${aws_ssm_parameter.stripe_annual_price_id.value}"
-        },
         
         # AI Configuration
         {
@@ -544,6 +536,14 @@ resource "aws_ecs_task_definition" "backend_staging" {
         {
           name      = "STRIPE_WEBHOOK_SECRET"
           valueFrom = aws_ssm_parameter.stripe_webhook_secret.arn
+        },
+        {
+          name      = "STRIPE_MONTHLY_PRICE_ID"
+          valueFrom = aws_ssm_parameter.stripe_monthly_price_id.arn
+        },
+        {
+          name      = "STRIPE_ANNUAL_PRICE_ID"
+          valueFrom = aws_ssm_parameter.stripe_annual_price_id.arn
         },
         
         # AI API Keys
