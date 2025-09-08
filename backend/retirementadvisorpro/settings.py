@@ -175,37 +175,25 @@ WSGI_APPLICATION = 'retirementadvisorpro.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Check if we have environment variables for production database
-DB_HOST = os.environ.get('DB_HOST')
-DB_NAME = os.environ.get('DB_NAME', 'retirementadvisorpro')
-DB_USER = os.environ.get('DB_USER', 'postgres')
-DB_PASSWORD = os.environ.get('DB_PASSWORD', 'password')
-DB_PORT = os.environ.get('DB_PORT', '5432')
+import dj_database_url
 
-if DB_HOST:
-    # Production configuration using individual environment variables
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': DB_NAME,
-            'USER': DB_USER,
-            'PASSWORD': DB_PASSWORD,
-            'HOST': DB_HOST,
-            'PORT': DB_PORT,
-        }
+# Default database configuration for local development
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'retirementadvisorpro',
+        'USER': 'postgres',
+        'PASSWORD': 'password',
+        'HOST': 'db',  # Use 'db' for Docker with a service named `db`
+        'PORT': '5432',
     }
-else:
-    # Local development settings
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'retirementadvisorpro',
-            'USER': 'postgres',
-            'PASSWORD': 'password',
-            'HOST': 'db',  # Use 'db' for Docker with a service named `db`
-            'PORT': '5432',
-        }
-    }
+}
+
+# Override with DATABASE_URL if it exists (for production)
+# dj-database-url handles complex passwords with special characters correctly
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

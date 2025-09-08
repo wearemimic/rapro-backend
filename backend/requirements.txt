@@ -1,6 +1,7 @@
 django
 djangorestframework
 django-cors-headers
+dj-database-url
 djangorestframework>=3.14.0
 djangorestframework-simplejwt==5.2.2
 gunicorn
