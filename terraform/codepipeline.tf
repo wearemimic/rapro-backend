@@ -302,7 +302,7 @@ resource "aws_codebuild_project" "frontend" {
             "ls -la",
             "echo Checking docker directory...",
             "ls -la docker/",
-            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$VITE_API_BASE_URL --build-arg VITE_API_URL=$VITE_API_URL --build-arg VITE_FRONTEND_URL=$VITE_FRONTEND_URL .",
+            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$VITE_API_BASE_URL --build-arg VITE_API_URL=$VITE_API_URL --build-arg VITE_FRONTEND_URL=$VITE_FRONTEND_URL --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY .",
             "docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG"
           ]
         }

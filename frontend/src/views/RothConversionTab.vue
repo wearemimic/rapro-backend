@@ -1280,6 +1280,16 @@ export default {
       ];
       return colors[Math.floor(Math.random() * colors.length)];
     },
+    hexToRgba(hex, alpha) {
+      // Convert hex color to rgba
+      if (!hex) return 'rgba(0,0,0,0.1)';
+      
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    },
     async recalculateConversion() {
       // Flag to track recalculation state
       this._isRecalculating = true;
@@ -1461,6 +1471,12 @@ export default {
           this.comparisonMetrics = data.comparison || {};
           this.optimalSchedule = data.optimal_schedule || {};
           
+          console.log('🔵 Setting optimalSchedule:', this.optimalSchedule);
+          console.log('🔵 optimalSchedule.score_breakdown:', this.optimalSchedule.score_breakdown);
+          if (this.optimalSchedule.score_breakdown) {
+            console.log('🔵 optimalSchedule.score_breakdown.total_rmds:', this.optimalSchedule.score_breakdown.total_rmds);
+          }
+          
           // Update the UI's conversion start year to match the optimal schedule
           if (this.optimalSchedule && this.optimalSchedule.start_year) {
             this.conversionStartYear = parseInt(this.optimalSchedule.start_year);
@@ -1468,11 +1484,18 @@ export default {
           }
           
           // Handle the new baseline metrics structure
+          console.log('🔵 API RESPONSE PROCESSING:');
+          console.log('🔵 data.baseline:', data.baseline);
+          console.log('🔵 data.optimal_schedule:', data.optimal_schedule);
+          
           if (data.baseline && data.baseline.metrics) {
             this.baselineMetrics = data.baseline.metrics || {};
+            console.log('🔵 Setting baselineMetrics from data.baseline.metrics:', this.baselineMetrics);
+            console.log('🔵 baselineMetrics.total_rmds:', this.baselineMetrics.total_rmds);
           } else {
             // Fallback to old API structure
             this.baselineMetrics = data.baseline || {};
+            console.log('🔵 Using fallback - Setting baselineMetrics from data.baseline:', this.baselineMetrics);
           }
           
           // Generate asset line data from the year-by-year results which contain asset balances
@@ -1494,14 +1517,21 @@ export default {
             }
           }
           
-          // Generate expense summary data
+          // Set flag that we have run a scenario BEFORE generating the expense summary
+          this.hasScenarioBeenRun = true;
+          
+          // Generate expense summary data (now it will use real data)
           const newExpenseSummaryData = this.generateExpenseSummaryData();
           if (newExpenseSummaryData) {
-            this.expenseSummaryData = JSON.parse(JSON.stringify(newExpenseSummaryData));
+            console.log('📊 Setting new expense summary data:', newExpenseSummaryData);
+            // Force Vue to detect the change by creating a completely new object
+            this.expenseSummaryData = Object.freeze(JSON.parse(JSON.stringify(newExpenseSummaryData)));
+            // Force a re-render of the chart component
+            this.$nextTick(() => {
+              console.log('📊 Chart data updated, forcing re-render');
+              this.$forceUpdate();
+            });
           }
-          
-          // Set flag that we have run a scenario
-          this.hasScenarioBeenRun = true;
           
           // Scroll to the Expense Summary section
           this.$nextTick(() => {
@@ -1754,9 +1784,9 @@ export default {
         const baselineInheritance = baseline.inheritance_tax || 75000;
         const optimalInheritance = optimal.inheritance_tax || 45000;
         
-        // Calculate totals
-        const baselineTotal = baselineRMDs + baselineTaxes + baselineMedicare + baselineInheritance;
-        const optimalTotal = optimalRMDs + optimalTaxes + optimalMedicare + optimalInheritance;
+        // Calculate totals (using only IRMAA, not base Medicare)
+        const baselineTotal = baselineRMDs + baselineTaxes + baselineIRMAA + baselineInheritance;
+        const optimalTotal = optimalRMDs + optimalTaxes + optimalIRMAA + optimalInheritance;
         
         // Calculate savings
         const savings = baselineTotal - optimalTotal;
@@ -2196,9 +2226,12 @@ export default {
         .join(' ');
     },
     generateExpenseSummaryData() {
+      console.log('🟡 generateExpenseSummaryData called');
+      console.log('🟡 hasScenarioBeenRun:', this.hasScenarioBeenRun);
       try {
         // Check if we have real data or need to use defaults
         if (!this.hasScenarioBeenRun) {
+          console.log('🟡 Using DEFAULT data (hasScenarioBeenRun is false)');
           // Use default data for initial display
           const defaultBaselineRMDs = 250000;
           const defaultOptimalRMDs = 180000;
@@ -2218,51 +2251,77 @@ export default {
           this.totalSavings = defaultSavings;
           this.savingsPercentage = defaultSavingsPercentage;
           
+          // For defaults, use smaller IRMAA values since they're just surcharges
+          const defaultBaselineIRMAA = 15000;  // Example IRMAA surcharge
+          const defaultOptimalIRMAA = 5000;    // Reduced after conversion
+          
+          // Recalculate totals with IRMAA instead of full Medicare
+          const defaultBaselineTotalWithIRMAA = defaultBaselineRMDs + defaultBaselineTaxes + defaultBaselineIRMAA + defaultBaselineInheritance;
+          const defaultOptimalTotalWithIRMAA = defaultOptimalRMDs + defaultOptimalTaxes + defaultOptimalIRMAA + defaultOptimalInheritance;
+          
           return {
-            labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+            labels: ['RMDs', 'State & Federal Taxes', 'IRMAA Surcharges', 'Inheritance Tax', 'Total Expenses'],
             datasets: [
               {
                 label: 'Before Conversion',
                 backgroundColor: '#007bff',
-                data: [defaultBaselineRMDs, defaultBaselineTaxes, defaultBaselineMedicare, defaultBaselineInheritance, defaultBaselineTotal]
+                data: [defaultBaselineRMDs, defaultBaselineTaxes, defaultBaselineIRMAA, defaultBaselineInheritance, defaultBaselineTotalWithIRMAA]
               },
               {
                 label: 'After Conversion',
                 backgroundColor: '#28a745',
-                data: [defaultOptimalRMDs, defaultOptimalTaxes, defaultOptimalMedicare, defaultOptimalInheritance, defaultOptimalTotal]
+                data: [defaultOptimalRMDs, defaultOptimalTaxes, defaultOptimalIRMAA, defaultOptimalInheritance, defaultOptimalTotalWithIRMAA]
               }
             ]
           };
         }
+        
+        console.log('🟡 Using REAL data (hasScenarioBeenRun is true)');
         
         // Get values from baseline and optimal schedule
         const baseline = this.baselineMetrics || {};
         const optimal = this.optimalSchedule?.score_breakdown || {};
         const comparison = this.comparisonMetrics || {};
         
+        // DEBUG: Log what we're actually reading from the API
+        console.log('🔴 BAR CHART DATA SOURCES:');
+        console.log('🔴 this.baselineMetrics:', this.baselineMetrics);
+        console.log('🔴 this.optimalSchedule:', this.optimalSchedule);
+        console.log('🔴 baseline object:', baseline);
+        console.log('🔴 optimal object:', optimal);
+        
         // Extract RMD data (use total RMDs from the enhanced API response)
         const baselineRMDs = baseline.total_rmds || 0;
         const optimalRMDs = optimal.total_rmds || 0;
         const rmdReduction = comparison.rmd_reduction || (baselineRMDs - optimalRMDs);
+        
+        // DEBUG: Log the RMD values we're using
+        console.log('🔴 baselineRMDs value:', baselineRMDs);
+        console.log('🔴 optimalRMDs value:', optimalRMDs);
+        console.log('🔴 These are the values going into the bar chart!');
         
         // Extract tax data
         const baselineTaxes = baseline.lifetime_tax || 0;
         const optimalTaxes = optimal.lifetime_tax || 0;
         const taxSavings = comparison.tax_savings || (baselineTaxes - optimalTaxes);
         
-        // Extract Medicare and IRMAA data
-        const baselineMedicare = (baseline.lifetime_medicare || 0) + (baseline.total_irmaa || 0);
-        const optimalMedicare = (optimal.lifetime_medicare || 0) + (optimal.total_irmaa || 0);
-        const medicareSavings = comparison.medicare_savings || comparison.irmaa_savings || (baselineMedicare - optimalMedicare);
+        // Extract ONLY IRMAA data (not base Medicare premiums)
+        // Base Medicare premiums are the same regardless of income, only IRMAA changes
+        const baselineIRMAA = baseline.total_irmaa || 0;
+        const optimalIRMAA = optimal.total_irmaa || 0;
+        const irmaaSavings = comparison.irmaa_savings || (baselineIRMAA - optimalIRMAA);
+        
+        console.log('🔴 Baseline IRMAA:', baselineIRMAA);
+        console.log('🔴 Optimal IRMAA:', optimalIRMAA);
         
         // Extract inheritance tax
         const baselineInheritance = baseline.inheritance_tax || 0;
         const optimalInheritance = optimal.inheritance_tax || 0;
         const inheritanceTaxSavings = comparison.inheritance_tax_savings || (baselineInheritance - optimalInheritance);
         
-        // Calculate totals
-        const baselineTotal = baselineRMDs + baselineTaxes + baselineMedicare + baselineInheritance;
-        const optimalTotal = optimalRMDs + optimalTaxes + optimalMedicare + optimalInheritance;
+        // Calculate totals (using only IRMAA, not base Medicare)
+        const baselineTotal = baselineRMDs + baselineTaxes + baselineIRMAA + baselineInheritance;
+        const optimalTotal = optimalRMDs + optimalTaxes + optimalIRMAA + optimalInheritance;
         
         // Calculate savings
         const savings = comparison.total_savings || (baselineTotal - optimalTotal);
@@ -2273,27 +2332,37 @@ export default {
         this.totalSavings = savings;
         this.savingsPercentage = savingsPercentage;
         
+        // DEBUG: Log the final data going into the chart
+        console.log('🔴 FINAL BAR CHART DATA:');
+        console.log('🔴 Before Conversion RMDs:', baselineRMDs);
+        console.log('🔴 After Conversion RMDs:', optimalRMDs);
+        console.log('🔴 Before dataset:', [baselineRMDs, baselineTaxes, baselineIRMAA, baselineInheritance, baselineTotal]);
+        console.log('🔴 After dataset:', [optimalRMDs, optimalTaxes, optimalIRMAA, optimalInheritance, optimalTotal]);
+        
         // Return the expense summary data
-        return {
-          labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+        const chartData = {
+          labels: ['RMDs', 'State & Federal Taxes', 'IRMAA Surcharges', 'Inheritance Tax', 'Total Expenses'],
           datasets: [
             {
               label: 'Before Conversion',
               backgroundColor: '#007bff',
-              data: [baselineRMDs, baselineTaxes, baselineMedicare, baselineInheritance, baselineTotal]
+              data: [baselineRMDs, baselineTaxes, baselineIRMAA, baselineInheritance, baselineTotal]
             },
             {
               label: 'After Conversion',
               backgroundColor: '#28a745',
-              data: [optimalRMDs, optimalTaxes, optimalMedicare, optimalInheritance, optimalTotal]
+              data: [optimalRMDs, optimalTaxes, optimalIRMAA, optimalInheritance, optimalTotal]
             }
           ]
         };
+        
+        console.log('🔴 Complete chart data object:', chartData);
+        return chartData;
       } catch (error) {
         console.error('Error generating expense summary data:', error);
         // Provide fallback data to ensure the graph doesn't break
         return {
-          labels: ['RMDs', 'State & Federal Taxes', 'Medicare & IRMAA', 'Inheritance Tax', 'Total Expenses'],
+          labels: ['RMDs', 'State & Federal Taxes', 'IRMAA Surcharges', 'Inheritance Tax', 'Total Expenses'],
           datasets: [
             {
               label: 'Before Conversion',

@@ -1074,6 +1074,14 @@ class RothConversionAPIView(APIView):
                 'scenarioResults': result['conversion_results']  # Add scenarioResults for frontend
             }
             
+            # DEBUG: Log what we're actually sending to the UI
+            print(f"\n=== ROTH CONVERSION API RESPONSE DEBUG ===")
+            print(f"Baseline RMDs (baseline.metrics.total_rmds): ${transformed_result['baseline']['metrics'].get('total_rmds', 0):,.0f}")
+            print(f"Conversion RMDs (optimal_schedule.score_breakdown.total_rmds): ${transformed_result['optimal_schedule']['score_breakdown'].get('total_rmds', 0):,.0f}")
+            print(f"Annual conversion amount: ${transformed_result['optimal_schedule']['annual_amount']:,.0f}")
+            print(f"Total conversion amount: ${transformed_result['optimal_schedule']['total_amount']:,.0f}")
+            print(f"==========================================\n")
+            
             # Return the transformed results
             return Response(transformed_result, status=status.HTTP_200_OK)
             

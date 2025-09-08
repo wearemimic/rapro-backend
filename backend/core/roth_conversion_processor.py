@@ -155,8 +155,8 @@ class RothConversionProcessor:
         
         return tax_loader.get_standard_deduction(filing_status)
     
-    def _calculate_medicare_costs(self, magi):
-        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds."""
+    def _calculate_medicare_costs(self, magi, year=None):
+        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds with inflation."""
         tax_loader = get_tax_loader()
         
         # Get base Medicare rates from CSV
@@ -176,8 +176,12 @@ class RothConversionProcessor:
         normalized_status = (tax_status or '').strip().lower()
         filing_status = status_mapping.get(normalized_status, 'Single')
         
-        # Calculate IRMAA surcharges using CSV data
-        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)
+        # Calculate IRMAA surcharges using inflation-adjusted thresholds if year is provided
+        if year:
+            part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
+        else:
+            # Fallback to non-inflated calculation if no year provided
+            part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)
         
         # For married filing jointly, double the base rates
         if filing_status == "Married Filing Jointly":
@@ -391,8 +395,15 @@ class RothConversionProcessor:
             metrics['total_irmaa'] += float(irmaa)
             
             # Add RMDs
+            rmd_amount = row.get('rmd_amount', 0)
+            if isinstance(rmd_amount, (int, float, Decimal)):
+                metrics['total_rmds'] += float(rmd_amount)
+                # DEBUG: Log each RMD
+                if float(rmd_amount) > 0:
+                    print(f"Year {row.get('year', 'unknown')}: Adding RMD ${float(rmd_amount):,.0f} to total")
+            # Also check for any other RMD fields
             for key, value in row.items():
-                if key.endswith('_rmd') and isinstance(value, (int, float, Decimal)):
+                if key.endswith('_rmd') and key != 'rmd_amount' and isinstance(value, (int, float, Decimal)):
                     metrics['total_rmds'] += float(value)
             
             # Add net income
@@ -738,9 +749,9 @@ class RothConversionProcessor:
                             
                             # Add Medicare/IRMAA if age >= 65
                             if primary_age and primary_age >= 65:
-                                # Calculate Medicare costs using proper MAGI and IRMAA calculations
+                                # Calculate Medicare costs using proper MAGI and IRMAA calculations with inflation
                                 magi = float(self.pre_retirement_income)  # MAGI is same as income for baseline
-                                total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi)
+                                total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi, year)
                                 pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
                                 pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
                                 pre_retirement_row['total_medicare'] = total_medicare
@@ -771,6 +782,11 @@ class RothConversionProcessor:
             # Ensure conversion scenario also has the same start_year
             conversion_scenario['start_year'] = baseline_scenario['start_year']
                 
+            # DEBUG: Log conversion parameters
+            print(f"\n=== ROTH CONVERSION PROCESSOR DEBUG ===")
+            print(f"Processing conversion with annual amount: ${conversion_scenario.get('roth_conversion_annual_amount', 0):,.0f}")
+            print(f"Conversion years: {conversion_scenario.get('roth_conversion_start_year', 'None')} - {conversion_scenario.get('roth_conversion_start_year', 0) + conversion_scenario.get('roth_conversion_duration', 0) - 1}")
+            
             try:
                 conversion_processor = ScenarioProcessor.from_dicts(
                     scenario=conversion_scenario,
@@ -908,6 +924,11 @@ class RothConversionProcessor:
         
         # Extract conversion metrics
         conversion_metrics = self._extract_metrics(conversion_results)
+        
+        # DEBUG: Log extracted metrics
+        print(f"Baseline total_rmds: ${baseline_metrics.get('total_rmds', 0):,.0f}")
+        print(f"Conversion total_rmds: ${conversion_metrics.get('total_rmds', 0):,.0f}")
+        print(f"========================================\n")
         
         # Compare metrics
         comparison = self._compare_metrics(baseline_metrics, conversion_metrics)

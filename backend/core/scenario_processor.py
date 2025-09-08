@@ -368,8 +368,11 @@ class ScenarioProcessor:
             ss_decrease_amount_actual = 0
             ss_income_primary_gross = 0
             ss_income_spouse_gross = 0
+            total_rmd_amount = 0  # Track total RMD for the year
             if primary_alive or spouse_alive:
                 gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
+                # Get the RMD amount that was calculated in _calculate_gross_income
+                total_rmd_amount = getattr(self, '_current_year_rmd', 0)
                 ss_income, ss_income_primary, ss_income_spouse = self._calculate_social_security(year, primary_alive, spouse_alive)
                 
                 # Check if SS decrease is applied this year and calculate actual amount
@@ -602,7 +605,8 @@ class ScenarioProcessor:
                 "ss_decrease_amount": ss_decrease_amount_actual,
                 "hold_harmless_protected": hold_harmless_protected,
                 "hold_harmless_amount": round(hold_harmless_amount, 2),
-                "original_remaining_ss": round(original_remaining_ss, 2)
+                "original_remaining_ss": round(original_remaining_ss, 2),
+                "rmd_amount": round(total_rmd_amount, 2)
             }
 
             # Add asset balances to summary with safe rounding
@@ -754,6 +758,14 @@ class ScenarioProcessor:
             self._log_debug(f"Year {year} - Asset type '{asset.get('income_type')}' does not have a balance. Calculating income only.")
             return 0
 
+        # If asset was fully converted to Roth, maintain zero balance
+        if asset.get("fully_converted_to_roth", False):
+            asset["current_asset_balance"] = Decimal('0')
+            asset["previous_year_balance"] = Decimal('0')
+            asset["last_processed_year"] = year
+            self._log_debug(f"Year {year} - Asset was fully converted to Roth, maintaining zero balance")
+            return Decimal('0')
+
         # Calculate annual contributions only if current age is less than start age
         annual_contribution = 0
         if current_age < start_age:
@@ -888,6 +900,7 @@ class ScenarioProcessor:
     def _calculate_gross_income(self, year, primary_alive=True, spouse_alive=True):
         self._log_debug(f"Processing gross income for year {year}")
         income_total = 0
+        total_rmd = 0  # Track RMD amounts for this calculation
         for asset in self.assets:
             # Skip Social Security assets - they are handled separately
             if asset.get("income_type") == "social_security":
@@ -913,7 +926,14 @@ class ScenarioProcessor:
                 rmd_amount = self._calculate_rmd(asset, year)
                 if rmd_amount > annual_income:
                     annual_income = rmd_amount
+                # Track RMD amount separately
+                if rmd_amount > 0:
+                    total_rmd += rmd_amount
+                    self._log_debug(f"Year {year} - Asset {asset.get('investment_name', 'Unknown')}: RMD = ${rmd_amount:,.2f}")
                 income_total += annual_income
+        # Store total RMD for this year so it can be accessed by the main calculate method
+        self._current_year_rmd = total_rmd
+        self._log_debug(f"Year {year} - Total RMD for year: ${total_rmd:,.2f}")
         return income_total
 
     def _calculate_social_security(self, year, primary_alive=True, spouse_alive=True):
@@ -1301,6 +1321,7 @@ class ScenarioProcessor:
                 asset_conversion_amount = roth_conversion_annual_amount * depletion_ratio
                 # Store but don't apply yet
                 asset["pending_roth_conversion"] = min(asset_conversion_amount, asset_balance)
+                self._log_debug(f"Year {year} - Asset {asset.get('income_name', 'Unknown')} balance: ${asset_balance:,.2f}, pending conversion: ${asset['pending_roth_conversion']:,.2f}")
             
             # Return total conversion amount for tax calculations
             return roth_conversion_annual_amount
@@ -1432,7 +1453,8 @@ class ScenarioProcessor:
                 actual_conversion = min(conversion_amount, current_balance)
                 
                 # Deplete the traditional account
-                asset["current_asset_balance"] = current_balance - actual_conversion
+                new_balance = current_balance - actual_conversion
+                asset["current_asset_balance"] = new_balance
                 
                 # Add to Roth account
                 roth_account["current_asset_balance"] = Decimal(str(roth_account.get("current_asset_balance", 0))) + actual_conversion
@@ -1440,6 +1462,8 @@ class ScenarioProcessor:
                 # Track the conversion
                 asset["roth_conversion_amount"] = actual_conversion
                 total_converted += actual_conversion
+                
+                self._log_debug(f"Year {year} - Converted ${actual_conversion:,.2f} from {asset.get('income_name', 'Unknown')}, new balance: ${new_balance:,.2f}")
                 
                 # Mark as fully converted if balance is now zero
                 if asset["current_asset_balance"] <= Decimal('0.01'):  # Allow for rounding

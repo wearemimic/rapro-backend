@@ -260,7 +260,7 @@ resource "aws_ecs_task_definition" "backend" {
         # Database Configuration
         {
           name  = "DATABASE_URL"
-          value = "postgres://postgres:${random_password.db_password.result}@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}"
+          value = "postgres://postgres:${random_password.db_password.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}"
         },
         {
           name  = "POSTGRES_DB"
@@ -270,11 +270,35 @@ resource "aws_ecs_task_definition" "backend" {
           name  = "POSTGRES_USER"
           value = aws_db_instance.main.username
         },
+        {
+          name  = "DATABASE_HOST"
+          value = aws_db_instance.main.address
+        },
+        {
+          name  = "DATABASE_NAME"
+          value = aws_db_instance.main.db_name
+        },
+        {
+          name  = "DATABASE_USER"
+          value = aws_db_instance.main.username
+        },
+        {
+          name  = "DATABASE_PASSWORD"
+          value = random_password.db_password.result
+        },
         
         # Redis Configuration
         {
           name  = "REDIS_URL"
           value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+        },
+        {
+          name  = "REDIS_HOST"
+          value = aws_elasticache_replication_group.main.primary_endpoint_address
+        },
+        {
+          name  = "REDIS_PORT"
+          value = "6379"
         },
         {
           name  = "CELERY_BROKER_URL"
@@ -510,7 +534,7 @@ resource "aws_ecs_task_definition" "celery_worker" {
         # Database Configuration
         {
           name  = "DATABASE_URL"
-          value = "postgres://postgres:${random_password.db_password.result}@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}"
+          value = "postgres://postgres:${random_password.db_password.result}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}"
         },
         {
           name  = "POSTGRES_DB"
@@ -520,11 +544,35 @@ resource "aws_ecs_task_definition" "celery_worker" {
           name  = "POSTGRES_USER"
           value = aws_db_instance.main.username
         },
+        {
+          name  = "DATABASE_HOST"
+          value = aws_db_instance.main.address
+        },
+        {
+          name  = "DATABASE_NAME"
+          value = aws_db_instance.main.db_name
+        },
+        {
+          name  = "DATABASE_USER"
+          value = aws_db_instance.main.username
+        },
+        {
+          name  = "DATABASE_PASSWORD"
+          value = random_password.db_password.result
+        },
         
         # Redis Configuration - Critical for Celery
         {
           name  = "REDIS_URL"
           value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+        },
+        {
+          name  = "REDIS_HOST"
+          value = aws_elasticache_replication_group.main.primary_endpoint_address
+        },
+        {
+          name  = "REDIS_PORT"
+          value = "6379"
         },
         {
           name  = "CELERY_BROKER_URL"
