@@ -780,8 +780,8 @@ onMounted(async () => {
         form.firstName = userInfo.firstName || '';
         form.lastName = userInfo.lastName || '';
         
-        // Clear the stored info after using it
-        sessionStorage.removeItem('auth0_user_info');
+        // Don't clear auth0_user_info here - we need it for step 3
+        // It will be cleared after successful registration completion
       }
     }
   }

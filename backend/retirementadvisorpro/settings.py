@@ -307,13 +307,40 @@ REPORT_CENTER_RETENTION = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Stripe Configuration
-STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'your_stripe_publishable_key')
-STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'your_stripe_secret_key')
-STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'your_stripe_webhook_secret')
+# In production/staging, these MUST be set via environment variables
+# For local development, they will be loaded from .env file
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
 
-# Stripe Product/Price IDs
-STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID', 'price_monthly_id')
-STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID', 'price_annual_id')
+if ENVIRONMENT in ['production', 'staging']:
+    # In production/staging, require Stripe keys to be set
+    STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
+    STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY')
+    STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET')
+    STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
+    STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
+    
+    if not STRIPE_SECRET_KEY:
+        print("WARNING: STRIPE_SECRET_KEY is not set in environment variables")
+        STRIPE_SECRET_KEY = 'sk_test_placeholder'  # Fallback to prevent crashes
+    
+    if not STRIPE_PUBLISHABLE_KEY:
+        print("WARNING: STRIPE_PUBLISHABLE_KEY is not set in environment variables")
+        STRIPE_PUBLISHABLE_KEY = 'pk_test_placeholder'
+        
+    if not STRIPE_MONTHLY_PRICE_ID:
+        print("WARNING: STRIPE_MONTHLY_PRICE_ID is not set in environment variables")
+        STRIPE_MONTHLY_PRICE_ID = 'price_placeholder_monthly'
+        
+    if not STRIPE_ANNUAL_PRICE_ID:
+        print("WARNING: STRIPE_ANNUAL_PRICE_ID is not set in environment variables")
+        STRIPE_ANNUAL_PRICE_ID = 'price_placeholder_annual'
+else:
+    # Local development - use .env file values or defaults
+    STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_placeholder')
+    STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_placeholder')
+    STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'whsec_placeholder')
+    STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID', 'price_placeholder_monthly')
+    STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID', 'price_placeholder_annual')
 
 # =============================================================================
 # CELERY CONFIGURATION
