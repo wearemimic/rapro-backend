@@ -21,9 +21,9 @@
       <div class="col-sm-6 col-lg-2 mb-3 mb-lg-5">
         <!-- Card -->
         <div class="col-auto" style="margin-top:50px;">
-          <a class="btn btn-primary" href="/clients/create">
+          <router-link class="btn btn-primary" to="/clients/create">
             <i class="bi-person-plus-fill me-1"></i> Create Client
-          </a>
+          </router-link>
         </div>
          
         <!-- End Card -->
