@@ -17,6 +17,7 @@ from datetime import timedelta
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
+import dj_database_url
 load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
 
 
@@ -174,8 +175,6 @@ WSGI_APPLICATION = 'retirementadvisorpro.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-import dj_database_url
 
 # Database configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
