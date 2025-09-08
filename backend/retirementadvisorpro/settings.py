@@ -175,22 +175,23 @@ WSGI_APPLICATION = 'retirementadvisorpro.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Check if we have a DATABASE_URL (production) or use local settings
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# Check if we have environment variables for production database
+DB_HOST = os.environ.get('DB_HOST')
+DB_NAME = os.environ.get('DB_NAME', 'retirementadvisorpro')
+DB_USER = os.environ.get('DB_USER', 'postgres')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', 'password')
+DB_PORT = os.environ.get('DB_PORT', '5432')
 
-if DATABASE_URL:
-    # Parse the DATABASE_URL for production
-    from urllib.parse import urlparse
-    db_url = urlparse(DATABASE_URL)
-    
+if DB_HOST:
+    # Production configuration using individual environment variables
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': db_url.path[1:] if db_url.path else 'retirementadvisorpro',
-            'USER': db_url.username or 'postgres',
-            'PASSWORD': db_url.password or 'password',
-            'HOST': db_url.hostname or 'localhost',
-            'PORT': db_url.port or '5432',
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST,
+            'PORT': DB_PORT,
         }
     }
 else:
