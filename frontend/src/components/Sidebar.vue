@@ -20,14 +20,13 @@
             <div id="navbarVerticalMenuPagesMenu">
               <!-- Collapse -->
               <div class="nav-item">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuPagesUsersMenu" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuPagesUsersMenu'" 
-                   :title="isCollapsed ? 'Clients' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuPagesUsersMenu">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" @click.prevent="toggleClientsDropdown" role="button" 
+                   :title="isCollapsed ? 'Clients' : ''" :aria-expanded="clientsDropdownOpen" aria-controls="navbarVerticalMenuPagesUsersMenu">
                   <i class="bi-people nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Clients</span>
                 </a>
 
-                <div id="navbarVerticalMenuPagesUsersMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                <div id="navbarVerticalMenuPagesUsersMenu" class="nav-collapse" :class="{ 'collapse': !clientsDropdownOpen, 'show': clientsDropdownOpen }" v-show="!isCollapsed">
                   <router-link class="nav-link" to="/clients">Overview</router-link>
                   <router-link class="nav-link" to="/clients/create">Add Client <span class="badge bg-info rounded-pill ms-1">Hot</span></router-link>
                 </div>
@@ -86,15 +85,14 @@
 
               <!-- Compliance Section -->
               <div class="nav-item">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuComplianceMenu" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuComplianceMenu'" 
-                   :title="isCollapsed ? 'FINRA Compliance' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuComplianceMenu">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" @click.prevent="toggleComplianceDropdown" role="button" 
+                   :title="isCollapsed ? 'FINRA Compliance' : ''" :aria-expanded="complianceDropdownOpen" aria-controls="navbarVerticalMenuComplianceMenu">
                   <i class="bi-shield-check nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">FINRA Compliance</span>
                   <span class="badge bg-success rounded-pill ms-1" v-show="!isCollapsed">✓</span>
                 </a>
 
-                <div id="navbarVerticalMenuComplianceMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                <div id="navbarVerticalMenuComplianceMenu" class="nav-collapse" :class="{ 'collapse': !complianceDropdownOpen, 'show': complianceDropdownOpen }" v-show="!isCollapsed">
                   <router-link class="nav-link" to="/compliance">
                     <i class="bi-speedometer2 nav-icon me-2"></i>Compliance Dashboard
                   </router-link>
@@ -115,15 +113,14 @@
               
               <!-- Client navigation section - only shown when in client context -->
               <div class="nav-item" v-if="isClientRoute">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuCurrentClient" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuCurrentClient'" 
-                   :title="isCollapsed ? 'Current Client' : ''" aria-expanded="true" aria-controls="navbarVerticalMenuCurrentClient">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" @click.prevent="toggleClientRouteDropdown" role="button" 
+                   :title="isCollapsed ? 'Current Client' : ''" :aria-expanded="clientRouteDropdownOpen" aria-controls="navbarVerticalMenuCurrentClient">
                   <i class="bi-person nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Current Client</span>
                   <span class="badge bg-primary rounded-pill ms-1" v-show="!isCollapsed">Active</span>
                 </a>
 
-                                  <div id="navbarVerticalMenuCurrentClient" class="nav-collapse collapse" :class="{ show: isClientRoute && !isCollapsed }" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                                  <div id="navbarVerticalMenuCurrentClient" class="nav-collapse" :class="{ 'collapse': !clientRouteDropdownOpen, 'show': clientRouteDropdownOpen }" v-show="!isCollapsed">
                     <router-link class="nav-link" :to="{ name: 'ClientDetail', params: { id: currentClientId }}">
                       <i class="bi-person-badge nav-icon me-2"></i>Client Detail
                     </router-link>
@@ -147,15 +144,14 @@
               
               <!-- Admin Section -->
               <div class="nav-item" v-if="isAdminUser">
-                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" href="#navbarVerticalMenuAdminMenu" role="button" 
-                   :data-bs-toggle="isCollapsed ? '' : 'collapse'" :data-bs-target="isCollapsed ? '' : '#navbarVerticalMenuAdminMenu'" 
-                   :title="isCollapsed ? 'Admin Panel' : ''" aria-expanded="false" aria-controls="navbarVerticalMenuAdminMenu">
+                <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" @click.prevent="toggleAdminDropdown" role="button" 
+                   :title="isCollapsed ? 'Admin Panel' : ''" :aria-expanded="adminDropdownOpen" aria-controls="navbarVerticalMenuAdminMenu">
                   <i class="bi-gear nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Admin Panel</span>
                   <span v-if="adminRole === 'super_admin'" class="badge bg-danger rounded-pill ms-1" v-show="!isCollapsed">Super</span>
                 </a>
 
-                <div id="navbarVerticalMenuAdminMenu" class="nav-collapse collapse" v-show="!isCollapsed" data-bs-parent="#navbarVerticalMenuPagesMenu">
+                <div id="navbarVerticalMenuAdminMenu" class="nav-collapse" :class="{ 'collapse': !adminDropdownOpen, 'show': adminDropdownOpen }" v-show="!isCollapsed">
                   <router-link class="nav-link" to="/admin/dashboard">
                     <i class="bi-speedometer2 nav-icon me-2"></i>Dashboard
                   </router-link>
@@ -227,6 +223,10 @@ export default {
       clientScenarios: [],
       isClientRoute: false,
       isCollapsed: false,
+      clientsDropdownOpen: false,
+      complianceDropdownOpen: false,
+      clientRouteDropdownOpen: true, // Default open for current client
+      adminDropdownOpen: false,
       totalUnreadCommunications: 0,
       pendingTasksCount: 0,
       todayEventsCount: 0,
@@ -374,6 +374,26 @@ export default {
       localStorage.setItem('sidebarCollapsed', this.isCollapsed.toString());
       // Emit event to parent if needed for layout adjustments
       this.$emit('sidebar-toggle', this.isCollapsed);
+    },
+    
+    toggleClientsDropdown() {
+      if (this.isCollapsed) return; // Don't toggle when collapsed
+      this.clientsDropdownOpen = !this.clientsDropdownOpen;
+    },
+    
+    toggleComplianceDropdown() {
+      if (this.isCollapsed) return; // Don't toggle when collapsed
+      this.complianceDropdownOpen = !this.complianceDropdownOpen;
+    },
+    
+    toggleClientRouteDropdown() {
+      if (this.isCollapsed) return; // Don't toggle when collapsed
+      this.clientRouteDropdownOpen = !this.clientRouteDropdownOpen;
+    },
+    
+    toggleAdminDropdown() {
+      if (this.isCollapsed) return; // Don't toggle when collapsed
+      this.adminDropdownOpen = !this.adminDropdownOpen;
     },
     
     // Check if a scenario is the currently selected one
