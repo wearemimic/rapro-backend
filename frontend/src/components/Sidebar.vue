@@ -158,6 +158,9 @@
                   <router-link v-if="canAccessSection('user_management')" class="nav-link" to="/admin/users">
                     <i class="bi-people nav-icon me-2"></i>User Management
                   </router-link>
+                  <router-link v-if="canAccessSection('affiliate_management')" class="nav-link" to="/affiliates">
+                    <i class="bi-link-45deg nav-icon me-2"></i>Affiliate Management
+                  </router-link>
                   <router-link v-if="canAccessSection('user_management')" class="nav-link" to="/admin/impersonation">
                     <i class="bi-person-check nav-icon me-2"></i>Impersonation Logs
                   </router-link>

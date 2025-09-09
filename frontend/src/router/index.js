@@ -65,6 +65,14 @@ const routes = [
       { path: 'compliance/audit-trail', name: 'AuditTrail', component: () => import('@/views/Compliance/AuditTrail.vue'), meta: { requiresAuth: true, title: 'Audit Trail' } },
       { path: 'compliance/retention', name: 'DocumentRetention', component: () => import('@/views/Compliance/DocumentRetention.vue'), meta: { requiresAuth: true, title: 'Document Retention' } },
       { path: 'compliance/reports', name: 'ComplianceReports', component: () => import('@/views/Compliance/ComplianceReports.vue'), meta: { requiresAuth: true, title: 'Compliance Reports' } },
+      
+      // Affiliate Management Routes (Admin Only)
+      { path: 'affiliates', name: 'AffiliateList', component: () => import('@/views/affiliate/AffiliateList.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+      { path: 'affiliates/:id', name: 'AffiliateDetail', component: () => import('@/views/affiliate/AffiliateDetail.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+      { path: 'affiliates/:id/edit', name: 'AffiliateEdit', component: () => import('@/views/affiliate/AffiliateDetail.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+      { path: 'affiliates/:id/dashboard', name: 'AffiliateDashboard', component: () => import('@/views/affiliate/AffiliateDetail.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+      { path: 'affiliates/:id/links', name: 'AffiliateLinks', component: () => import('@/views/affiliate/AffiliateDetail.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+      { path: 'affiliates/:id/commissions', name: 'AffiliateCommissions', component: () => import('@/views/affiliate/AffiliateDetail.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
     ]
   },
   
