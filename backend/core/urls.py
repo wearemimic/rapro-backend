@@ -8,6 +8,10 @@ from .views_main import ListCreateRealEstateView, RealEstateDetailView, ReportTe
 from .views_main import EmailAccountViewSet, CommunicationViewSet, LeadViewSet, LeadSourceViewSet, TaskViewSet, TaskTemplateViewSet, CalendarAccountViewSet, CalendarEventViewSet, MeetingTemplateViewSet
 from .views.activity_views import ActivityLogViewSet
 from .views.document_views import DocumentViewSet, DocumentCategoryViewSet, DocumentVersionViewSet, DocumentAuditLogViewSet, DocumentTemplateViewSet, DocumentRetentionPolicyViewSet, bulk_document_action
+from .affiliate_views import (
+    AffiliateViewSet, AffiliateLinkViewSet, CommissionViewSet, 
+    AffiliatePayoutViewSet, AffiliateDiscountCodeViewSet, track_click
+)
 from .views_main import gmail_auth_url, gmail_oauth_callback, outlook_auth_url, outlook_oauth_callback, send_email, sync_all_emails, oauth_settings_status, google_calendar_auth_url, google_calendar_oauth_callback, outlook_calendar_auth_url, outlook_calendar_oauth_callback, calendar_settings_status, create_video_meeting, update_video_meeting, delete_video_meeting, get_meeting_join_info, send_meeting_reminder, video_settings_status, get_jump_ai_meeting_insights
 from .views_main import analyze_communication, bulk_analyze_communications, ai_analysis_stats, high_priority_communications, trigger_auto_analysis
 from .views_main import celery_health_check, task_status, queue_monitoring
@@ -115,6 +119,14 @@ workflow_router.register(r'admin/workflows', WorkflowViewSet, basename='workflow
 workflow_router.register(r'admin/search', SearchViewSet, basename='search')
 workflow_router.register(r'admin/search/filter-presets', FilterPresetViewSet, basename='filterpreset')
 
+# Affiliate Management Router
+affiliate_router = DefaultRouter()
+affiliate_router.register(r'affiliates', AffiliateViewSet, basename='affiliate')
+affiliate_router.register(r'affiliate-links', AffiliateLinkViewSet, basename='affiliatelink')
+affiliate_router.register(r'commissions', CommissionViewSet, basename='commission')
+affiliate_router.register(r'affiliate-payouts', AffiliatePayoutViewSet, basename='affiliatepayout')
+affiliate_router.register(r'discount-codes', AffiliateDiscountCodeViewSet, basename='discountcode')
+
 urlpatterns = [
     # Health check endpoint for ECS load balancer
     path('health/', lambda request: HttpResponse('OK', status=200), name='health'),
@@ -187,6 +199,12 @@ urlpatterns = [
     
     # Include Communication Tools router
     path('', include(communication_router.urls)),
+    
+    # Include Affiliate Management router
+    path('', include(affiliate_router.urls)),
+    
+    # Public affiliate click tracking endpoint (no auth required)
+    path('r/<str:tracking_code>/', track_click, name='affiliate-track-click'),
     
     # CRM-specific endpoints
     path('email/gmail/auth-url/', gmail_auth_url, name='gmail-auth-url'),

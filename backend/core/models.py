@@ -3631,3 +3631,15 @@ class FeedbackResponse(models.Model):
         note_type = "Internal Note" if self.is_internal_note else "Response"
         return f"{note_type}: {self.feedback.title} by {self.staff_user.email}"
 
+
+# Import affiliate models
+from .affiliate_models import (
+    Affiliate,
+    AffiliateLink,
+    AffiliateClick,
+    AffiliateConversion,
+    Commission,
+    AffiliatePayout,
+    AffiliateDiscountCode
+)
+
