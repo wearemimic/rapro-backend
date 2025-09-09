@@ -93,9 +93,6 @@ resource "aws_ecs_service" "backend" {
     rollback = true
   }
 
-  # Longer health check grace period for Django startup
-  health_check_grace_period_seconds = 120
-
   depends_on = [
     aws_lb_listener.http,
     aws_lb_listener.https,

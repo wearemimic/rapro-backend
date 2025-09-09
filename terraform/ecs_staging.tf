@@ -304,15 +304,15 @@ resource "aws_ecs_task_definition" "frontend_staging" {
         },
         {
           name  = "VITE_API_URL"
-          value = "http://staging.retirementadvisorpro.com/api"
+          value = "https://staging.retirementadvisorpro.com/api"
         },
         {
           name  = "VITE_API_BASE_URL"
-          value = "http://staging.retirementadvisorpro.com"
+          value = "https://staging.retirementadvisorpro.com"
         },
         {
           name  = "VITE_FRONTEND_URL"
-          value = "http://staging.retirementadvisorpro.com"
+          value = "https://staging.retirementadvisorpro.com"
         }
       ]
       
@@ -426,7 +426,7 @@ resource "aws_ecs_task_definition" "backend_staging" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = "http://staging.retirementadvisorpro.com"
+          value = "https://staging.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
