@@ -25,10 +25,10 @@
                   <span class="me-2 fw-semibold">Choose</span>
                   <!-- Scenario Switcher Dropdown -->
                   <div class="dropdown me-2">
-                    <button class="btn btn-outline-primary dropdown-toggle" type="button" id="scenarioSwitchDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-outline-primary dropdown-toggle" type="button" @click="toggleScenarioDropdown" :aria-expanded="scenarioDropdownOpen">
                       {{ scenario ? scenario.name : 'Select Scenario' }}
                     </button>
-                    <ul class="dropdown-menu" aria-labelledby="scenarioSwitchDropdown">
+                    <ul class="dropdown-menu" :class="{ 'show': scenarioDropdownOpen }">
                       <li v-for="s in scenarios" :key="s.id">
                         <a class="dropdown-item" :class="{ active: selectedScenarioId === s.id }" href="#" @click.prevent="switchToScenario(s.id)">
                           <i class="bi-graph-up me-2"></i>{{ s.name }}
@@ -39,7 +39,7 @@
                   <span class="me-2 text-muted">-</span>
                   <!-- Page Navigation Dropdown -->
                   <div class="dropdown">
-                    <button class="btn btn-outline-primary dropdown-toggle" type="button" id="scenarioNavDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-outline-primary dropdown-toggle" type="button" @click="toggleNavDropdown" :aria-expanded="navDropdownOpen">
                       <span v-if="activeTab === 'overview'">Scenario Overview</span>
                       <span v-else-if="activeTab === 'financial'">Financial Overview</span>
                       <span v-else-if="activeTab === 'socialSecurity'">Social Security Overview</span>
@@ -51,7 +51,7 @@
                       <span v-else-if="activeTab === 'nextSteps'">Next Steps</span>
                       <span v-else>Select View</span>
                     </button>
-                    <ul class="dropdown-menu" aria-labelledby="scenarioNavDropdown">
+                    <ul class="dropdown-menu" :class="{ 'show': navDropdownOpen }">
                       <li><a class="dropdown-item" :class="{ active: activeTab === 'overview' }" href="#" @click.prevent="navigateToTab('overview')">
                         <i class="bi-graph-up me-2"></i>Scenario Overview
                       </a></li>
@@ -84,10 +84,10 @@
                 </div>
                 <!-- Actions Dropdown -->
                 <div class="dropdown">
-                  <button class="btn btn-primary dropdown-toggle" type="button" id="actionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                  <button class="btn btn-primary dropdown-toggle" type="button" @click="toggleActionsDropdown" :aria-expanded="actionsDropdownOpen">
                     Actions
                   </button>
-                  <ul class="dropdown-menu" aria-labelledby="actionsDropdown">
+                  <ul class="dropdown-menu" :class="{ 'show': actionsDropdownOpen }">
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')"><i class="bi-plus-circle me-2"></i>New Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')"><i class="bi-files me-2"></i>Duplicate Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="editScenario"><i class="bi-pencil me-2"></i>Edit Scenario</a></li>
@@ -462,6 +462,10 @@ export default {
         overviewFinancial: false,
         overviewFlow: false
       },
+      // Dropdown states for navigation
+      scenarioDropdownOpen: false,
+      navDropdownOpen: false,
+      actionsDropdownOpen: false,
       preRetirementIncome: 0,
       availableYears: [],
       conversionStartYear: null,
@@ -479,11 +483,11 @@ export default {
     this.initPlugins();
     this.initializeCircles();
     
+    // Add click handler to close dropdowns when clicking outside
+    document.addEventListener('click', this.handleClickOutside);
+    
     // Load all scenario data in one batch to prevent rate limiting
     await this.loadAllScenarioData();
-
-    // Add event listener for clicks outside the dropdown
-    document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
     // Remove event listener when component is destroyed
@@ -497,6 +501,35 @@ export default {
   },
   methods: {
     ...mapActions(['fetchScenarioData']),
+    
+    // Dropdown toggle methods
+    toggleScenarioDropdown() {
+      this.scenarioDropdownOpen = !this.scenarioDropdownOpen;
+      // Close other dropdowns
+      this.navDropdownOpen = false;
+      this.actionsDropdownOpen = false;
+    },
+    
+    toggleNavDropdown() {
+      this.navDropdownOpen = !this.navDropdownOpen;
+      // Close other dropdowns
+      this.scenarioDropdownOpen = false;
+      this.actionsDropdownOpen = false;
+    },
+    
+    toggleActionsDropdown() {
+      this.actionsDropdownOpen = !this.actionsDropdownOpen;
+      // Close other dropdowns
+      this.scenarioDropdownOpen = false;
+      this.navDropdownOpen = false;
+    },
+    
+    // Close dropdowns when clicking outside
+    closeAllDropdowns() {
+      this.scenarioDropdownOpen = false;
+      this.navDropdownOpen = false;
+      this.actionsDropdownOpen = false;
+    },
     
     // Batch load all scenario data to prevent rate limiting
     async loadAllScenarioData() {
@@ -574,6 +607,8 @@ export default {
       document.body.scrollTop = 0;
     },
     navigateToTab(tab) {
+      // Close dropdown after selection
+      this.navDropdownOpen = false;
       // Navigate to the selected tab by updating the URL
       this.$router.push({
         name: 'ScenarioDetail',
@@ -585,6 +620,8 @@ export default {
       });
     },
     switchToScenario(scenarioId) {
+      // Close dropdown after selection
+      this.scenarioDropdownOpen = false;
       // Switch to a different scenario while maintaining current tab
       this.$router.push({
         name: 'ScenarioDetail',
@@ -1009,7 +1046,13 @@ export default {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
     handleClickOutside(event) {
-      console.log('handleClickOutside triggered');
+      // Handle navigation dropdowns
+      const dropdownElement = event.target.closest('.dropdown');
+      if (!dropdownElement) {
+        this.closeAllDropdowns();
+      }
+      
+      // Handle tab section dropdowns
       const dropdowns = {
         financial: this.$refs.financialDropdown,
         socialSecurity: this.$refs.socialSecurityDropdown,
@@ -1019,14 +1062,9 @@ export default {
 
       for (const [tab, dropdown] of Object.entries(dropdowns)) {
         if (dropdown) {
-          console.log(`Checking dropdown for tab: ${tab}`);
-          console.log(`Dropdown contains event target: ${dropdown.contains(event.target)}`);
-          console.log(`Dropdown open state before: ${this.isDropdownOpen[tab]}`);
           if (!dropdown.contains(event.target) && this.isDropdownOpen[tab]) {
-            console.log(`Closing dropdown for tab: ${tab}`);
             this.isDropdownOpen[tab] = false;
           }
-          console.log(`Dropdown open state after: ${this.isDropdownOpen[tab]}`);
         }
       }
     },
@@ -1157,6 +1195,8 @@ export default {
         });
     },
     createScenario(type) {
+      // Close dropdown after selection
+      this.actionsDropdownOpen = false;
       const clientId = this.$route.params.id;
       console.log('🔄 createScenario called with type:', type);
       console.log('📍 Client ID:', clientId);
@@ -1176,6 +1216,8 @@ export default {
       }
     },
     editScenario() {
+      // Close dropdown after selection
+      this.actionsDropdownOpen = false;
       const clientId = this.$route.params.id;
       const scenarioId = this.$route.params.scenarioid;
       this.$router.push({ 
@@ -1185,6 +1227,8 @@ export default {
       });
     },
     async toggleScenarioSharing() {
+      // Close dropdown after selection
+      this.actionsDropdownOpen = false;
       try {
         const token = localStorage.getItem('token');
         if (!token) {
