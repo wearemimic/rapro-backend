@@ -386,7 +386,7 @@
       <div class="card-body">
           <div class="row mb-3">
             <div class="col-auto">
-              <button class="btn btn-primary" @click="addNewInvestment" data-bs-toggle="modal" data-bs-target="#investmentModal">
+              <button class="btn btn-primary" @click="addNewInvestment">
                 <i class="bi bi-plus-circle me-2"></i>Add Investment Account
               </button>
             </div>
@@ -544,6 +544,7 @@
   :primary-current-age="primaryCurrentAge"
   :spouse-current-age="spouseCurrentAge"
   :editing-investment="editingInvestment"
+  :show="showInvestmentModal"
   @save="handleInvestmentSave"
   @cancel="cancelInvestmentEdit"
 />
@@ -801,6 +802,9 @@ function handleInvestmentSave(investmentData) {
     delete investmentData.isEdit; // Remove the flag
     scenario.value.investments.push(investmentData);
   }
+  
+  // Close the modal
+  showInvestmentModal.value = false;
 }
 
 function removeInvestmentById(id) {
@@ -845,6 +849,9 @@ async function loadMedicareInflationRates() {
   }
 }
 
+// Modal visibility state
+const showInvestmentModal = ref(false);
+
 async function addNewInvestment() {
   // Clear any existing editing state to ensure modal opens in add mode
   editingInvestment.value = null;
@@ -854,21 +861,24 @@ async function addNewInvestment() {
     console.log('ScenarioCreate: Loading client data before opening investment modal');
     await loadClientData();
   }
+  
+  // Show the modal
+  showInvestmentModal.value = true;
 }
 
 function cancelInvestmentEdit() {
   // Clear the editing state when user cancels
   editingInvestment.value = null;
+  // Close the modal
+  showInvestmentModal.value = false;
 }
 
 function editInvestment(investment) {
   // Set the investment being edited - this will trigger the modal to populate
   editingInvestment.value = investment;
   
-  // Open the modal
-  const modal = document.getElementById('investmentModal');
-  const bootstrapModal = new bootstrap.Modal(modal);
-  bootstrapModal.show();
+  // Show the modal
+  showInvestmentModal.value = true;
 }
 
 // Group investments by type

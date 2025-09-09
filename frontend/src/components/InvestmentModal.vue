@@ -1,10 +1,9 @@
 <template>
   <div 
-    class="modal fade" 
-    id="investmentModal" 
+    v-if="show"
+    class="modal d-block" 
     tabindex="-1" 
-    aria-labelledby="investmentModalLabel" 
-    aria-hidden="true"
+    style="background-color: rgba(0, 0, 0, 0.5);"
   >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
@@ -13,7 +12,7 @@
             <i class="bi bi-question-circle" style="margin-right: 8px;"></i>
             {{ isEditMode ? 'Edit Investment' : 'Add Investment' }}
           </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <button type="button" class="btn-close" @click="cancelEdit" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p class="text-muted mb-4">Provide personal financial investment information for the case.</p>
@@ -188,7 +187,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="cancelEdit">Cancel</button>
+          <button type="button" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
           <button type="button" class="btn btn-primary" @click="saveInvestment">Save</button>
         </div>
       </div>
@@ -231,6 +230,10 @@ const props = defineProps({
   editingInvestment: {
     type: Object,
     default: null
+  },
+  show: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -575,19 +578,13 @@ const saveInvestment = () => {
 
   emit('save', investmentData)
   
-  // Close modal and reset form
-  const modal = document.getElementById('investmentModal')
-  const bootstrapModal = bootstrap.Modal.getInstance(modal)
-  bootstrapModal.hide()
-  
+  // Reset form
   resetForm()
 }
 
 const cancelEdit = () => {
-  // Emit cancel event so parent can clear editing state
-  if (isEditMode.value) {
-    emit('cancel')
-  }
+  // Emit cancel event so parent can clear editing state and close modal
+  emit('cancel')
   resetForm()
 }
 
