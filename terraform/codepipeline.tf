@@ -296,28 +296,41 @@ resource "aws_codebuild_project" "frontend" {
             "echo NPM version: $(npm --version)",
             "echo Running npm run build...",
             "npm run build",
-            "echo Building Docker image for frontend...",
+            "echo Building Docker images for frontend...",
             "cd $CODEBUILD_SRC_DIR",
             "echo Current directory after cd to CODEBUILD_SRC_DIR: $(pwd)",
             "ls -la",
             "echo Checking docker directory...",
             "ls -la docker/",
-            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:$IMAGE_TAG --build-arg VITE_API_BASE_URL=$VITE_API_BASE_URL --build-arg VITE_API_URL=$VITE_API_URL --build-arg VITE_FRONTEND_URL=$VITE_FRONTEND_URL --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY .",
-            "docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG"
+            "# Build PRODUCTION image with production URLs",
+            "echo Building production image with app.retirementadvisorpro.com URLs...",
+            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:latest --build-arg VITE_API_BASE_URL=https://app.retirementadvisorpro.com --build-arg VITE_API_URL=https://app.retirementadvisorpro.com/api --build-arg VITE_FRONTEND_URL=https://app.retirementadvisorpro.com --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY .",
+            "docker tag $IMAGE_REPO_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest",
+            "# Build STAGING image with staging URLs",
+            "echo Building staging image with staging.retirementadvisorpro.com URLs...",
+            "docker build -f docker/Dockerfile.frontend.prod -t $IMAGE_REPO_NAME:staging --build-arg VITE_API_BASE_URL=https://staging.retirementadvisorpro.com --build-arg VITE_API_URL=https://staging.retirementadvisorpro.com/api --build-arg VITE_FRONTEND_URL=https://staging.retirementadvisorpro.com --build-arg VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN --build-arg VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID --build-arg VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE --build-arg VITE_STRIPE_PUBLIC_KEY=$VITE_STRIPE_PUBLIC_KEY .",
+            "docker tag $IMAGE_REPO_NAME:staging $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging"
           ]
         }
         post_build = {
           commands = [
             "echo Build completed on `date`",
-            "echo Pushing Docker image to ECR...",
-            "docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG",
-            "printf '[{\"name\":\"frontend\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json",
-            "cat imagedefinitions.json"
+            "echo Pushing Docker images to ECR...",
+            "# Push production image",
+            "docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest",
+            "# Push staging image",
+            "docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging",
+            "# Production image definition",
+            "printf '[{\"name\":\"frontend\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest > imagedefinitions.json",
+            "# Staging image definition",
+            "printf '[{\"name\":\"frontend\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging > imagedefinitions-staging.json",
+            "cat imagedefinitions.json",
+            "cat imagedefinitions-staging.json"
           ]
         }
       }
       artifacts = {
-        files = ["imagedefinitions.json"]
+        files = ["imagedefinitions.json", "imagedefinitions-staging.json"]
         name = "frontend-build-$(date +%Y-%m-%d)"
       }
     })
@@ -424,15 +437,24 @@ resource "aws_codebuild_project" "backend" {
             "echo Build completed on `date`",
             "echo Pushing Docker image to ECR...",
             "docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG",
+            "# Also tag and push as staging",
+            "docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging",
+            "docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging",
+            "# Production image definitions",
             "printf '[{\"name\":\"backend\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json",
             "printf '[{\"name\":\"celery-worker\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions_celery.json",
+            "# Staging image definitions",
+            "printf '[{\"name\":\"backend\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging > imagedefinitions-staging.json",
+            "printf '[{\"name\":\"celery-worker\",\"imageUri\":\"%s\"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging > imagedefinitions_celery-staging.json",
             "cat imagedefinitions.json",
-            "cat imagedefinitions_celery.json"
+            "cat imagedefinitions_celery.json",
+            "cat imagedefinitions-staging.json",
+            "cat imagedefinitions_celery-staging.json"
           ]
         }
       }
       artifacts = {
-        files = ["imagedefinitions.json", "imagedefinitions_celery.json"]
+        files = ["imagedefinitions.json", "imagedefinitions_celery.json", "imagedefinitions-staging.json", "imagedefinitions_celery-staging.json"]
         name = "backend-build-$(date +%Y-%m-%d)"
       }
     })

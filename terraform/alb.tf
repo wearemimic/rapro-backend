@@ -69,8 +69,8 @@ resource "aws_lb_target_group" "backend" {
     enabled             = true
     healthy_threshold   = 2
     unhealthy_threshold = 2
-    timeout             = 5
-    interval            = 30
+    timeout             = 30  # Increased from 5 to handle slow Django startup
+    interval            = 60  # Increased from 30 to reduce check frequency
     path                = "/api/health/"  # Django health check endpoint
     matcher             = "200"
     port                = "traffic-port"

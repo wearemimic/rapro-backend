@@ -81,6 +81,9 @@ resource "aws_ecs_service" "backend" {
     container_port   = 8000
   }
 
+  # Give Django time to start before health checks begin
+  health_check_grace_period_seconds = 180
+
   # Deployment configuration
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 50  # Allow lower for API services
