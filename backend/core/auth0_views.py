@@ -238,6 +238,7 @@ def auth0_exchange_code(request):
     try:
         code = request.data.get('code')
         flow_type = request.data.get('flow_type', 'login')  # 'login' or 'registration'
+        affiliate_code = request.data.get('affiliate_code')  # Get affiliate tracking code
         
         if not code:
             return Response({'message': 'Authorization code is required'}, status=status.HTTP_400_BAD_REQUEST)

@@ -6,8 +6,11 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import logging
+from decimal import Decimal
 
 from .services.analytics_service import RevenueAnalyticsService
+from .affiliate_models import Affiliate, AffiliateConversion, Commission
+from .affiliate_emails import send_affiliate_conversion_notification
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -59,6 +62,9 @@ def handle_subscription_created(subscription):
         
         user.save()
         logger.info(f"Subscription created successfully for user {user.email}")
+        
+        # Check for affiliate tracking
+        track_affiliate_conversion(user, subscription)
         
         # Trigger revenue analytics recalculation
         trigger_revenue_analytics()
@@ -151,4 +157,94 @@ def trigger_revenue_analytics():
         logger.info("Revenue analytics recalculated after subscription change")
         
     except Exception as e:
-        logger.error(f"Error triggering revenue analytics: {str(e)}") 
+        logger.error(f"Error triggering revenue analytics: {str(e)}")
+
+
+def track_affiliate_conversion(user, subscription):
+    """Track affiliate conversion when a subscription is created"""
+    try:
+        # Check if user has affiliate tracking in their session or metadata
+        # This would typically be stored when user signs up through affiliate link
+        affiliate_code = None
+        
+        # Check user metadata for affiliate tracking
+        if hasattr(user, 'metadata') and user.metadata:
+            affiliate_code = user.metadata.get('affiliate_code')
+        
+        # If no affiliate code found, check for discount code attribution
+        if not affiliate_code and subscription.discount:
+            # Check if discount code is associated with an affiliate
+            from .affiliate_models import AffiliateDiscountCode
+            try:
+                discount = AffiliateDiscountCode.objects.get(
+                    stripe_coupon_id=subscription.discount.coupon.id,
+                    is_active=True
+                )
+                affiliate_code = discount.affiliate.affiliate_code
+            except AffiliateDiscountCode.DoesNotExist:
+                pass
+        
+        if not affiliate_code:
+            return  # No affiliate attribution found
+        
+        # Find the affiliate
+        affiliate = Affiliate.objects.get(affiliate_code=affiliate_code, status='active')
+        
+        # Calculate subscription amount
+        subscription_amount = Decimal(str(subscription.items.data[0].price.unit_amount / 100))
+        is_annual = subscription.items.data[0].price.recurring.interval == 'year'
+        
+        # Create conversion record
+        conversion = AffiliateConversion.objects.create(
+            affiliate=affiliate,
+            user=user,
+            user_email=user.email,
+            subscription_id=subscription.id,
+            subscription_amount=subscription_amount,
+            subscription_plan='annual' if is_annual else 'monthly',
+            conversion_value=subscription_amount * 12 if is_annual else subscription_amount,
+            conversion_date=timezone.now().date(),
+            is_valid=True
+        )
+        
+        # Calculate commission based on affiliate's commission structure
+        commission_rate = affiliate.commission_rate_first_month
+        
+        if affiliate.commission_type == 'flat':
+            commission_amount = affiliate.flat_rate_amount or Decimal('0')
+        elif affiliate.commission_type == 'percentage':
+            commission_amount = subscription_amount * (commission_rate / 100)
+        else:
+            # Handle tiered or custom commission
+            commission_amount = subscription_amount * (commission_rate / 100)
+        
+        # Create commission record
+        commission = Commission.objects.create(
+            affiliate=affiliate,
+            conversion=conversion,
+            commission_type='first_month',
+            description=f"Commission for {user.email} - {subscription.items.data[0].price.recurring.interval}ly plan",
+            base_amount=subscription_amount,
+            commission_rate=float(commission_rate / 100) if affiliate.commission_type != 'flat' else 0,
+            commission_amount=commission_amount,
+            period_start=timezone.now().date(),
+            period_end=timezone.now().date(),
+            status='pending'
+        )
+        
+        # Update affiliate statistics
+        affiliate.total_conversions += 1
+        affiliate.total_revenue_generated += conversion.conversion_value
+        affiliate.total_commissions_earned += commission_amount
+        affiliate.last_activity_at = timezone.now()
+        affiliate.save()
+        
+        # Send conversion notification email to affiliate
+        send_affiliate_conversion_notification.delay(str(affiliate.id), str(conversion.id))
+        
+        logger.info(f"Affiliate conversion tracked for {affiliate.affiliate_code}: {user.email}")
+        
+    except Affiliate.DoesNotExist:
+        logger.warning(f"Affiliate not found for code: {affiliate_code}")
+    except Exception as e:
+        logger.error(f"Error tracking affiliate conversion: {str(e)}") 

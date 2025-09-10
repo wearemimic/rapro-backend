@@ -104,6 +104,13 @@ class CustomUser(AbstractUser):
         blank=True, 
         help_text="Date when SMS consent was given"
     )
+    
+    # Tracking and attribution metadata
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional metadata for user tracking (e.g., affiliate attribution)"
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []

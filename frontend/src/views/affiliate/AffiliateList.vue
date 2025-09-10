@@ -6,13 +6,30 @@
         <h1 class="h3 mb-0">Affiliate Management</h1>
         <p class="text-muted">Manage your affiliate partners and track their performance</p>
       </div>
-      <button 
-        class="btn btn-primary"
-        @click="showCreateModal = true"
-      >
-        <i class="fas fa-plus me-2"></i>
-        Add New Affiliate
-      </button>
+      <div>
+        <a 
+          href="/affiliate/portal/login"
+          target="_blank"
+          class="btn btn-outline-success me-2"
+        >
+          <i class="fas fa-sign-in-alt me-2"></i>
+          Affiliate Portal
+        </a>
+        <router-link 
+          to="/affiliate-dashboard"
+          class="btn btn-outline-primary me-2"
+        >
+          <i class="fas fa-chart-line me-2"></i>
+          View Analytics
+        </router-link>
+        <button 
+          class="btn btn-primary"
+          @click="showCreateModal = true"
+        >
+          <i class="fas fa-plus me-2"></i>
+          Add New Affiliate
+        </button>
+      </div>
     </div>
 
     <!-- Stats Cards -->
@@ -296,6 +313,16 @@
                             View Commissions
                           </a>
                         </li>
+                        <li>
+                          <a
+                            class="dropdown-item"
+                            href="#"
+                            @click.prevent="setupStripeConnect(affiliate)"
+                          >
+                            <i class="fas fa-credit-card me-2"></i>
+                            Payment Setup
+                          </a>
+                        </li>
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                           <a
@@ -563,6 +590,10 @@ export default {
       router.push(`/affiliates/${affiliate.id}/commissions`)
     }
     
+    const setupStripeConnect = (affiliate) => {
+      router.push(`/affiliates/${affiliate.id}/stripe-connect`)
+    }
+    
     const approveAffiliate = async (affiliate) => {
       if (confirm(`Approve ${affiliate.business_name} as an affiliate?`)) {
         try {
@@ -713,6 +744,7 @@ export default {
       viewDashboard,
       viewLinks,
       viewCommissions,
+      setupStripeConnect,
       approveAffiliate,
       suspendAffiliate,
       reactivateAffiliate,

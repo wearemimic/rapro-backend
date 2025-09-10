@@ -5,9 +5,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Avg
 from django.http import JsonResponse, HttpResponseRedirect
 from datetime import datetime, timedelta
+from django.contrib.auth.hashers import make_password, check_password
+from rest_framework_simplejwt.tokens import RefreshToken
 import logging
 
 from .affiliate_models import (
@@ -18,6 +20,10 @@ from .affiliate_models import (
     Commission,
     AffiliatePayout,
     AffiliateDiscountCode
+)
+from .affiliate_emails import (
+    send_affiliate_welcome_email,
+    send_affiliate_conversion_notification
 )
 from .affiliate_serializers import (
     AffiliateSerializer,
@@ -78,6 +84,15 @@ class AffiliateViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-created_at')
     
+    def perform_create(self, serializer):
+        """Create a new affiliate and send welcome email"""
+        affiliate = serializer.save()
+        
+        # Send welcome email asynchronously
+        send_affiliate_welcome_email.delay(str(affiliate.id))
+        
+        return affiliate
+    
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
         """Approve an affiliate application"""
@@ -94,7 +109,9 @@ class AffiliateViewSet(viewsets.ModelViewSet):
         affiliate.approved_by = request.user
         affiliate.save()
         
-        # TODO: Send approval email to affiliate
+        # Send approval email
+        from .affiliate_emails import AffiliateEmailService
+        AffiliateEmailService.send_approval_email(affiliate)
         
         return Response({'status': 'Affiliate approved successfully'})
     
@@ -182,6 +199,299 @@ class AffiliateViewSet(viewsets.ModelViewSet):
         commissions = commissions.order_by('-created_at')
         serializer = CommissionSerializer(commissions, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def track_click(self, request):
+        """
+        Track affiliate click via API (for frontend integration)
+        """
+        affiliate_code = request.data.get('affiliate_code')
+        page_url = request.data.get('page_url', '')
+        referrer = request.data.get('referrer', '')
+        
+        if not affiliate_code:
+            return Response(
+                {'error': 'Affiliate code is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            affiliate = Affiliate.objects.get(affiliate_code=affiliate_code)
+        except Affiliate.DoesNotExist:
+            return Response(
+                {'error': 'Invalid affiliate code'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get client IP and user agent
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip_address = x_forwarded_for.split(',')[0]
+        else:
+            ip_address = request.META.get('REMOTE_ADDR', '0.0.0.0')
+        
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        
+        # Generate session ID
+        import uuid
+        session_id = request.session.session_key or f"session_{uuid.uuid4().hex[:16]}"
+        
+        # Create click record
+        click = AffiliateClick.objects.create(
+            affiliate=affiliate,
+            session_id=session_id,
+            tracking_code=affiliate_code,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            referrer=referrer[:1000] if referrer else ''
+        )
+        
+        return Response({
+            'success': True,
+            'message': 'Click tracked successfully',
+            'session_id': session_id
+        })
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def portal_login(self, request):
+        """
+        Affiliate portal login endpoint.
+        Accepts email/code or email/password for authentication.
+        """
+        email = request.data.get('email')
+        code = request.data.get('code')
+        password = request.data.get('password')
+        
+        if not email:
+            return Response(
+                {'error': 'Email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            affiliate = Affiliate.objects.get(email=email)
+        except Affiliate.DoesNotExist:
+            return Response(
+                {'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Check if using code or password
+        if code:
+            # Verify affiliate code
+            if affiliate.affiliate_code != code:
+                return Response(
+                    {'error': 'Invalid credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Check if password needs to be set up
+            if not hasattr(affiliate, 'portal_password') or not affiliate.portal_password:
+                return Response(
+                    {'error': 'Password setup required', 'needs_password_setup': True},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        elif password:
+            # Verify password
+            if not hasattr(affiliate, 'portal_password') or not affiliate.portal_password:
+                return Response(
+                    {'error': 'Invalid credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            if not check_password(password, affiliate.portal_password):
+                return Response(
+                    {'error': 'Invalid credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        else:
+            return Response(
+                {'error': 'Code or password is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update last activity
+        affiliate.last_activity_at = timezone.now()
+        affiliate.save(update_fields=['last_activity_at'])
+        
+        # Generate JWT tokens for the affiliate
+        refresh = RefreshToken()
+        refresh['user_id'] = str(affiliate.id)  # Convert UUID to string
+        refresh['is_affiliate_portal'] = True
+        refresh['affiliate_code'] = affiliate.affiliate_code
+        
+        # Create session data (convert UUID to string)
+        session_data = {
+            'affiliate_id': str(affiliate.id),
+            'affiliate_code': affiliate.affiliate_code,
+            'name': affiliate.business_name,
+            'email': affiliate.email,
+            'company': affiliate.business_name,
+            'is_affiliate_portal': True
+        }
+        
+        return Response({
+            'success': True,
+            'affiliate': AffiliateSerializer(affiliate).data,
+            'session': {
+                'token': str(refresh.access_token),
+                'refresh': str(refresh),
+                'affiliate': session_data
+            }
+        })
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def setup_password(self, request):
+        """
+        Set up password for first-time affiliate portal access.
+        """
+        email = request.data.get('email')
+        code = request.data.get('code')
+        password = request.data.get('password')
+        
+        if not all([email, code, password]):
+            return Response(
+                {'error': 'Email, code, and password are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(password) < 8:
+            return Response(
+                {'error': 'Password must be at least 8 characters long'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            affiliate = Affiliate.objects.get(email=email, affiliate_code=code)
+        except Affiliate.DoesNotExist:
+            return Response(
+                {'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Set the password
+        affiliate.portal_password = make_password(password)
+        affiliate.last_activity_at = timezone.now()
+        affiliate.save(update_fields=['portal_password', 'last_activity_at'])
+        
+        # Generate JWT tokens
+        refresh = RefreshToken()
+        refresh['user_id'] = str(affiliate.id)  # Convert UUID to string
+        refresh['is_affiliate_portal'] = True
+        refresh['affiliate_code'] = affiliate.affiliate_code
+        
+        # Create session data (convert UUID to string)
+        session_data = {
+            'affiliate_id': str(affiliate.id),
+            'affiliate_code': affiliate.affiliate_code,
+            'name': affiliate.business_name,
+            'email': affiliate.email,
+            'company': affiliate.business_name,
+            'is_affiliate_portal': True
+        }
+        
+        return Response({
+            'success': True,
+            'affiliate': AffiliateSerializer(affiliate).data,
+            'session': {
+                'token': str(refresh.access_token),
+                'refresh': str(refresh),
+                'affiliate': session_data
+            }
+        })
+    
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def portal_dashboard(self, request):
+        """
+        Get dashboard data for authenticated affiliate.
+        Uses affiliate_id from JWT token or query parameter.
+        """
+        # Get affiliate_id from request (would be set by authentication middleware)
+        affiliate_id = request.GET.get('affiliate_id')
+        
+        if not affiliate_id:
+            # Try to get from JWT token if available
+            if hasattr(request, 'user') and hasattr(request.user, 'id'):
+                affiliate_id = request.user.id
+            else:
+                return Response(
+                    {'error': 'Authentication required'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        
+        try:
+            affiliate = Affiliate.objects.get(id=affiliate_id)
+        except Affiliate.DoesNotExist:
+            return Response(
+                {'error': 'Affiliate not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get performance metrics
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        
+        clicks = AffiliateClick.objects.filter(
+            affiliate=affiliate,
+            clicked_at__gte=thirty_days_ago
+        )
+        
+        conversions = AffiliateConversion.objects.filter(
+            affiliate=affiliate,
+            conversion_date__gte=thirty_days_ago.date()
+        )
+        
+        commissions = Commission.objects.filter(
+            affiliate=affiliate,
+            created_at__gte=thirty_days_ago
+        )
+        
+        # Calculate metrics
+        total_clicks = clicks.count()
+        total_conversions = conversions.count()
+        conversion_rate = (total_conversions / total_clicks * 100) if total_clicks > 0 else 0
+        total_commission = commissions.aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0
+        
+        # Get recent activity
+        recent_clicks = clicks.order_by('-clicked_at')[:10]
+        recent_conversions = conversions.order_by('-conversion_date')[:5]
+        
+        # Get active links
+        active_links = AffiliateLink.objects.filter(
+            affiliate=affiliate,
+            is_active=True
+        ).annotate(
+            click_count=Count('clicks'),
+            conversion_count=Count('clicks__conversion')
+        )
+        
+        return Response({
+            'affiliate': AffiliateSerializer(affiliate).data,
+            'metrics': {
+                'total_clicks': total_clicks,
+                'total_conversions': total_conversions,
+                'conversion_rate': round(conversion_rate, 2),
+                'total_commission': float(total_commission),
+                'pending_commission': float(
+                    commissions.filter(status='pending').aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0
+                ),
+                'paid_commission': float(
+                    commissions.filter(status='paid').aggregate(Sum('commission_amount'))['commission_amount__sum'] or 0
+                )
+            },
+            'recent_activity': {
+                'clicks': [{
+                    'id': str(click.id),  # Convert UUID to string
+                    'clicked_at': click.clicked_at,
+                    'source': getattr(click, 'source', 'direct'),
+                    'ip_address': click.ip_address
+                } for click in recent_clicks],
+                'conversions': [{
+                    'id': str(conv.id),  # Convert UUID to string
+                    'converted_at': conv.conversion_date,
+                    'conversion_value': float(conv.subscription_amount)
+                } for conv in recent_conversions]
+            },
+            'links': AffiliateLinkSerializer(active_links, many=True).data
+        })
 
 
 class AffiliateLinkViewSet(viewsets.ModelViewSet):

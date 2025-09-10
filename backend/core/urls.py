@@ -12,6 +12,10 @@ from .affiliate_views import (
     AffiliateViewSet, AffiliateLinkViewSet, CommissionViewSet, 
     AffiliatePayoutViewSet, AffiliateDiscountCodeViewSet, track_click
 )
+from .stripe_connect_views import (
+    create_connect_account, create_account_link, get_account_status,
+    create_payout, process_batch_payouts, get_payout_dashboard
+)
 from .views_main import gmail_auth_url, gmail_oauth_callback, outlook_auth_url, outlook_oauth_callback, send_email, sync_all_emails, oauth_settings_status, google_calendar_auth_url, google_calendar_oauth_callback, outlook_calendar_auth_url, outlook_calendar_oauth_callback, calendar_settings_status, create_video_meeting, update_video_meeting, delete_video_meeting, get_meeting_join_info, send_meeting_reminder, video_settings_status, get_jump_ai_meeting_insights
 from .views_main import analyze_communication, bulk_analyze_communications, ai_analysis_stats, high_priority_communications, trigger_auto_analysis
 from .views_main import celery_health_check, task_status, queue_monitoring
@@ -205,6 +209,14 @@ urlpatterns = [
     
     # Public affiliate click tracking endpoint (no auth required)
     path('r/<str:tracking_code>/', track_click, name='affiliate-track-click'),
+    
+    # Stripe Connect endpoints for affiliate payouts
+    path('stripe-connect/create-account/', create_connect_account, name='stripe-connect-create'),
+    path('stripe-connect/account-link/', create_account_link, name='stripe-connect-link'),
+    path('stripe-connect/account-status/', get_account_status, name='stripe-connect-status'),
+    path('stripe-connect/create-payout/', create_payout, name='stripe-connect-payout'),
+    path('stripe-connect/batch-payouts/', process_batch_payouts, name='stripe-connect-batch'),
+    path('stripe-connect/payout-dashboard/', get_payout_dashboard, name='stripe-connect-dashboard'),
     
     # CRM-specific endpoints
     path('email/gmail/auth-url/', gmail_auth_url, name='gmail-auth-url'),

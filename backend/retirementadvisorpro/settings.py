@@ -14,6 +14,7 @@ from pathlib import Path
 from django.conf import settings
 from django.conf.urls.static import static
 from datetime import timedelta
+from celery.schedules import crontab
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -383,6 +384,24 @@ CELERY_TASK_SEND_SENT_EVENT = True
 # Error handling
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_IGNORE_RESULT = False
+
+# Celery Beat schedule for periodic tasks
+CELERY_BEAT_SCHEDULE = {
+    'send-monthly-affiliate-statements': {
+        'task': 'core.affiliate_emails.send_monthly_statements',
+        'schedule': crontab(day_of_month=1, hour=0, minute=0),  # 1st of each month at midnight UTC
+        'options': {
+            'expires': 3600,  # Expire after 1 hour if not executed
+        }
+    },
+    'process-pending-commissions': {
+        'task': 'core.affiliate_emails.process_pending_commissions',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM UTC
+        'options': {
+            'expires': 3600,
+        }
+    },
+}
 
 # Local development fallback configuration
 # This ensures the app can run locally without Redis for basic functionality

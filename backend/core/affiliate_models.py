@@ -105,6 +105,26 @@ class Affiliate(models.Model):
         help_text="Minimum balance required for payout"
     )
     
+    # Stripe Connect Integration
+    stripe_connect_account_id = models.CharField(
+        max_length=255, blank=True,
+        help_text="Stripe Connect account ID for automated payouts"
+    )
+    stripe_account_status = models.CharField(
+        max_length=50, blank=True,
+        choices=[
+            ('pending', 'Pending Verification'),
+            ('active', 'Active'),
+            ('restricted', 'Restricted'),
+            ('disabled', 'Disabled'),
+        ],
+        help_text="Current status of Stripe Connect account"
+    )
+    stripe_payouts_enabled = models.BooleanField(
+        default=False,
+        help_text="Whether Stripe payouts are enabled for this account"
+    )
+    
     # Status and Tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
     approved_at = models.DateTimeField(null=True, blank=True)
@@ -124,6 +144,9 @@ class Affiliate(models.Model):
         help_text="Description of how the affiliate plans to promote the service"
     )
     admin_notes = models.TextField(blank=True, help_text="Internal notes about this affiliate")
+    
+    # Portal Authentication
+    portal_password = models.CharField(max_length=255, blank=True, help_text="Hashed password for affiliate portal access")
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -425,6 +448,7 @@ class AffiliatePayout(models.Model):
     # Payment Information
     payment_method = models.CharField(max_length=50)
     payment_reference = models.CharField(max_length=255, blank=True, help_text="Transaction ID or check number")
+    stripe_transfer_id = models.CharField(max_length=255, blank=True, help_text="Stripe Connect transfer ID")
     payment_details = models.JSONField(default=dict, blank=True)
     
     # Status

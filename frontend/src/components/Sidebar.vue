@@ -161,6 +161,12 @@
                   <router-link v-if="canAccessSection('affiliate_management')" class="nav-link" to="/affiliates">
                     <i class="bi-link-45deg nav-icon me-2"></i>Affiliate Management
                   </router-link>
+                  <router-link v-if="canAccessSection('affiliate_management')" class="nav-link" to="/affiliate-dashboard">
+                    <i class="bi-graph-up nav-icon me-2"></i>Affiliate Analytics
+                  </router-link>
+                  <router-link v-if="canAccessSection('affiliate_management')" class="nav-link" to="/affiliate-commissions">
+                    <i class="bi-cash-stack nav-icon me-2"></i>Commission Management
+                  </router-link>
                   <router-link v-if="canAccessSection('user_management')" class="nav-link" to="/admin/impersonation">
                     <i class="bi-person-check nav-icon me-2"></i>Impersonation Logs
                   </router-link>
