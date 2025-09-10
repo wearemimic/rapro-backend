@@ -21,9 +21,18 @@ app.use(router);
 // Auth0 removed - using Django server-side authentication
 
 import { useAuthStore } from './stores/auth';
+import { trackAffiliateCode } from './utils/affiliateTracking';
+
 const authStore = useAuthStore();
 authStore.init(); // ✅ Ensure axios always has the token
 authStore.restoreImpersonationState(); // ✅ Restore impersonation state if any
+
+// Check for affiliate tracking code in URL on app initialization
+const urlParams = new URLSearchParams(window.location.search);
+const affiliateCode = urlParams.get('ref');
+if (affiliateCode) {
+  trackAffiliateCode(affiliateCode);
+}
 
 // Toast configuration (optional customization)
 app.use(Toast, {

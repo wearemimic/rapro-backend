@@ -1104,13 +1104,24 @@ def register_advisor(request):
             # Create the user
             user = serializer.save()
             
+            # Check for affiliate tracking code
+            affiliate_code = request.data.get('affiliate_code')
+            if affiliate_code:
+                # Store affiliate attribution in user metadata
+                user.metadata = user.metadata or {}
+                user.metadata['affiliate_code'] = affiliate_code
+                user.metadata['affiliate_tracked_at'] = timezone.now().isoformat()
+                user.save(update_fields=['metadata'])
+                print(f"✅ Tracked affiliate code {affiliate_code} for user {user.email}")
+            
             # Create Stripe customer
             stripe_customer = stripe.Customer.create(
                 email=user.email,
                 name=f"{user.first_name} {user.last_name}",
                 metadata={
                     'user_id': user.id,
-                    'company_name': user.company_name
+                    'company_name': user.company_name,
+                    'affiliate_code': affiliate_code if affiliate_code else ''
                 }
             )
             

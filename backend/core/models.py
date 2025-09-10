@@ -104,6 +104,13 @@ class CustomUser(AbstractUser):
         blank=True, 
         help_text="Date when SMS consent was given"
     )
+    
+    # Tracking and attribution metadata
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional metadata for user tracking (e.g., affiliate attribution)"
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -3630,4 +3637,16 @@ class FeedbackResponse(models.Model):
     def __str__(self):
         note_type = "Internal Note" if self.is_internal_note else "Response"
         return f"{note_type}: {self.feedback.title} by {self.staff_user.email}"
+
+
+# Import affiliate models
+from .affiliate_models import (
+    Affiliate,
+    AffiliateLink,
+    AffiliateClick,
+    AffiliateConversion,
+    Commission,
+    AffiliatePayout,
+    AffiliateDiscountCode
+)
 

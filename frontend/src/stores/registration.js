@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useAuthStore } from './auth';
 import { API_CONFIG } from '@/config';
+import { getValidAffiliateCode } from '@/utils/affiliateTracking';
 
 export const useRegistrationStore = defineStore('registration', () => {
   const registrationData = ref({
@@ -41,6 +42,9 @@ export const useRegistrationStore = defineStore('registration', () => {
       isLoading.value = true;
       error.value = null;
 
+      // Check for affiliate code (uses utility to validate 30-day window)
+      const affiliateCode = getValidAffiliateCode();
+
       // Combine step 1 and step 2 data
       const fullData = {
         email: registrationData.value.email,
@@ -56,6 +60,12 @@ export const useRegistrationStore = defineStore('registration', () => {
         state: data.state,
         zip_code: data.zipCode,
       };
+
+      // Add affiliate code if present
+      if (affiliateCode) {
+        fullData.affiliate_code = affiliateCode;
+        console.log('📊 Including affiliate code in registration:', affiliateCode);
+      }
 
       // Send registration request to backend
       const response = await fetch(`${API_CONFIG.API_URL}/register-advisor/`, {
