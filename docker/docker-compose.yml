@@ -24,6 +24,7 @@ services:
       - "${BACKEND_PORT:-8000}:${BACKEND_PORT:-8000}"
     volumes:
       - ../backend:/app
+      - ../frontend/public:/app/frontend/public:ro
     working_dir: /app
     depends_on:
       - db

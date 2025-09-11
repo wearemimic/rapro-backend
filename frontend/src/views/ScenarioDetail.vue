@@ -1,5 +1,19 @@
 <template>
     <div class="container-fluid" style="margin-top:80px;">
+      <!-- PDF Generation Overlay -->
+      <transition name="fade">
+        <div v-if="isGeneratingPDF" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+             style="z-index: 9999; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(3px);">
+          <div class="text-center bg-dark bg-opacity-75 p-5 rounded-3" style="min-width: 300px;">
+            <div class="spinner-border text-primary mb-4" style="width: 4rem; height: 4rem;" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <h3 class="text-white mb-3">Generating Report</h3>
+            <p class="text-white-50 mb-0">Please wait, this may take a moment...</p>
+          </div>
+        </div>
+      </transition>
+      
       <!-- Page Header -->
       <div class="page-header">
         <div class="d-flex mb-3">
@@ -19,8 +33,8 @@
               </div>
               <!-- End Col -->
 
-              <div class="col-lg-auto d-flex align-items-center">
-                <!-- Navigation Dropdowns -->
+              <div class="col-lg-auto d-flex align-items-center" v-if="!isPdfMode">
+                <!-- Navigation Dropdowns (hidden in PDF mode) -->
                 <div class="d-flex align-items-center me-3">
                   <span class="me-2 fw-semibold">Choose</span>
                   <!-- Scenario Switcher Dropdown -->
@@ -91,6 +105,8 @@
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')"><i class="bi-plus-circle me-2"></i>New Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')"><i class="bi-files me-2"></i>Duplicate Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="editScenario"><i class="bi-pencil me-2"></i>Edit Scenario</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" @click.prevent="downloadScenarioPDF"><i class="bi-file-earmark-pdf me-2"></i>Download PDF Report</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                       <a class="dropdown-item d-flex justify-content-between align-items-center" href="#" @click.prevent="toggleScenarioSharing">
@@ -433,6 +449,10 @@ export default {
       client: null,
       scenarioResults: [],
       activeTab: this.$route.query.tab || 'overview', // Use route query param or default to overview
+      isPdfMode: this.$route.query.pdf === 'true', // Check if we're in PDF generation mode
+      // PDF generation tracking
+      isGeneratingPDF: false,
+      pdfGenerationMessage: '',
       // Async calculation tracking
       isCalculating: false,
       calculationProgress: 0,
@@ -480,6 +500,31 @@ export default {
       this.activeTab = this.$route.query.tab;
     }
     
+    // If in PDF mode, hide sidebar and header
+    if (this.isPdfMode) {
+      document.body.classList.add('pdf-mode');
+      // Add CSS to hide navigation elements
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .pdf-mode .navbar-vertical,
+        .pdf-mode .navbar-vertical-aside,
+        .pdf-mode .header,
+        .pdf-mode .navbar,
+        .pdf-mode aside,
+        .pdf-mode nav {
+          display: none !important;
+        }
+        .pdf-mode .content,
+        .pdf-mode .main,
+        .pdf-mode .container-fluid {
+          margin-left: 0 !important;
+          margin-top: 0 !important;
+          padding-top: 20px !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
     this.initPlugins();
     this.initializeCircles();
     
@@ -524,6 +569,28 @@ export default {
       this.navDropdownOpen = false;
     },
     
+    // Get auth token from localStorage or cookies
+    getAuthToken() {
+      // First check localStorage
+      let token = localStorage.getItem('token');
+      if (token) return token;
+      
+      // Fallback to cookies (for PDF generation)
+      const name = 'token=';
+      const decodedCookie = decodeURIComponent(document.cookie);
+      const ca = decodedCookie.split(';');
+      for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') {
+          c = c.substring(1);
+        }
+        if (c.indexOf(name) === 0) {
+          return c.substring(name.length, c.length);
+        }
+      }
+      return null;
+    },
+    
     // Close dropdowns when clicking outside
     closeAllDropdowns() {
       this.scenarioDropdownOpen = false;
@@ -538,6 +605,10 @@ export default {
       
       try {
         console.log('Loading client and scenario data...');
+        
+        // Get token from localStorage or cookies (for PDF mode)
+        const token = this.getAuthToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
         
         // First, load client data to get scenarios
         const clientResponse = await axios.get(`${API_CONFIG.API_URL}/clients/${clientId}/`, { headers });
@@ -1271,6 +1342,66 @@ export default {
       }
     },
     
+    async downloadScenarioPDF() {
+      // Close dropdown after selection
+      this.actionsDropdownOpen = false;
+      
+      try {
+        const clientId = this.$route.params.id;
+        const scenarioId = this.$route.params.scenarioid;
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          this.$toast?.error?.('Please log in to download the report') || console.error('Not logged in');
+          return;
+        }
+        
+        // Start loading state
+        this.isGeneratingPDF = true;
+        this.pdfGenerationMessage = 'Generating Report';
+        
+        // Call backend API to generate PDF
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/scenarios/${scenarioId}/generate-pdf/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            tabs: ['overview', 'financial', 'socialSecurity', 'medicare']
+          })
+        });
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          
+          // Create download link
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `scenario_${scenarioId}_report_${new Date().toISOString().split('T')[0]}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          this.$toast?.success?.('PDF report downloaded successfully!');
+        } else {
+          const error = await response.text();
+          console.error('Failed to generate PDF:', error);
+          this.$toast?.error?.('Failed to generate PDF report. Please try again.') || console.error('PDF generation failed');
+        }
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        this.$toast?.error?.('An error occurred while generating the PDF. Please try again.') || console.error('PDF generation error');
+      } finally {
+        // Always hide loading state
+        this.isGeneratingPDF = false;
+        this.pdfGenerationMessage = '';
+      }
+    },
+    
     // New async calculation methods
     async startAsyncCalculation() {
       const scenarioId = this.$route.params.scenarioid;
@@ -1787,5 +1918,13 @@ export default {
     width: 100%;
     margin-bottom: 0.5rem;
   }
+}
+
+/* Fade transition for PDF generation overlay */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>
