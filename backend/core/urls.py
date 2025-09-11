@@ -20,6 +20,7 @@ from .views_main import gmail_auth_url, gmail_oauth_callback, outlook_auth_url, 
 from .views_main import analyze_communication, bulk_analyze_communications, ai_analysis_stats, high_priority_communications, trigger_auto_analysis
 from .views_main import celery_health_check, task_status, queue_monitoring
 from . import views_main as views
+from .pdf_generator import generate_scenario_pdf_view
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .webhooks import stripe_webhook
 from django.http import HttpResponse
@@ -173,6 +174,7 @@ urlpatterns = [
     path('scenarios/<int:scenario_id>/update/', views.update_scenario, name='scenario-update'),
     path('scenarios/<int:scenario_id>/update-assets/', views.update_scenario_assets, name='scenario-update-assets'),
     path('scenarios/<int:scenario_id>/update-percentages/', views.update_scenario_percentages, name='scenario-update-percentages'),
+    path('scenarios/<int:scenario_id>/generate-pdf/', generate_scenario_pdf_view, name='scenario-generate-pdf'),
     path('clients/<int:client_id>/scenarios/<int:scenario_id>/', views.delete_scenario, name='scenario-delete'),
     path('integrations/', lambda request: HttpResponse('Integrations endpoint placeholder'), name='integrations'),
    #  path('proxy/<path:path>', proxy_to_wealthbox, name='proxy_to_wealthbox'),
