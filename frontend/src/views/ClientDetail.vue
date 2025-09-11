@@ -31,7 +31,7 @@
                   Overview
                 </a>
               </li>
-              <li class="nav-item" v-if="hasCRMAccess">
+              <li class="nav-item" v-if="isAdminUser">
                 <a class="nav-link" 
                   :class="{ 'active': activeTab === 'communications' }"
                   id="communications-tab" 
@@ -78,7 +78,7 @@
                   <span v-if="clientDocumentCount > 0" class="badge bg-secondary ms-1">{{ clientDocumentCount }}</span>
                 </a>
               </li>
-              <li class="nav-item">
+              <li class="nav-item" v-if="isAdminUser">
                 <a class="nav-link" 
                   :class="{ 'active': activeTab === 'portal-access' }"
                   id="portal-access-tab" 
@@ -247,7 +247,7 @@
             <div class="tab-pane fade" 
                  :class="{ 'show active': activeTab === 'communications' }"
                  id="communications-pane" role="tabpanel" 
-                 aria-labelledby="communications-tab" v-if="hasCRMAccess">
+                 aria-labelledby="communications-tab" v-if="isAdminUser">
               <div>
                 <CommunicationSummaryWidget :client="client" class="mb-4" />
                 <CommunicationList 
@@ -478,7 +478,7 @@
             <div class="tab-pane fade" 
                  :class="{ 'show active': activeTab === 'portal-access' }"
                  id="portal-access-pane" role="tabpanel" 
-                 aria-labelledby="portal-access-tab">
+                 aria-labelledby="portal-access-tab" v-if="isAdminUser">
               <div>
                 <ClientPortalAccess 
                   v-if="client"
@@ -553,6 +553,18 @@ export default {
         return hasCRMAccess(authStore.user);
       } catch (error) {
         return hasCRMAccess(null);
+      }
+    },
+    
+    isAdminUser() {
+      try {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        return authStore.user?.is_admin_user || false;
+      } catch (error) {
+        // Fallback to localStorage
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        return user.is_admin_user || false;
       }
     },
     
