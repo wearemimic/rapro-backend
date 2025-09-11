@@ -71,7 +71,7 @@
     
     <!-- CRM Quick Stats -->
     <div class="row" v-if="hasCRMAccess">
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5" v-if="isAdminUser">
         <div class="card h-100">
           <div class="card-body">
             <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">Unread Communications</span>
@@ -84,7 +84,7 @@
         </div>
       </div>
 
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5" v-if="isAdminUser">
         <div class="card h-100">
           <div class="card-body">
             <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">High Priority Items</span>
@@ -97,7 +97,7 @@
         </div>
       </div>
 
-      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5">
+      <div class="col-sm-6 col-lg-3 mb-3 mb-lg-5" v-if="isAdminUser">
         <div class="card h-100">
           <div class="card-body">
             <span class="card-subtitle mb-2 text-center d-block text-muted" style="font-size: 0.75rem; font-weight: 500;">AI Analyzed Today</span>
@@ -124,8 +124,8 @@
       </div>
     </div>
 
-    <!-- FINRA Compliance Quick Status -->
-    <div class="row mb-3 mb-lg-5">
+    <!-- FINRA Compliance Quick Status (Admin Only) -->
+    <div class="row mb-3 mb-lg-5" v-if="isAdminUser">
       <div class="col-12">
         <div class="card border-success">
           <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -382,6 +382,17 @@ export default {
       } catch (error) {
         // Fallback to direct function call which will check localStorage
         return hasCRMAccess(null);
+      }
+    },
+    isAdminUser() {
+      try {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        return authStore.user?.is_admin_user || false;
+      } catch (error) {
+        // Fallback to localStorage
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        return user.is_admin_user || false;
       }
     },
     filteredClients() {

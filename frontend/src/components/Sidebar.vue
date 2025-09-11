@@ -33,8 +33,8 @@
               </div>
               <!-- End Collapse -->
 
-              <!-- Communication Center -->
-              <div class="nav-item">
+              <!-- Communication Center (Admin Only) -->
+              <div class="nav-item" v-if="isAdminUser">
                 <router-link class="nav-link" to="/communication-center" :title="isCollapsed ? 'Communication Center' : ''" role="button">
                   <i class="bi-inbox nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Communication Center</span>
@@ -63,8 +63,8 @@
               </div>
               <!-- End Calendar -->
 
-              <!-- Document Management -->
-              <div class="nav-item">
+              <!-- Document Management (Admin Only) -->
+              <div class="nav-item" v-if="isAdminUser">
                 <router-link class="nav-link" to="/documents" :title="isCollapsed ? 'Documents' : ''" role="button">
                   <i class="bi-files nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Documents</span>
@@ -73,8 +73,8 @@
               </div>
               <!-- End Document Management -->
 
-              <!-- Report Center -->
-              <div class="nav-item">
+              <!-- Report Center (Admin Only) -->
+              <div class="nav-item" v-if="isAdminUser">
                 <router-link class="nav-link" to="/report-center" :title="isCollapsed ? 'Report Center' : ''" role="button">
                   <i class="bi-file-earmark-slides nav-icon"></i>
                   <span class="nav-link-title" v-show="!isCollapsed">Report Center</span>
@@ -83,8 +83,8 @@
               </div>
               <!-- End Report Center -->
 
-              <!-- Compliance Section -->
-              <div class="nav-item">
+              <!-- Compliance Section (Admin Only) -->
+              <div class="nav-item" v-if="isAdminUser">
                 <a class="nav-link" :class="{ 'dropdown-toggle': !isCollapsed }" @click.prevent="toggleComplianceDropdown" role="button" 
                    :title="isCollapsed ? 'FINRA Compliance' : ''" :aria-expanded="complianceDropdownOpen" aria-controls="navbarVerticalMenuComplianceMenu">
                   <i class="bi-shield-check nav-icon"></i>
