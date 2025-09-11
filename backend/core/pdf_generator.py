@@ -79,13 +79,14 @@ class ScenarioPDFGenerator:
             PDF content as bytes
         """
         try:
-            # Use ngrok URL 
-            ngrok_url = 'https://e847cda89897.ngrok-free.app'
+            # Get the frontend URL from environment or use default
+            import os
+            frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
             
             # Build the actual URL to the page with PDF mode parameter
             # This will tell the frontend to hide navigation elements
             # Also pass the token as a URL parameter for the frontend to use
-            url = f"{ngrok_url}/clients/{client_id}/scenarios/detail/{scenario_id}?pdf=true"
+            url = f"{frontend_url}/clients/{client_id}/scenarios/detail/{scenario_id}?pdf=true"
             if auth_token:
                 url += f"&pdfToken={auth_token}"
             
