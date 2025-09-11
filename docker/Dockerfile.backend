@@ -12,6 +12,8 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
+# Explicitly ensure pdfcrowd is installed
+RUN pip install pdfcrowd==6.5.2
 COPY backend/ .
 EXPOSE 8000
 CMD ["gunicorn", "retirementadvisorpro.wsgi:application", "--bind", "0.0.0.0:8000"]
