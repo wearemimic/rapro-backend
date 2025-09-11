@@ -146,6 +146,24 @@ def auth0_callback(request):
             frontend_url = f'{settings.FRONTEND_URL}/login?error=no_email'
             return redirect(frontend_url)
         
+        # Extract auth provider from the sub field
+        sub = user_info.get('sub', '')
+        auth_provider = 'password'  # default
+        if sub.startswith('google-oauth2|'):
+            auth_provider = 'google-oauth2'
+        elif sub.startswith('facebook|'):
+            auth_provider = 'facebook'
+        elif sub.startswith('apple|'):
+            auth_provider = 'apple'
+        elif sub.startswith('linkedin|'):
+            auth_provider = 'linkedin'
+        elif sub.startswith('windowslive|') or sub.startswith('microsoft|'):
+            auth_provider = 'microsoft'
+        elif sub.startswith('auth0|'):
+            auth_provider = 'password'
+        
+        print(f"Auth provider detected: {auth_provider} from sub: {sub[:20]}...")
+        
         # Check if Django user already exists with active subscription
         try:
             existing_user = User.objects.get(email=email)
