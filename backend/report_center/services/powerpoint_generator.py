@@ -30,7 +30,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 
 from .chart_export_service import ChartExportService
-from .scenario_data_integration_service import ScenarioDataIntegrationService
+from .scenario_integration_service import ScenarioDataIntegrationService
 
 logger = logging.getLogger(__name__)
 

@@ -11,7 +11,7 @@ from datetime import datetime
 from django.utils import timezone
 from django.db.models import Q, Sum, Avg
 
-from core.models import Scenario, Client, Asset, Income, Expense, TaxSettings
+from core.models import Scenario, Client, IncomeSource
 from ..models import Report
 
 logger = logging.getLogger(__name__)
@@ -81,9 +81,9 @@ class ScenarioDataIntegrationService:
         """Extract comprehensive scenario information"""
         
         # Get related data
-        assets = list(scenario.assets.all().values())
-        incomes = list(scenario.incomes.all().values())
-        expenses = list(scenario.expenses.all().values())
+        assets = list(scenario.income_sources.filter(current_asset_balance__gt=0).values())
+        incomes = list(scenario.income_sources.all().values())
+        expenses = []  # No expense model in current schema
         
         # Convert Decimal fields to float for JSON serialization
         for asset in assets:
@@ -172,9 +172,9 @@ class ScenarioDataIntegrationService:
             }
             
             # Get initial values
-            initial_assets = float(scenario.assets.aggregate(total=Sum('current_balance'))['total'] or 0)
-            annual_income = float(scenario.incomes.aggregate(total=Sum('amount'))['total'] or 0)
-            annual_expenses = float(scenario.expenses.aggregate(total=Sum('amount'))['total'] or 0)
+            initial_assets = float(scenario.income_sources.aggregate(total=Sum('current_asset_balance'))['total'] or 0)
+            annual_income = float(scenario.income_sources.aggregate(total=Sum('monthly_amount'))['total'] or 0) * 12
+            annual_expenses = 0  # No expense model in current schema
             
             # Simple projection logic (this would be enhanced with actual calculation engine)
             current_assets = initial_assets
@@ -277,9 +277,9 @@ class ScenarioDataIntegrationService:
         
         try:
             # Calculate totals
-            total_assets = scenario.assets.aggregate(total=Sum('current_balance'))['total'] or 0
-            total_income = scenario.incomes.aggregate(total=Sum('amount'))['total'] or 0
-            total_expenses = scenario.expenses.aggregate(total=Sum('amount'))['total'] or 0
+            total_assets = scenario.income_sources.aggregate(total=Sum('current_asset_balance'))['total'] or 0
+            total_income = scenario.income_sources.aggregate(total=Sum('monthly_amount'))['total'] or 0
+            total_expenses = 0  # No expense model in current schema
             
             # Calculate derived metrics
             net_worth = float(total_assets)
@@ -302,9 +302,9 @@ class ScenarioDataIntegrationService:
                 'years_to_retirement': years_to_retirement,
                 'retirement_duration_years': retirement_years,
                 'retirement_year': scenario.retirement_year,
-                'asset_count': scenario.assets.count(),
-                'income_source_count': scenario.incomes.count(),
-                'expense_category_count': scenario.expenses.count(),
+                'asset_count': scenario.income_sources.filter(current_asset_balance__gt=0).count(),
+                'income_source_count': scenario.income_sources.count(),
+                'expense_category_count': 0,  # No expense model in current schema
             }
             
         except Exception as e:
@@ -315,7 +315,7 @@ class ScenarioDataIntegrationService:
         """Get detailed asset breakdown for reports"""
         
         try:
-            assets = scenario.assets.all()
+            assets = scenario.income_sources.filter(current_asset_balance__gt=0)
             
             breakdown = {
                 'total_value': 0,
@@ -329,21 +329,21 @@ class ScenarioDataIntegrationService:
             }
             
             for asset in assets:
-                current_balance = float(asset.current_balance or 0)
+                current_balance = float(asset.current_asset_balance or 0)
                 breakdown['total_value'] += current_balance
                 
                 # Group by investment type
-                inv_type = asset.investment_type or 'Other'
+                inv_type = asset.income_type or 'Other'
                 if inv_type not in breakdown['by_type']:
                     breakdown['by_type'][inv_type] = 0
                 breakdown['by_type'][inv_type] += current_balance
                 
                 # Individual account data
                 breakdown['by_account'].append({
-                    'name': asset.investment_name or asset.income_name or 'Unnamed Asset',
+                    'name': asset.income_name or 'Unnamed Asset',
                     'type': inv_type,
                     'current_balance': current_balance,
-                    'annual_contribution': float(asset.annual_contribution or 0),
+                    'annual_contribution': float(asset.monthly_contribution * 12 if asset.monthly_contribution else 0),
                     'employer_match': float(asset.employer_match or 0)
                 })
                 
@@ -365,7 +365,7 @@ class ScenarioDataIntegrationService:
         """Get detailed income source analysis"""
         
         try:
-            incomes = scenario.incomes.all()
+            incomes = scenario.income_sources.all()
             
             analysis = {
                 'total_annual': 0,
@@ -436,7 +436,7 @@ class ScenarioDataIntegrationService:
         """Get detailed expense analysis"""
         
         try:
-            expenses = scenario.expenses.all()
+            expenses = []  # No expense model in current schema
             
             analysis = {
                 'total_annual': 0,

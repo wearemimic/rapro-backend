@@ -530,6 +530,7 @@ def get_scenario_detail(request, scenario_id):
                 'current_balance': float(income.current_asset_balance or 0),
                 'monthly_contribution': float(income.monthly_contribution or 0),
                 'growth_rate': income.rate_of_return,
+                'rate_of_return': income.rate_of_return,  # FIX: Also provide rate_of_return for frontend compatibility
                 'withdrawal_amount': float(income.monthly_amount or 0),
                 'amount_per_month': float(income.monthly_amount or 0),
                 'amount_at_fra': float(income.monthly_amount or 0),
@@ -620,6 +621,7 @@ def get_scenario_for_editing(request, scenario_id):
                 'current_balance': float(income.current_asset_balance or 0),
                 'monthly_contribution': float(income.monthly_contribution or 0),
                 'growth_rate': income.rate_of_return,
+                'rate_of_return': income.rate_of_return,  # FIX: Also provide rate_of_return for frontend compatibility
                 'withdrawal_amount': float(income.monthly_amount or 0),
                 'amount_per_month': float(income.monthly_amount or 0),
                 'amount_at_fra': float(income.monthly_amount or 0),

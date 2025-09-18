@@ -1371,7 +1371,8 @@ class ScenarioProcessor:
         
         # Step 5: Prevent negative balances
         for asset in self.assets:
-            if asset.get("current_asset_balance", 0) < 0:
+            balance = asset.get("current_asset_balance", 0)
+            if balance is None or balance < 0:
                 asset["current_asset_balance"] = Decimal('0')
 
     def _ensure_roth_account_exists(self, initial_balance=Decimal('0')):

@@ -763,6 +763,7 @@ export default {
 <style scoped>
 .affiliate-list {
   padding: 20px;
+  margin-top: 60px; /* Add space for fixed header */
 }
 
 .table tbody tr {

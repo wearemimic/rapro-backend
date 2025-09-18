@@ -16,7 +16,7 @@ from celery import shared_task
 
 from ..models import ReportSchedule, ReportScheduleExecution, ReportTemplate
 from .report_generator import ReportGeneratorService
-from .report_file_storage import ReportFileStorageService
+from .file_storage_service import ReportFileStorageService
 from core.models import Client, Scenario
 
 logger = logging.getLogger(__name__)

@@ -13,12 +13,12 @@ router.register(r'analytics', views.TemplateAnalyticsViewSet, basename='template
 router.register(r'generations', views.ReportGenerationViewSet, basename='reportgeneration')
 
 urlpatterns = [
-    path('api/report-center/', include(router.urls)),
+    path('report-center/', include(router.urls)),
     
     # AI-powered content generation endpoints
-    path('api/report-center/ai/executive-summary/', ai_views.generate_executive_summary, name='ai-executive-summary'),
-    path('api/report-center/ai/slide-recommendations/', ai_views.generate_slide_recommendations, name='ai-slide-recommendations'),
-    path('api/report-center/ai/content-suggestions/', ai_views.generate_content_for_section, name='ai-content-suggestions'),
-    path('api/report-center/ai/client-insights/', ai_views.generate_client_insights, name='ai-client-insights'),
-    path('api/report-center/ai/usage-analytics/', ai_views.get_ai_usage_analytics, name='ai-usage-analytics'),
+    path('report-center/ai/executive-summary/', ai_views.generate_executive_summary, name='ai-executive-summary'),
+    path('report-center/ai/slide-recommendations/', ai_views.generate_slide_recommendations, name='ai-slide-recommendations'),
+    path('report-center/ai/content-suggestions/', ai_views.generate_content_for_section, name='ai-content-suggestions'),
+    path('report-center/ai/client-insights/', ai_views.generate_client_insights, name='ai-client-insights'),
+    path('report-center/ai/usage-analytics/', ai_views.get_ai_usage_analytics, name='ai-usage-analytics'),
 ]

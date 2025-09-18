@@ -325,6 +325,64 @@
         </div>
       </div>
     </div>
+
+    <!-- Generate Link Modal -->
+    <div v-if="showLinkModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Generate Affiliate Link</h5>
+            <button type="button" class="btn-close" @click="showLinkModal = false"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="generateLink">
+              <div class="mb-3">
+                <label for="linkName" class="form-label">Link Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="linkName"
+                  v-model="newLink.name"
+                  placeholder="e.g., Homepage Banner"
+                  required
+                >
+              </div>
+              <div class="mb-3">
+                <label for="linkDestination" class="form-label">Destination URL</label>
+                <input
+                  type="url"
+                  class="form-control"
+                  id="linkDestination"
+                  v-model="newLink.destination_url"
+                  placeholder="https://example.com/signup"
+                  required
+                >
+              </div>
+              <div class="mb-3">
+                <label for="linkCampaign" class="form-label">Campaign (Optional)</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="linkCampaign"
+                  v-model="newLink.campaign"
+                  placeholder="e.g., Spring 2024"
+                >
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showLinkModal = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="generateLink" :disabled="generatingLink">
+              <span v-if="generatingLink">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Generating...
+              </span>
+              <span v-else>Generate Link</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -347,6 +405,12 @@ export default {
     const links = ref([])
     const commissions = ref([])
     const dashboardData = ref(null)
+    const generatingLink = ref(false)
+    const newLink = ref({
+      name: '',
+      destination_url: '',
+      campaign: ''
+    })
     
     // Computed
     const affiliate = computed(() => affiliateStore.currentAffiliate)
@@ -373,6 +437,41 @@ export default {
     
     const editAffiliate = () => {
       router.push(`/affiliates/${affiliateId.value}/edit`)
+    }
+    
+    const generateLink = async () => {
+      if (!newLink.value.name || !newLink.value.destination_url) {
+        alert('Please fill in required fields')
+        return
+      }
+      
+      generatingLink.value = true
+      try {
+        await affiliateStore.createAffiliateLink(affiliateId.value, {
+          name: newLink.value.name,
+          destination_url: newLink.value.destination_url,
+          campaign: newLink.value.campaign
+        })
+        
+        // Reset form and close modal
+        newLink.value = {
+          name: '',
+          destination_url: '',
+          campaign: ''
+        }
+        showLinkModal.value = false
+        
+        // Reload links if on links tab
+        if (activeTab.value === 'links') {
+          await loadLinks()
+        }
+        
+        alert('Link generated successfully!')
+      } catch (error) {
+        alert('Failed to generate link: ' + (error.response?.data?.error || error.message))
+      } finally {
+        generatingLink.value = false
+      }
     }
     
     const copyLink = async (trackingCode) => {
@@ -430,6 +529,9 @@ export default {
       loading,
       error,
       editAffiliate,
+      generateLink,
+      generatingLink,
+      newLink,
       loadDashboard,
       copyLink,
       toggleLinkStatus,
@@ -443,6 +545,7 @@ export default {
 <style scoped>
 .affiliate-detail {
   padding: 20px;
+  margin-top: 60px; /* Add space for fixed header */
 }
 
 code {

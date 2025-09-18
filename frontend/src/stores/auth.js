@@ -4,10 +4,32 @@ import axios from 'axios';
 import router from '@/router';
 import { isTokenValid, isTokenExpiringSoon, getTokenExpirationInMinutes } from '@/utils/tokenUtils';
 
+// Helper function to get token from cookies
+function getTokenFromCookie() {
+  const name = 'token=';
+  const decodedCookie = decodeURIComponent(document.cookie);
+  const ca = decodedCookie.split(';');
+  for(let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) === 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+  return null;
+}
+
+// Helper function to get token from either localStorage or cookies
+function getToken() {
+  return localStorage.getItem('token') || getTokenFromCookie();
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: JSON.parse(localStorage.getItem('user')) || null,
-    token: localStorage.getItem('token') || null,
+    token: getToken(),
     loading: false,
     error: null,
     isAuth0: false,

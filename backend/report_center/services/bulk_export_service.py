@@ -16,7 +16,7 @@ from django.core.files.base import ContentFile
 from celery import shared_task
 
 from .report_generator import ReportGeneratorService
-from .report_file_storage import ReportFileStorageService
+from .file_storage_service import ReportFileStorageService
 from ..models import Report, ReportTemplate, BulkExportJob
 from core.models import Client, Scenario
 

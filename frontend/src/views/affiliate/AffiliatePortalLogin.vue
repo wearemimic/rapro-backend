@@ -281,10 +281,12 @@ const handleLogin = async () => {
   } catch (err) {
     if (err.response?.status === 401) {
       // Check if this is a first-time access that needs password setup
-      if (err.response.data.needs_password_setup) {
+      if (err.response.data?.needs_password_setup) {
+        error.value = '' // Clear any error
         showPasswordSetup.value = true
+        successMessage.value = 'Welcome! Please create a password for your account.'
       } else {
-        error.value = err.response.data.error || 'Invalid credentials. Please check your email and code/password.'
+        error.value = err.response.data?.error || 'Invalid credentials. Please check your email and code/password.'
       }
     } else {
       error.value = err.response?.data?.error || 'Login failed. Please try again.'

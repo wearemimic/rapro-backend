@@ -40,13 +40,34 @@ export const apiService = {
    * @returns {Object} The axios config object with Authorization header
    */
   getConfig() {
-    const token = localStorage.getItem('token');
+    // Check localStorage first, then cookies as fallback (for PDF generation)
+    const token = localStorage.getItem('token') || this.getTokenFromCookie();
     return {
       headers: {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       }
     };
+  },
+  
+  /**
+   * Get token from cookie (fallback for when localStorage isn't available, e.g., PDF generation)
+   * @returns {string|null} The token from cookie or null
+   */
+  getTokenFromCookie() {
+    const name = 'token=';
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(name) === 0) {
+        return c.substring(name.length, c.length);
+      }
+    }
+    return null;
   }
 };
 
