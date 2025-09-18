@@ -35,12 +35,14 @@ class PerformanceMonitoringMiddleware(MiddlewareMixin):
     def process_response(self, request, response):
         """Record performance metrics after processing"""
         try:
-            # Skip static files and admin interface
-            if (hasattr(request, '_perf_start_time') and 
-                not request.path.startswith('/static/') and 
+            # Skip static files, admin interface, and health checks
+            if (hasattr(request, '_perf_start_time') and
+                not request.path.startswith('/static/') and
                 not request.path.startswith('/admin/') and
+                not request.path == '/api/health/' and  # Skip health endpoint
+                not request.path == '/health/' and      # Skip health endpoint (both paths)
                 request.path.startswith('/api/')):
-                
+
                 self._record_performance_metrics(request, response)
         
         except Exception as e:

@@ -132,9 +132,14 @@ affiliate_router.register(r'commissions', CommissionViewSet, basename='commissio
 affiliate_router.register(r'affiliate-payouts', AffiliatePayoutViewSet, basename='affiliatepayout')
 affiliate_router.register(r'discount-codes', AffiliateDiscountCodeViewSet, basename='discountcode')
 
+from .views_health import health_check, health_check_detailed, readiness_check, liveness_check
+
 urlpatterns = [
-    # Health check endpoint for ECS load balancer
-    path('health/', lambda request: HttpResponse('OK', status=200), name='health'),
+    # Health check endpoints for ECS load balancer (optimized for speed)
+    path('health/', health_check, name='health'),  # Primary health endpoint - FAST
+    path('health/detailed/', health_check_detailed, name='health-detailed'),  # Detailed checks
+    path('health/ready/', readiness_check, name='readiness'),  # Readiness probe
+    path('health/live/', liveness_check, name='liveness'),  # Liveness probe
     path('logout/', logout_view, name='logout'),
     path('register/', register_view, name='register'),
     path('profile/', profile_view, name='profile'),
