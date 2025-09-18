@@ -273,7 +273,7 @@
                         />
                       </td>
                       <td>
-                        <input v-model.number="income.rate_of_return" type="number" class="form-control" />
+                        <input v-model.number="income.rate_of_return" type="number" step="0.001" class="form-control" />
                       </td>
                       <td>
                         <select v-model.number="income.start_age" class="form-control">
@@ -412,7 +412,7 @@
                     <td>{{ investment.owned_by === 'primary' ? primaryFirstName : spouseFirstName }}</td>
                     <td>{{ investment.investment_name || investment.income_name }}</td>
                     <td>{{ formatCurrencyDisplay(investment.current_balance || 0) }}</td>
-                    <td>{{ investment.rate_of_return ? investment.rate_of_return.toFixed(1) : '0' }}%</td>
+                    <td>{{ investment.rate_of_return ? (parseFloat(investment.rate_of_return) * 100).toFixed(1) : '0' }}%</td>
                     <td>{{ investment.start_age }}</td>
                     <td>{{ investment.end_age }}</td>
                     <td class="text-center">
@@ -785,8 +785,10 @@ const groupedIncome = computed(() => {
 
 // Investment functions
 function handleInvestmentSave(investmentData) {
-  // Growth rate is already in percentage format, no conversion needed
-  
+  // Debug: Log what we received from the modal
+  console.log('ScenarioCreate: Received investment data:', investmentData)
+  console.log('ScenarioCreate: rate_of_return received:', investmentData.rate_of_return)
+
   if (investmentData.isEdit) {
     // Update existing investment
     const index = scenario.value.investments.findIndex(inv => inv.id === investmentData.id);
@@ -802,7 +804,7 @@ function handleInvestmentSave(investmentData) {
     delete investmentData.isEdit; // Remove the flag
     scenario.value.investments.push(investmentData);
   }
-  
+
   // Close the modal
   showInvestmentModal.value = false;
 }
@@ -874,9 +876,13 @@ function cancelInvestmentEdit() {
 }
 
 function editInvestment(investment) {
+  // Debug: Log the investment data when editing
+  console.log('ScenarioCreate: Editing investment data:', investment);
+  console.log('ScenarioCreate: Edit rate_of_return:', investment.rate_of_return);
+
   // Set the investment being edited - this will trigger the modal to populate
   editingInvestment.value = investment;
-  
+
   // Show the modal
   showInvestmentModal.value = true;
 }
@@ -917,7 +923,7 @@ async function submitScenario() {
       sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
-      sanitized.rate_of_return = parseFloat(row.growth_rate || 0).toFixed(4);
+      sanitized.rate_of_return = parseFloat(row.rate_of_return || 0).toFixed(4);
       sanitized.cola = parseFloat(row.cola || 0).toFixed(2);
       sanitized.exclusion_ratio = parseFloat(row.exclusion_ratio || row.percent_taxable || 0).toFixed(4);
       sanitized.tax_rate = parseFloat(row.tax_rate || 0).toFixed(4);
@@ -927,6 +933,8 @@ async function submitScenario() {
     // Clean and map investment sources for API payload
     const investments = scenario.value.investments;
     const cleanedInvestments = investments.map(row => {
+      console.log('Investment before sanitization:', row);
+      console.log('rate_of_return before sanitization:', row.rate_of_return);
       const sanitized = { ...row };
       // Ensure fields match expected database schema
       sanitized.owned_by = row.owned_by;
@@ -937,7 +945,8 @@ async function submitScenario() {
       sanitized.monthly_contribution = parseFloat(row.monthly_contribution || 0).toFixed(2);
       sanitized.age_to_begin_withdrawal = row.start_age;
       sanitized.age_to_end_withdrawal = row.end_age;
-      sanitized.rate_of_return = parseFloat(row.rate_of_return || 0) / 100; // Convert percentage to decimal for backend rate_of_return field
+      sanitized.rate_of_return = row.rate_of_return || 0; // Already in decimal format from modal
+      console.log('rate_of_return being sent to backend:', sanitized.rate_of_return);
       sanitized.cola = 0;
       sanitized.exclusion_ratio = 0;
       sanitized.tax_rate = 0;
@@ -1090,22 +1099,31 @@ async function loadScenarioForDuplication(scenarioId) {
     
     // Separate income sources and investments
     const allIncomeSources = scenarioData.income || [];
+    console.log('All income sources from scenario:', allIncomeSources);
     const rawInvestments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
+    console.log('Filtered investments:', rawInvestments);
     const incomeSources = allIncomeSources.filter(item => !investmentTypes.includes(item.income_type));
     
     // Debug: Log raw investment data to see what fields are available
     console.log('Raw investment data from backend:', rawInvestments);
     
-    // Map investment fields properly for frontend compatibility  
-    const investments = rawInvestments.map(item => ({
-      ...item,
-      investment_name: item.income_name || item.investment_name || '', // Don't fall back to income_type
-      current_balance: item.current_asset_balance || item.current_balance || 0,
-      start_age: item.age_to_begin_withdrawal || item.start_age || 65,
-      end_age: item.age_to_end_withdrawal || item.end_age || 95,
-      rate_of_return: (item.rate_of_return || item.growth_rate) * 100, // Convert decimal to percentage for display
-      withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0
-    }));
+    // Map investment fields properly for frontend compatibility
+    const investments = rawInvestments.map(item => {
+      console.log('Raw investment from DB:', item);
+      console.log('rate_of_return from DB:', item.rate_of_return);
+      console.log('rate_of_return value for calculation:', item.rate_of_return, 'will display as:', (item.rate_of_return * 100).toFixed(1) + '%');
+
+      return {
+        ...item,
+        investment_name: item.income_name || item.investment_name || '',
+        current_balance: item.current_asset_balance || item.current_balance || 0,
+        start_age: item.age_to_begin_withdrawal || item.start_age || 65,
+        end_age: item.age_to_end_withdrawal || item.end_age || 95,
+        withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0,
+        rate_of_return: item.rate_of_return || item.growth_rate || 0  // FIX: Map rate_of_return from backend's growth_rate field
+        // growth_rate comes from DB as-is (decimal format)
+      };
+    });
     
     // Prefill the scenario object with properly separated data
     scenario.value = {
@@ -1134,19 +1152,28 @@ async function loadScenarioForEditing(scenarioId) {
     
     // Separate income sources and investments
     const allIncomeSources = scenarioData.income || [];
+    console.log('All income sources from scenario:', allIncomeSources);
     const rawInvestments = allIncomeSources.filter(item => investmentTypes.includes(item.income_type));
+    console.log('Filtered investments:', rawInvestments);
     const incomeSources = allIncomeSources.filter(item => !investmentTypes.includes(item.income_type));
     
-    // Map investment fields properly for frontend compatibility  
-    const investments = rawInvestments.map(item => ({
-      ...item,
-      investment_name: item.income_name || item.investment_name || '', // Don't fall back to income_type
-      current_balance: item.current_asset_balance || item.current_balance || 0,
-      start_age: item.age_to_begin_withdrawal || item.start_age || 65,
-      end_age: item.age_to_end_withdrawal || item.end_age || 95,
-      rate_of_return: (item.rate_of_return || item.growth_rate) * 100, // Convert decimal to percentage for display
-      withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0
-    }));
+    // Map investment fields properly for frontend compatibility
+    const investments = rawInvestments.map(item => {
+      console.log('Raw investment from DB:', item);
+      console.log('rate_of_return from DB:', item.rate_of_return);
+      console.log('rate_of_return value for calculation:', item.rate_of_return, 'will display as:', (item.rate_of_return * 100).toFixed(1) + '%');
+
+      return {
+        ...item,
+        investment_name: item.income_name || item.investment_name || '',
+        current_balance: item.current_asset_balance || item.current_balance || 0,
+        start_age: item.age_to_begin_withdrawal || item.start_age || 65,
+        end_age: item.age_to_end_withdrawal || item.end_age || 95,
+        withdrawal_amount: item.monthly_amount || item.withdrawal_amount || 0,
+        rate_of_return: item.rate_of_return || item.growth_rate || 0  // FIX: Map rate_of_return from backend's growth_rate field
+        // growth_rate comes from DB as-is (decimal format)
+      };
+    });
     
     // Prefill the scenario object with properly separated data for editing
     scenario.value = {

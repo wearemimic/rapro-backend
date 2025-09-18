@@ -1018,7 +1018,7 @@ export default {
       const remainingValue = initialValue - conversionAmount;
       
       // Use asset's growth rate if available, otherwise use a default value
-      const growthRate = parseFloat(asset.growth_rate || asset.rate_of_return);
+      const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
       const years = this.yearsUntilRetirement;
       
       // Compound interest formula: A = P(1 + r/100)^t
@@ -1125,7 +1125,7 @@ export default {
           const initialValue = parseFloat(asset.current_asset_balance) || 0;
           const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
           console.log(`🔍 Asset ${asset.income_type}: initial=${initialValue}, conversion=${conversionAmount}`);
-          const growthRate = parseFloat(asset.growth_rate || asset.rate_of_return);
+          const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
           const yearsToConvert = parseInt(this.yearsToConvert) || 1;
           const annualConversion = conversionAmount / yearsToConvert;
           
@@ -1161,7 +1161,7 @@ export default {
         // Add dataset for unaffected assets
         this.unaffectedAssets.forEach(asset => {
           const initialValue = parseFloat(asset.current_asset_balance) || 0;
-          const growthRate = parseFloat(asset.growth_rate || asset.rate_of_return);
+          const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
           
           // Generate data points
           const data = [];
@@ -1896,7 +1896,7 @@ export default {
           const initialValue = parseFloat(asset.current_asset_balance) || 0;
           const conversionAmount = parseFloat(this.maxToConvert[asset.id || asset.income_type]) || 0;
           console.log(`🔍 Asset ${asset.income_type}: initial=${initialValue}, conversion=${conversionAmount}`);
-          const growthRate = parseFloat(asset.rate_of_return) * 100; // Convert from decimal to percentage
+          const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0) * 100; // Convert from decimal to percentage
           const yearsToConvert = parseInt(this.yearsToConvert) || 1;
           const annualConversion = conversionAmount / yearsToConvert;
           
@@ -1936,7 +1936,7 @@ export default {
         // Add dataset for unaffected assets
         this.unaffectedAssets.forEach(asset => {
           const initialValue = parseFloat(asset.current_asset_balance) || 0;
-          const growthRate = parseFloat(asset.growth_rate || asset.rate_of_return);
+          const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
           
           // Generate data points
           const data = [];

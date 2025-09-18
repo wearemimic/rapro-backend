@@ -379,16 +379,18 @@ const resetForm = () => {
 watch(() => props.editingInvestment, (newValue) => {
   if (newValue) {
     // Populate form with existing investment data
+    console.log('InvestmentModal: Loading investment for edit:', newValue);
+    console.log('InvestmentModal: rate_of_return from parent:', newValue.rate_of_return);
     investment.value = {
       owned_by: newValue.owned_by || 'primary',
       income_type: newValue.income_type || '',
       investment_name: newValue.investment_name || newValue.income_name || '',
-      current_balance: newValue.current_balance || null,
+      current_balance: newValue.current_balance || newValue.current_asset_balance || null,
       age_established: newValue.age_established || null,
-      rate_of_return: newValue.rate_of_return ? (newValue.rate_of_return < 1 ? newValue.rate_of_return * 100 : newValue.rate_of_return) : (newValue.growth_rate ? newValue.growth_rate * 100 : null), // Convert decimal to percentage for display
-      age_start_taking: newValue.start_age || 65,
-      age_stop_taking: newValue.end_age || 95,
-      monthly_withdrawal_amount: newValue.withdrawal_amount || null,
+      rate_of_return: newValue.rate_of_return !== null && newValue.rate_of_return !== undefined ? newValue.rate_of_return * 100 : 0, // Convert rate_of_return from decimal to percentage for display
+      age_start_taking: newValue.start_age || newValue.age_to_begin_withdrawal || 65,
+      age_stop_taking: newValue.end_age || newValue.age_to_end_withdrawal || 95,
+      monthly_withdrawal_amount: newValue.withdrawal_amount || newValue.monthly_amount || null,
       is_contributing: newValue.is_contributing || false,
       annual_contribution_amount: newValue.monthly_contribution ? newValue.monthly_contribution * 12 : null,
       annual_contribution_percentage: newValue.contribution_percentage || null,
@@ -397,8 +399,8 @@ watch(() => props.editingInvestment, (newValue) => {
     }
     
     // Update display values
-    currentBalanceDisplay.value = newValue.current_balance ? formatCurrency(newValue.current_balance) : ''
-    monthlyWithdrawalDisplay.value = newValue.withdrawal_amount ? new Intl.NumberFormat('en-US').format(newValue.withdrawal_amount) : ''
+    currentBalanceDisplay.value = investment.value.current_balance ? formatCurrency(investment.value.current_balance) : ''
+    monthlyWithdrawalDisplay.value = investment.value.monthly_withdrawal_amount ? new Intl.NumberFormat('en-US').format(investment.value.monthly_withdrawal_amount) : ''
     annualContributionDisplay.value = investment.value.annual_contribution_amount ? new Intl.NumberFormat('en-US').format(investment.value.annual_contribution_amount) : ''
   } else {
     resetForm()
@@ -555,6 +557,9 @@ const saveInvestment = () => {
     return
   }
 
+  // Debug: Log the rate of return before conversion
+  console.log('InvestmentModal: rate_of_return before save:', investment.value.rate_of_return)
+
   // Convert to the format expected by the backend
   const investmentData = {
     id: isEditMode.value ? props.editingInvestment.id : (Date.now() + Math.random()), // Preserve ID when editing
@@ -564,7 +569,7 @@ const saveInvestment = () => {
     owned_by: investment.value.owned_by,
     current_balance: investment.value.current_balance || 0,
     age_established: investment.value.age_established,
-    rate_of_return: investment.value.rate_of_return / 100, // Convert percentage to decimal for backend
+    rate_of_return: investment.value.rate_of_return ? investment.value.rate_of_return / 100 : 0, // Convert percentage to decimal for backend
     monthly_contribution: investment.value.is_contributing ? 
       (investment.value.annual_contribution_amount ? investment.value.annual_contribution_amount / 12 : 0) : 0,
     contribution_percentage: investment.value.annual_contribution_percentage || 0,
@@ -576,8 +581,11 @@ const saveInvestment = () => {
     isEdit: isEditMode.value // Flag to indicate this is an edit
   }
 
+  // Debug: Log the converted rate of return
+  console.log('InvestmentModal: investmentData being saved:', investmentData)
+
   emit('save', investmentData)
-  
+
   // Reset form
   resetForm()
 }
