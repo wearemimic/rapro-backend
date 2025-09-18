@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Auth0 Google Login</title>
+</head>
+<body>
+    <h1>Direct Auth0 Test</h1>
+    <button onclick="testAuth0()">Test Auth0 Google Login</button>
+    <div id="result"></div>
+
+    <script>
+    function testAuth0() {
+        const domain = 'genai-030069804226358743.us.auth0.com';
+        const clientId = 'MS2O3usgLl8btDkPNwO6i0ZzC4LxR0Jw';
+        const callbackUrl = 'http://localhost:3000/auth/callback';
+
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: clientId,
+            redirect_uri: callbackUrl,
+            scope: 'openid profile email',
+            connection: 'google-oauth2',
+            state: 'test',
+            prompt: 'login'
+        });
+
+        const url = `https://${domain}/authorize?${params.toString()}`;
+
+        document.getElementById('result').innerHTML =
+            `<p>Redirecting to:</p><pre>${url}</pre>`;
+
+        setTimeout(() => {
+            window.location.href = url;
+        }, 2000);
+    }
+    </script>
+</body>
+</html>

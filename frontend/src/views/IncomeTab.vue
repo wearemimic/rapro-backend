@@ -4,7 +4,17 @@
     <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Income Projection Table</h5>
-        <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
+
+        <!-- Loading state for table -->
+        <div v-if="!incomeProjectionTable || incomeProjectionTable.length === 0" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading income data...</span>
+          </div>
+          <p class="mt-2 text-muted">Loading income projections...</p>
+        </div>
+
+        <!-- Table content -->
+        <div v-else class="table-responsive" style="overflow-x: auto; max-width: 100%;">
           <table class="table table-hover" style="min-width: 800px;">
             <thead class="thead-light">
               <tr>
@@ -117,7 +127,7 @@
                     <td>{{ selectedAsset.income_type }}</td>
                     <td>${{ parseFloat(selectedAsset.current_asset_balance || 0).toLocaleString() }}</td>
                     <td>${{ parseFloat(selectedAsset.monthly_contribution || 0).toLocaleString() }}</td>
-                    <td>{{ (parseFloat(selectedAsset.rate_of_return || 0) * 100).toFixed(2) }}%</td>
+                    <td>{{ (parseFloat(selectedAsset.rate_of_return || selectedAsset.growth_rate || 0) * 100).toFixed(2) }}%</td>
                     <td>{{ selectedAsset.age_to_begin_withdrawal }}</td>
                     <td>{{ selectedAsset.age_to_end_withdrawal }}</td>
                     <td>${{ parseFloat(selectedAsset.monthly_amount || 0).toLocaleString() }}</td>
@@ -149,7 +159,17 @@
             <!-- Asset Graph -->
             <div>
               <h6 class="mb-3">Projection Graph</h6>
-              <Graph v-if="selectedAsset" :data="getGraphData(selectedAsset.income_type)" :height="300" />
+              <div v-if="isLoadingGraph" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading graph data...</span>
+                </div>
+                <p class="mt-2 text-muted">Calculating projections...</p>
+              </div>
+              <div v-else-if="!selectedAsset" class="alert alert-info">No asset selected</div>
+              <div v-else-if="!getGraphData(selectedAsset.income_type).labels" class="alert alert-warning">
+                No graph data available for this asset
+              </div>
+              <Graph v-else :data="getGraphData(selectedAsset.income_type)" :height="300" />
             </div>
           </div>
           <div class="modal-footer">
@@ -168,6 +188,7 @@
 <script>
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
+import { useScenarioCalculationsStore } from '@/stores/scenarioCalculations';
 
 export default {
   components: {
@@ -201,10 +222,60 @@ export default {
       rothGrowthRate: 0,
       // Modal state
       showAssetDetailModal: false,
-      selectedAsset: null
+      selectedAsset: null,
+      isLoadingGraph: false
     };
   },
+  mounted() {
+    // Force a re-compute when store updates
+    const store = useScenarioCalculationsStore();
+    console.log('🔥 INCOME TAB MOUNTED');
+    console.log('🔥 Props received:', {
+      scenario: !!this.scenario,
+      scenarioResults: this.scenarioResults?.length || 0,
+      assetDetails: this.assetDetails?.length || 0,
+      client: !!this.client
+    });
+    console.log('🔥 Asset Details:', this.assetDetails);
+    console.log('🔥 Store state:', {
+      hasResults: store.enhancedResults.length > 0,
+      hasAssets: store.assetDetails.length > 0
+    });
+
+    // Initialize store if we have all the data
+    if (this.assetDetails && this.assetDetails.length > 0 &&
+        this.scenarioResults && this.scenarioResults.length > 0) {
+      console.log('🔥 Initializing store from IncomeTab mounted');
+      store.initialize(
+        this.scenarioResults,
+        this.assetDetails,
+        this.scenario,
+        this.client
+      );
+    }
+  },
+  watch: {
+    assetDetails: {
+      handler(newVal) {
+        console.log('🔥 INCOME TAB: assetDetails changed:', newVal?.length || 0, 'assets');
+        if (newVal && newVal.length > 0 && this.scenarioResults && this.scenarioResults.length > 0) {
+          const store = useScenarioCalculationsStore();
+          console.log('🔥 INCOME TAB: Reinitializing store with new asset data');
+          store.initialize(
+            this.scenarioResults,
+            this.assetDetails,
+            this.scenario,
+            this.client
+          );
+        }
+      },
+      immediate: true
+    }
+  },
   computed: {
+    calculationsStore() {
+      return useScenarioCalculationsStore();
+    },
     stickyPositions() {
       // Calculate sticky positions based on whether spouse column is shown
       const isMarried = this.client?.tax_status && this.client?.tax_status.toLowerCase() !== 'single';
@@ -230,15 +301,73 @@ export default {
         .filter(key => key.includes('income') && !knownKeys.includes(key));
     },
     incomeProjectionTable() {
-      // Generate income projection table data using backend scenario results
-      const projections = [];
-      
-      // If we have scenario results, use them for accurate calculations
-      if (this.scenarioResults && this.scenarioResults.length > 0) {
-        return this.generateTableFromScenarioResults();
+      // Use the central store's enhanced results
+      const store = useScenarioCalculationsStore();
+      const enhancedResults = store.enhancedResults;
+
+      console.log('IncomeTab checking store:', {
+        storeInitialized: !!store,
+        enhancedResultsLength: enhancedResults?.length || 0,
+        assetDetailsLength: store.assetDetails?.length || 0,
+        scenarioResultsLength: this.scenarioResults?.length || 0
+      });
+
+      // If store has data, use it
+      if (enhancedResults && enhancedResults.length > 0) {
+        console.log('Using enhanced results from store:', enhancedResults.length);
+        console.log('First row assetIncomes:', enhancedResults[0]?.assetIncomes);
+
+        // Transform enhanced results into table format
+        return enhancedResults.map(result => ({
+          year: result.year,
+          primaryAge: result.primary_age,
+          spouseAge: result.spouse_age,
+          incomes: result.assetIncomes || {},
+          total: parseFloat(result.gross_income || 0)
+        }));
       }
-      
-      if (!this.scenario || !this.assetDetails) return projections;
+
+      // If store not ready but we have scenario results, try to initialize store
+      if (this.scenarioResults && this.scenarioResults.length > 0 && this.assetDetails && this.assetDetails.length > 0) {
+        console.log('Store not ready, attempting initialization with local data');
+        console.log('🔥 Client prop:', this.client);
+        console.log('🔥 Scenario.client:', this.scenario?.client);
+        console.log('🔥 Using client:', this.client);
+
+        store.initialize(
+          this.scenarioResults,
+          this.assetDetails,
+          this.scenario,
+          this.client  // Use the client prop directly
+        );
+
+        // After initialization, try to get enhanced results again
+        const newEnhancedResults = store.enhancedResults;
+        if (newEnhancedResults && newEnhancedResults.length > 0) {
+          console.log('Store initialized successfully, using enhanced results');
+          return newEnhancedResults.map(result => ({
+            year: result.year,
+            primaryAge: result.primary_age,
+            spouseAge: result.spouse_age,
+            incomes: result.assetIncomes || {},
+            total: parseFloat(result.gross_income || 0)
+          }));
+        }
+      }
+
+      // Ultimate fallback - just show totals
+      if (this.scenarioResults && this.scenarioResults.length > 0) {
+        console.log('Store initialization failed, using basic scenario results');
+        return this.scenarioResults.map(result => ({
+          year: result.year,
+          primaryAge: result.primary_age,
+          spouseAge: result.spouse_age,
+          incomes: {},
+          total: parseFloat(result.gross_income || 0)
+        }));
+      }
+
+      return [];
       
       
       // Get client ages - handle invalid dates
@@ -326,16 +455,91 @@ export default {
     }
   },
   methods: {
+    /**
+     * SINGLE SOURCE OF TRUTH for asset calculations
+     * This calculates the COMPLETE projection for an asset from current age to end age
+     * Returns a dictionary with withdrawal amounts for each age
+     */
+    calculateAssetProjection(asset) {
+      // Get client's actual current age
+      const birthYear = new Date(this.client?.birthdate).getFullYear();
+      const currentYear = new Date().getFullYear();
+      const actualCurrentAge = currentYear - birthYear;
+
+      // Get scenario parameters
+      const endAge = this.scenario?.mortality_age || 90;
+      const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
+      const withdrawalStartAge = parseInt(asset.age_to_begin_withdrawal || 65);
+      const withdrawalEndAge = parseInt(asset.age_to_end_withdrawal || endAge);
+      const monthlyContribution = parseFloat(asset.monthly_contribution || 0);
+      const annualContribution = monthlyContribution * 12;
+      const specifiedAnnualWithdrawal = parseFloat(asset.monthly_amount || 0) * 12;
+
+      // RMD table from IRS
+      const rmdTable = {
+        72: 27.4, 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0,
+        79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0,
+        86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8,
+        93: 10.1, 94: 9.5, 95: 8.9, 96: 8.4, 97: 7.8, 98: 7.3, 99: 6.8, 100: 6.4,
+        101: 6.0, 102: 5.6, 103: 5.2, 104: 4.9, 105: 4.5, 106: 4.2, 107: 3.9,
+        108: 3.7, 109: 3.4, 110: 3.1, 111: 2.9, 112: 2.6, 113: 2.4, 114: 2.1, 115: 1.9
+      };
+
+      const normalizedType = this.getAssetType(asset);
+      const projection = {};
+      let currentBalance = parseFloat(asset.current_asset_balance || 0);
+
+      // Calculate for each year from current age to end age
+      for (let age = actualCurrentAge; age <= endAge; age++) {
+        let withdrawal = 0;
+
+        if (age < withdrawalStartAge) {
+          // Pre-retirement: contributions and growth only
+          currentBalance += annualContribution;
+          currentBalance *= (1 + growthRate);
+        } else if (age >= withdrawalStartAge && age <= withdrawalEndAge) {
+          // Retirement phase: calculate withdrawals
+
+          // Calculate RMD if applicable (qualified accounts at age 73+)
+          if (normalizedType === 'qualified' && age >= 73 && currentBalance > 0) {
+            const divisor = rmdTable[age] || (age > 115 ? 1.9 : 10);
+            const rmdAmount = currentBalance / divisor;
+            withdrawal = Math.max(rmdAmount, specifiedAnnualWithdrawal);
+          } else {
+            withdrawal = specifiedAnnualWithdrawal;
+          }
+
+          // Don't withdraw more than available
+          if (withdrawal > currentBalance) {
+            withdrawal = currentBalance;
+          }
+
+          // Subtract withdrawal, then apply growth
+          currentBalance -= withdrawal;
+          currentBalance *= (1 + growthRate);
+        }
+
+        projection[age] = {
+          withdrawal: withdrawal,
+          balance: currentBalance
+        };
+      }
+
+      return projection;
+    },
     generateTableFromScenarioResults() {
       // Generate income table using accurate backend scenario results
       const projections = [];
-      
-      // Create a map of assets for easy lookup
-      const assetMap = {};
+
+      // Pre-calculate projections for all qualified/non-qualified assets
+      const assetProjections = {};
       this.assetDetails.forEach(asset => {
-        assetMap[asset.id] = asset;
+        const normalizedType = this.getAssetType(asset);
+        if (normalizedType === 'qualified' || normalizedType === 'non_qualified') {
+          assetProjections[asset.id] = this.calculateAssetProjection(asset);
+        }
       });
-      
+
       // Process each year from scenario results
       this.scenarioResults.forEach(result => {
         const row = {
@@ -343,7 +547,8 @@ export default {
           primaryAge: result.primary_age,
           spouseAge: result.spouse_age,
           incomes: {},
-          total: 0
+          total: 0,
+          backendTotal: parseFloat(result.gross_income || 0)  // Store backend's gross_income for comparison
         };
         
         
@@ -352,7 +557,7 @@ export default {
           let income = 0;
           const normalizedType = this.getAssetType(asset);
           const owner = asset.owned_by?.toLowerCase();
-          
+
           // Map backend results to frontend assets
           if (normalizedType === 'social_security') {
             if (owner === 'primary') {
@@ -360,23 +565,26 @@ export default {
             } else if (owner === 'spouse' || owner === 'secondary') {
               income = parseFloat(result.ss_income_spouse || 0);
             }
-            
-          } else if (normalizedType === 'qualified') {
-            // For now, use the calculated method for other asset types
-            // Later we can add more backend fields for these
-            const primaryAgeDisplay = result.primary_age;
-            const spouseAgeDisplay = result.spouse_age;
-            income = this.calculateAssetIncomeForYear(asset, result.primary_age, primaryAgeDisplay, spouseAgeDisplay);
+
+          } else if ((normalizedType === 'qualified' || normalizedType === 'non_qualified') && assetProjections[asset.id]) {
+            // Use the pre-calculated projection for this asset
+            const relevantAge = owner === 'spouse' ? result.spouse_age : result.primary_age;
+            const projection = assetProjections[asset.id][relevantAge];
+            income = projection ? projection.withdrawal : 0;
+
           } else {
             // For other asset types, use the calculated method
             const primaryAgeDisplay = result.primary_age;
             const spouseAgeDisplay = result.spouse_age;
             income = this.calculateAssetIncomeForYear(asset, result.primary_age, primaryAgeDisplay, spouseAgeDisplay);
           }
-          
+
           row.incomes[asset.id] = income;
           row.total += income;
         });
+
+        // Use backend's gross_income as the authoritative total
+        row.total = row.backendTotal;
         
         projections.push(row);
       });
@@ -429,11 +637,11 @@ export default {
       if (!asset) return {};
       
       // Get client's actual current age from birthdate
-      const birthYear = new Date(this.scenario?.client?.birthdate).getFullYear();
+      const birthYear = new Date(this.client?.birthdate).getFullYear();
       const currentYear = new Date().getFullYear();
       let actualCurrentAge = currentYear - birthYear;
-      
-      console.log(`Client birthdate: ${this.scenario?.client?.birthdate}, Birth year: ${birthYear}, Current age: ${actualCurrentAge}`);
+
+      console.log(`Client birthdate: ${this.client?.birthdate}, Birth year: ${birthYear}, Current age: ${actualCurrentAge}`);
       
       // If we couldn't get the birthdate, use a fallback
       if (!birthYear || isNaN(actualCurrentAge)) {
@@ -450,7 +658,7 @@ export default {
       const startBalance = parseFloat(asset.current_asset_balance || 0);
       const monthlyContribution = parseFloat(asset.monthly_contribution || 0);
       const annualContribution = monthlyContribution * 12;
-      const growthRate = parseFloat(asset.rate_of_return || 0) / 100;
+      const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
       const withdrawalStartAge = parseInt(asset.age_to_begin_withdrawal || retirementAge);
       const withdrawalEndAge = parseInt(asset.age_to_end_withdrawal || endAge);
       const annualWithdrawal = parseFloat(asset.monthly_amount || 0) * 12;
@@ -459,7 +667,61 @@ export default {
       const normalizedType = this.getAssetType(asset);
 
       // Qualified/Non-Qualified: handle investment accounts with balances
-      if (normalizedType === 'qualified' || normalizedType === 'non_qualified' || startBalance > 0) {
+      if (normalizedType === 'qualified' || normalizedType === 'non_qualified') {
+        console.log('📊 getGraphData: Creating graph for qualified asset', asset.id);
+
+        // Use the SAME unified calculation method
+        const projection = this.calculateAssetProjection(asset);
+        console.log('📊 getGraphData: Projection calculated, keys:', Object.keys(projection).length);
+
+        const labels = [];
+        const withdrawals = [];
+        const balances = [];
+
+        // Extract data from projection for graph
+        for (let age = actualCurrentAge; age <= endAge; age++) {
+          if (projection[age]) {
+            labels.push(age);
+            withdrawals.push(projection[age].withdrawal);
+            balances.push(projection[age].balance);
+          }
+        }
+
+        console.log('📊 getGraphData: Graph data built:', {
+          labelsCount: labels.length,
+          firstLabels: labels.slice(0, 5),
+          firstWithdrawals: withdrawals.slice(0, 5),
+          firstBalances: balances.slice(0, 5)
+        });
+
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'Balance',
+              data: balances,
+              borderColor: 'green',
+              backgroundColor: 'rgba(0, 128, 0, 0.1)',
+              borderWidth: 2,
+              fill: false,
+              tension: 0.3,
+              yAxisID: 'y',
+              order: 1
+            },
+            {
+              label: 'Withdrawals',
+              data: withdrawals,
+              borderColor: 'red',
+              backgroundColor: 'rgba(255, 0, 0, 0.1)',
+              borderWidth: 2,
+              fill: false,
+              tension: 0.3,
+              yAxisID: 'y',
+              order: 2
+            }
+          ]
+        };
+      } else if (normalizedType === 'qualified__OLD' || normalizedType === 'non_qualified__OLD' || startBalance > 0) {
         console.log(`Retirement account data:`, {
           type: asset.income_type,
           currentAge: actualCurrentAge,
@@ -711,7 +973,7 @@ export default {
       const startBalance = parseFloat(asset.current_asset_balance || 0);
       const monthlyContribution = parseFloat(asset.monthly_contribution || 0);
       const annualContribution = monthlyContribution * 12;
-      const growthRate = parseFloat(asset.rate_of_return || 0) / 100;
+      const growthRate = parseFloat(asset.rate_of_return || asset.growth_rate || 0);
       const withdrawalStartAge = parseInt(asset.age_to_begin_withdrawal || 65);
       
       // Get the client's actual current age
@@ -888,10 +1150,18 @@ export default {
     showAssetModal(asset) {
       this.selectedAsset = asset;
       this.showAssetDetailModal = true;
+      this.isLoadingGraph = true;
+
+      // Simulate loading time for complex calculations
+      // In real scenario, this would be during actual async data fetch
+      setTimeout(() => {
+        this.isLoadingGraph = false;
+      }, 500); // Half second loading time for UX feedback
     },
     closeAssetModal() {
       this.showAssetDetailModal = false;
       this.selectedAsset = null;
+      this.isLoadingGraph = false;
     }
   }
 };

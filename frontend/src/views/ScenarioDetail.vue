@@ -360,7 +360,10 @@
               <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'income'" class="tab-pane active" style="margin-top:50px;">
-              <IncomeTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" :client="client" />
+              <div v-if="!assetDetails || assetDetails.length === 0" class="alert alert-warning">
+                Loading asset data...
+              </div>
+              <IncomeTab v-else :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" :client="client" />
             </div>
             <div v-show="activeTab === 'rothConversion'" class="tab-pane active" style="margin-top:50px;">
               <RothConversionTab :scenario="scenario" :assetDetails="assetDetails" :scenarioResults="scenarioResults" :client="client" />
@@ -404,6 +407,7 @@ import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { mapActions } from 'vuex';
+import { useScenarioCalculationsStore } from '@/stores/scenarioCalculations';
 
 import Chart from 'chart.js/auto';
 
@@ -992,10 +996,36 @@ export default {
             this.scenarioResults = response.data;
             console.log('🎯 SCENARIO_DEBUG [SCENARIO_DETAIL]: scenarioResults set, length:', this.scenarioResults.length);
             console.log('🎯 SCENARIO_DEBUG [SCENARIO_DETAIL]: filteredScenarioResults length:', this.filteredScenarioResults.length);
-            
+
+            // Load asset details first, then initialize store
+            console.log('📊 Loading assets for scenario:', this.$route.params.scenarioid);
+            const scenarioId = this.$route.params.scenarioid;
+            const token = localStorage.getItem('token');
+            const assetHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+            axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/assets/`, { headers: assetHeaders })
+              .then(response => {
+                this.assetDetails = response.data;
+                console.log('📊 Asset Details loaded:', this.assetDetails.length, 'assets');
+
+                // NOW initialize the store with all data
+                console.log('📊 Initializing calculations store');
+                const calculationsStore = useScenarioCalculationsStore();
+                calculationsStore.initialize(
+                  this.scenarioResults,
+                  this.assetDetails,
+                  this.scenario,
+                  this.client
+                );
+                console.log('📊 Store initialized');
+              })
+              .catch(error => {
+                console.error('📊 Error fetching asset details:', error);
+              });
+
             // Re-initialize chart with new data
             this.initializeChartJS();
-            
+
             // Calculate and update the percentage metrics
             this.updateScenarioPercentages();
           } else {
@@ -1254,16 +1284,41 @@ export default {
       }
       return `${firstName} ${lastName}`;
     },
-    fetchAssetDetails() {
-      const scenarioId = this.$route.params.scenarioid;
-      axios.get(`${API_CONFIG.API_URL}/scenarios/${scenarioId}/assets/`, { headers })
-        .then(response => {
-          this.assetDetails = response.data;
-          console.log('Asset Details:', this.assetDetails);
-        })
-        .catch(error => {
-          console.error('Error fetching asset details:', error);
-        });
+    async fetchAssetDetails() {
+      console.log('🔥 fetchAssetDetails: Loading assets for scenario:', this.scenario?.id);
+
+      if (!this.scenario?.id) {
+        console.error('🔥 fetchAssetDetails: No scenario ID available');
+        return;
+      }
+
+      try {
+        const token = this.getAuthToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const response = await axios.get(
+          `${API_CONFIG.API_URL}/scenarios/${this.scenario.id}/assets/`,
+          { headers }
+        );
+
+        this.assetDetails = response.data;
+        console.log('🔥 fetchAssetDetails: Loaded', this.assetDetails.length, 'assets');
+        console.log('🔥 fetchAssetDetails: Assets:', this.assetDetails);
+
+        // Initialize the store if we have all data
+        if (this.scenarioResults && this.scenarioResults.length > 0) {
+          const calculationsStore = useScenarioCalculationsStore();
+          calculationsStore.initialize(
+            this.scenarioResults,
+            this.assetDetails,
+            this.scenario,
+            this.client
+          );
+          console.log('🔥 fetchAssetDetails: Store initialized with assets');
+        }
+      } catch (error) {
+        console.error('🔥 fetchAssetDetails: Error loading assets:', error);
+      }
     },
     createScenario(type) {
       // Close dropdown after selection
