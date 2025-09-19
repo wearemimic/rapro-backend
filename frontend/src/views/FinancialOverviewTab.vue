@@ -81,101 +81,17 @@
       </div>
     </div>
 
-    <!-- Table Card -->
+    <!-- Financial Summary Table -->
     <div class="card mb-3 mb-lg-5">
-      <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center flex-wrap">
-          <h4 class="card-header-title mb-0">Financial Overview Table</h4>
-          <div class="indicator-legend d-flex align-items-center mt-2 mt-md-0" style="font-size: 0.9em;">
-            <span class="me-3">
-              <span class="me-1">📉</span>
-              <small class="text-muted">SS Decrease</small>
-            </span>
-            <span class="me-3">
-              <span class="me-1">ℹ️</span>
-              <small class="text-muted">IRMAA Bracket</small>
-            </span>
-            <span>
-              <span class="me-1">🔒</span>
-              <small class="text-muted">Hold Harmless</small>
-            </span>
-          </div>
-        </div>
-      </div>
       <div class="card-body">
-        <div v-if="filteredResults.length" class="table-responsive">
-          <table class="table table-hover">
-            <thead class="thead-light">
-              <tr>
-                <th>Year</th>
-                <th>Primary Age</th>
-                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
-                <th>Gross Income</th>
-                <th>AGI</th>
-                <th>MAGI</th>
-                <th>Tax Bracket</th>
-                <th>Federal Tax</th>
-                <th>Total Medicare</th>
-                <th>Remaining Income</th>
-                <th>Indicators</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in filteredResults" :key="row.year" :class="{ 'irmaa-bracket-row': isIrmaaBracketHit(row, idx) }">
-                <td>{{ row.year }}</td>
-                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
-                <td v-else></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
-                <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td>{{ formatCurrency(row.gross_income) }}</td>
-                <td>{{ formatCurrency(row.agi) }}</td>
-                <td>{{ formatCurrency(row.magi) }}</td>
-                <td>{{ row.tax_bracket }}</td>
-                <td>{{ formatCurrency(row.federal_tax) }}</td>
-                <td>{{ formatCurrency(row.total_medicare) }}</td>
-                <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>
-                <td style="position: relative; text-align: center;">
-                  <span v-if="row.ss_decrease_applied" class="ss-decrease-icon" @click.stop="toggleSsDecreaseTooltip(idx)" title="Social Security Decrease">
-                    📉
-                  </span>
-                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)" title="IRMAA Information" :style="{ marginLeft: row.ss_decrease_applied ? '5px' : '0' }">
-                    ℹ️
-                  </span>
-                  <span v-if="isHoldHarmlessProtected(row)" class="hold-harmless-icon" @click.stop="toggleHoldHarmlessTooltip(idx)" title="Hold Harmless Protection" :style="{ marginLeft: (row.ss_decrease_applied || isIrmaaBracketHit(row, idx)) ? '5px' : '0' }">
-                    🔒
-                  </span>
-                  <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                    {{ getIrmaaBracketLabel(row) }}
-                  </div>
-                  <div v-if="openSsDecreaseTooltipIdx === idx" class="ss-decrease-popover">
-                    Social Security Decrease
-                  </div>
-                  <div v-if="openHoldHarmlessTooltipIdx === idx" class="hold-harmless-popover">
-                    Hold Harmless Protection: Social Security maintained at previous year's level. Without this protection, you would have received {{ formatCurrency(row.original_remaining_ss || 0) }} ({{ formatCurrency(row.hold_harmless_amount || 0) }} less).
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr style="font-weight: bold;">
-                <td>Total</td>
-                <td></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0)) }}</td>
-                <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0)) }}</td>
-                <td></td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <h5 class="mb-4">Financial Overview Table</h5>
+        <FinancialSummaryTable
+          :scenario-id="4"
+          :client="client"
+        />
       </div>
     </div>
-    
+
     <!-- Disclosures Card -->
     <DisclosuresCard />
   </div>
@@ -190,6 +106,7 @@ import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 import { API_CONFIG } from '@/config';
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
+import FinancialSummaryTable from '../components/FinancialSummaryTable.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -232,7 +149,8 @@ const IRMAA_LABELS = {
 export default {
   components: {
     Graph,
-    DisclosuresCard
+    DisclosuresCard,
+    FinancialSummaryTable
   },
   props: {
     scenarioResults: {
@@ -419,6 +337,10 @@ export default {
     }
   },
   methods: {
+    onComprehensiveDataLoaded(data) {
+      // Store the comprehensive data for use in graphs and calculations
+      console.log('Comprehensive data loaded:', data);
+    },
     async fetchIrmaaThresholds() {
       if (!this.filteredResults || !this.filteredResults.length) return;
       
