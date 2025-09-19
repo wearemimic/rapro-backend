@@ -161,7 +161,20 @@ export default {
     };
 
     const isIrmaaBracketHit = (row, idx) => {
-      return row.irmaa_bracket_number > 0;
+      // Returns true if this row's IRMAA bracket is different from the previous row
+      const currentBracket = row.irmaa_bracket_number || 0;
+
+      if (idx === 0) {
+        // First row - show if in any bracket
+        return currentBracket > 0;
+      }
+
+      // Check if bracket changed from previous row
+      const prevRow = tableData.value[idx - 1];
+      const prevBracket = prevRow?.irmaa_bracket_number || 0;
+
+      // Show indicator if bracket number changed (either up or down)
+      return currentBracket !== prevBracket;
     };
 
     const isHoldHarmlessProtected = (row) => {

@@ -86,8 +86,9 @@
       <div class="card-body">
         <h5 class="mb-4">Financial Overview Table</h5>
         <FinancialSummaryTable
-          :scenario-id="4"
+          :scenario-id="scenario?.id"
           :client="client"
+          @data-loaded="onComprehensiveDataLoaded"
         />
       </div>
     </div>
@@ -153,6 +154,10 @@ export default {
     FinancialSummaryTable
   },
   props: {
+    scenario: {
+      type: Object,
+      required: true
+    },
     scenarioResults: {
       type: Array,
       required: true
@@ -183,7 +188,8 @@ export default {
       openIrmaaTooltipIdx: null,
       openSsDecreaseTooltipIdx: null,
       openHoldHarmlessTooltipIdx: null,
-      dynamicIrmaaThresholds: {} // Will store thresholds by year
+      dynamicIrmaaThresholds: {}, // Will store thresholds by year
+      comprehensiveData: null // Store comprehensive data for graphs
     };
   },
   computed: {
@@ -202,34 +208,38 @@ export default {
       return IRMAA_LABELS['single'];
     },
     totalGrossIncome() {
-      return this.filteredResults.reduce((total, row) => total + parseFloat(row.gross_income || 0), 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.gross_income_total || 0), 0);
     },
     totalTax() {
-      return this.filteredResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0);
     },
     totalMedicare() {
-      return this.filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0);
     },
     netIncome() {
-      return this.filteredResults.reduce((total, row) => {
-        const gross = parseFloat(row.gross_income || 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => {
+        const gross = parseFloat(row.gross_income_total || 0);
         const tax = parseFloat(row.federal_tax || 0);
         const medicare = parseFloat(row.total_medicare || 0);
         return total + (gross - tax - medicare);
       }, 0);
     },
     chartData() {
-      if (!this.filteredResults || !this.filteredResults.length) {
-        console.warn('⚠️ FinancialOverview: No filtered results, returning empty chart data');
+      if (!this.comprehensiveData?.years || !this.comprehensiveData.years.length) {
+        console.warn('⚠️ FinancialOverview: No comprehensive data, returning empty chart data');
         return { labels: [], datasets: [] };
       }
 
-      const labels = this.filteredResults.map(row => row.year.toString());
+      const labels = this.comprehensiveData.years.map(row => row.year.toString());
       const datasets = [
         {
           type: 'line',
           label: 'Gross Income',
-          data: this.filteredResults.map(row => parseFloat(row.gross_income) || 0),
+          data: this.comprehensiveData.years.map(row => parseFloat(row.gross_income_total) || 0),
           borderColor: '#4285f4',
           backgroundColor: 'transparent',
           borderWidth: 3,
@@ -243,8 +253,8 @@ export default {
         {
           type: 'line',
           label: 'Net Income',
-          data: this.filteredResults.map(row => {
-            const gross = parseFloat(row.gross_income) || 0;
+          data: this.comprehensiveData.years.map(row => {
+            const gross = parseFloat(row.gross_income_total) || 0;
             const tax = parseFloat(row.federal_tax) || 0;
             const medicare = parseFloat(row.total_medicare) || 0;
             return gross - tax - medicare;
@@ -262,7 +272,7 @@ export default {
         {
           type: 'bar',
           label: 'Federal Tax',
-          data: this.filteredResults.map(row => parseFloat(row.federal_tax) || 0),
+          data: this.comprehensiveData.years.map(row => parseFloat(row.federal_tax) || 0),
           backgroundColor: '#ea4335',
           stack: 'Stack 0',
           yAxisID: 'y',
@@ -271,7 +281,7 @@ export default {
         {
           type: 'bar',
           label: 'Medicare',
-          data: this.filteredResults.map(row => parseFloat(row.total_medicare) || 0),
+          data: this.comprehensiveData.years.map(row => parseFloat(row.total_medicare) || 0),
           backgroundColor: '#fbbc05',
           stack: 'Stack 0',
           yAxisID: 'y',
@@ -279,7 +289,7 @@ export default {
         }
       ];
 
-      console.log('✅ FinancialOverview chartData computed successfully:', { labels, datasets });
+      console.log('✅ FinancialOverview chartData computed successfully (comprehensive data):', { labels, datasets });
       return { labels, datasets };
     },
     chartOptions() {
@@ -324,13 +334,27 @@ export default {
     }
   },
   watch: {
-    filteredResults: {
-      handler(newResults) {
+    comprehensiveData: {
+      handler(newData) {
         // Use nextTick to ensure DOM is ready
         this.$nextTick(() => {
-          this.renderFlowChart(newResults);
+          this.renderFlowChart();
           this.initializeCircles();
+          this.fetchIrmaaThresholds();
         });
+      },
+      deep: true,
+      immediate: false
+    },
+    filteredResults: {
+      handler(newResults) {
+        // Fallback to old data if comprehensive data not available yet
+        if (!this.comprehensiveData) {
+          this.$nextTick(() => {
+            this.renderFlowChart(newResults);
+            this.initializeCircles();
+          });
+        }
       },
       deep: true,
       immediate: true
@@ -340,12 +364,18 @@ export default {
     onComprehensiveDataLoaded(data) {
       // Store the comprehensive data for use in graphs and calculations
       console.log('Comprehensive data loaded:', data);
+      this.comprehensiveData = data;
+
+      // Re-initialize circles with new data
+      this.$nextTick(() => {
+        this.initializeCircles();
+      });
     },
     async fetchIrmaaThresholds() {
-      if (!this.filteredResults || !this.filteredResults.length) return;
-      
-      const startYear = Math.min(...this.filteredResults.map(r => r.year));
-      const endYear = Math.max(...this.filteredResults.map(r => r.year));
+      if (!this.comprehensiveData?.years || !this.comprehensiveData.years.length) return;
+
+      const startYear = Math.min(...this.comprehensiveData.years.map(r => r.year));
+      const endYear = Math.max(...this.comprehensiveData.years.map(r => r.year));
       const filingStatus = this.client?.tax_status || 'Single';
       
       try {
@@ -369,15 +399,17 @@ export default {
       }
     },
     renderFlowChart(results) {
-      if (!results || results.length === 0) return;
+      // Use comprehensive data if available, fallback to passed results
+      const data = this.comprehensiveData?.years || results || [];
+      if (!data || data.length === 0) return;
 
       // Clear previous chart
       d3.select('#financialFlowChart').selectAll('*').remove();
 
-      // Calculate totals for the flow
-      const totalGrossIncome = results.reduce((sum, row) => sum + parseFloat(row.gross_income || 0), 0);
-      const totalFederalTax = results.reduce((sum, row) => sum + parseFloat(row.federal_tax || 0), 0);
-      const totalMedicare = results.reduce((sum, row) => sum + parseFloat(row.total_medicare || 0), 0);
+      // Calculate totals for the flow (use gross_income_total for comprehensive data)
+      const totalGrossIncome = data.reduce((sum, row) => sum + parseFloat(row.gross_income_total || row.gross_income || 0), 0);
+      const totalFederalTax = data.reduce((sum, row) => sum + parseFloat(row.federal_tax || 0), 0);
+      const totalMedicare = data.reduce((sum, row) => sum + parseFloat(row.total_medicare || 0), 0);
       
       // Estimate IRMAA as a portion of Medicare (for demonstration)
       const estimatedIRMAA = totalMedicare * 0.3; // Assume 30% of Medicare is IRMAA
@@ -390,7 +422,7 @@ export default {
       const finalNetIncome = netIncome - otherExpenses;
 
       // Create D3 Sankey data structure
-      const data = {
+      const sankeyData = {
         nodes: [
           { id: 0, name: 'Total Income' },
           { id: 1, name: 'Taxable Income' },
@@ -426,7 +458,7 @@ export default {
         .extent([[1, 1], [width - 1, height - 5]]);
 
       // Generate the sankey layout
-      const { nodes, links } = sankeyGenerator(data);
+      const { nodes, links } = sankeyGenerator(sankeyData);
 
       // Color mapping
       const colorMap = {
@@ -696,7 +728,7 @@ export default {
   },
   mounted() {
     this.initializeCircles();
-    this.fetchIrmaaThresholds();
+    // fetchIrmaaThresholds will be called when comprehensive data loads
     document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
@@ -705,15 +737,12 @@ export default {
   watch: {
     scenarioResults: {
       handler() {
-        this.$nextTick(() => {
-          this.initializeCircles();
-        });
-      },
-      deep: true
-    },
-    filteredResults: {
-      handler() {
-        this.fetchIrmaaThresholds();
+        // Only update circles if we don't have comprehensive data yet
+        if (!this.comprehensiveData) {
+          this.$nextTick(() => {
+            this.initializeCircles();
+          });
+        }
       },
       deep: true
     }

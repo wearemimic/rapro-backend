@@ -146,75 +146,14 @@
         </div>
       </div>
       <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead class="thead-light">
-              <tr>
-                <th>Year</th>
-                <th>Primary Age</th>
-                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
-                <th>Primary SSI Benefit</th>
-                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse SSI Benefit</th>
-                <th v-if="hasSsDecrease">SS Decrease</th>
-                <th>Total Medicare</th>
-                <th>SSI Taxed</th>
-                <th>Remaining SSI</th>
-                <th>Indicators</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in filteredResults" :key="row.year" :class="{ 'irmaa-bracket-row': isIrmaaBracketHit(row, idx) }">
-                <td>{{ row.year }}</td>
-                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
-                <td v-else></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
-                <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td>
-                  ${{ parseFloat(row.ss_income_primary_gross || 0).toFixed(2) }}
-                </td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single'">
-                  ${{ parseFloat(row.ss_income_spouse_gross || 0).toFixed(2) }}
-                </td>
-                <td v-if="hasSsDecrease" class="text-danger">
-                  ${{ getSsDecreaseAmount(row).toFixed(2) }}
-                </td>
-                <td style="position: relative;">
-                  ${{ parseFloat(row.total_medicare || 0).toFixed(2) }}
-                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)">
-                    ℹ️
-                  </span>
-                  <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                    IRMAA Bracket: {{ getIrmaaBracketLabel(row) }}
-                  </div>
-                </td>
-                <td>${{ parseFloat(row.ssi_taxed || 0).toFixed(2) }}</td>
-                <td :class="{ 'cell-negative': getRemainingSSI(row) < 0 }">
-                  ${{ getRemainingSSI(row).toFixed(2) }}
-                </td>
-                <td style="position: relative; text-align: center;">
-                  <span v-if="row.ss_decrease_applied" class="ss-decrease-icon" @click.stop="toggleSsDecreaseTooltip(idx)" title="Social Security Decrease">
-                    📉
-                  </span>
-                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon-table" @click.stop="toggleIrmaaTooltip(idx)" title="IRMAA Information" :style="{ marginLeft: row.ss_decrease_applied ? '5px' : '0' }">
-                    ℹ️
-                  </span>
-                  <span v-if="isHoldHarmlessProtected(row)" class="hold-harmless-icon" @click.stop="toggleHoldHarmlessTooltip(idx)" title="Hold Harmless Protection" :style="{ marginLeft: (row.ss_decrease_applied || isIrmaaBracketHit(row, idx)) ? '5px' : '0' }">
-                    🔒
-                  </span>
-                  <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                    {{ getIrmaaBracketLabel(row) }}
-                  </div>
-                  <div v-if="openSsDecreaseTooltipIdx === idx" class="ss-decrease-popover">
-                    Social Security {{ reductionPercentage }}% reduction applied starting {{ row.year }}
-                  </div>
-                  <div v-if="openHoldHarmlessTooltipIdx === idx" class="hold-harmless-popover">
-                    Hold Harmless Protection: Social Security maintained at previous year's level. Without this protection, you would have received {{ formatCurrency(row.original_remaining_ss || 0) }} ({{ formatCurrency(row.hold_harmless_amount || 0) }} less).
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <SocialSecurityTable
+          :scenario-id="scenario?.id"
+          :client="client"
+          :scenario="scenario"
+          :mortality-age="mortalityAge"
+          :spouse-mortality-age="spouseMortalityAge"
+          @data-loaded="onSocialSecurityDataLoaded"
+        />
       </div>
     </div>
     <!-- End Card for Table -->
@@ -230,6 +169,7 @@ import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
+import SocialSecurityTable from '../components/SocialSecurityTable.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -272,7 +212,8 @@ const IRMAA_LABELS = {
 export default {
   components: {
     Graph,
-    DisclosuresCard
+    DisclosuresCard,
+    SocialSecurityTable
   },
   props: {
     scenario: {
@@ -307,7 +248,8 @@ export default {
       },
       openIrmaaTooltipIdx: null,
       openSsDecreaseTooltipIdx: null,
-      openHoldHarmlessTooltipIdx: null
+      openHoldHarmlessTooltipIdx: null,
+      socialSecurityData: null // Store Social Security comprehensive data for graphs
     };
   },
   watch: {
@@ -332,15 +274,17 @@ export default {
   },
   computed: {
     filteredResults() {
-      if (!this.scenarioResults || !Array.isArray(this.scenarioResults)) {
+      // Use Social Security comprehensive data if available, fallback to old scenarioResults
+      const dataSource = this.socialSecurityData?.years || this.scenarioResults || [];
+      if (!Array.isArray(dataSource)) {
         return [];
       }
-      
+
       const mortalityAge = Number(this.mortalityAge) || 90;
       const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
       const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
       const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-      return this.scenarioResults.filter(row => {
+      return dataSource.filter(row => {
         if (isSingle) {
           return row.primary_age <= mortalityAge;
         } else {
@@ -689,6 +633,16 @@ export default {
     }
   },
   methods: {
+    onSocialSecurityDataLoaded(data) {
+      // Store the Social Security comprehensive data for use in graphs and calculations
+      console.log('Social Security data loaded:', data);
+      this.socialSecurityData = data;
+
+      // Update insights with new data
+      this.$nextTick(() => {
+        this.logBenefitData();
+      });
+    },
     toggleDropdown(tab) {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
