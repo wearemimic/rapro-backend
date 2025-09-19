@@ -29,11 +29,11 @@
               <div class="row text-center">
                 <div class="col-6 mb-2">
                   <small class="text-muted d-block">Total Medicare Expense</small>
-                  <strong class="text-primary fs-2">${{ (totalMedicareCost).toLocaleString() }}</strong>
+                  <strong class="text-primary fs-2">${{ (totalMedicareCostLocal).toLocaleString() }}</strong>
                 </div>
                 <div class="col-6 mb-2">
                   <small class="text-muted d-block">IRMAA Surcharges</small>
-                  <strong class="text-primary fs-2">${{ totalIrmaaSurcharge.toLocaleString() }}</strong>
+                  <strong class="text-primary fs-2">${{ totalIrmaaSurchargeLocal.toLocaleString() }}</strong>
                 </div>
               </div>
             </div>
@@ -65,51 +65,11 @@
             </div>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Year</th>
-                <th>Primary Age</th>
-                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
-                <th>Part B</th>
-                <th>Part D</th>
-                <th>IRMAA Surcharge</th>
-                <th>Total Medicare</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in filteredResults" :key="idx" :class="{ 'irmaa-bracket-row': isIrmaaBracketHit(row, idx) }">
-                <td>{{ row.year }}</td>
-                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
-                <td v-else></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
-                <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td>${{ parseFloat(row.part_b || 0).toFixed(2) }}</td>
-                <td>${{ parseFloat(row.part_d || 0).toFixed(2) }}</td>
-                <td>${{ parseFloat(row.irmaa_surcharge || 0).toFixed(2) }}</td>
-                <td style="position: relative;">
-                  ${{ parseFloat(row.total_medicare || 0).toFixed(2) }}
-                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)">
-                    ℹ️
-                  </span>
-                  <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                    IRMAA Bracket: {{ getIrmaaBracketLabel(row) }}
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr style="font-weight: bold;">
-                <td colspan="2"><strong>Total</strong></td>
-                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.part_b || 0), 0).toFixed(2) }}</td>
-                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.part_d || 0), 0).toFixed(2) }}</td>
-                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.irmaa_surcharge || 0), 0).toFixed(2) }}</td>
-                <td>${{ filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0).toFixed(2) }}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <MedicareTable
+          :scenario-id="scenario?.id"
+          :client="client"
+          @data-loaded="onMedicareDataLoaded"
+        />
       </div>
     </div>
     
@@ -124,6 +84,7 @@ import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
+import MedicareTable from '../components/MedicareTable.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -166,9 +127,14 @@ const IRMAA_LABELS = {
 export default {
   components: {
     Graph,
-    DisclosuresCard
+    DisclosuresCard,
+    MedicareTable
   },
   props: {
+    scenario: {
+      type: Object,
+      required: true
+    },
     scenarioResults: {
       type: Array,
       required: true
@@ -207,19 +173,22 @@ export default {
       isDropdownOpen: {
         medicare: false
       },
-      openIrmaaTooltipIdx: null
+      openIrmaaTooltipIdx: null,
+      medicareData: null // Store Medicare comprehensive data for graphs
     };
   },
   computed: {
     filteredResults() {
-      if (!this.scenarioResults || !Array.isArray(this.scenarioResults)) {
+      // Use Medicare comprehensive data if available, fallback to old scenarioResults
+      const dataSource = this.medicareData?.years || this.scenarioResults || [];
+      if (!Array.isArray(dataSource)) {
         return [];
       }
       const mortalityAge = Number(this.mortalityAge) || 90;
       const spouseMortalityAge = Number(this.spouseMortalityAge) || 90;
       const isSingle = this.client?.tax_status?.toLowerCase() === 'single';
       const maxAge = isSingle ? mortalityAge : Math.max(mortalityAge, spouseMortalityAge);
-      return this.scenarioResults.filter(row => {
+      return dataSource.filter(row => {
         if (isSingle) {
           return row.primary_age <= mortalityAge;
         } else {
@@ -312,9 +281,32 @@ export default {
           }
         }
       };
+    },
+    // Calculate totals from comprehensive Medicare data
+    totalMedicareCostLocal() {
+      if (!this.filteredResults || !this.filteredResults.length) {
+        return 0;
+      }
+      return parseFloat(this.filteredResults.reduce((total, row) => total + (parseFloat(row.total_medicare || 0)), 0).toFixed(2));
+    },
+    totalIrmaaSurchargeLocal() {
+      if (!this.filteredResults || !this.filteredResults.length) {
+        return 0;
+      }
+      return parseFloat(this.filteredResults.reduce((total, row) => total + (parseFloat(row.irmaa_surcharge || 0)), 0).toFixed(2));
     }
   },
   methods: {
+    onMedicareDataLoaded(data) {
+      // Store the Medicare comprehensive data for use in graphs and calculations
+      console.log('Medicare data loaded:', data);
+      this.medicareData = data;
+
+      // Re-initialize circles with new data
+      this.$nextTick(() => {
+        this.initializeCircles();
+      });
+    },
     toggleDropdown(tab) {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
@@ -341,7 +333,10 @@ export default {
             if (circleElement) {
               // Clear previous SVG if any
               circleElement.innerHTML = '';
-              const irmaaPercentage = Math.round((this.totalIrmaaSurcharge / this.totalMedicareCost) * 100);
+              // Prevent division by zero and handle no data case
+              const totalCost = this.totalMedicareCostLocal || 0;
+              const totalIrmaa = this.totalIrmaaSurchargeLocal || 0;
+              const irmaaPercentage = totalCost > 0 ? Math.round((totalIrmaa / totalCost) * 100) : 0;
               let circleColor = '#377dff';
               if (irmaaPercentage > 50) {
                 circleColor = '#ff0000';
@@ -440,6 +435,14 @@ export default {
   },
   watch: {
     scenarioResults: {
+      handler() {
+        this.$nextTick(() => {
+          this.initializeCircles();
+        });
+      },
+      deep: true
+    },
+    medicareData: {
       handler() {
         this.$nextTick(() => {
           this.initializeCircles();

@@ -81,101 +81,18 @@
       </div>
     </div>
 
-    <!-- Table Card -->
+    <!-- Financial Summary Table -->
     <div class="card mb-3 mb-lg-5">
-      <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center flex-wrap">
-          <h4 class="card-header-title mb-0">Financial Overview Table</h4>
-          <div class="indicator-legend d-flex align-items-center mt-2 mt-md-0" style="font-size: 0.9em;">
-            <span class="me-3">
-              <span class="me-1">📉</span>
-              <small class="text-muted">SS Decrease</small>
-            </span>
-            <span class="me-3">
-              <span class="me-1">ℹ️</span>
-              <small class="text-muted">IRMAA Bracket</small>
-            </span>
-            <span>
-              <span class="me-1">🔒</span>
-              <small class="text-muted">Hold Harmless</small>
-            </span>
-          </div>
-        </div>
-      </div>
       <div class="card-body">
-        <div v-if="filteredResults.length" class="table-responsive">
-          <table class="table table-hover">
-            <thead class="thead-light">
-              <tr>
-                <th>Year</th>
-                <th>Primary Age</th>
-                <th v-if="client?.tax_status?.toLowerCase() !== 'single'">Spouse Age</th>
-                <th>Gross Income</th>
-                <th>AGI</th>
-                <th>MAGI</th>
-                <th>Tax Bracket</th>
-                <th>Federal Tax</th>
-                <th>Total Medicare</th>
-                <th>Remaining Income</th>
-                <th>Indicators</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in filteredResults" :key="row.year" :class="{ 'irmaa-bracket-row': isIrmaaBracketHit(row, idx) }">
-                <td>{{ row.year }}</td>
-                <td v-if="row.primary_age <= (Number(mortalityAge) || 90)">{{ row.primary_age }}</td>
-                <td v-else></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single' && row.spouse_age <= (Number(spouseMortalityAge) || 90)">{{ row.spouse_age }}</td>
-                <td v-else-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td>{{ formatCurrency(row.gross_income) }}</td>
-                <td>{{ formatCurrency(row.agi) }}</td>
-                <td>{{ formatCurrency(row.magi) }}</td>
-                <td>{{ row.tax_bracket }}</td>
-                <td>{{ formatCurrency(row.federal_tax) }}</td>
-                <td>{{ formatCurrency(row.total_medicare) }}</td>
-                <td>{{ formatCurrency(parseFloat(row.gross_income) - (parseFloat(row.federal_tax) + parseFloat(row.total_medicare))) }}</td>
-                <td style="position: relative; text-align: center;">
-                  <span v-if="row.ss_decrease_applied" class="ss-decrease-icon" @click.stop="toggleSsDecreaseTooltip(idx)" title="Social Security Decrease">
-                    📉
-                  </span>
-                  <span v-if="isIrmaaBracketHit(row, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)" title="IRMAA Information" :style="{ marginLeft: row.ss_decrease_applied ? '5px' : '0' }">
-                    ℹ️
-                  </span>
-                  <span v-if="isHoldHarmlessProtected(row)" class="hold-harmless-icon" @click.stop="toggleHoldHarmlessTooltip(idx)" title="Hold Harmless Protection" :style="{ marginLeft: (row.ss_decrease_applied || isIrmaaBracketHit(row, idx)) ? '5px' : '0' }">
-                    🔒
-                  </span>
-                  <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
-                    {{ getIrmaaBracketLabel(row) }}
-                  </div>
-                  <div v-if="openSsDecreaseTooltipIdx === idx" class="ss-decrease-popover">
-                    Social Security Decrease
-                  </div>
-                  <div v-if="openHoldHarmlessTooltipIdx === idx" class="hold-harmless-popover">
-                    Hold Harmless Protection: Social Security maintained at previous year's level. Without this protection, you would have received {{ formatCurrency(row.original_remaining_ss || 0) }} ({{ formatCurrency(row.hold_harmless_amount || 0) }} less).
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr style="font-weight: bold;">
-                <td>Total</td>
-                <td></td>
-                <td v-if="client?.tax_status?.toLowerCase() !== 'single'"></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0)) }}</td>
-                <td>{{ formatCurrency(filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0)) }}</td>
-                <td></td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <h5 class="mb-4">Financial Overview Table</h5>
+        <FinancialSummaryTable
+          :scenario-id="scenario?.id"
+          :client="client"
+          @data-loaded="onComprehensiveDataLoaded"
+        />
       </div>
     </div>
-    
+
     <!-- Disclosures Card -->
     <DisclosuresCard />
   </div>
@@ -190,6 +107,7 @@ import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 import { API_CONFIG } from '@/config';
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
+import FinancialSummaryTable from '../components/FinancialSummaryTable.vue';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -232,9 +150,14 @@ const IRMAA_LABELS = {
 export default {
   components: {
     Graph,
-    DisclosuresCard
+    DisclosuresCard,
+    FinancialSummaryTable
   },
   props: {
+    scenario: {
+      type: Object,
+      required: true
+    },
     scenarioResults: {
       type: Array,
       required: true
@@ -265,7 +188,8 @@ export default {
       openIrmaaTooltipIdx: null,
       openSsDecreaseTooltipIdx: null,
       openHoldHarmlessTooltipIdx: null,
-      dynamicIrmaaThresholds: {} // Will store thresholds by year
+      dynamicIrmaaThresholds: {}, // Will store thresholds by year
+      comprehensiveData: null // Store comprehensive data for graphs
     };
   },
   computed: {
@@ -284,34 +208,38 @@ export default {
       return IRMAA_LABELS['single'];
     },
     totalGrossIncome() {
-      return this.filteredResults.reduce((total, row) => total + parseFloat(row.gross_income || 0), 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.gross_income_total || 0), 0);
     },
     totalTax() {
-      return this.filteredResults.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0);
     },
     totalMedicare() {
-      return this.filteredResults.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0);
     },
     netIncome() {
-      return this.filteredResults.reduce((total, row) => {
-        const gross = parseFloat(row.gross_income || 0);
+      if (!this.comprehensiveData?.years) return 0;
+      return this.comprehensiveData.years.reduce((total, row) => {
+        const gross = parseFloat(row.gross_income_total || 0);
         const tax = parseFloat(row.federal_tax || 0);
         const medicare = parseFloat(row.total_medicare || 0);
         return total + (gross - tax - medicare);
       }, 0);
     },
     chartData() {
-      if (!this.filteredResults || !this.filteredResults.length) {
-        console.warn('⚠️ FinancialOverview: No filtered results, returning empty chart data');
+      if (!this.comprehensiveData?.years || !this.comprehensiveData.years.length) {
+        console.warn('⚠️ FinancialOverview: No comprehensive data, returning empty chart data');
         return { labels: [], datasets: [] };
       }
 
-      const labels = this.filteredResults.map(row => row.year.toString());
+      const labels = this.comprehensiveData.years.map(row => row.year.toString());
       const datasets = [
         {
           type: 'line',
           label: 'Gross Income',
-          data: this.filteredResults.map(row => parseFloat(row.gross_income) || 0),
+          data: this.comprehensiveData.years.map(row => parseFloat(row.gross_income_total) || 0),
           borderColor: '#4285f4',
           backgroundColor: 'transparent',
           borderWidth: 3,
@@ -325,8 +253,8 @@ export default {
         {
           type: 'line',
           label: 'Net Income',
-          data: this.filteredResults.map(row => {
-            const gross = parseFloat(row.gross_income) || 0;
+          data: this.comprehensiveData.years.map(row => {
+            const gross = parseFloat(row.gross_income_total) || 0;
             const tax = parseFloat(row.federal_tax) || 0;
             const medicare = parseFloat(row.total_medicare) || 0;
             return gross - tax - medicare;
@@ -344,7 +272,7 @@ export default {
         {
           type: 'bar',
           label: 'Federal Tax',
-          data: this.filteredResults.map(row => parseFloat(row.federal_tax) || 0),
+          data: this.comprehensiveData.years.map(row => parseFloat(row.federal_tax) || 0),
           backgroundColor: '#ea4335',
           stack: 'Stack 0',
           yAxisID: 'y',
@@ -353,7 +281,7 @@ export default {
         {
           type: 'bar',
           label: 'Medicare',
-          data: this.filteredResults.map(row => parseFloat(row.total_medicare) || 0),
+          data: this.comprehensiveData.years.map(row => parseFloat(row.total_medicare) || 0),
           backgroundColor: '#fbbc05',
           stack: 'Stack 0',
           yAxisID: 'y',
@@ -361,7 +289,7 @@ export default {
         }
       ];
 
-      console.log('✅ FinancialOverview chartData computed successfully:', { labels, datasets });
+      console.log('✅ FinancialOverview chartData computed successfully (comprehensive data):', { labels, datasets });
       return { labels, datasets };
     },
     chartOptions() {
@@ -406,24 +334,48 @@ export default {
     }
   },
   watch: {
-    filteredResults: {
-      handler(newResults) {
+    comprehensiveData: {
+      handler(newData) {
         // Use nextTick to ensure DOM is ready
         this.$nextTick(() => {
-          this.renderFlowChart(newResults);
+          this.renderFlowChart();
           this.initializeCircles();
+          this.fetchIrmaaThresholds();
         });
+      },
+      deep: true,
+      immediate: false
+    },
+    filteredResults: {
+      handler(newResults) {
+        // Fallback to old data if comprehensive data not available yet
+        if (!this.comprehensiveData) {
+          this.$nextTick(() => {
+            this.renderFlowChart(newResults);
+            this.initializeCircles();
+          });
+        }
       },
       deep: true,
       immediate: true
     }
   },
   methods: {
+    onComprehensiveDataLoaded(data) {
+      // Store the comprehensive data for use in graphs and calculations
+      console.log('Comprehensive data loaded:', data);
+      this.comprehensiveData = data;
+
+      // Re-initialize circles with new data
+      this.$nextTick(() => {
+        this.initializeCircles();
+      });
+    },
     async fetchIrmaaThresholds() {
-      if (!this.filteredResults || !this.filteredResults.length) return;
-      
-      const startYear = Math.min(...this.filteredResults.map(r => r.year));
-      const endYear = Math.max(...this.filteredResults.map(r => r.year));
+      if (!this.comprehensiveData?.years || !this.comprehensiveData.years.length) return;
+
+      const startYear = Math.min(...this.comprehensiveData.years.map(r => r.year));
+      const endYear = Math.max(...this.comprehensiveData.years.map(r => r.year));
       const filingStatus = this.client?.tax_status || 'Single';
       
       try {
@@ -447,15 +399,17 @@ export default {
       }
     },
     renderFlowChart(results) {
-      if (!results || results.length === 0) return;
+      // Use comprehensive data if available, fallback to passed results
+      const data = this.comprehensiveData?.years || results || [];
+      if (!data || data.length === 0) return;
 
       // Clear previous chart
       d3.select('#financialFlowChart').selectAll('*').remove();
 
-      // Calculate totals for the flow
-      const totalGrossIncome = results.reduce((sum, row) => sum + parseFloat(row.gross_income || 0), 0);
-      const totalFederalTax = results.reduce((sum, row) => sum + parseFloat(row.federal_tax || 0), 0);
-      const totalMedicare = results.reduce((sum, row) => sum + parseFloat(row.total_medicare || 0), 0);
+      // Calculate totals for the flow (use gross_income_total for comprehensive data)
+      const totalGrossIncome = data.reduce((sum, row) => sum + parseFloat(row.gross_income_total || row.gross_income || 0), 0);
+      const totalFederalTax = data.reduce((sum, row) => sum + parseFloat(row.federal_tax || 0), 0);
+      const totalMedicare = data.reduce((sum, row) => sum + parseFloat(row.total_medicare || 0), 0);
       
       // Estimate IRMAA as a portion of Medicare (for demonstration)
       const estimatedIRMAA = totalMedicare * 0.3; // Assume 30% of Medicare is IRMAA
@@ -468,7 +422,7 @@ export default {
       const finalNetIncome = netIncome - otherExpenses;
 
       // Create D3 Sankey data structure
-      const data = {
+      const sankeyData = {
         nodes: [
           { id: 0, name: 'Total Income' },
           { id: 1, name: 'Taxable Income' },
@@ -504,7 +458,7 @@ export default {
         .extent([[1, 1], [width - 1, height - 5]]);
 
       // Generate the sankey layout
-      const { nodes, links } = sankeyGenerator(data);
+      const { nodes, links } = sankeyGenerator(sankeyData);
 
       // Color mapping
       const colorMap = {
@@ -774,7 +728,7 @@ export default {
   },
   mounted() {
     this.initializeCircles();
-    this.fetchIrmaaThresholds();
+    // fetchIrmaaThresholds will be called when comprehensive data loads
     document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
@@ -783,15 +737,12 @@ export default {
   watch: {
     scenarioResults: {
       handler() {
-        this.$nextTick(() => {
-          this.initializeCircles();
-        });
-      },
-      deep: true
-    },
-    filteredResults: {
-      handler() {
-        this.fetchIrmaaThresholds();
+        // Only update circles if we don't have comprehensive data yet
+        if (!this.comprehensiveData) {
+          this.$nextTick(() => {
+            this.initializeCircles();
+          });
+        }
       },
       deep: true
     }

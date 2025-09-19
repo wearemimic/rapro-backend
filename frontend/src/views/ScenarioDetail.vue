@@ -57,7 +57,7 @@
                       <span v-if="activeTab === 'overview'">Scenario Overview</span>
                       <span v-else-if="activeTab === 'financial'">Financial Overview</span>
                       <span v-else-if="activeTab === 'socialSecurity'">Social Security Overview</span>
-                      <span v-else-if="activeTab === 'socialSecurity2'">Social Security 2</span>
+                      <span v-else-if="activeTab === 'socialSecurity2' && isAdminUser">Social Security 2</span>
                       <span v-else-if="activeTab === 'medicare'">Medicare Overview</span>
                       <span v-else-if="activeTab === 'income'">Income</span>
                       <span v-else-if="activeTab === 'rothConversion'">Roth Conversion</span>
@@ -75,7 +75,7 @@
                       <li><a class="dropdown-item" :class="{ active: activeTab === 'socialSecurity' }" href="#" @click.prevent="navigateToTab('socialSecurity')">
                         <i class="bi-shield-check me-2"></i>Social Security Overview
                       </a></li>
-                      <li><a class="dropdown-item" :class="{ active: activeTab === 'socialSecurity2' }" href="#" @click.prevent="navigateToTab('socialSecurity2')">
+                      <li v-if="isAdminUser"><a class="dropdown-item" :class="{ active: activeTab === 'socialSecurity2' }" href="#" @click.prevent="navigateToTab('socialSecurity2')">
                         <i class="bi-shield me-2"></i>Social Security 2
                       </a></li>
                       <li><a class="dropdown-item" :class="{ active: activeTab === 'medicare' }" href="#" @click.prevent="navigateToTab('medicare')">
@@ -348,7 +348,7 @@
               <DisclosuresCard />
             </div>
             <div v-show="activeTab === 'financial'" class="tab-pane active" style="margin-top:50px;">
-              <FinancialOverviewTab :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
+              <FinancialOverviewTab :scenario="scenario" :scenario-results="scenarioResults" :filtered-results="filteredScenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'socialSecurity'" class="tab-pane active" style="margin-top:50px;">
               <SocialSecurityOverviewTab :scenario="scenario" :scenario-results="scenarioResults" :client="client" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" :is-calculating="isCalculating" />
@@ -357,7 +357,7 @@
               <SocialSecurity2Tab :key="`ss2-${scenario?.id}-${activeTab}`" :scenario="scenario" :scenario-results="scenarioResults" :client="client" @update-scenario="handleScenarioUpdate" />
             </div>
             <div v-show="activeTab === 'medicare'" class="tab-pane active" style="margin-top:50px;">
-              <MedicareOverviewTab :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
+              <MedicareOverviewTab :scenario="scenario" :scenario-results="scenarioResults" :client="client" :partBInflationRate="partBInflationRate" :partDInflationRate="partDInflationRate" :totalIrmaaSurcharge="totalIrmaaSurcharge" :totalMedicareCost="totalMedicareCost" :mortality-age="scenario?.mortality_age" :spouse-mortality-age="scenario?.spouse_mortality_age" />
             </div>
             <div v-show="activeTab === 'income'" class="tab-pane active" style="margin-top:50px;">
               <div v-if="!assetDetails || assetDetails.length === 0" class="alert alert-warning">
@@ -408,6 +408,7 @@ import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { mapActions } from 'vuex';
 import { useScenarioCalculationsStore } from '@/stores/scenarioCalculations';
+import { useAuthStore } from '@/stores/auth';
 
 import Chart from 'chart.js/auto';
 
@@ -1597,6 +1598,10 @@ export default {
     }
   },
   computed: {
+    isAdminUser() {
+      const authStore = useAuthStore();
+      return authStore.isAdminUser;
+    },
     filteredScenarioResults() {
       const mortalityAge = Number(this.scenario?.mortality_age) || 90;
       const spouseMortalityAge = Number(this.scenario?.spouse_mortality_age) || 90;

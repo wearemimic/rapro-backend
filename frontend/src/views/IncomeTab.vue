@@ -179,6 +179,17 @@
       </div>
     </div>
     
+    <!-- TABLE 2 -->
+    <div class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <h5 class="mb-4">TABLE 2</h5>
+        <ComprehensiveFinancialTable
+          :scenario-id="scenario.id"
+          :client="client"
+        />
+      </div>
+    </div>
+
     <!-- Disclosures Card -->
     <DisclosuresCard />
 
@@ -188,12 +199,14 @@
 <script>
 import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
+import ComprehensiveFinancialTable from '../components/ComprehensiveFinancialTable.vue';
 import { useScenarioCalculationsStore } from '@/stores/scenarioCalculations';
 
 export default {
   components: {
     Graph,
-    DisclosuresCard
+    DisclosuresCard,
+    ComprehensiveFinancialTable
   },
   props: {
     scenario: {
