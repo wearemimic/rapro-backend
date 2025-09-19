@@ -250,7 +250,7 @@ resource "aws_codebuild_project" "frontend" {
     # For production builds, use production URLs
     environment_variable {
       name  = "VITE_API_BASE_URL"
-      value = "http://app.retirementadvisorpro.com"
+      value = "https://app.retirementadvisorpro.com"
     }
     
     environment_variable {
@@ -260,7 +260,7 @@ resource "aws_codebuild_project" "frontend" {
     
     environment_variable {
       name  = "VITE_FRONTEND_URL"
-      value = "http://app.retirementadvisorpro.com"
+      value = "https://app.retirementadvisorpro.com"
     }
 
     dynamic "environment_variable" {

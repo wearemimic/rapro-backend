@@ -186,11 +186,11 @@ resource "aws_ecs_task_definition" "frontend" {
         },
         {
           name  = "VITE_API_BASE_URL"
-          value = "http://app.retirementadvisorpro.com"
+          value = "https://app.retirementadvisorpro.com"
         },
         {
           name  = "VITE_FRONTEND_URL"
-          value = "http://app.retirementadvisorpro.com"
+          value = "https://app.retirementadvisorpro.com"
         }
       ]
 
@@ -203,13 +203,14 @@ resource "aws_ecs_task_definition" "frontend" {
         }
       }
 
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
-      }
+      # Removed health check to match staging configuration
+      # healthCheck = {
+      #   command     = ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      #   interval    = 30
+      #   timeout     = 5
+      #   retries     = 3
+      #   startPeriod = 60
+      # }
 
       essential = true
     }
@@ -312,7 +313,7 @@ resource "aws_ecs_task_definition" "backend" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = "http://app.retirementadvisorpro.com"
+          value = "https://app.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
@@ -483,13 +484,15 @@ resource "aws_ecs_task_definition" "backend" {
         }
       }
 
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 90
-      }
+      # Removed ECS health check to match staging configuration
+      # ALB health checks are sufficient for monitoring container health
+      # healthCheck = {
+      #   command     = ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || exit 1"]
+      #   interval    = 30
+      #   timeout     = 5
+      #   retries     = 3
+      #   startPeriod = 90
+      # }
 
       essential = true
     }
@@ -586,7 +589,7 @@ resource "aws_ecs_task_definition" "celery_worker" {
         # Frontend URL for redirects
         {
           name  = "FRONTEND_URL"
-          value = "http://app.retirementadvisorpro.com"
+          value = "https://app.retirementadvisorpro.com"
         },
         
         # Auth0 Configuration
@@ -760,7 +763,7 @@ resource "aws_ecs_task_definition" "celery_beat" {
 
 # Celery Flower Task Definition (optional monitoring)
 resource "aws_ecs_task_definition" "celery_flower" {
-  count = 1  # Set to 0 to disable
+  count = 0  # Disabled - no SSL certificate configured, matching staging
 
   family                   = "${local.name_prefix}-celery-flower"
   requires_compatibilities = ["FARGATE"]
@@ -807,13 +810,14 @@ resource "aws_ecs_task_definition" "celery_flower" {
         }
       }
 
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:5555/ || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
-      }
+      # Removed health check to match staging configuration
+      # healthCheck = {
+      #   command     = ["CMD-SHELL", "curl -f http://localhost:5555/ || exit 1"]
+      #   interval    = 30
+      #   timeout     = 5
+      #   retries     = 3
+      #   startPeriod = 60
+      # }
 
       essential = true
     }

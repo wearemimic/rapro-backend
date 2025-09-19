@@ -308,18 +308,18 @@ resource "aws_cloudwatch_metric_alarm" "application_errors" {
   })
 }
 
-# ECS Task stopped alarm
-resource "aws_cloudwatch_log_metric_filter" "ecs_task_stopped" {
-  name           = "${local.name_prefix}-ecs-task-stopped"
-  log_group_name = "/aws/ecs/containerinsights/${aws_ecs_cluster.main.name}/performance"
-  pattern        = "[version, account, time, region, cluster_name, task_arn, task_definition_arn, service_name=\"${aws_ecs_service.backend.name}\", last_status=\"STOPPED\", desired_status, ...]"
-
-  metric_transformation {
-    name      = "ECSTaskStopped"
-    namespace = "RetirementAdvisorPro/ECS"
-    value     = "1"
-  }
-}
+# ECS Task stopped alarm - disabled until Container Insights is enabled
+# resource "aws_cloudwatch_log_metric_filter" "ecs_task_stopped" {
+#   name           = "${local.name_prefix}-ecs-task-stopped"
+#   log_group_name = "/aws/ecs/containerinsights/${aws_ecs_cluster.main.name}/performance"
+#   pattern        = "[version, account, time, region, cluster_name, task_arn, task_definition_arn, service_name=\"${aws_ecs_service.backend.name}\", last_status=\"STOPPED\", desired_status, ...]"
+#
+#   metric_transformation {
+#     name      = "ECSTaskStopped"
+#     namespace = "RetirementAdvisorPro/ECS"
+#     value     = "1"
+#   }
+# }
 
 # X-Ray Tracing (optional for detailed performance monitoring)
 # resource "aws_xray_sampling_rule" "retirementadvisorpro" {
