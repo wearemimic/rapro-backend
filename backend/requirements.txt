@@ -56,3 +56,4 @@ elasticsearch>=8.9.0
 psutil>=5.9.0
 django-compressor>=4.4
 django-filter
+pdfcrowd>=5.17.0

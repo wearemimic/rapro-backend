@@ -1,7 +1,49 @@
 <template>
   <div>
-    <!-- Income Projection Table -->
-    <div class="card mb-3 mb-lg-5">
+    <!-- Toggle between views -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Income Analysis</h5>
+          <div class="btn-group" role="group">
+            <button
+              type="button"
+              :class="['btn', 'btn-sm', viewMode === 'simple' ? 'btn-primary' : 'btn-outline-primary']"
+              @click="viewMode = 'simple'">
+              Simple View
+            </button>
+            <button
+              type="button"
+              :class="['btn', 'btn-sm', viewMode === 'comprehensive' ? 'btn-primary' : 'btn-outline-primary']"
+              @click="viewMode = 'comprehensive'">
+              Comprehensive View
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comprehensive Financial Table (New PRD View) -->
+    <div v-if="viewMode === 'comprehensive'" class="card mb-3 mb-lg-5">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h5 class="mb-0">TABLE 2</h5>
+          <button
+            @click="exportToCSV"
+            class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-download me-1"></i>
+            Export CSV
+          </button>
+        </div>
+        <ComprehensiveFinancialTable
+          :scenario-id="scenario.id"
+          :client="client"
+        />
+      </div>
+    </div>
+
+    <!-- Original Income Projection Table (Simple View) -->
+    <div v-else class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Income Projection Table</h5>
 
@@ -15,7 +57,7 @@
 
         <!-- Table content -->
         <div v-else class="table-responsive" style="overflow-x: auto; max-width: 100%;">
-          <table class="table table-hover" style="min-width: 800px;">
+          <table class="table table-hover table-sm" style="min-width: 800px;">
             <thead class="thead-light">
               <tr>
                 <th :style="`position: sticky; left: ${stickyPositions.year.left}; background-color: #f8f9fa; z-index: 10; min-width: ${stickyPositions.year.width};`">Year</th>
@@ -24,8 +66,8 @@
                 <th v-for="asset in assetDetails" :key="'header-' + asset.id">
                   <div class="d-flex align-items-center justify-content-center">
                     <span>{{ formatAssetColumnHeader(asset) }}</span>
-                    <button 
-                      @click="showAssetModal(asset)" 
+                    <button
+                      @click="showAssetModal(asset)"
                       class="btn btn-link btn-sm p-0 ms-1"
                       style="text-decoration: none;"
                       title="View graph and details">
@@ -33,6 +75,7 @@
                     </button>
                   </div>
                 </th>
+                <th v-if="hasQualifiedAssets">401k Balance</th>
                 <th style="position: sticky; right: 0; background-color: #f8f9fa; z-index: 10; min-width: 120px;">Total</th>
               </tr>
             </thead>
@@ -44,6 +87,7 @@
                 <td v-for="asset in assetDetails" :key="'data-' + asset.id + '-' + row.year">
                   {{ formatCurrency(row.incomes[asset.id] || 0) }}
                 </td>
+                <td v-if="hasQualifiedAssets">{{ formatCurrency(row.qualifiedBalance || 0) }}</td>
                 <td style="position: sticky; right: 0; background-color: #f8f9fa; z-index: 5; min-width: 120px; font-weight: 600;">{{ formatCurrency(row.total) }}</td>
               </tr>
             </tbody>
@@ -178,17 +222,6 @@
         </div>
       </div>
     </div>
-    
-    <!-- TABLE 2 -->
-    <div class="card mb-3 mb-lg-5">
-      <div class="card-body">
-        <h5 class="mb-4">TABLE 2</h5>
-        <ComprehensiveFinancialTable
-          :scenario-id="scenario.id"
-          :client="client"
-        />
-      </div>
-    </div>
 
     <!-- Disclosures Card -->
     <DisclosuresCard />
@@ -201,6 +234,7 @@ import Graph from '../components/Graph.vue';
 import DisclosuresCard from '../components/DisclosuresCard.vue';
 import ComprehensiveFinancialTable from '../components/ComprehensiveFinancialTable.vue';
 import { useScenarioCalculationsStore } from '@/stores/scenarioCalculations';
+import { useComprehensiveStore } from '@/stores/comprehensiveStore';
 
 export default {
   components: {
@@ -236,7 +270,9 @@ export default {
       // Modal state
       showAssetDetailModal: false,
       selectedAsset: null,
-      isLoadingGraph: false
+      isLoadingGraph: false,
+      // View mode for toggling between simple and comprehensive
+      viewMode: 'simple'  // 'simple' or 'comprehensive'
     };
   },
   mounted() {
@@ -250,6 +286,10 @@ export default {
       client: !!this.client
     });
     console.log('🔥 Asset Details:', this.assetDetails);
+    console.log('🔥 Asset IDs from assetDetails:', this.assetDetails?.map(a => a.id));
+    console.log('🔥 First scenario result:', this.scenarioResults?.[0]);
+    console.log('🔥 First result asset_incomes:', this.scenarioResults?.[0]?.asset_incomes);
+    console.log('🔥 Keys in first result:', this.scenarioResults?.[0] ? Object.keys(this.scenarioResults[0]) : 'No results');
     console.log('🔥 Store state:', {
       hasResults: store.enhancedResults.length > 0,
       hasAssets: store.assetDetails.length > 0
@@ -288,6 +328,12 @@ export default {
   computed: {
     calculationsStore() {
       return useScenarioCalculationsStore();
+    },
+    hasQualifiedAssets() {
+      return this.assetDetails.some(asset => {
+        const type = this.getAssetType(asset);
+        return type === 'qualified';
+      });
     },
     stickyPositions() {
       // Calculate sticky positions based on whether spouse column is shown
@@ -336,6 +382,7 @@ export default {
           primaryAge: result.primary_age,
           spouseAge: result.spouse_age,
           incomes: result.assetIncomes || {},
+          qualifiedBalance: result.qualified_balance || 0,
           total: parseFloat(result.gross_income || 0)
         }));
       }
@@ -363,6 +410,7 @@ export default {
             primaryAge: result.primary_age,
             spouseAge: result.spouse_age,
             incomes: result.assetIncomes || {},
+            qualifiedBalance: result.qualified_balance || 0,
             total: parseFloat(result.gross_income || 0)
           }));
         }
@@ -376,6 +424,7 @@ export default {
           primaryAge: result.primary_age,
           spouseAge: result.spouse_age,
           incomes: {},
+          qualifiedBalance: result.qualified_balance || 0,
           total: parseFloat(result.gross_income || 0)
         }));
       }
@@ -468,6 +517,159 @@ export default {
     }
   },
   methods: {
+    getAssetIncome(result, assetId) {
+      // Get income for a specific asset from the result's asset_incomes
+      if (!result.asset_incomes) {
+        console.warn(`No asset_incomes in result for year ${result.year}`);
+        return 0;
+      }
+
+      // Debug: Log what we're looking for and what we have
+      const income = result.asset_incomes[assetId] || result.asset_incomes[String(assetId)] || 0;
+      if (income > 0) {
+        console.log(`Year ${result.year}, Asset ${assetId}: Found income ${income}`);
+      }
+
+      return income;
+    },
+
+    getAssetBalance(result, asset) {
+      // Get the balance for an investment asset
+      // The backend tracks individual asset balances in asset_incomes
+      // For investment accounts, we need to look at specific balance tracking
+
+      // Check if this is an investment type asset
+      if (!this.isInvestmentAsset(asset)) return 0;
+
+      // Look for asset-specific balance in the result
+      // The backend should be tracking this per asset
+      const assetType = (asset.income_type || '').toLowerCase().replace(/\s+/g, '_');
+      const balanceKey = `${assetType}_balance_${asset.id}`;
+
+      if (result[balanceKey] !== undefined) {
+        return result[balanceKey];
+      }
+
+      // For now, return the qualified_balance if it's a qualified asset
+      // This will be improved when backend tracks per-asset balances
+      if (this.isQualifiedAsset(asset)) {
+        return result.qualified_balance || 0;
+      }
+
+      return 0;
+    },
+
+    isInvestmentAsset(asset) {
+      // Check if an asset is any type of investment account
+      const investmentTypes = [
+        'qualified',
+        'non-qualified',
+        'roth',
+        'inherited traditional spouse',
+        'inherited roth spouse',
+        'inherited traditional non-spouse',
+        'inherited roth non-spouse'
+      ];
+
+      const type = (asset.income_type || '').toLowerCase();
+      return investmentTypes.includes(type);
+    },
+
+    isQualifiedAsset(asset) {
+      // Check if an asset is a qualified (tax-deferred) retirement account
+      // These are subject to RMDs at age 73 (or 75 for those born after 1959)
+      const type = (asset.income_type || '').toLowerCase();
+      return type === 'qualified' ||
+             type === 'inherited traditional spouse' ||
+             type === 'inherited traditional non-spouse';
+    },
+
+    isRothAsset(asset) {
+      // Check if an asset is a Roth account (no RMDs during owner's lifetime)
+      const type = (asset.income_type || '').toLowerCase();
+      return type === 'roth' ||
+             type === 'inherited roth spouse' ||
+             type === 'inherited roth non-spouse';
+    },
+
+    isInheritedAsset(asset) {
+      // Check if an asset is inherited (has special RMD rules)
+      const type = (asset.income_type || '').toLowerCase();
+      return type.includes('inherited');
+    },
+
+    getRMDStartAge(asset) {
+      // Get the RMD start age based on asset type and IRS rules
+      const type = (asset.income_type || '').toLowerCase();
+
+      // Inherited non-spouse accounts must start RMDs immediately
+      if (type.includes('inherited') && type.includes('non-spouse')) {
+        return asset.age_to_begin_withdrawal || 0; // Start immediately
+      }
+
+      // Inherited spouse accounts have more flexibility
+      if (type.includes('inherited') && type.includes('spouse')) {
+        // Spouse can treat as own, so use regular RMD rules
+        return 73; // SECURE Act 2.0 rules
+      }
+
+      // Regular qualified accounts - RMD starts at 73 (or 75 for younger people)
+      if (this.isQualifiedAsset(asset)) {
+        // Could check birth year here for 73 vs 75 rule
+        return 73;
+      }
+
+      // Roth accounts - no RMDs during owner's lifetime
+      if (type === 'roth') {
+        return 999; // Effectively never
+      }
+
+      // Inherited Roth accounts do have RMDs
+      if (type.includes('inherited') && type.includes('roth')) {
+        return asset.age_to_begin_withdrawal || 0;
+      }
+
+      return null;
+    },
+
+    getAssetTooltip(asset) {
+      // Generate detailed tooltip text for asset column headers
+      const type = this.getAssetType(asset);
+      let tooltip = `Type: ${asset.income_type}`;
+
+      if (asset.owned_by) {
+        tooltip += `\nOwner: ${asset.owned_by}`;
+      }
+
+      // Add RMD information for applicable assets
+      const rmdAge = this.getRMDStartAge(asset);
+      if (rmdAge && rmdAge < 999) {
+        tooltip += `\nRMD Starts: Age ${rmdAge}`;
+      }
+
+      if (asset.age_to_begin_withdrawal) {
+        tooltip += `\nWithdrawals Start: Age ${asset.age_to_begin_withdrawal}`;
+      }
+
+      if (asset.age_to_end_withdrawal) {
+        tooltip += `\nWithdrawals End: Age ${asset.age_to_end_withdrawal}`;
+      }
+
+      if (asset.monthly_amount) {
+        tooltip += `\nMonthly Withdrawal: $${parseFloat(asset.monthly_amount).toLocaleString()}`;
+      }
+
+      if (asset.current_asset_balance) {
+        tooltip += `\nStarting Balance: $${parseFloat(asset.current_asset_balance).toLocaleString()}`;
+      }
+
+      if (asset.rate_of_return) {
+        tooltip += `\nGrowth Rate: ${(parseFloat(asset.rate_of_return) * 100).toFixed(2)}%`;
+      }
+
+      return tooltip;
+    },
+
     /**
      * SINGLE SOURCE OF TRUTH for asset calculations
      * This calculates the COMPLETE projection for an asset from current age to end age
@@ -560,44 +762,55 @@ export default {
           primaryAge: result.primary_age,
           spouseAge: result.spouse_age,
           incomes: {},
-          total: 0,
-          backendTotal: parseFloat(result.gross_income || 0)  // Store backend's gross_income for comparison
+          qualifiedBalance: result.qualified_balance || 0,
+          total: result.total || result.gross_income || 0  // USE BACKEND'S TOTAL - NO CALCULATIONS
         };
         
         
-        // Map the backend results to our assets
-        this.assetDetails.forEach(asset => {
-          let income = 0;
-          const normalizedType = this.getAssetType(asset);
-          const owner = asset.owned_by?.toLowerCase();
+        // Use backend's asset_incomes if available, otherwise fall back to calculations
+        if (result.asset_incomes && Object.keys(result.asset_incomes).length > 0) {
+          // Backend provides individual asset incomes - use them directly
+          console.log('Backend asset_incomes for year', result.year, ':', result.asset_incomes);
+          console.log('Asset details IDs:', this.assetDetails.map(a => ({id: a.id, name: a.income_name})));
 
-          // Map backend results to frontend assets
-          if (normalizedType === 'social_security') {
-            if (owner === 'primary') {
-              income = parseFloat(result.ss_income_primary || 0);
-            } else if (owner === 'spouse' || owner === 'secondary') {
-              income = parseFloat(result.ss_income_spouse || 0);
+          this.assetDetails.forEach(asset => {
+            // Try both string and number keys since JSON may convert IDs
+            const income = result.asset_incomes[asset.id] || result.asset_incomes[String(asset.id)] || 0;
+            row.incomes[asset.id] = income;
+            // DON'T CALCULATE TOTAL - USE BACKEND'S TOTAL
+          });
+        } else {
+          // Fallback: Map the backend results to our assets (for backwards compatibility)
+          this.assetDetails.forEach(asset => {
+            let income = 0;
+            const normalizedType = this.getAssetType(asset);
+            const owner = asset.owned_by?.toLowerCase();
+
+            // Map backend results to frontend assets
+            if (normalizedType === 'social_security') {
+              if (owner === 'primary') {
+                income = parseFloat(result.ss_income_primary || 0);
+              } else if (owner === 'spouse' || owner === 'secondary') {
+                income = parseFloat(result.ss_income_spouse || 0);
+              }
+
+            } else if ((normalizedType === 'qualified' || normalizedType === 'non_qualified') && assetProjections[asset.id]) {
+              // Use the pre-calculated projection for this asset
+              const relevantAge = owner === 'spouse' ? result.spouse_age : result.primary_age;
+              const projection = assetProjections[asset.id][relevantAge];
+              income = projection ? projection.withdrawal : 0;
+
+            } else {
+              // For other asset types, use the calculated method
+              const primaryAgeDisplay = result.primary_age;
+              const spouseAgeDisplay = result.spouse_age;
+              income = this.calculateAssetIncomeForYear(asset, result.primary_age, primaryAgeDisplay, spouseAgeDisplay);
             }
 
-          } else if ((normalizedType === 'qualified' || normalizedType === 'non_qualified') && assetProjections[asset.id]) {
-            // Use the pre-calculated projection for this asset
-            const relevantAge = owner === 'spouse' ? result.spouse_age : result.primary_age;
-            const projection = assetProjections[asset.id][relevantAge];
-            income = projection ? projection.withdrawal : 0;
-
-          } else {
-            // For other asset types, use the calculated method
-            const primaryAgeDisplay = result.primary_age;
-            const spouseAgeDisplay = result.spouse_age;
-            income = this.calculateAssetIncomeForYear(asset, result.primary_age, primaryAgeDisplay, spouseAgeDisplay);
-          }
-
-          row.incomes[asset.id] = income;
-          row.total += income;
-        });
-
-        // Use backend's gross_income as the authoritative total
-        row.total = row.backendTotal;
+            row.incomes[asset.id] = income;
+            // DON'T CALCULATE TOTAL - USE BACKEND'S TOTAL
+          });
+        }
         
         projections.push(row);
       });
@@ -975,6 +1188,11 @@ export default {
     },
     exportComparisonReport() {
       // Implement PDF export logic
+    },
+    exportToCSV() {
+      // Use the comprehensive store to export data
+      const comprehensiveStore = useComprehensiveStore();
+      comprehensiveStore.exportToCSV(this.scenario.id);
     },
     getProjectedBalance(asset) {
       // Only calculate for retirement accounts

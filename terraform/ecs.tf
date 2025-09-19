@@ -182,7 +182,7 @@ resource "aws_ecs_task_definition" "frontend" {
         },
         {
           name  = "VITE_API_URL"
-          value = "http://app.retirementadvisorpro.com/api"
+          value = "https://app.retirementadvisorpro.com/api"
         },
         {
           name  = "VITE_API_BASE_URL"

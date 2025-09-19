@@ -207,39 +207,52 @@ export default {
       }
       return IRMAA_LABELS['single'];
     },
+    // Use comprehensive data if available, otherwise fall back to filteredResults
+    dataForCalculations() {
+      if (this.comprehensiveData?.years?.length > 0) {
+        return this.comprehensiveData.years;
+      }
+      return this.filteredResults;
+    },
     totalGrossIncome() {
-      if (!this.comprehensiveData?.years) return 0;
-      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.gross_income_total || 0), 0);
+      return this.dataForCalculations.reduce((total, row) => {
+        const income = row.gross_income_total || row.gross_income || 0;
+        return total + parseFloat(income);
+      }, 0);
     },
     totalTax() {
-      if (!this.comprehensiveData?.years) return 0;
-      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.federal_tax || 0), 0);
+      return this.dataForCalculations.reduce((total, row) => {
+        const tax = row.federal_tax || 0;
+        return total + parseFloat(tax);
+      }, 0);
     },
     totalMedicare() {
-      if (!this.comprehensiveData?.years) return 0;
-      return this.comprehensiveData.years.reduce((total, row) => total + parseFloat(row.total_medicare || 0), 0);
+      return this.dataForCalculations.reduce((total, row) => {
+        const medicare = row.total_medicare || 0;
+        return total + parseFloat(medicare);
+      }, 0);
     },
     netIncome() {
-      if (!this.comprehensiveData?.years) return 0;
-      return this.comprehensiveData.years.reduce((total, row) => {
-        const gross = parseFloat(row.gross_income_total || 0);
+      return this.dataForCalculations.reduce((total, row) => {
+        const gross = parseFloat(row.gross_income_total || row.gross_income || 0);
         const tax = parseFloat(row.federal_tax || 0);
         const medicare = parseFloat(row.total_medicare || 0);
         return total + (gross - tax - medicare);
       }, 0);
     },
     chartData() {
-      if (!this.comprehensiveData?.years || !this.comprehensiveData.years.length) {
-        console.warn('⚠️ FinancialOverview: No comprehensive data, returning empty chart data');
+      const dataSource = this.dataForCalculations;
+      if (!dataSource || !dataSource.length) {
+        console.warn('⚠️ FinancialOverview: No data available, returning empty chart data');
         return { labels: [], datasets: [] };
       }
 
-      const labels = this.comprehensiveData.years.map(row => row.year.toString());
+      const labels = dataSource.map(row => row.year.toString());
       const datasets = [
         {
           type: 'line',
           label: 'Gross Income',
-          data: this.comprehensiveData.years.map(row => parseFloat(row.gross_income_total) || 0),
+          data: dataSource.map(row => parseFloat(row.gross_income_total || row.gross_income || 0)),
           borderColor: '#4285f4',
           backgroundColor: 'transparent',
           borderWidth: 3,
@@ -253,10 +266,10 @@ export default {
         {
           type: 'line',
           label: 'Net Income',
-          data: this.comprehensiveData.years.map(row => {
-            const gross = parseFloat(row.gross_income_total) || 0;
-            const tax = parseFloat(row.federal_tax) || 0;
-            const medicare = parseFloat(row.total_medicare) || 0;
+          data: dataSource.map(row => {
+            const gross = parseFloat(row.gross_income_total || row.gross_income || 0);
+            const tax = parseFloat(row.federal_tax || 0);
+            const medicare = parseFloat(row.total_medicare || 0);
             return gross - tax - medicare;
           }),
           borderColor: '#34a853',
@@ -272,7 +285,7 @@ export default {
         {
           type: 'bar',
           label: 'Federal Tax',
-          data: this.comprehensiveData.years.map(row => parseFloat(row.federal_tax) || 0),
+          data: dataSource.map(row => parseFloat(row.federal_tax || 0)),
           backgroundColor: '#ea4335',
           stack: 'Stack 0',
           yAxisID: 'y',
@@ -281,7 +294,7 @@ export default {
         {
           type: 'bar',
           label: 'Medicare',
-          data: this.comprehensiveData.years.map(row => parseFloat(row.total_medicare) || 0),
+          data: dataSource.map(row => parseFloat(row.total_medicare || 0)),
           backgroundColor: '#fbbc05',
           stack: 'Stack 0',
           yAxisID: 'y',

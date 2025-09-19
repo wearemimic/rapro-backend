@@ -689,3 +689,72 @@ docker compose -f docker/docker-compose.yml restart backend
 - **Customer Verified**: mark@irmaacertifiedplanner.com exists in Stripe with active subscription
 - **Cancellation Confirmed**: Subscription shows `cancel_at_period_end=true` in Stripe
 - **API Data Flow**: Real-time data from Stripe API, no database caching
+
+## Recent Development Updates (September 10, 2025)
+
+### Report Generator System Fixed and Enabled
+**Complete restoration of advanced report generation system with PDF/PowerPoint export:**
+
+#### **Issues Fixed:**
+1. **Enabled Report Center URLs**: Uncommented line 30 in `/backend/retirementadvisorpro/urls.py`
+2. **Fixed Import Errors**: 
+   - Corrected model imports (`Asset`, `Income`, `Expense` → `IncomeSource`)
+   - Fixed service imports (`report_file_storage` → `file_storage_service`)
+   - Fixed `scenario_data_integration_service` → `scenario_integration_service`
+3. **Fixed URL Path Duplication**: Removed duplicate `/api/` prefix in report_center URLs
+4. **Updated Model References**: Adapted to use `income_sources` instead of non-existent models
+
+#### **Report Generator Features Now Available:**
+- **Template Management**: CRUD operations for report templates
+- **Report Generation**: PDF and PowerPoint export formats
+- **AI-Powered Content**: Automatic content generation for reports
+- **Background Processing**: Async report generation via Celery
+- **Report History**: Track and manage all generated reports
+- **Custom Branding**: Upload logos and customize templates
+
+#### **API Endpoints Activated:**
+- `/api/report-center/templates/` - Template management
+- `/api/report-center/reports/` - Report generation and history
+- `/api/report-center/ai/executive-summary/` - AI executive summaries
+- `/api/report-center/ai/slide-recommendations/` - AI slide recommendations
+- `/api/report-center/ai/content-suggestions/` - AI content generation
+
+### Affiliate System UI Fixes
+
+#### **Layout Issues Fixed:**
+- **Affiliate Detail Page**: Added `margin-top: 60px` to push content below fixed header
+- **Affiliate List Page**: Added `margin-top: 60px` to fix header overlap
+
+#### **Functionality Fixes:**
+1. **Generate Link Button**:
+   - Added missing modal component for link generation
+   - Implemented `generateLink` method with form validation
+   - Added reactive data for `newLink` and `generatingLink` states
+   - Modal includes fields for link name, destination URL, and campaign
+
+2. **Edit Button**:
+   - Created new `AffiliateEdit.vue` component with complete edit form
+   - Updated router configuration to use the new component
+   - Form includes all affiliate fields (business name, email, contact, status, commission rate, payment method, etc.)
+   - Proper navigation between edit and detail views
+
+#### **Affiliate Portal Password System:**
+- **No Auto-Generation**: Passwords are user-created, not auto-generated
+- **First-Time Login Flow**:
+  1. Affiliate logs in with email + affiliate code
+  2. System detects no password → shows password setup form
+  3. Affiliate creates password (min 8 characters)
+  4. Password is hashed and stored securely
+- **Fixed Error Handling**: Updated frontend to properly show password setup form instead of error message
+- **Test Affiliate**: `test@affiliate.com` with code `E8QE1ID8` ready for password setup
+
+#### **Files Created/Modified:**
+- `/frontend/src/views/affiliate/AffiliateEdit.vue` - New edit component
+- `/frontend/src/views/affiliate/AffiliateDetail.vue` - Added modal and functionality
+- `/frontend/src/views/affiliate/AffiliateList.vue` - Fixed layout
+- `/frontend/src/views/affiliate/AffiliatePortalLogin.vue` - Fixed password setup flow
+- `/frontend/src/router/index.js` - Updated routing
+- `/backend/report_center/services/scenario_integration_service.py` - Fixed model references
+- `/backend/report_center/services/powerpoint_generator.py` - Fixed imports
+- `/backend/report_center/services/bulk_export_service.py` - Fixed imports
+- `/backend/report_center/urls.py` - Fixed URL paths

@@ -161,6 +161,80 @@ def run_scenario_calculation(request, scenario_id):
         return Response({"error": "Scenario not found."}, status=404)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def comprehensive_financial_summary(request, scenario_id):
+    """
+    GET /api/scenarios/{scenario_id}/comprehensive-summary/
+
+    Returns complete year-by-year financial projection with all income sources,
+    taxes, Medicare/IRMAA, and net income calculations per PRD specification.
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+
+        # Security check - ensure user owns this scenario
+        if scenario.client.advisor != request.user:
+            return Response({"error": "Access denied"}, status=403)
+
+        # Use ScenarioProcessor (our comprehensive calculator)
+        processor = ScenarioProcessor(scenario_id=scenario.id, debug=False)
+        results = processor.calculate()
+
+        # Get income source names for the columns
+        from .models import IncomeSource
+        income_sources = IncomeSource.objects.filter(scenario_id=scenario_id)
+        income_source_names = {}
+        asset_names = {}
+
+        # Income types that don't have balances (just income streams)
+        income_only_types = ['social_security', 'pension', 'wages', 'rental_income', 'other']
+
+        for source in income_sources:
+            source_id = str(source.id)
+            # Use income_name for the display name
+            name = source.income_name or source.income_type.replace('_', ' ').title()
+            income_source_names[source_id] = name
+
+            # Only add to asset_names if it's NOT an income-only type AND has a balance
+            if (source.income_type.lower() not in income_only_types and
+                source.current_asset_balance and source.current_asset_balance > 0):
+                asset_names[source_id] = name
+
+        # Format response per PRD specification
+        response_data = {
+            'scenario_id': scenario_id,
+            'scenario_name': scenario.name,
+            'client_id': scenario.client.id,
+            'client_name': f"{scenario.client.first_name} {scenario.client.last_name}",
+            'retirement_age': scenario.retirement_age,
+            'mortality_age': scenario.mortality_age,
+            'years': results,  # Array of annual summaries with PRD-compliant fields
+            'income_source_names': income_source_names,
+            'asset_names': asset_names
+        }
+
+        # Add metadata about the calculation
+        if results:
+            response_data['summary'] = {
+                'total_years': len(results),
+                'start_year': results[0].get('year'),
+                'end_year': results[-1].get('year'),
+                'start_age': results[0].get('primary_age'),
+                'end_age': results[-1].get('primary_age'),
+            }
+
+        return Response(response_data)
+
+    except Scenario.DoesNotExist:
+        return Response({"error": "Scenario not found"}, status=404)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in comprehensive_financial_summary: {str(e)}")
+        return Response({"error": "Calculation failed", "details": str(e)}, status=500)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def start_scenario_calculation_async(request, scenario_id):

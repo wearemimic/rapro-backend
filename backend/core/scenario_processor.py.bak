@@ -3,8 +3,7 @@ from decimal import Decimal, InvalidOperation
 from core.models import Scenario, Client, Spouse, IncomeSource
 from core.tax_csv_loader import get_tax_loader
 
-# RMD Table based on IRS Uniform Lifetime Table (Publication 590-B)
-# Updated with complete table including ages 101-120+
+# RMD Table based on IRS Uniform Lifetime Table
 RMD_TABLE = {
     72: 27.4,
     73: 26.5,
@@ -39,22 +38,17 @@ RMD_TABLE = {
     102: 5.6,
     103: 5.2,
     104: 4.9,
-    105: 4.6,
-    106: 4.3,
-    107: 4.1,
-    108: 3.9,
-    109: 3.7,
-    110: 3.5,
-    111: 3.4,
-    112: 3.3,
-    113: 3.1,
-    114: 3.0,
-    115: 2.9,
-    116: 2.8,
-    117: 2.7,
-    118: 2.5,
-    119: 2.3,
-    120: 2.0,  # IRS table uses 2.0 for ages 120 and older
+    105: 4.5,
+    106: 4.2,
+    107: 3.9,
+    108: 3.7,
+    109: 3.4,
+    110: 3.1,
+    111: 2.9,
+    112: 2.6,
+    113: 2.4,
+    114: 2.1,
+    115: 1.9,
 }
 
 class ScenarioProcessor:
@@ -159,12 +153,11 @@ class ScenarioProcessor:
         
         # Log input data for debugging
         if debug:
-            pass  # Debug output commented out
-            # print(f"ScenarioProcessor.from_dicts() called with:")
-            # print(f"Scenario: {scenario}")
-            # print(f"Client: {client}")
-            # print(f"Spouse: {spouse}")
-            # print(f"Assets count: {len(assets) if assets else 0}")
+            print(f"ScenarioProcessor.from_dicts() called with:")
+            print(f"Scenario: {scenario}")
+            print(f"Client: {client}")
+            print(f"Spouse: {spouse}")
+            print(f"Assets count: {len(assets) if assets else 0}")
         
         # Validate client data
         if not client:
@@ -185,7 +178,7 @@ class ScenarioProcessor:
             if field not in client or client[field] is None:
                 if field == 'birthdate':  # Skip birthdate as it's handled separately
                     continue
-                # print(f"WARNING: Client missing required field '{field}', using default: {default_value}")
+                print(f"WARNING: Client missing required field '{field}', using default: {default_value}")
                 client[field] = default_value
         
         # Ensure all required scenario fields are present with defaults
@@ -201,8 +194,7 @@ class ScenarioProcessor:
         for field, default_value in required_scenario_fields.items():
             if field not in scenario or scenario[field] is None:
                 if instance.debug:
-                    pass  # Debug output commented out
-                    # print(f"WARNING: Scenario missing field '{field}', using default: {default_value}")
+                    print(f"WARNING: Scenario missing field '{field}', using default: {default_value}")
                 scenario[field] = default_value
         
         # Set scenario attributes directly from the dictionary
@@ -228,11 +220,11 @@ class ScenarioProcessor:
                 # If birthdate is missing, use a default (current year - 65)
                 current_year = datetime.datetime.now().year
                 instance.primary_birthdate = datetime.date(current_year - 65, 1, 1)
-                # print(f"WARNING: Client birthdate missing, using default: {instance.primary_birthdate}")
+                print(f"WARNING: Client birthdate missing, using default: {instance.primary_birthdate}")
                 # Update the client dictionary with the default birthdate
                 client['birthdate'] = instance.primary_birthdate.strftime('%Y-%m-%d')
         except Exception as e:
-            # print(f"ERROR parsing client birthdate: {e}")
+            print(f"ERROR parsing client birthdate: {e}")
             # Default to 65 years ago
             current_year = datetime.datetime.now().year
             instance.primary_birthdate = datetime.date(current_year - 65, 1, 1)
@@ -248,15 +240,14 @@ class ScenarioProcessor:
                 else:
                     instance.spouse_birthdate = spouse['birthdate']
             except Exception as e:
-                pass  # Debug output commented out
-                # print(f"ERROR parsing spouse birthdate: {e}")
+                print(f"ERROR parsing spouse birthdate: {e}")
         
         # Set tax status with default
         instance.tax_status = client.get('tax_status', 'Single')
         
         # Set assets with validation
         if not assets:
-            # print("WARNING: No assets provided, using empty list")
+            print("WARNING: No assets provided, using empty list")
             instance.assets = []
         else:
             # Validate each asset has required fields
@@ -264,7 +255,7 @@ class ScenarioProcessor:
             for asset in assets:
                 # Ensure each asset has the minimum required fields
                 if 'income_type' not in asset:
-                    # print(f"WARNING: Asset missing income_type, skipping: {asset}")
+                    print(f"WARNING: Asset missing income_type, skipping: {asset}")
                     continue
                 
                 # Ensure numeric fields are properly set
@@ -353,10 +344,7 @@ class ScenarioProcessor:
     def calculate(self):
         results = []
         cumulative_federal_tax = 0
-
-        # Track MAGI history for 2-year lookback (IRMAA determination)
-        magi_history = {}  # year -> MAGI value
-
+        
         # Starting retirement income calculation
 
         # Determine mortality years
@@ -395,19 +383,19 @@ class ScenarioProcessor:
             # Check mortality
             if primary_alive and year > primary_mortality_year:
                 primary_alive = False
-                # print(f"Primary deceased in year {year}")
+                print(f"Primary deceased in year {year}")
             if spouse_alive and spouse_mortality_year and year > spouse_mortality_year:
                 spouse_alive = False
-                # print(f"Spouse deceased in year {year}")
+                print(f"Spouse deceased in year {year}")
 
             # Switch tax status if one spouse dies
             if tax_status == "Married Filing Jointly" and (not primary_alive or not spouse_alive):
                 tax_status = "Single"
-                # print(f"Tax status switched to Single in year {year}")
+                print(f"Tax status switched to Single in year {year}")
 
             # If both deceased, stop calculations
             if not primary_alive and not spouse_alive:
-                # print(f"Both deceased in year {year}, stopping calculations.")
+                print(f"Both deceased in year {year}, stopping calculations.")
                 break
 
             # Processing year with primary and spouse ages
@@ -420,26 +408,10 @@ class ScenarioProcessor:
             ss_income_primary_gross = 0
             ss_income_spouse_gross = 0
             total_rmd_amount = 0  # Track total RMD for the year
-
-            # Initialize start_of_year_balances outside conditional to ensure it's always in scope
-            start_of_year_balances = {}
-
-            # STEP 1A: Calculate RMDs ONCE for all assets (before any other calculations)
             if primary_alive or spouse_alive:
-                for asset in self.assets:
-                    if not asset.get("fully_converted_to_roth", False):
-                        rmd = self._calculate_rmd(asset, year)
-                        asset['current_year_rmd'] = rmd
-                        if rmd > 0:
-                            total_rmd_amount += rmd
-                            self._log_debug(f"Year {year} - {asset.get('income_name', 'Asset')}: RMD = ${rmd:,.2f}")
-                    else:
-                        asset['current_year_rmd'] = 0
-
-            if primary_alive or spouse_alive:
-
-                gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive, start_of_year_balances)
-                # RMD is now tracked in total_rmd_amount above
+                gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive)
+                # Get the RMD amount that was calculated in _calculate_gross_income
+                total_rmd_amount = getattr(self, '_current_year_rmd', 0)
                 ss_income, ss_income_primary, ss_income_spouse = self._calculate_social_security(year, primary_alive, spouse_alive)
                 
                 # Check if SS decrease is applied this year and calculate actual amount
@@ -460,17 +432,17 @@ class ScenarioProcessor:
                 if year < retirement_year and pre_retirement_income:
                     pre_retirement_income_decimal = Decimal(str(pre_retirement_income))
                     gross_income += pre_retirement_income_decimal
-                    # print(f"  Adding pre-retirement income: ${pre_retirement_income_decimal:,.2f}")
+                    print(f"  Adding pre-retirement income: ${pre_retirement_income_decimal:,.2f}")
                     
             agi_excl_ss = Decimal(gross_income)
             taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
 
             # Calculate provisional income for debug
             provisional_income = agi_excl_ss + Decimal('0.5') * Decimal(ss_income)
-            # Commented:             print(f"\nPROVISIONAL INCOME CALCULATION:")
-            # print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
-            # print(f"  + 50% of SS (${ss_income:,.2f} × 0.5): ${Decimal('0.5') * Decimal(ss_income):,.2f}")
-            # print(f"  = Provisional Income: ${provisional_income:,.2f}")
+            print(f"\nPROVISIONAL INCOME CALCULATION:")
+            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
+            print(f"  + 50% of SS (${ss_income:,.2f} × 0.5): ${Decimal('0.5') * Decimal(ss_income):,.2f}")
+            print(f"  = Provisional Income: ${provisional_income:,.2f}")
             
             # Get IRS thresholds based on filing status
             if self.tax_status == "Single":
@@ -480,9 +452,9 @@ class ScenarioProcessor:
                 base_threshold = Decimal('32000')
                 additional_threshold = Decimal('44000')
                 
-            # print(f"\nIRS THRESHOLDS ({self.tax_status}):")
-            # print(f"  Base: ${base_threshold:,.2f}")
-            # print(f"  Additional: ${additional_threshold:,.2f}")
+            print(f"\nIRS THRESHOLDS ({self.tax_status}):")
+            print(f"  Base: ${base_threshold:,.2f}")
+            print(f"  Additional: ${additional_threshold:,.2f}")
 
             # Calculate how much would be taxable based on IRS rules
             if provisional_income <= base_threshold:
@@ -492,12 +464,12 @@ class ScenarioProcessor:
             else:
                 taxable_portion = f"85% of amount over ${additional_threshold:,.2f} + 50% between thresholds"
             
-            # print(f"\nTAXABLE SOCIAL SECURITY CALCULATION:")
-            # print(f"  SS Benefits: ${ss_income:,.2f}")
-            # print(f"  Provisional Income: ${provisional_income:,.2f}")
-            # print(f"  Taxable Portion: {taxable_portion}")
-            # print(f"  Calculated Taxable SS: ${taxable_ss:,.2f}")
-            # print(f"  % of SS Taxable: {(taxable_ss / ss_income * 100) if ss_income > 0 else 0:.1f}%")
+            print(f"\nTAXABLE SOCIAL SECURITY CALCULATION:")
+            print(f"  SS Benefits: ${ss_income:,.2f}")
+            print(f"  Provisional Income: ${provisional_income:,.2f}")
+            print(f"  Taxable Portion: {taxable_portion}")
+            print(f"  Calculated Taxable SS: ${taxable_ss:,.2f}")
+            print(f"  % of SS Taxable: {(taxable_ss / ss_income * 100) if ss_income > 0 else 0:.1f}%")
 
             taxable_income = agi_excl_ss + taxable_ss
             
@@ -519,12 +491,12 @@ class ScenarioProcessor:
                 
                 standard_deduction = tax_loader.get_standard_deduction(filing_status)
                 taxable_income = max(Decimal('0'), taxable_income - standard_deduction)
-                # print(f"\nSTANDARD DEDUCTION APPLIED: {standard_deduction} for {self.tax_status}. Taxable Income after deduction: ${taxable_income:,.2f}")
+                print(f"\nSTANDARD DEDUCTION APPLIED: {standard_deduction} for {self.tax_status}. Taxable Income after deduction: ${taxable_income:,.2f}")
 
-            # print(f"\nTAXABLE INCOME CALCULATION:")
-            # print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
-            # print(f"  + Taxable SS: ${taxable_ss:,.2f}")
-            # print(f"  = Taxable Income: ${taxable_income:,.2f}")
+            print(f"\nTAXABLE INCOME CALCULATION:")
+            print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
+            print(f"  + Taxable SS: ${taxable_ss:,.2f}")
+            print(f"  = Taxable Income: ${taxable_income:,.2f}")
 
             # Calculate MAGI (Modified Adjusted Gross Income) for Medicare IRMAA determination
             # MAGI = AGI + Tax-exempt interest + excluded foreign income + other specific add-backs
@@ -552,22 +524,17 @@ class ScenarioProcessor:
                              excluded_foreign_income + ira_contribution_deduction + untaxed_ss
             
             magi = agi + magi_adjustments
-
-            # Store MAGI for future 2-year lookback
-            magi_history[year] = magi
-
-            if magi == agi:
-                pass  # MAGI equals AGI - no adjustments
-                # print(f"\nMAGI CALCULATION: (Note: MAGI equals AGI because no MAGI adjustments are present)")
-            else:
-                pass  # MAGI different from AGI due to adjustments
-                # print(f"\nMAGI CALCULATION: (MAGI is different from AGI due to adjustments)")
             
-            # print(f"  AGI (taxable income): ${agi:,.2f}")
-            # print(f"  + Tax-exempt interest: ${excluded_municipal_bond_interest:,.2f}")
-            # print(f"  + Foreign income exclusion: ${excluded_foreign_income:,.2f}")
-            # print(f"  + IRA contribution deduction: ${ira_contribution_deduction:,.2f}")
-            # print(f"  = MAGI: ${magi:,.2f}")
+            if magi == agi:
+                print(f"\nMAGI CALCULATION: (Note: MAGI equals AGI because no MAGI adjustments are present)")
+            else:
+                print(f"\nMAGI CALCULATION: (MAGI is different from AGI due to adjustments)")
+            
+            print(f"  AGI (taxable income): ${agi:,.2f}")
+            print(f"  + Tax-exempt interest: ${excluded_municipal_bond_interest:,.2f}")
+            print(f"  + Foreign income exclusion: ${excluded_foreign_income:,.2f}")
+            print(f"  + IRA contribution deduction: ${ira_contribution_deduction:,.2f}")
+            print(f"  = MAGI: ${magi:,.2f}")
 
             # STEP 3: Taxable Income & MAGI Engine
             # Removed duplicate calculation
@@ -575,61 +542,32 @@ class ScenarioProcessor:
             # STEP 4: Federal Tax & AMT Engine
             federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
             cumulative_federal_tax += federal_tax
-
-            # Initialize state tax (will be calculated later based on state rules)
-            state_tax = Decimal('0')
-
-            # Calculate total income for the year first (needed for effective rate)
-            total_income_for_year = round(gross_income + ss_income, 2)
-
-            # Calculate marginal and effective tax rates
-            marginal_rate = Decimal('0')
-            effective_rate = Decimal('0')
-
-            # Extract marginal rate from bracket string (e.g., "22%" -> 22)
-            if tax_bracket:
-                try:
-                    marginal_rate = Decimal(tax_bracket.replace('%', ''))
-                except:
-                    marginal_rate = Decimal('0')
-
-            # Calculate effective rate (total tax / total income)
-            if total_income_for_year > 0:
-                effective_rate = (federal_tax / total_income_for_year * 100).quantize(Decimal('0.1'))
             
-            # print(f"\nTAX CALCULATION:")
-            # print(f"  Taxable Income: ${taxable_income:,.2f}")
-            # print(f"  Federal Tax: ${federal_tax:,.2f}")
-            # print(f"  Cumulative Federal Tax: ${cumulative_federal_tax:,.2f}")
+            print(f"\nTAX CALCULATION:")
+            print(f"  Taxable Income: ${taxable_income:,.2f}")
+            print(f"  Federal Tax: ${federal_tax:,.2f}")
+            print(f"  Cumulative Federal Tax: ${cumulative_federal_tax:,.2f}")
 
             # STEP 5: Medicare & IRMAA Engine (2-year lookback)
-            # IRMAA is based on MAGI from 2 years prior per IRS rules
-            lookback_year = year - 2
-            lookback_magi = magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
-
-            # For debugging/logging
-            if lookback_year in magi_history:
-                self._log_debug(f"Year {year}: Using MAGI from {lookback_year} (${lookback_magi:,.2f}) for IRMAA determination")
-            else:
-                self._log_debug(f"Year {year}: No {lookback_year} MAGI history, using current MAGI (${magi:,.2f})")
-
-            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year)
+            # Note: In real-world scenarios, IRMAA is based on MAGI from 2 years prior
+            # For projection purposes, we're using current year MAGI for simplicity
+            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(magi, year)
             total_medicare = Decimal(total_medicare)
             
-            # print(f"\nMEDICARE COSTS:")
-            # print(f"  Medicare Base: ${medicare_base:,.2f}")
-            # print(f"  IRMAA: ${irmaa:,.2f}")
-            # print(f"  Part D: ${base_part_d:,.2f}")
-            # print(f"  Part D IRMAA: ${part_d_irmaa:,.2f}")
-            # print(f"  Total Medicare: ${total_medicare:,.2f}")
+            print(f"\nMEDICARE COSTS:")
+            print(f"  Medicare Base: ${medicare_base:,.2f}")
+            print(f"  IRMAA: ${irmaa:,.2f}")
+            print(f"  Part D: ${base_part_d:,.2f}")
+            print(f"  Part D IRMAA: ${part_d_irmaa:,.2f}")
+            print(f"  Total Medicare: ${total_medicare:,.2f}")
 
             # STEP 6: Roth Conversion Module (Joint Household, Phase 1)
             roth_conversion_amount = self._calculate_roth_conversion(year)
             if roth_conversion_amount > 0:
-                # print(f"\nROTH CONVERSION:")
-                # print(f"  Conversion Amount: ${roth_conversion_amount:,.2f}")
+                print(f"\nROTH CONVERSION:")
+                print(f"  Conversion Amount: ${roth_conversion_amount:,.2f}")
                 taxable_income += roth_conversion_amount
-                # print(f"  Updated Taxable Income: ${taxable_income:,.2f}")
+                print(f"  Updated Taxable Income: ${taxable_income:,.2f}")
 
             # STEP 7: Asset Spend-Down & Growth Engine
             self._calculate_asset_spend_down(year)
@@ -653,32 +591,25 @@ class ScenarioProcessor:
                         hold_harmless_amount = previous_remaining_ss - original_remaining_ss
                         # Reduce Medicare deduction to maintain previous year's remaining amount
                         effective_medicare = total_medicare - hold_harmless_amount
-                        # print(f"\nHOLD HARMLESS PROTECTION APPLIED:")
-                        # print(f"  SS income (unchanged): ${ss_income:,.2f}")
-                        # print(f"  Full Medicare cost: ${total_medicare:,.2f}")
-                        # print(f"  Effective Medicare deduction: ${effective_medicare:,.2f}")
-                        # print(f"  Previous year remaining SS: ${previous_remaining_ss:,.2f}")
-                        # print(f"  Current calculated remaining: ${original_remaining_ss:,.2f}")
-                        # print(f"  Hold Harmless protection: ${hold_harmless_amount:,.2f}")
+                        print(f"\nHOLD HARMLESS PROTECTION APPLIED:")
+                        print(f"  SS income (unchanged): ${ss_income:,.2f}")
+                        print(f"  Full Medicare cost: ${total_medicare:,.2f}")
+                        print(f"  Effective Medicare deduction: ${effective_medicare:,.2f}")
+                        print(f"  Previous year remaining SS: ${previous_remaining_ss:,.2f}")
+                        print(f"  Current calculated remaining: ${original_remaining_ss:,.2f}")
+                        print(f"  Hold Harmless protection: ${hold_harmless_amount:,.2f}")
 
-            # Calculate net income fields per PRD requirements
-            total_income = gross_income + ss_income  # Total income before deductions
-            after_tax_income = total_income - federal_tax - state_tax  # Income after taxes
-            after_medicare_income = after_tax_income - effective_medicare  # Income after taxes and Medicare
-            remaining_income = after_medicare_income  # Final remaining income (same as after_medicare_income)
-
-            # Legacy calculations (kept for backward compatibility)
             net_income = gross_income + ss_income - federal_tax - effective_medicare
             remaining_ss = ss_income - effective_medicare
             irmaa = irmaa + part_d_irmaa
             
-            # print(f"\nFINAL RESULTS FOR YEAR {year}:")
-            # print(f"  Gross Income: ${gross_income:,.2f}")
-            # print(f"  Taxable Income: ${taxable_income:,.2f}")
-            # print(f"  Federal Tax: ${federal_tax:,.2f}")
-            # print(f"  Total Medicare: ${total_medicare:,.2f}")
-            # print(f"  Net Income: ${net_income:,.2f}")
-            # print("--------------------------------------------")
+            print(f"\nFINAL RESULTS FOR YEAR {year}:")
+            print(f"  Gross Income: ${gross_income:,.2f}")
+            print(f"  Taxable Income: ${taxable_income:,.2f}")
+            print(f"  Federal Tax: ${federal_tax:,.2f}")
+            print(f"  Total Medicare: ${total_medicare:,.2f}")
+            print(f"  Net Income: ${net_income:,.2f}")
+            print("--------------------------------------------")
 
             # Combine asset incomes from both regular and SS assets
             all_asset_incomes = {}
@@ -687,104 +618,23 @@ class ScenarioProcessor:
             if hasattr(self, '_current_year_ss_asset_incomes'):
                 all_asset_incomes.update(self._current_year_ss_asset_incomes)
 
-            # Total income already calculated above for effective rate calculation
-
-            # Calculate qualified account totals and build asset dictionaries
-            qualified_balance_total = Decimal('0')
-            qualified_income_total = Decimal('0')
-            non_qualified_balance_total = Decimal('0')
-            non_qualified_income_total = Decimal('0')
-
-            # Build PRD-required dictionaries
-            asset_balances = start_of_year_balances  # Use START of year balances
-            rmd_required = {}  # ID -> RMD amount mapping
-
-            for asset in self.assets:
-                asset_type = asset.get("income_type", "").lower()
-                asset_balance = Decimal(str(asset.get("current_asset_balance", 0)))
-                asset_id = asset.get('id')
-
-                # Populate rmd_required dictionary (only for assets with RMDs)
-                current_rmd = asset.get('current_year_rmd', 0)
-                if asset_id and current_rmd > 0:
-                    rmd_required[asset_id] = float(current_rmd)
-
-                # Track qualified assets (tax-deferred accounts subject to RMDs)
-                if asset_type in ["qualified", "401k", "traditional_ira", "sep_ira", "403b",
-                                  "inherited traditional spouse", "inherited traditional non-spouse"]:
-                    qualified_balance_total += asset_balance
-                    if asset_id and asset_id in all_asset_incomes:
-                        qualified_income_total += Decimal(str(all_asset_incomes[asset_id]))
-
-                # Track non-qualified assets (taxable brokerage accounts)
-                elif asset_type in ["non-qualified", "non_qualified", "brokerage", "savings"]:
-                    non_qualified_balance_total += asset_balance
-                    if asset_id and asset_id in all_asset_incomes:
-                        non_qualified_income_total += Decimal(str(all_asset_incomes[asset_id]))
-
-            # Calculate state tax (already initialized above)
-            state_name = ''
-            if hasattr(self.scenario, 'state') and self.scenario.state:
-                tax_loader = get_tax_loader()
-                state_info = tax_loader.get_state_tax_info(self.scenario.state)
-                state_name = state_info.get('state', self.scenario.state)
-
-                # Simple state tax calculation - can be enhanced based on state rules
-                if not state_info.get('retirement_income_exempt', False):
-                    state_tax_rate = Decimal(str(state_info.get('income_tax_rate', 0)))
-                    # Apply state tax to AGI (simplified - states have different rules)
-                    state_tax = agi * state_tax_rate
-
-                    # Some states don't tax Social Security
-                    if not state_info.get('ss_taxed', False):
-                        # Adjust state taxable income to exclude SS
-                        state_taxable_income = agi - Decimal(str(taxable_ss))
-                        state_tax = max(Decimal('0'), state_taxable_income * state_tax_rate)
-
             summary = {
                 "year": year,
                 "primary_age": primary_age if primary_alive else None,
                 "spouse_age": spouse_age if spouse_alive else None,
-
-                # Income Details
-                "gross_income": round(gross_income, 2),  # Non-SS income only (401k, etc)
-                "total": total_income_for_year,  # TOTAL of all income sources
+                "gross_income": round(gross_income + ss_income, 2),
                 "ss_income": round(ss_income, 2),
                 "ss_income_primary": round(ss_income_primary, 2),
                 "ss_income_spouse": round(ss_income_spouse, 2),
                 "ss_income_primary_gross": round(ss_income_primary_gross, 2),
                 "ss_income_spouse_gross": round(ss_income_spouse_gross, 2),
                 "taxable_ss": round(taxable_ss, 2),
-
-                # Asset Details (PRD-compliant fields)
-                "income_by_source": all_asset_incomes,  # ID -> income amount mapping
-                "asset_balances": asset_balances,  # ID -> balance mapping
-                "rmd_required": rmd_required,  # ID -> RMD amount mapping
-                "rmd_total": round(total_rmd_amount, 2),  # Total RMD for the year
-
-                # Legacy asset fields for backward compatibility
-                "qualified_balance": round(qualified_balance_total, 2),
-                "qualified_income": round(qualified_income_total, 2),
-                "non_qualified_balance": round(non_qualified_balance_total, 2),
-                "non_qualified_income": round(non_qualified_income_total, 2),
-                "asset_incomes": all_asset_incomes,  # Legacy field name
-                "rmd_amount": round(total_rmd_amount, 2),  # Legacy field name
-
-                # Tax Calculations
                 "agi": round(agi, 2),
                 "magi": round(magi, 2),
-                "lookback_magi": round(lookback_magi, 2),  # MAGI used for IRMAA (2-year lookback)
                 "taxable_income": round(taxable_income, 2),
+                "roth_conversion": round(roth_conversion_amount, 2),
                 "federal_tax": round(federal_tax, 2),
-                "state_tax": round(state_tax, 2),
-                "state": state_name,
-                "total_taxes": round(federal_tax + state_tax, 2),
                 "cumulative_federal_tax": round(cumulative_federal_tax, 2),
-                "tax_bracket": tax_bracket,
-                "marginal_rate": float(marginal_rate),
-                "effective_rate": float(effective_rate),
-
-                # Medicare/IRMAA
                 "medicare_base": round(medicare_base, 2),
                 "part_b": round(medicare_base, 2),
                 "part_d": round(base_part_d, 2),
@@ -794,25 +644,16 @@ class ScenarioProcessor:
                 "irmaa_bracket_threshold": float(current_irmaa_bracket['magi_threshold']) if current_irmaa_bracket else None,
                 "total_medicare": round(total_medicare, 2),
                 "effective_medicare": round(effective_medicare, 2),
-
-                # Net Income After All Deductions (PRD-compliant fields)
-                "gross_income_total": round(total_income, 2),  # Total income before any deductions
-                "after_tax_income": round(after_tax_income, 2),  # After federal and state taxes
-                "after_medicare_income": round(after_medicare_income, 2),  # After taxes and Medicare
-                "remaining_income": round(remaining_income, 2),  # Final remaining income
-
-                # Legacy fields for backward compatibility
                 "net_income": round(net_income, 2),
-                "remaining_income_after_taxes": round(total_income_for_year - federal_tax - state_tax - effective_medicare, 2),
                 "remaining_ss": round(remaining_ss, 2),
-
-                # Special Adjustments
-                "roth_conversion": round(roth_conversion_amount, 2),
+                "tax_bracket": tax_bracket,
                 "ss_decrease_applied": ss_decrease_applied,
                 "ss_decrease_amount": ss_decrease_amount_actual,
                 "hold_harmless_protected": hold_harmless_protected,
                 "hold_harmless_amount": round(hold_harmless_amount, 2),
                 "original_remaining_ss": round(original_remaining_ss, 2),
+                "rmd_amount": round(total_rmd_amount, 2),
+                "asset_incomes": all_asset_incomes  # Add individual asset incomes
             }
 
             # Add asset balances to summary with safe rounding
@@ -840,26 +681,18 @@ class ScenarioProcessor:
     def _requires_rmd(self, asset):
         """
         Determine if an asset type requires RMD calculations.
-        Traditional/qualified accounts and inherited traditional accounts require RMDs.
-        Roth accounts do not require RMDs during owner's lifetime.
-        Inherited Roth accounts DO require RMDs.
+        Only the new asset types that are traditional/qualified accounts require RMD.
         """
         income_type = asset.get("income_type", "")
-        income_type_lower = income_type.lower()
-
-        # Asset types that require RMD (case-insensitive check)
+        
+        # New asset types that require RMD
         rmd_asset_types = [
-            "qualified",  # Traditional tax-deferred accounts
-            "inherited traditional spouse",
-            "inherited traditional non-spouse",
-            "inherited roth spouse",  # Inherited Roth accounts DO have RMDs
-            "inherited roth non-spouse"  # Inherited Roth accounts DO have RMDs
+            "Qualified",  # Traditional tax-deferred accounts
+            "Inherited Traditional Spouse",
+            "Inherited Traditional Non-Spouse"
         ]
-
-        # Check both exact match and lowercase match
-        return income_type in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse",
-                               "Inherited Roth Spouse", "Inherited Roth Non-Spouse"] or \
-               income_type_lower in rmd_asset_types
+        
+        return income_type in rmd_asset_types
 
     def _get_rmd_start_age(self, asset, owner_birthdate):
         """
@@ -912,35 +745,19 @@ class ScenarioProcessor:
         asset_type = asset.get("income_type", "")
         rmd_start_age = self._get_rmd_start_age(asset, birthdate)
         
-        # Handle inherited non-spouse accounts (10-year rule for post-2019 deaths)
-        if "Inherited" in asset_type and "Non-Spouse" in asset_type:
-            # SECURE Act rules for inherited accounts:
-            # - Traditional: Must deplete by end of 10th year
-            # - Roth: Also subject to 10-year rule but tax-free
+        # Handle inherited non-spouse accounts (10-year rule)
+        if asset_type == "Inherited Traditional Non-Spouse":
+            # For inherited non-spouse, must deplete by end of 10th year
+            # No annual RMDs required, but account must be empty by year 10
             inheritance_year = asset.get("inheritance_year", year - 1)  # Default to previous year
             years_since_inheritance = year - inheritance_year
-
-            # Check if post-2019 death (SECURE Act applies)
-            if inheritance_year >= 2020:
-                if years_since_inheritance >= 10:
-                    # Must withdraw entire remaining balance in year 10
-                    balance = asset.get("current_asset_balance", 0)
-                    self._log_debug(f"Year {year} - 10-year rule: withdrawing entire balance ${balance:,.2f}")
-                    return Decimal(str(balance))
-                else:
-                    # No annual RMD required in years 1-9 (optional distributions allowed)
-                    return Decimal('0')
+            
+            if years_since_inheritance >= 10:
+                # Must withdraw entire remaining balance in year 10
+                return Decimal(str(asset.get("current_asset_balance", 0)))
             else:
-                # Pre-2020 inheritance: use stretch IRA rules (life expectancy)
-                # Simplified calculation - would need beneficiary age for accurate calc
-                if current_age >= 18:
-                    life_expectancy = max(1.0, 83.0 - current_age)
-                    balance = asset.get("previous_year_balance", 0)
-                    rmd_amount = Decimal(str(balance)) / Decimal(str(life_expectancy))
-                    self._log_debug(f"Year {year} - Pre-2020 inherited: RMD = ${rmd_amount:,.2f}")
-                    return rmd_amount
-                else:
-                    return Decimal('0')
+                # No required distribution in years 1-9 (but beneficiary can take distributions)
+                return Decimal('0')
         
         # Handle regular and inherited spouse accounts
         if rmd_start_age is None or current_age < rmd_start_age:
@@ -984,16 +801,7 @@ class ScenarioProcessor:
         current_age = year - birthdate.year
         start_age = asset.get("age_to_begin_withdrawal")
         end_age = asset.get("age_to_end_withdrawal")
-
-        # Handle both decimal (0.07) and percentage (7.0) formats
-        rate_value = asset.get("rate_of_return", 0)
-        if rate_value and rate_value < 1:
-            # Already in decimal format (e.g., 0.07 for 7%)
-            rate_of_return = Decimal(str(rate_value))
-        else:
-            # In percentage format (e.g., 7.0 for 7%), convert to decimal
-            rate_of_return = Decimal(str(rate_value)) / 100
-
+        rate_of_return = Decimal(asset.get("rate_of_return", 0)) / 100
         monthly_contribution = Decimal(asset.get("monthly_contribution") or 0)
 
         # Log asset details
@@ -1141,32 +949,20 @@ class ScenarioProcessor:
         
         return current_balance
 
-    def _calculate_gross_income(self, year, primary_alive=True, spouse_alive=True, start_of_year_balances=None):
+    def _calculate_gross_income(self, year, primary_alive=True, spouse_alive=True):
         self._log_debug(f"Processing gross income for year {year}")
         income_total = 0
-        qualified_income_total = 0  # Track qualified account income specifically
         total_rmd = 0  # Track RMD amounts for this calculation
         asset_incomes = {}  # Track individual asset incomes
         for asset in self.assets:
             # Skip Social Security assets - they are handled separately
             if asset.get("income_type") == "social_security":
-                # Still need to capture their balance (0) for completeness
-                if start_of_year_balances is not None:
-                    asset_id = asset.get('id')
-                    if asset_id:
-                        start_of_year_balances[asset_id] = 0
                 continue
-
+                
             owner = asset.get("owned_by", "primary")
             if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
                 continue
             self._update_asset_balance(asset, year)
-
-            # Capture balance AFTER update but BEFORE withdrawals
-            if start_of_year_balances is not None:
-                asset_id = asset.get('id')
-                if asset_id:
-                    start_of_year_balances[asset_id] = float(asset.get('current_asset_balance', 0))
             birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
             if not birthdate:
                 continue
@@ -1179,15 +975,14 @@ class ScenarioProcessor:
                 monthly_amount = Decimal(asset.get("monthly_amount") or 0)
                 inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                 annual_income = inflated_amount * 12
-                # Check if RMD was already calculated and stored for this asset
-                # RMD is now calculated ONCE in the main calculate loop
-                asset_rmd = asset.get('current_year_rmd', 0)
-                if asset_rmd > annual_income:
-                    annual_income = asset_rmd
-                    self._log_debug(f"Year {year} - Using RMD amount ${asset_rmd:,.2f} instead of planned withdrawal ${annual_income:,.2f}")
+                # Apply RMD override for qualifying asset types
+                rmd_amount = self._calculate_rmd(asset, year)
+                if rmd_amount > annual_income:
+                    annual_income = rmd_amount
                 # Track RMD amount separately
-                if asset_rmd > 0:
-                    total_rmd += asset_rmd
+                if rmd_amount > 0:
+                    total_rmd += rmd_amount
+                    self._log_debug(f"Year {year} - Asset {asset.get('investment_name', 'Unknown')}: RMD = ${rmd_amount:,.2f}")
                 income_total += annual_income
 
                 # Track individual asset income
@@ -1195,9 +990,12 @@ class ScenarioProcessor:
                 if asset_id:
                     asset_incomes[asset_id] = float(annual_income)
 
+        # Store total RMD for this year so it can be accessed by the main calculate method
+        self._current_year_rmd = total_rmd
+        self._log_debug(f"Year {year} - Total RMD for year: ${total_rmd:,.2f}")
+
         # Store asset incomes for this year to be accessed by the main calculate method
         self._current_year_asset_incomes = asset_incomes
-        self._log_debug(f"Year {year} - Gross income calculation complete")
 
         return income_total
 
@@ -1625,24 +1423,22 @@ class ScenarioProcessor:
         for asset in self.assets:
             self._update_asset_balance(asset, year)
         
-        # Step 2: Apply RMDs that were already calculated (must be done before conversions per IRS rules)
+        # Step 2: Calculate and apply RMDs (must be done before conversions per IRS rules)
         for asset in self.assets:
-            # Only apply RMDs for assets that haven't been fully converted
+            # Only calculate RMDs for assets that haven't been fully converted
             if asset.get("fully_converted_to_roth", False):
                 asset["withdrawal_amount"] = Decimal('0')
                 continue
-
-            # Use the RMD that was already calculated at the beginning of the year
-            rmd_amount = asset.get('current_year_rmd', 0)
+                
+            rmd_amount = self._calculate_rmd(asset, year)
             withdrawal_amount = Decimal(str(asset.get("withdrawal_amount", 0)))
             if rmd_amount > withdrawal_amount:
                 asset["withdrawal_amount"] = rmd_amount
                 # Actually withdraw the RMD
                 asset["current_asset_balance"] = max(
-                    Decimal('0'),
+                    Decimal('0'), 
                     Decimal(str(asset.get("current_asset_balance", 0))) - rmd_amount
                 )
-                self._log_debug(f"Applied RMD of ${rmd_amount:,.2f} to {asset.get('income_name', 'Asset')}")
         
         # Step 3: Calculate Roth conversions (this just calculates, doesn't apply)
         total_conversion = self._calculate_roth_conversion(year)
@@ -1764,8 +1560,7 @@ class ScenarioProcessor:
 
     def _log_debug(self, message):
         if self.debug:
-            pass  # Debug output commented out
-            # print(f"🔍 Debug: {message}")
+            print(f"🔍 Debug: {message}")
 
     def _calculate_inheritance_tax(self, final_year_data):
         """
@@ -1817,12 +1612,12 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
     provisional_income = agi + tax_exempt_interest + Decimal('0.5') * ss_benefits
     
     # Detailed calculation explanation
-    # print(f"  DETAILED SS TAXATION CALCULATION:")
-    # print(f"    SS Benefits: ${ss_benefits:,.2f}")
-    # print(f"    AGI (excluding SS): ${agi:,.2f}")
-    # print(f"    Tax-exempt interest: ${tax_exempt_interest:,.2f}")
-    # print(f"    50% of SS: ${Decimal('0.5') * ss_benefits:,.2f}")
-    # print(f"    Provisional Income: ${provisional_income:,.2f}")
+    print(f"  DETAILED SS TAXATION CALCULATION:")
+    print(f"    SS Benefits: ${ss_benefits:,.2f}")
+    print(f"    AGI (excluding SS): ${agi:,.2f}")
+    print(f"    Tax-exempt interest: ${tax_exempt_interest:,.2f}")
+    print(f"    50% of SS: ${Decimal('0.5') * ss_benefits:,.2f}")
+    print(f"    Provisional Income: ${provisional_income:,.2f}")
 
     # Determine the base and additional thresholds based on filing status
     if filing_status == "Single":
@@ -1834,22 +1629,22 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
     else:
         raise ValueError("Unsupported filing status")
         
-    # print(f"    Filing Status: {filing_status}")
-    # print(f"    Base threshold: ${base_threshold:,.2f}")
-    # print(f"    Additional threshold: ${additional_threshold:,.2f}")
+    print(f"    Filing Status: {filing_status}")
+    print(f"    Base threshold: ${base_threshold:,.2f}")
+    print(f"    Additional threshold: ${additional_threshold:,.2f}")
 
     # Calculate the taxable portion of Social Security benefits
     if provisional_income <= base_threshold:
         taxable_ss = Decimal('0')
-        # print(f"    Case: Provisional income <= base threshold")
-        # print(f"    Taxable SS: $0.00 (0% of benefits)")
+        print(f"    Case: Provisional income <= base threshold")
+        print(f"    Taxable SS: $0.00 (0% of benefits)")
     elif provisional_income <= additional_threshold:
         taxable_ss = min(Decimal('0.5') * (provisional_income - base_threshold), Decimal('0.5') * ss_benefits)
-        # print(f"    Case: Provisional income between thresholds")
-        # print(f"    Amount over base: ${provisional_income - base_threshold:,.2f}")
-        # print(f"    50% of amount over base: ${Decimal('0.5') * (provisional_income - base_threshold):,.2f}")
-        # print(f"    Maximum allowed (50% of SS): ${Decimal('0.5') * ss_benefits:,.2f}")
-        # print(f"    Taxable SS: ${taxable_ss:,.2f}")
+        print(f"    Case: Provisional income between thresholds")
+        print(f"    Amount over base: ${provisional_income - base_threshold:,.2f}")
+        print(f"    50% of amount over base: ${Decimal('0.5') * (provisional_income - base_threshold):,.2f}")
+        print(f"    Maximum allowed (50% of SS): ${Decimal('0.5') * ss_benefits:,.2f}")
+        print(f"    Taxable SS: ${taxable_ss:,.2f}")
     else:
         # For incomes above the additional threshold, the formula is more complex:
         # 50% of the amount between thresholds + 85% of the amount above additional threshold
@@ -1865,20 +1660,19 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
         
         taxable_ss = min(calculated_taxable_ss, max_taxable_ss)
         
-        # print(f"    Case: Provisional income > additional threshold")
-        # print(f"    Amount between thresholds: ${amount_between_thresholds:,.2f}")
-        # print(f"    50% of amount between thresholds: ${taxable_portion_first_tier:,.2f}")
-        # print(f"    Amount above additional threshold: ${amount_above_additional:,.2f}")
-        # print(f"    85% of amount above additional: ${taxable_portion_second_tier:,.2f}")
-        # print(f"    Calculated taxable amount: ${calculated_taxable_ss:,.2f}")
-        # print(f"    Maximum allowed (85% of SS): ${max_taxable_ss:,.2f}")
+        print(f"    Case: Provisional income > additional threshold")
+        print(f"    Amount between thresholds: ${amount_between_thresholds:,.2f}")
+        print(f"    50% of amount between thresholds: ${taxable_portion_first_tier:,.2f}")
+        print(f"    Amount above additional threshold: ${amount_above_additional:,.2f}")
+        print(f"    85% of amount above additional: ${taxable_portion_second_tier:,.2f}")
+        print(f"    Calculated taxable amount: ${calculated_taxable_ss:,.2f}")
+        print(f"    Maximum allowed (85% of SS): ${max_taxable_ss:,.2f}")
         # Avoid division by zero when calculating percentage
         if ss_benefits > 0:
             percentage = (taxable_ss / ss_benefits * 100)
-            # print(f"    Final Taxable SS: ${taxable_ss:,.2f} ({percentage:.1f}% of benefits)")
+            print(f"    Final Taxable SS: ${taxable_ss:,.2f} ({percentage:.1f}% of benefits)")
         else:
-            pass  # No SS benefits
-            # print(f"    Final Taxable SS: ${taxable_ss:,.2f} (no SS benefits)")
+            print(f"    Final Taxable SS: ${taxable_ss:,.2f} (no SS benefits)")
 
     return taxable_ss
 

@@ -206,9 +206,10 @@
                     >
                       <div class="template-preview-small">
                         <img 
-                          :src="template.preview_image || '/images/template-placeholder.png'" 
+                          :src="template.preview_image || '/images/logo-placeholder.png'" 
                           class="card-img-top"
                           :alt="template.name"
+                          @error="handleImageError"
                         >
                       </div>
                       <div class="card-body">
@@ -776,6 +777,11 @@ export default {
         custom: true
       }
       reportSections.value.push(customSection)
+    }
+
+    const handleImageError = (event) => {
+      // Fallback to a default placeholder when image fails to load
+      event.target.src = '/images/logo-placeholder.png'
     }
 
     const createReport = async () => {

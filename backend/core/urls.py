@@ -3,7 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views_main import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration, mock_report_templates, mock_reports, mock_generate_report, mock_report_status
 from . import report_views
-from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, start_scenario_calculation_async, get_task_status, cancel_task, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years, medicare_inflation_rates
+from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, comprehensive_financial_summary, start_scenario_calculation_async, get_task_status, cancel_task, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years, medicare_inflation_rates
 from .views_main import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
 from .views_main import EmailAccountViewSet, CommunicationViewSet, LeadViewSet, LeadSourceViewSet, TaskViewSet, TaskTemplateViewSet, CalendarAccountViewSet, CalendarEventViewSet, MeetingTemplateViewSet
 from .views.activity_views import ActivityLogViewSet
@@ -167,6 +167,7 @@ urlpatterns = [
     path('clients/<int:client_id>/comparison-preferences/', comparison_preferences, name='comparison-preferences'),
     path('clients/<int:client_id>/scenarios/create/', create_scenario, name='scenario-create'),
     path('scenarios/<int:scenario_id>/calculate/', run_scenario_calculation, name='scenario-calculate'),
+    path('scenarios/<int:scenario_id>/comprehensive-summary/', comprehensive_financial_summary, name='comprehensive-financial-summary'),
     path('scenarios/<int:scenario_id>/calculate-async/', start_scenario_calculation_async, name='scenario-calculate-async'),
     path('tasks/<str:task_id>/status/', get_task_status, name='task-status'),
     path('tasks/<str:task_id>/cancel/', cancel_task, name='task-cancel'),
