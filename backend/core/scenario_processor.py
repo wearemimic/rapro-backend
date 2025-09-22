@@ -1084,17 +1084,24 @@ class ScenarioProcessor:
                         asset['pre_retirement_conversions'] += conversion_amount
                     
                 asset["previous_year_balance"] = current_balance
-                
+
                 # If this account was fully converted, mark it
                 if current_balance <= Decimal('0.01'):
                     asset["fully_converted_to_roth"] = True
                     asset["current_asset_balance"] = Decimal('0')
                     self._log_debug(f"Asset fully converted during pre-retirement years")
-                    
+
                 # If conversions happened, ensure we have a Roth account to track them
                 if asset.get('pre_retirement_conversions', 0) > 0:
                     self._ensure_roth_account_exists(asset['pre_retirement_conversions'])
-            
+
+                # IMPORTANT FIX: We've already grown the asset through all projection years
+                # up to and including the target year. Don't apply growth again below.
+                asset["last_processed_year"] = year
+                asset["current_asset_balance"] = current_balance
+                self._log_debug(f"Year {year} - Projection complete. Final balance after {years_to_grow} years: ${current_balance:,.2f}")
+                return current_balance
+
         # If we've already processed this asset but need to update for a new year
         elif asset["last_processed_year"] < year - 1:
             # Calculate how many years we need to catch up
