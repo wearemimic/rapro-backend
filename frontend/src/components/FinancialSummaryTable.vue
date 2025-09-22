@@ -22,14 +22,17 @@
             <!-- Demographics Columns -->
             <th :colspan="hasSpouse ? 3 : 2" class="text-center bg-info text-white">Demographics</th>
 
+            <!-- Gross Income Column -->
+            <th colspan="1" class="text-center bg-success text-white">Income</th>
+
             <!-- Tax Columns -->
             <th colspan="5" class="text-center bg-warning">Taxes</th>
 
             <!-- Medicare Columns -->
             <th colspan="1" class="text-center bg-danger text-white">Medicare</th>
 
-            <!-- Net Income Columns -->
-            <th colspan="4" class="text-center bg-primary text-white">Net Income</th>
+            <!-- Net Income Column -->
+            <th colspan="1" class="text-center bg-primary text-white">Net Income</th>
 
             <!-- Indicators Column -->
             <th class="text-center bg-secondary text-white">Indicators</th>
@@ -39,6 +42,9 @@
             <th style="background-color: #f8f9fa;">Year</th>
             <th style="background-color: #f8f9fa;">{{ primaryName }} Age</th>
             <th v-if="hasSpouse" style="background-color: #f8f9fa;">{{ spouseName }} Age</th>
+
+            <!-- Gross Income -->
+            <th>Gross Income</th>
 
             <!-- Taxes -->
             <th>AGI</th>
@@ -51,9 +57,6 @@
             <th class="border-end">Total Medicare</th>
 
             <!-- Net Income -->
-            <th>Gross Income</th>
-            <th>After Tax</th>
-            <th>After Medicare</th>
             <th>Remaining</th>
 
             <!-- Indicators -->
@@ -72,6 +75,9 @@
             <td>{{ year.primary_age || '-' }}</td>
             <td v-if="hasSpouse">{{ year.spouse_age || '-' }}</td>
 
+            <!-- Gross Income -->
+            <td>{{ formatCurrency(year.gross_income_total || 0) }}</td>
+
             <!-- Taxes -->
             <td>{{ formatCurrency(year.agi || 0) }}</td>
             <td>{{ formatCurrency(year.magi || 0) }}</td>
@@ -83,9 +89,6 @@
             <td class="border-end">{{ formatCurrency(year.total_medicare || 0) }}</td>
 
             <!-- Net Income -->
-            <td>{{ formatCurrency(year.gross_income_total || 0) }}</td>
-            <td>{{ formatCurrency(year.after_tax_income || 0) }}</td>
-            <td>{{ formatCurrency(year.after_medicare_income || 0) }}</td>
             <td class="fw-bold">{{ formatCurrency(year.remaining_income || 0) }}</td>
 
             <!-- Indicators -->
