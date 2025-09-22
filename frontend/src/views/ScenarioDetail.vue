@@ -101,7 +101,7 @@
                   <button class="btn btn-primary dropdown-toggle" type="button" @click="toggleActionsDropdown" :aria-expanded="actionsDropdownOpen">
                     Actions
                   </button>
-                  <ul class="dropdown-menu" :class="{ 'show': actionsDropdownOpen }">
+                  <ul class="dropdown-menu dropdown-menu-end" :class="{ 'show': actionsDropdownOpen }">
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('scratch')"><i class="bi-plus-circle me-2"></i>New Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="createScenario('duplicate')"><i class="bi-files me-2"></i>Duplicate Scenario</a></li>
                     <li><a class="dropdown-item" href="#" @click.prevent="editScenario"><i class="bi-pencil me-2"></i>Edit Scenario</a></li>

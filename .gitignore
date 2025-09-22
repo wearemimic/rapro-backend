@@ -74,3 +74,5 @@ terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/.terraform.lock.hcl
+COMPREHENSIVE_TABLES_MIGRATION_GUIDE.html
+COMPREHENSIVE_TABLES_MIGRATION_GUIDE.md

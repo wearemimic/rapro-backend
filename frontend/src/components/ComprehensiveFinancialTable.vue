@@ -21,7 +21,9 @@
           <thead>
             <tr class="header-row-first">
             <!-- Demographics Columns (Sticky) -->
+
             <th :colspan="hasSpouse ? 3 : 2" class="text-center bg-info text-white demo-header-sticky" style="position: sticky; left: 0; z-index: 11;">Demographics</th>
+
 
             <!-- Income Sources Columns -->
             <th v-if="incomeSourceColumns.length > 0" :colspan="incomeSourceColumns.length" class="text-center bg-success text-white" style="background-color: #28a745 !important;">

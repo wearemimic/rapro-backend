@@ -717,17 +717,21 @@ const youngestCurrentAge = computed(() => {
 // Dynamic age options based on income type
 const getAgeOptions = (incomeType, startAge = null) => {
   let minAge, maxAge;
-  
+
   if (['Wages', 'Rental_Income', 'Other'].includes(incomeType)) {
     // For these income types, start from current age of youngest person
     minAge = startAge || youngestCurrentAge.value;
     maxAge = 100;
+  } else if (incomeType === 'Pension') {
+    // For pensions, start from age 50
+    minAge = 50;
+    maxAge = 100;
   } else {
-    // For other income types (social security, pension, etc.), use standard retirement age range
+    // For other income types (social security, etc.), use standard retirement age range
     minAge = 62;
     maxAge = 100;
   }
-  
+
   const ageRange = maxAge - minAge + 1;
   return Array.from({ length: ageRange }, (_, i) => minAge + i);
 };
