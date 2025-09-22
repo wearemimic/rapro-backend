@@ -11,11 +11,11 @@
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label>First Name</label>
-                  <input v-model="form.first_name" class="form-control" required minlength="3" maxlength="30">
+                  <input v-model="form.first_name" class="form-control" required minlength="2" maxlength="30">
                 </div>
                 <div class="col-md-6 mb-3">
                   <label>Last Name</label>
-                  <input v-model="form.last_name" class="form-control" required minlength="5" maxlength="30">
+                  <input v-model="form.last_name" class="form-control" required minlength="2" maxlength="30">
                 </div>
               </div>
 
@@ -77,11 +77,11 @@
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label>Spouse First Name</label>
-                <input v-model="form.spouse_first_name" class="form-control" required>
+                <input v-model="form.spouse_first_name" class="form-control" required minlength="2" maxlength="30">
               </div>
               <div class="col-md-6 mb-3">
                 <label>Spouse Last Name</label>
-                <input v-model="form.spouse_last_name" class="form-control" required>
+                <input v-model="form.spouse_last_name" class="form-control" required minlength="2" maxlength="30">
               </div>
             </div>
             <div class="row">
