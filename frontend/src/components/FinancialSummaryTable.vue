@@ -20,7 +20,7 @@
         <thead class="thead-light" style="position: sticky; top: 0; z-index: 20;">
           <tr>
             <!-- Demographics Columns -->
-            <th colspan="3" class="text-center bg-info text-white">Demographics</th>
+            <th :colspan="hasSpouse ? 3 : 2" class="text-center bg-info text-white">Demographics</th>
 
             <!-- Tax Columns -->
             <th colspan="5" class="text-center bg-warning">Taxes</th>
