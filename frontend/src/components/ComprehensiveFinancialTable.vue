@@ -15,40 +15,46 @@
     </div>
 
     <!-- Table Content -->
-    <div v-else-if="tableData && tableData.length > 0" class="table-responsive" style="overflow-x: auto;">
-      <table class="table table-hover table-sm" style="min-width: 1400px;">
-        <thead class="thead-light" style="position: sticky; top: 0; z-index: 20;">
-          <tr>
+    <div v-else-if="tableData && tableData.length > 0" class="table-wrapper">
+      <div class="table-scroll-container">
+        <table class="table table-hover table-sm">
+          <thead>
+            <tr class="header-row-first">
             <!-- Demographics Columns (Sticky) -->
-            <th :colspan="hasSpouse ? 3 : 2" class="text-center bg-info text-white">Demographics</th>
+
+            <th :colspan="hasSpouse ? 3 : 2" class="text-center bg-info text-white demo-header-sticky" style="position: sticky; left: 0; z-index: 11;">Demographics</th>
+
 
             <!-- Income Sources Columns -->
-            <th v-if="incomeSourceColumns.length > 0" :colspan="incomeSourceColumns.length" class="text-center bg-success text-white">
+            <th v-if="incomeSourceColumns.length > 0" :colspan="incomeSourceColumns.length" class="text-center bg-success text-white" style="background-color: #28a745 !important;">
               Income Sources
             </th>
 
             <!-- Asset Balances Columns -->
-            <th v-if="assetBalanceColumns.length > 0" :colspan="assetBalanceColumns.length" class="text-center bg-success text-white">
+            <th v-if="assetBalanceColumns.length > 0" :colspan="assetBalanceColumns.length" class="text-center bg-secondary text-white" style="background-color: #6c757d !important;">
               Asset Balances
             </th>
 
             <!-- RMD Columns -->
-            <th colspan="2" class="text-center bg-success text-white">RMDs</th>
+            <th colspan="2" class="text-center bg-dark text-white" style="background-color: #343a40 !important;">RMDs</th>
 
             <!-- Tax Columns -->
-            <th colspan="7" class="text-center bg-warning">Taxes</th>
+            <th colspan="7" class="text-center bg-warning" style="background-color: #ffc107 !important;">Taxes</th>
 
             <!-- Medicare Columns -->
-            <th colspan="5" class="text-center bg-danger text-white">Medicare/IRMAA</th>
+            <th colspan="5" class="text-center bg-danger text-white" style="background-color: #dc3545 !important;">Medicare/IRMAA</th>
 
-            <!-- Net Income Columns -->
-            <th colspan="4" class="text-center bg-primary text-white">Net Income</th>
-          </tr>
-          <tr style="background-color: #f8f9fa;">
+            <!-- Income Phases Columns -->
+            <th colspan="3" class="text-center bg-primary text-white" style="background-color: #007bff !important;">Income Phases</th>
+
+            <!-- Net Income Column -->
+            <th colspan="1" class="text-center bg-success text-white" style="position: sticky; right: 0; z-index: 11;">Net Income</th>
+            </tr>
+            <tr class="header-row-second">
             <!-- Demographics -->
             <th style="position: sticky; left: 0; z-index: 10; background-color: #f8f9fa;">Year</th>
-            <th style="background-color: #f8f9fa;">{{ primaryName }} Age</th>
-            <th v-if="hasSpouse" style="background-color: #f8f9fa;">{{ spouseName }} Age</th>
+            <th :class="{ 'demo-last-col': !hasSpouse }" style="position: sticky; left: 60px; z-index: 10; background-color: #f8f9fa;">{{ primaryName }} Age</th>
+            <th v-if="hasSpouse" class="demo-last-col" style="position: sticky; left: 160px; z-index: 10; background-color: #f8f9fa;">{{ spouseName }} Age</th>
 
             <!-- Income Sources -->
             <th v-for="source in incomeSourceColumns" :key="`income-${source.id}`">
@@ -80,10 +86,12 @@
             <th>Bracket</th>
             <th class="border-end">Total Medicare</th>
 
-            <!-- Net Income -->
+            <!-- Income Phases -->
             <th>Gross Income</th>
             <th>After Tax</th>
-            <th>After Medicare</th>
+            <th class="border-end">After Medicare</th>
+
+            <!-- Net Income -->
             <th class="sticky-column fw-bold" style="position: sticky; right: 0; z-index: 10; background-color: #f8f9fa;">
               Remaining
             </th>
@@ -93,8 +101,8 @@
           <tr v-for="year in tableData" :key="year.year">
             <!-- Demographics -->
             <td style="position: sticky; left: 0; background-color: white; z-index: 5;">{{ year.year }}</td>
-            <td>{{ year.primary_age || '-' }}</td>
-            <td v-if="hasSpouse">{{ year.spouse_age || '-' }}</td>
+            <td :class="{ 'demo-last-col': !hasSpouse }" style="position: sticky; left: 60px; background-color: white; z-index: 5;">{{ year.primary_age || '-' }}</td>
+            <td v-if="hasSpouse" class="demo-last-col" style="position: sticky; left: 160px; background-color: white; z-index: 5;">{{ year.spouse_age || '-' }}</td>
 
             <!-- Income Sources -->
             <td v-for="source in incomeSourceColumns" :key="`income-${source.id}-${year.year}`">
@@ -141,16 +149,19 @@
             </td>
             <td class="border-end">{{ formatCurrency(year.total_medicare || 0) }}</td>
 
-            <!-- Net Income -->
+            <!-- Income Phases -->
             <td>{{ formatCurrency(year.gross_income_total || 0) }}</td>
             <td>{{ formatCurrency(year.after_tax_income || 0) }}</td>
-            <td>{{ formatCurrency(year.after_medicare_income || 0) }}</td>
+            <td class="border-end">{{ formatCurrency(year.after_medicare_income || 0) }}</td>
+
+            <!-- Net Income -->
             <td class="sticky-column fw-bold" style="position: sticky; right: 0; background-color: #f8f9fa; z-index: 5;">
               {{ formatCurrency(year.remaining_income || 0) }}
             </td>
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Empty State -->
@@ -351,28 +362,51 @@ export default {
   position: relative;
 }
 
-.sticky-column {
-  position: sticky;
-  background-color: #f8f9fa;
-  font-weight: 500;
+/* Table wrapper */
+.table-wrapper {
+  width: 100%;
 }
 
-/* Keep Bootstrap color classes intact */
-.table thead tr:first-child th {
+.table-scroll-container {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Table sizing */
+.table {
+  min-width: 1400px;
+}
+
+/* Header styling - no sticky for now */
+.table thead {
+  background: white;
+}
+
+/* Header rows */
+.header-row-first th {
+  /* First row styling */
+}
+
+.header-row-second th {
+  background-color: #f8f9fa;
+}
+
+/* Ensure all header cells have solid backgrounds */
+.table thead tr.header-row-first th {
   font-weight: 700;
   text-transform: uppercase;
   font-size: 0.8rem;
   letter-spacing: 0.5px;
 }
 
-.table thead tr:nth-child(2) th {
+.table thead tr.header-row-second th {
   border-bottom: 1px solid #dee2e6;
   font-weight: 600;
   font-size: 0.875rem;
+  background-color: #f8f9fa;
 }
 
 .table th {
-  background-color: #f8f9fa;
   font-weight: 600;
   font-size: 0.875rem;
   white-space: nowrap;
@@ -385,9 +419,10 @@ export default {
   vertical-align: middle;
 }
 
-.table-responsive {
-  max-height: 600px;
-  overflow: auto;
+.sticky-column {
+  position: sticky;
+  background-color: #f8f9fa;
+  font-weight: 500;
 }
 
 /* Zebra striping */
@@ -408,6 +443,16 @@ export default {
 /* Sticky styling enhancements */
 .sticky-column {
   box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+/* Add shadow to the last demographic column for visual separation */
+.demo-last-col {
+  box-shadow: 3px 0 5px rgba(0,0,0,0.1);
+}
+
+/* Sticky demographics header */
+.demo-header-sticky {
+  box-shadow: 3px 0 5px rgba(0,0,0,0.1);
 }
 
 /* Badge styles */
