@@ -943,7 +943,10 @@ class ScenarioProcessor:
                     return Decimal('0')
         
         # Handle regular and inherited spouse accounts
-        if rmd_start_age is None or current_age < rmd_start_age:
+        if rmd_start_age is None:
+            self._log_debug(f"Year {year} - No RMD start age defined")
+            return 0
+        if current_age < rmd_start_age:
             self._log_debug(f"Year {year} - Owner age {current_age} below RMD start age {rmd_start_age}")
             return 0
 
@@ -1016,11 +1019,14 @@ class ScenarioProcessor:
 
         # Calculate annual contributions only if current age is less than start age
         annual_contribution = 0
-        if current_age < start_age:
+        if start_age is not None and current_age < start_age:
             annual_contribution = monthly_contribution * 12
             self._log_debug(f"Year {year} - Current age {current_age} < withdrawal start age {start_age}, applying annual contribution: ${annual_contribution}")
         else:
-            self._log_debug(f"Year {year} - Current age {current_age} >= withdrawal start age {start_age}, no contributions")
+            if start_age is not None:
+                self._log_debug(f"Year {year} - Current age {current_age} >= withdrawal start age {start_age}, no contributions")
+            else:
+                self._log_debug(f"Year {year} - No withdrawal start age defined, no contributions")
 
         # Get current year and check if this is the first time we're processing this asset
         current_year = datetime.datetime.now().year
@@ -1054,7 +1060,7 @@ class ScenarioProcessor:
                     projection_age = projection_year - birthdate.year
                     
                     # Apply contributions only if before withdrawal age
-                    if projection_age < start_age:
+                    if start_age is not None and projection_age < start_age:
                         current_balance += annual_contribution
                         self._log_debug(f"Projection Year {projection_year} - Age {projection_age} < {start_age}, added contribution: ${annual_contribution}")
                     
@@ -1116,7 +1122,7 @@ class ScenarioProcessor:
                 catch_up_age = catch_up_year - birthdate.year
                 
                 # Apply contributions only if before withdrawal age
-                if catch_up_age < start_age:
+                if start_age is not None and catch_up_age < start_age:
                     current_balance += annual_contribution
                     self._log_debug(f"Catch-up Year {catch_up_year} - Age {catch_up_age} < {start_age}, added contribution: ${annual_contribution}")
                 
@@ -1129,7 +1135,7 @@ class ScenarioProcessor:
         current_balance = asset["previous_year_balance"]
         
         # Apply contributions for current year if in contribution phase (before withdrawal age)
-        if current_age < start_age:
+        if start_age is not None and current_age < start_age:
             current_balance += annual_contribution
             self._log_debug(f"Year {year} - Added contribution: ${annual_contribution}")
         
