@@ -1,33 +1,10 @@
 <template>
   <div>
-    <!-- Toggle between views -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Income Analysis</h5>
-          <div class="btn-group" role="group">
-            <button
-              type="button"
-              :class="['btn', 'btn-sm', viewMode === 'simple' ? 'btn-primary' : 'btn-outline-primary']"
-              @click="viewMode = 'simple'">
-              Simple View
-            </button>
-            <button
-              type="button"
-              :class="['btn', 'btn-sm', viewMode === 'comprehensive' ? 'btn-primary' : 'btn-outline-primary']"
-              @click="viewMode = 'comprehensive'">
-              Comprehensive View
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Comprehensive Financial Table (New PRD View) -->
-    <div v-if="viewMode === 'comprehensive'" class="card mb-3 mb-lg-5">
+    <!-- Comprehensive Financial Table -->
+    <div class="card mb-3 mb-lg-5">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-4">
-          <h5 class="mb-0">TABLE 2</h5>
+          <h5 class="mb-0">Income Analysis</h5>
           <button
             @click="exportToCSV"
             class="btn btn-sm btn-outline-secondary">
@@ -42,8 +19,8 @@
       </div>
     </div>
 
-    <!-- Original Income Projection Table (Simple View) -->
-    <div v-else class="card mb-3 mb-lg-5">
+    <!-- Original Income Projection Table (Hidden) -->
+    <div v-if="false" class="card mb-3 mb-lg-5">
       <div class="card-body">
         <h5 class="mb-4">Income Projection Table</h5>
 
@@ -270,9 +247,7 @@ export default {
       // Modal state
       showAssetDetailModal: false,
       selectedAsset: null,
-      isLoadingGraph: false,
-      // View mode for toggling between simple and comprehensive
-      viewMode: 'simple'  // 'simple' or 'comprehensive'
+      isLoadingGraph: false
     };
   },
   mounted() {
