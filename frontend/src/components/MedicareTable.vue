@@ -20,7 +20,7 @@
         <thead class="thead-light" style="position: sticky; top: 0; z-index: 20;">
           <tr>
             <!-- Demographics Columns -->
-            <th colspan="3" class="text-center bg-info text-white">Demographics</th>
+            <th :colspan="hasSpouse ? 3 : 2" class="text-center bg-info text-white">Demographics</th>
 
             <!-- Medicare Columns -->
             <th colspan="4" class="text-center bg-danger text-white">Medicare</th>
@@ -79,7 +79,7 @@
         </tbody>
         <tfoot>
           <tr style="font-weight: bold;">
-            <td colspan="3"><strong>Total</strong></td>
+            <td :colspan="hasSpouse ? 3 : 2"><strong>Total</strong></td>
             <td>{{ formatCurrency(tableData.reduce((total, row) => total + parseFloat(row.part_b || 0), 0)) }}</td>
             <td>{{ formatCurrency(tableData.reduce((total, row) => total + parseFloat(row.part_d || 0), 0)) }}</td>
             <td>{{ formatCurrency(tableData.reduce((total, row) => total + parseFloat(row.irmaa_surcharge || 0), 0)) }}</td>
