@@ -1844,8 +1844,23 @@ def calculate_taxable_social_security(ss_benefits, agi, tax_exempt_interest, fil
     elif filing_status == "Married Filing Jointly":
         base_threshold = Decimal('32000')
         additional_threshold = Decimal('44000')
+    elif filing_status == "Married Filing Separately":
+        # Married Filing Separately has much lower thresholds
+        base_threshold = Decimal('0')
+        additional_threshold = Decimal('0')
+    elif filing_status == "Head of Household":
+        # Head of Household uses same thresholds as Single
+        base_threshold = Decimal('25000')
+        additional_threshold = Decimal('34000')
+    elif filing_status == "Qualifying Widow(er)":
+        # Qualifying Widow(er) uses same thresholds as Married Filing Jointly
+        base_threshold = Decimal('32000')
+        additional_threshold = Decimal('44000')
     else:
-        raise ValueError("Unsupported filing status")
+        # Default to Single thresholds for any unknown status
+        self._log_debug(f"Warning: Unknown filing status '{filing_status}', defaulting to Single thresholds")
+        base_threshold = Decimal('25000')
+        additional_threshold = Decimal('34000')
         
     # print(f"    Filing Status: {filing_status}")
     # print(f"    Base threshold: ${base_threshold:,.2f}")
