@@ -613,14 +613,14 @@ class ScenarioProcessor:
             else:
                 self._log_debug(f"Year {year}: No {lookback_year} MAGI history, using current MAGI (${magi:,.2f})")
 
-            medicare_base, irmaa, total_medicare, base_part_d, part_d_irmaa, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year)
+            medicare_base, irmaa_surcharge_annual, total_medicare, base_part_d, part_d_irmaa_annual, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year)
             total_medicare = Decimal(total_medicare)
             
             # print(f"\nMEDICARE COSTS:")
             # print(f"  Medicare Base: ${medicare_base:,.2f}")
-            # print(f"  IRMAA: ${irmaa:,.2f}")
+            # print(f"  IRMAA Part B Surcharge: ${irmaa_surcharge_annual:,.2f}")
             # print(f"  Part D: ${base_part_d:,.2f}")
-            # print(f"  Part D IRMAA: ${part_d_irmaa:,.2f}")
+            # print(f"  Part D IRMAA: ${part_d_irmaa_annual:,.2f}")
             # print(f"  Total Medicare: ${total_medicare:,.2f}")
 
             # STEP 6: Roth Conversion Module (Joint Household, Phase 1)
@@ -670,7 +670,8 @@ class ScenarioProcessor:
             # Legacy calculations (kept for backward compatibility)
             net_income = gross_income + ss_income - federal_tax - effective_medicare
             remaining_ss = ss_income - effective_medicare
-            irmaa = irmaa + part_d_irmaa
+            # Total IRMAA surcharge (Part B + Part D) for annual reporting
+            total_irmaa_surcharge_annual = irmaa_surcharge_annual + part_d_irmaa_annual
             
             # print(f"\nFINAL RESULTS FOR YEAR {year}:")
             # print(f"  Gross Income: ${gross_income:,.2f}")
@@ -788,7 +789,7 @@ class ScenarioProcessor:
                 "medicare_base": round(medicare_base, 2),
                 "part_b": round(medicare_base, 2),
                 "part_d": round(base_part_d, 2),
-                "irmaa_surcharge": round(irmaa, 2),
+                "irmaa_surcharge": round(total_irmaa_surcharge_annual, 2),
                 "irmaa_threshold": first_irmaa_threshold,
                 "irmaa_bracket_number": irmaa_bracket_number,
                 "irmaa_bracket_threshold": float(current_irmaa_bracket['magi_threshold']) if current_irmaa_bracket else None,
@@ -1527,9 +1528,6 @@ class ScenarioProcessor:
         if filing_status == "Married Filing Jointly":
             base_part_b *= 2
             base_part_d *= 2
-        
-        # Total IRMAA (base + surcharge)
-        irmaa = base_part_b + part_b_surcharge
 
         # Retrieve inflation rates from the scenario
         part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
@@ -1543,11 +1541,11 @@ class ScenarioProcessor:
         for _ in range(years_until_current):
             base_part_b *= (1 + part_b_inflation_rate)
             base_part_d *= (1 + part_d_inflation_rate)
-            irmaa *= (1 + part_d_inflation_rate)
+            part_b_surcharge *= (1 + part_b_inflation_rate)  # Inflate the surcharge directly
             part_d_irmaa *= (1 + part_d_inflation_rate)
 
-        # Calculate the IRMAA cost separately
-        irmaa_cost = irmaa - base_part_b
+        # IRMAA cost is just the inflated surcharge
+        irmaa_cost = part_b_surcharge
 
         if irmaa_cost < 0:
             irmaa_cost = 0
@@ -1556,15 +1554,16 @@ class ScenarioProcessor:
         total_medicare_monthly = base_part_b + irmaa_cost + base_part_d + part_d_irmaa
 
         # Log the adjusted values
-        self._log_debug(f"Year {year} - Inflated Medicare Base Part B: {base_part_b}, Inflated IRMAA: {irmaa}, Base Part D: {base_part_d}, Part D IRMAA: {part_d_irmaa}, Total Medicare Monthly: {total_medicare_monthly}")
+        self._log_debug(f"Year {year} - Inflated Medicare Base Part B: {base_part_b}, Inflated IRMAA Part B Surcharge: {irmaa_cost}, Base Part D: {base_part_d}, Part D IRMAA: {part_d_irmaa}, Total Medicare Monthly: {total_medicare_monthly}")
 
         total_medicare_annual = total_medicare_monthly * 12  # Calculate total annual cost
-        self._log_debug(f"Adjusted Medicare Base Part B: {base_part_b}, Adjusted IRMAA: {irmaa}, Base Part D: {base_part_d}, Part D IRMAA: {part_d_irmaa}, Total Medicare Annual: {total_medicare_annual}")
+        self._log_debug(f"Adjusted Medicare Base Part B: {base_part_b}, Adjusted IRMAA Part B Surcharge: {irmaa_cost}, Base Part D: {base_part_d}, Part D IRMAA: {part_d_irmaa}, Total Medicare Annual: {total_medicare_annual}")
         base_part_b_annual = base_part_b * 12
         base_part_d_annual = base_part_d * 12
         irmaa_cost_annual = irmaa_cost * 12
-        
-        return base_part_b_annual, irmaa_cost_annual, total_medicare_annual, base_part_d_annual, part_d_irmaa, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number
+        part_d_irmaa_annual = part_d_irmaa * 12
+
+        return base_part_b_annual, irmaa_cost_annual, total_medicare_annual, base_part_d_annual, part_d_irmaa_annual, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number
 
     def _calculate_roth_conversion(self, year):
         """
