@@ -162,7 +162,7 @@
             <!-- Message Content -->
             <div class="card-body flex-grow-1" style="overflow-y: auto;">
               <div class="message-content">
-                <div class="message-body" v-html="formatMessageContent(selectedMessage.content)"></div>
+                <div class="message-body" v-html="sanitizeMessageContent(selectedMessage.content)"></div>
                 
                 <!-- Attachments -->
                 <div v-if="selectedMessage.attachments && selectedMessage.attachments.length > 0" class="message-attachments mt-3">
@@ -336,6 +336,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useCommunicationStore } from '@/stores/communicationStore.js'
+import { sanitizeHTML } from '@/utils/sanitizer'
 
 const props = defineProps({
   client: {
@@ -520,8 +521,12 @@ const formatDateTime = (dateString) => {
   })
 }
 
-const formatMessageContent = (content) => {
-  return content.replace(/\n/g, '<br>')
+const sanitizeMessageContent = (content) => {
+  if (!content) return ''
+  // Convert newlines to <br> tags first
+  const withBreaks = content.replace(/\n/g, '<br>')
+  // Then sanitize to prevent XSS
+  return sanitizeHTML(withBreaks, false)
 }
 
 const truncateText = (text, maxLength) => {

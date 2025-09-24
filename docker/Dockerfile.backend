@@ -15,5 +15,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Explicitly ensure pdfcrowd is installed
 RUN pip install pdfcrowd==6.5.2
 COPY backend/ .
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 CMD ["gunicorn", "retirementadvisorpro.wsgi:application", "--bind", "0.0.0.0:8000"]

@@ -6,12 +6,13 @@ from .models import (
     CustomUser, Client, Scenario, Spouse, RealEstate, ReportTemplate, TemplateSlide,
     EmailAccount, Communication, Lead, LeadSource, SMSMessage, TwilioConfiguration, ActivityLog,
     Task, TaskTemplate, TaskComment, CalendarAccount, CalendarEvent, MeetingTemplate, CalendarEventReminder,
-    Document, DocumentCategory, DocumentVersion, DocumentPermission, DocumentAuditLog, 
+    Document, DocumentCategory, DocumentVersion, DocumentPermission, DocumentAuditLog,
     DocumentTemplate, DocumentRetentionPolicy
 )
 import logging
 from django.contrib.auth import get_user_model
 import json
+from .sanitizers import SerializerSanitizerMixin, sanitize_user_input
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,10 @@ class ClientCreateSerializer(serializers.ModelSerializer):
 
         return client
     
-class ClientSerializer(serializers.ModelSerializer):
+class ClientSerializer(SerializerSanitizerMixin, serializers.ModelSerializer):
+    # Sanitize user input in names and notes
+    SANITIZE_FIELDS = ['first_name', 'last_name', 'notes', 'email']
+    STRICT_SANITIZE_FIELDS = ['first_name', 'last_name', 'email']
     advisor = serializers.HiddenField(default=serializers.CurrentUserDefault())
     spouse_first_name = serializers.CharField(required=False, allow_blank=True)
     spouse_last_name = serializers.CharField(required=False, allow_blank=True)
@@ -158,7 +162,10 @@ class ClientEditSerializer(serializers.ModelSerializer):
         return instance
 
 
-class ScenarioSummarySerializer(serializers.ModelSerializer):
+class ScenarioSummarySerializer(SerializerSanitizerMixin, serializers.ModelSerializer):
+    # Sanitize scenario names and descriptions
+    SANITIZE_FIELDS = ['name', 'description', 'notes']
+    STRICT_SANITIZE_FIELDS = ['name']
     class Meta:
         model = Scenario
         fields = [
@@ -439,7 +446,10 @@ class EmailAccountSerializer(serializers.ModelSerializer):
         return "Never"
 
 
-class CommunicationSerializer(serializers.ModelSerializer):
+class CommunicationSerializer(SerializerSanitizerMixin, serializers.ModelSerializer):
+    # Sanitize communication content
+    SANITIZE_FIELDS = ['subject', 'content', 'notes', 'ai_suggested_response']
+    STRICT_SANITIZE_FIELDS = ['subject']
     client_name = serializers.SerializerMethodField()
     lead_name = serializers.SerializerMethodField()
     recipient_type = serializers.SerializerMethodField()

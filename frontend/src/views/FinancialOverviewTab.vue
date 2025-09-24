@@ -699,8 +699,10 @@ export default {
           if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
             const circleElement = document.getElementById('circle-financial');
             if (circleElement) {
-              // Clear previous SVG if any
-              circleElement.innerHTML = '';
+              // Clear previous SVG if any (safe operation - not user input)
+              while (circleElement.firstChild) {
+                circleElement.removeChild(circleElement.firstChild);
+              }
               const total = this.totalGrossIncome;
               const tax = this.totalTax;
               const medicare = this.totalMedicare;

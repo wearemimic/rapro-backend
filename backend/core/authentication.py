@@ -322,29 +322,29 @@ User = get_user_model()
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Custom JWT serializer to include admin claims"""
-    
+    """Custom JWT serializer - admin claims removed for security"""
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        
-        # Add admin-related claims to the token
-        token['is_admin_user'] = user.is_admin_user
-        token['admin_role'] = user.admin_role or ''
-        token['admin_permissions'] = user.admin_permissions or {}
-        
-        # Add other user claims
+
+        # Only include non-sensitive user claims
+        # Admin claims should be fetched server-side, not stored in JWT
         token['user_id'] = user.id
         token['email'] = user.email
         token['company_name'] = user.company_name or ''
         token['subscription_status'] = user.subscription_status or ''
-        
+
+        # Add a flag to indicate if user has admin privileges
+        # But don't include the actual permissions in the token
+        token['has_admin_access'] = user.is_admin_user
+
         return token
 
 
 class CustomRefreshToken(RefreshToken):
-    """Custom refresh token with admin claims"""
-    
+    """Custom refresh token - admin claims removed for security"""
+
     @classmethod
     def for_user(cls, user):
         """
@@ -354,17 +354,15 @@ class CustomRefreshToken(RefreshToken):
         token = cls()
         token[cls.token_type] = cls.token_type
         token['user_id'] = user.pk
-        
-        # Add admin-related claims
-        token['is_admin_user'] = user.is_admin_user
-        token['admin_role'] = user.admin_role or ''
-        token['admin_permissions'] = user.admin_permissions or {}
-        
-        # Add other user claims
+
+        # Only include non-sensitive claims
         token['email'] = user.email
         token['company_name'] = user.company_name or ''
         token['subscription_status'] = user.subscription_status or ''
-        
+
+        # Simple flag for admin access, not the actual permissions
+        token['has_admin_access'] = user.is_admin_user
+
         return token
 
 
@@ -397,42 +395,36 @@ class CustomJWTAuthentication(JWTAuthentication):
     
     def get_user(self, validated_token):
         """
-        Override to add admin claims from token to user object
+        Override to fetch fresh admin claims from database (not from token for security)
         """
-        print(f"🎫 CustomJWTAuthentication.get_user called with token: {validated_token}")
+        print(f"🎫 CustomJWTAuthentication.get_user called")
         user = super().get_user(validated_token)
         print(f"👤 Retrieved user: {user.id} ({user.email})")
-        
-        # Get admin claims from token payload
-        is_admin_user = validated_token.get('is_admin_user', False)
-        admin_role = validated_token.get('admin_role', '')
-        admin_permissions = validated_token.get('admin_permissions', {})
-        
-        # Temporarily override user properties with token claims
-        # This ensures the decorators see the admin status from the token
-        if is_admin_user:
-            # Store original values
-            user._original_admin_role = user.admin_role
-            user._original_admin_permissions = user.admin_permissions
-            user._original_is_platform_admin = user.is_platform_admin
-            user._original_can_access_admin_section = user.can_access_admin_section
-            
-            # Override with token values (set writable fields instead of read-only property)
-            user.admin_role = admin_role
-            user.admin_permissions = admin_permissions
-            # Set is_platform_admin to True to make is_admin_user property return True
-            user.is_platform_admin = True
-            
-            # Override the can_access_admin_section method
-            def token_can_access_admin_section(section):
-                """Always return True for super_admin from token"""
-                if admin_role == 'super_admin':
-                    return True
-                # Fallback to original method
-                return user._original_can_access_admin_section(section)
-            
-            user.can_access_admin_section = token_can_access_admin_section
-        
+
+        # Check if user has admin access flag in token
+        has_admin_access = validated_token.get('has_admin_access', False)
+
+        if has_admin_access:
+            # Fetch fresh admin claims from database (not from token)
+            # This prevents token manipulation attacks
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                fresh_user = User.objects.get(pk=user.pk)
+
+                # Use actual database values for admin permissions
+                user.is_platform_admin = fresh_user.is_platform_admin
+                user.admin_role = fresh_user.admin_role
+                user.admin_permissions = fresh_user.admin_permissions
+
+                print(f"✅ Admin claims fetched from database for user {user.email}")
+            except Exception as e:
+                print(f"⚠️ Error fetching admin claims: {str(e)}")
+                # Default to no admin access if fetch fails
+                user.is_platform_admin = False
+                user.admin_role = None
+                user.admin_permissions = {}
+
         return user
 
 

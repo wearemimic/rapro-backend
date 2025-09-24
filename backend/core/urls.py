@@ -26,6 +26,7 @@ from .webhooks import stripe_webhook
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
 from .auth0_views import auth0_login_redirect, auth0_login_google, auth0_callback, auth0_logout, auth0_exchange_code, complete_professional_info, auth0_complete_registration, validate_coupon, embedded_signup, create_account, change_password
+from . import cookie_auth_views
 from .views_stripe import get_subscription_plans, validate_coupon_dynamic
 from .billing_views import (
     subscription_details, cancel_subscription, reactivate_subscription,
@@ -156,6 +157,15 @@ urlpatterns = [
     path('auth0/complete-registration/', auth0_complete_registration, name='auth0_complete_registration'),  # Registration completion with Stripe
     path('change-password/', change_password, name='change_password'),  # Password change for Auth0 users
     path('validate-coupon/', validate_coupon, name='validate_coupon'),  # Coupon validation (legacy)
+
+    # Cookie-based authentication endpoints (secure)
+    path('auth/cookie/login/', cookie_auth_views.cookie_login, name='cookie_login'),
+    path('auth/cookie/auth0/', cookie_auth_views.cookie_auth0_exchange, name='cookie_auth0'),
+    path('auth/cookie/logout/', cookie_auth_views.cookie_logout, name='cookie_logout'),
+    path('auth/cookie/refresh/', cookie_auth_views.cookie_refresh, name='cookie_refresh'),
+    path('auth/cookie/verify/', cookie_auth_views.verify_auth, name='verify_auth'),
+    path('auth/cookie/csrf/', cookie_auth_views.get_csrf_token, name='get_csrf'),
+    path('auth/cookie/migrate/', cookie_auth_views.migrate_to_cookie_auth, name='migrate_auth'),
     
     # Dynamic Stripe pricing endpoints
     path('subscription-plans/', get_subscription_plans, name='subscription_plans'),  # Get dynamic subscription plans from Stripe

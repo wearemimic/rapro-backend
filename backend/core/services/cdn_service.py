@@ -226,7 +226,8 @@ class CDNService:
         try:
             with open(file_path, 'rb') as f:
                 content = f.read()
-                return hashlib.md5(content).hexdigest()[:8]
+                # Use SHA256 for content hashing (truncated for CDN cache keys)
+                return hashlib.sha256(content).hexdigest()[:16]
         except Exception as e:
             logger.error(f"Failed to generate hash for {file_path}: {str(e)}")
             return None

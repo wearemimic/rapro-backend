@@ -92,9 +92,16 @@
             <td class="fw-bold">{{ formatCurrency(year.remaining_income || 0) }}</td>
 
             <!-- Indicators -->
-            <td class="text-center">
+            <td class="text-center" style="position: relative;">
               <span v-if="year.ss_decrease_applied" class="me-1" title="Social Security Decrease Applied">📉</span>
-              <span v-if="year.hold_harmless_applied" :title="`Hold Harmless Protection: Saved ${formatCurrency(year.hold_harmless_amount || 0)}`">🔒</span>
+              <span v-if="isIrmaaBracketHit(year, idx)" class="irmaa-info-icon" @click.stop="toggleIrmaaTooltip(idx)" title="IRMAA Information" :style="{ marginLeft: year.ss_decrease_applied ? '5px' : '0' }">
+                ℹ️
+              </span>
+              <span v-if="year.hold_harmless_applied" :title="`Hold Harmless Protection: Saved ${formatCurrency(year.hold_harmless_amount || 0)}`" :style="{ marginLeft: (year.ss_decrease_applied || isIrmaaBracketHit(year, idx)) ? '5px' : '0' }">🔒</span>
+              <!-- IRMAA Tooltip -->
+              <div v-if="openIrmaaTooltipIdx === idx" class="irmaa-popover">
+                {{ getIrmaaBracketLabel(year) }}
+              </div>
             </td>
           </tr>
         </tbody>
@@ -135,6 +142,7 @@ export default {
     const loading = ref(false);
     const error = ref(null);
     const comprehensiveData = ref(null);
+    const openIrmaaTooltipIdx = ref(null);
 
     // Computed properties
     const tableData = computed(() => {
@@ -180,6 +188,30 @@ export default {
 
       // Show indicator if bracket number changed (either up or down)
       return currentBracket !== prevBracket;
+    };
+
+    const getIrmaaBracketLabel = (row) => {
+      const magi = Number(row.magi);
+      const bracketNum = row.irmaa_bracket_number || 0;
+      const bracketThreshold = Number(row.irmaa_bracket_threshold);
+      const year = row.year;
+
+      if (bracketNum > 0 && bracketThreshold) {
+        return `IRMAA Bracket ${bracketNum}: MAGI (${formatCurrency(magi)}) exceeds ${formatCurrency(bracketThreshold)} in ${year}`;
+      } else if (bracketNum > 0) {
+        return `IRMAA Bracket ${bracketNum} in ${year}`;
+      } else {
+        const firstThreshold = Number(row.irmaa_threshold);
+        if (firstThreshold) {
+          const difference = firstThreshold - magi;
+          return `No IRMAA: ${formatCurrency(difference)} below first threshold of ${formatCurrency(firstThreshold)} in ${year}`;
+        }
+        return `No IRMAA surcharge in ${year}`;
+      }
+    };
+
+    const toggleIrmaaTooltip = (idx) => {
+      openIrmaaTooltipIdx.value = openIrmaaTooltipIdx.value === idx ? null : idx;
     };
 
     const fetchComprehensiveData = async () => {
@@ -238,7 +270,10 @@ export default {
       spouseName,
       hasSpouse,
       formatCurrency,
-      isIrmaaBracketHit
+      isIrmaaBracketHit,
+      getIrmaaBracketLabel,
+      toggleIrmaaTooltip,
+      openIrmaaTooltipIdx
     };
   }
 };
@@ -295,6 +330,42 @@ export default {
 /* IRMAA bracket indicator */
 .irmaa-bracket-row {
   border-top: 2px solid #ff8000 !important;
+}
+
+/* IRMAA info icon */
+.irmaa-info-icon {
+  cursor: pointer;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+/* IRMAA popover tooltip */
+.irmaa-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-bottom: 5px;
+  max-width: 300px;
+  text-align: left;
+}
+
+.irmaa-popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #333 transparent transparent transparent;
 }
 
 /* Badge styles */

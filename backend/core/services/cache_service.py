@@ -46,7 +46,8 @@ class CacheService:
             else:
                 param_str = str(params)
             
-            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:8]
+            # Use SHA256 for cache key hashing (truncated for readability)
+            param_hash = hashlib.sha256(param_str.encode()).hexdigest()[:16]
             return f"{prefix}:{param_hash}"
         
         return prefix

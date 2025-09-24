@@ -348,6 +348,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { sanitizeHTML } from '@/utils/sanitizer'
 
 // Props
 const props = defineProps({
@@ -409,7 +410,11 @@ const lengthOptions = [
 
 // Computed
 const formattedResponse = computed(() => {
-  return props.communication.ai_suggested_response?.replace(/\n/g, '<br>') || ''
+  if (!props.communication.ai_suggested_response) return ''
+  // Convert newlines to breaks
+  const formatted = props.communication.ai_suggested_response.replace(/\n/g, '<br>')
+  // Sanitize to prevent XSS
+  return sanitizeHTML(formatted, false)
 })
 
 // Methods

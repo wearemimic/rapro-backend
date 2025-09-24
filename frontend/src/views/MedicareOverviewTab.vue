@@ -331,8 +331,10 @@ export default {
           if (CirclesGlobal && typeof CirclesGlobal.create === 'function') {
             const circleElement = document.getElementById('circle-medicare');
             if (circleElement) {
-              // Clear previous SVG if any
-              circleElement.innerHTML = '';
+              // Clear previous SVG if any (safe operation - not user input)
+              while (circleElement.firstChild) {
+                circleElement.removeChild(circleElement.firstChild);
+              }
               // Prevent division by zero and handle no data case
               const totalCost = this.totalMedicareCostLocal || 0;
               const totalIrmaa = this.totalIrmaaSurchargeLocal || 0;

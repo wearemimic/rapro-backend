@@ -25,7 +25,8 @@ class Auth0TokenCache:
     @classmethod
     def get_cache_key(cls, key_type, identifier):
         """Generate a unique cache key"""
-        hash_id = hashlib.md5(identifier.encode()).hexdigest()
+        # Use SHA256 for cache key hashing (more secure than MD5)
+        hash_id = hashlib.sha256(identifier.encode()).hexdigest()[:32]
         return f"auth0_{key_type}_{hash_id}"
 
     @classmethod

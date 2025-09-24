@@ -3,16 +3,20 @@ import jwt
 import requests
 import time
 import stripe
+import secrets
+import hashlib
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
 from django.http import JsonResponse
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .authentication import create_jwt_pair_for_user, get_enhanced_user_data
+from .session_manager import SessionManager
 from urllib.parse import urlencode, quote
 
 # Initialize Stripe
@@ -32,19 +36,29 @@ def auth0_login_redirect(request):
     client_id = settings.AUTH0_CLIENT_ID
     # Critical: Use Django backend callback URL - Auth0 will callback here
     callback_url = request.build_absolute_uri('/api/auth0/callback/')
-    
+
+    # Generate secure state parameter to prevent CSRF attacks
+    state = secrets.token_urlsafe(32)
+    # Store state in cache for 10 minutes (auth flow should complete within this time)
+    cache_key = f"auth0_state_{state}"
+    cache.set(cache_key, {
+        'timestamp': time.time(),
+        'ip': request.META.get('REMOTE_ADDR'),
+        'user_agent': request.META.get('HTTP_USER_AGENT', '')
+    }, timeout=600)  # 10 minutes
+
     # Build Auth0 authorization URL exactly as per Django quickstart
     params = {
         'response_type': 'code',
         'client_id': client_id,
         'redirect_uri': callback_url,
         'scope': 'openid profile email',
-        'state': 'login'
+        'state': state  # Use secure random state
     }
-    
+
     auth_url = f'https://{domain}/authorize?' + urlencode(params)
     print(f"🔗 Redirecting to Auth0: {auth_url}")
-    print(f"🔗 Callback URL: {callback_url}")
+    print(f"🔗 State parameter: {state}")
     return redirect(auth_url)
 
 @api_view(['GET'])
@@ -57,7 +71,18 @@ def auth0_login_google(request):
     client_id = settings.AUTH0_CLIENT_ID
     # Critical: Use Django backend callback URL
     callback_url = request.build_absolute_uri('/api/auth0/callback/')
-    
+
+    # Generate secure state parameter to prevent CSRF attacks
+    state = secrets.token_urlsafe(32)
+    # Store state in cache for 10 minutes
+    cache_key = f"auth0_state_{state}"
+    cache.set(cache_key, {
+        'timestamp': time.time(),
+        'ip': request.META.get('REMOTE_ADDR'),
+        'user_agent': request.META.get('HTTP_USER_AGENT', ''),
+        'connection': 'google-oauth2'
+    }, timeout=600)  # 10 minutes
+
     # Build Auth0 authorization URL with Google connection
     params = {
         'response_type': 'code',
@@ -65,12 +90,12 @@ def auth0_login_google(request):
         'redirect_uri': callback_url,
         'scope': 'openid profile email',
         'connection': 'google-oauth2',
-        'state': 'login'
+        'state': state  # Use secure random state
     }
-    
+
     auth_url = f'https://{domain}/authorize?' + urlencode(params)
     print(f"🔗 Redirecting to Auth0 Google: {auth_url}")
-    print(f"🔗 Callback URL: {callback_url}")
+    print(f"🔗 State parameter: {state}")
     return redirect(auth_url)
 
 @api_view(['GET'])
@@ -84,14 +109,36 @@ def auth0_callback(request):
     code = request.GET.get('code')
     state = request.GET.get('state')
     error = request.GET.get('error')
-    
+
     if error:
         error_description = request.GET.get('error_description', 'Unknown error')
         print(f"❌ Auth0 error: {error} - {error_description}")
         # Redirect to frontend with error
         frontend_url = f'{settings.FRONTEND_URL}/login?error={quote(f"{error}: {error_description}")}'
         return redirect(frontend_url)
-    
+
+    # Validate state parameter to prevent CSRF attacks
+    if not state:
+        print("❌ No state parameter received - possible CSRF attack")
+        frontend_url = f'{settings.FRONTEND_URL}/login?error=invalid_state'
+        return redirect(frontend_url)
+
+    cache_key = f"auth0_state_{state}"
+    state_data = cache.get(cache_key)
+
+    if not state_data:
+        print(f"❌ Invalid or expired state parameter: {state}")
+        frontend_url = f'{settings.FRONTEND_URL}/login?error=invalid_state'
+        return redirect(frontend_url)
+
+    # Delete state from cache to prevent reuse
+    cache.delete(cache_key)
+
+    # Optional: Validate additional security checks
+    if state_data.get('ip') != request.META.get('REMOTE_ADDR'):
+        print(f"⚠️ IP address mismatch during auth flow")
+        # You could reject this or just log it as suspicious
+
     if not code:
         print("❌ No authorization code received")
         frontend_url = f'{settings.FRONTEND_URL}/login?error=no_code'
@@ -186,7 +233,15 @@ def auth0_callback(request):
                 
                 # Create Django JWT tokens for authenticated user
                 jwt_tokens = create_jwt_pair_for_user(existing_user)
-                
+
+                # Enforce concurrent session limits
+                if jwt_tokens.get('access'):
+                    SessionManager.enforce_session_limit(
+                        existing_user,
+                        jwt_tokens['access'],
+                        request
+                    )
+
                 # Prepare user data for frontend
                 user_data = {
                     'id': existing_user.id,
@@ -636,8 +691,12 @@ def auth0_complete_registration(request):
             
             # Remove None values
             customer_data = {k: v for k, v in customer_data.items() if v}
-            
-            customer = stripe.Customer.create(**customer_data)
+
+            # Generate idempotency key to prevent duplicate charges
+            import hashlib
+            idempotency_key = hashlib.sha256(f"customer_{email}_{timestamp}".encode()).hexdigest()
+
+            customer = stripe.Customer.create(**customer_data, idempotency_key=idempotency_key)
             print(f"✅ Stripe customer created: {customer.id}")
             
         except stripe.error.StripeError as e:
@@ -674,8 +733,11 @@ def auth0_complete_registration(request):
             if coupon_code:
                 subscription_data['discounts'] = [{'coupon': coupon_code}]
                 print(f"✅ Applying coupon via discounts: {coupon_code}")
-            
-            subscription = stripe.Subscription.create(**subscription_data)
+
+            # Generate idempotency key for subscription to prevent duplicate charges
+            sub_idempotency_key = hashlib.sha256(f"subscription_{customer.id}_{price_id}_{timestamp}".encode()).hexdigest()
+
+            subscription = stripe.Subscription.create(**subscription_data, idempotency_key=sub_idempotency_key)
             print(f"✅ Stripe subscription created: {subscription.id}")
             
             # Store subscription end date for user creation later

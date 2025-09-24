@@ -660,8 +660,32 @@ def start_user_impersonation(request, user_id):
         admin_user = request.user
         if target_user.id == admin_user.id:
             return Response(
-                {'error': 'Cannot impersonate yourself'}, 
+                {'error': 'Cannot impersonate yourself'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Additional security: Check for active impersonation sessions
+        active_sessions = UserImpersonationLog.objects.filter(
+            admin_user=admin_user,
+            is_active=True
+        ).exists()
+
+        if active_sessions:
+            return Response(
+                {'error': 'You already have an active impersonation session. End it before starting a new one.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Rate limit impersonation attempts
+        recent_sessions = UserImpersonationLog.objects.filter(
+            admin_user=admin_user,
+            start_timestamp__gte=timezone.now() - timezone.timedelta(hours=1)
+        ).count()
+
+        if recent_sessions >= 5:
+            return Response(
+                {'error': 'Too many impersonation attempts. Please wait before trying again.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
             )
         
         # Check if target user is also an admin and current user has sufficient privileges
@@ -2744,10 +2768,27 @@ def admin_upload_tax_data_file(request):
         # Validate file type
         if not uploaded_file.name.endswith('.csv'):
             return Response(
-                {'error': 'File must be a CSV file'}, 
+                {'error': 'File must be a CSV file'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Scan file for security threats
+        from core.services.file_scanner_service import scan_uploaded_file
+        scan_results = scan_uploaded_file(uploaded_file)
+
+        if not scan_results['safe']:
+            logger.error(f"Tax data upload blocked - security threats detected: {scan_results['threats']}")
+            return Response(
+                {
+                    'error': 'File failed security scan',
+                    'details': 'The uploaded CSV file contains potentially malicious content and has been blocked.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Reset file pointer after scan
+        uploaded_file.seek(0)
+
         # Validate tax year
         if tax_year:
             try:

@@ -369,7 +369,26 @@ def profile_view(request):
         if serializer.is_valid():
             # Handle logo file upload separately if present
             if 'logo' in request.FILES:
-                user.logo = request.FILES['logo']
+                # Scan logo file for security threats
+                from core.services.file_scanner_service import scan_uploaded_file
+                logo_file = request.FILES['logo']
+                scan_results = scan_uploaded_file(logo_file)
+
+                if not scan_results['safe']:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Logo upload blocked - security threats detected: {scan_results['threats']}")
+                    return Response(
+                        {
+                            'error': 'Logo file failed security scan',
+                            'details': 'The uploaded logo contains potentially malicious content and has been blocked.'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # File is safe, proceed with upload
+                logo_file.seek(0)  # Reset file pointer after scan
+                user.logo = logo_file
                 user.save(update_fields=['logo'])
             
             # Save the rest of the data

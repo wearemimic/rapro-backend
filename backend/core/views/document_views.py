@@ -203,7 +203,23 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Read file content
+            # Scan file for security threats
+            from core.services.file_scanner_service import scan_uploaded_file
+            scan_results = scan_uploaded_file(file_obj)
+
+            if not scan_results['safe']:
+                logger.error(f"File upload blocked - security threats detected: {scan_results['threats']}")
+                return Response(
+                    {
+                        'error': 'File failed security scan',
+                        'details': 'The uploaded file contains potentially malicious content and has been blocked.',
+                        'threats_detected': len(scan_results['threats'])
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Read file content after scan
+            file_obj.seek(0)
             file_content = file_obj.read()
 
             # Get category and client objects

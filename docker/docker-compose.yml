@@ -15,6 +15,14 @@ services:
     environment:
       - PORT=${FRONTEND_PORT:-3000}
     command: ["sh", "-c", "npm install sortablejs && npm run dev"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
   
   backend:
     build:
@@ -37,10 +45,18 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     entrypoint: /bin/sh
     command: >
-      -c "./wait-for-it.sh db:5432 -- 
-      && python manage.py migrate 
-      && python manage.py seed_data 
+      -c "./wait-for-it.sh db:5432 --
+      && python manage.py migrate
+      && python manage.py seed_data
       && gunicorn retirementadvisorpro.wsgi:application --bind 0.0.0.0:${BACKEND_PORT:-8000}"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
 
   db:
     image: postgres:14
@@ -52,6 +68,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   redis:
     image: redis:7-alpine
@@ -66,6 +90,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
   celery_worker:
     build:
@@ -84,10 +116,18 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     entrypoint: /bin/sh
     command: >
-      -c "./wait-for-it.sh db:5432 -- 
-      ./wait-for-it.sh redis:6379 -- 
+      -c "./wait-for-it.sh db:5432 --
+      ./wait-for-it.sh redis:6379 --
       celery -A retirementadvisorpro worker --loglevel=info --concurrency=4 --max-tasks-per-child=100"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   celery_beat:
     build:
@@ -106,10 +146,18 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     entrypoint: /bin/sh
     command: >
-      -c "./wait-for-it.sh db:5432 -- 
-      ./wait-for-it.sh redis:6379 -- 
+      -c "./wait-for-it.sh db:5432 --
+      ./wait-for-it.sh redis:6379 --
       celery -A retirementadvisorpro beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
   celery_flower:
     build:
@@ -130,9 +178,17 @@ services:
       - "5555:5555"
     entrypoint: /bin/sh
     command: >
-      -c "./wait-for-it.sh redis:6379 -- 
+      -c "./wait-for-it.sh redis:6379 --
       celery -A retirementadvisorpro flower --port=5555 --address=0.0.0.0"
     profiles: ["monitoring"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
 volumes:
   postgres_data:

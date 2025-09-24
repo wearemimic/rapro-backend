@@ -29,15 +29,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-k=cvx&v-c(&wn9by6qqgn%!fxrrzix2)4exw_l328a8&9#ppgp'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-k=cvx&v-c(&wn9by6qqgn%!fxrrzix2)4exw_l328a8&9#ppgp')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 AUTH_USER_MODEL = 'core.CustomUser'
 
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.83', '*']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -64,14 +64,15 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',  # ENABLED - Critical for security
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.cookie_auth.CookieTokenMiddleware',  # Cookie-based JWT middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.sql_injection_guard.SQLInjectionGuardMiddleware',  # SQL Injection Prevention
     'core.middleware.SubscriptionMiddleware',  # Enforce payment requirement
     # 'core.middleware.AdminAccessMiddleware',   # Admin access control - DISABLED: Conflicts with JWT auth
     'core.middleware.AdminAuditMiddleware',    # Admin audit logging
@@ -113,7 +114,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'core.authentication.CustomJWTAuthentication',
+        'core.cookie_auth.CookieJWTAuthentication',  # New cookie-based auth
+        'core.authentication.CustomJWTAuthentication',  # Fallback to header-based
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -223,12 +225,35 @@ else:
     }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),  # Reduced from 60 for security
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ("Bearer",),
     'TOKEN_OBTAIN_SERIALIZER': 'core.authentication.CustomTokenObtainPairSerializer',
+
+    # Additional security settings
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': 'retirementadvisorpro',
+    'JWK_URL': None,
+    'LEEWAY': 0,  # No time tolerance for token validation
+
+    # Security headers
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+
+    # JTI claim for token uniqueness
+    'JTI_CLAIM': 'jti',
+
+    # Sliding tokens for better UX with security
+    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=15),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -294,6 +319,31 @@ REPORT_CENTER_ALLOWED_TYPES = {
     'GENERATED_REPORTS': ['.pdf', '.pptx'],
 }
 
+# Global file upload validation settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+
+# Allowed file extensions for general uploads
+ALLOWED_FILE_EXTENSIONS = {
+    'images': ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
+    'documents': ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'],
+    'data': ['.csv', '.json', '.xml'],
+}
+
+# Prohibited file extensions (security risk)
+PROHIBITED_FILE_EXTENSIONS = [
+    '.exe', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.js',
+    '.jar', '.zip', '.rar', '.sh', '.app', '.deb', '.rpm'
+]
+
+# MIME type validation
+ALLOWED_MIME_TYPES = {
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+    'application/pdf', 'application/msword', 'application/vnd.ms-excel',
+    'application/vnd.ms-powerpoint', 'text/csv', 'application/json'
+}
+
 # Report retention settings (in days)
 REPORT_CENTER_RETENTION = {
     'DRAFT_REPORTS': 90,  # Keep draft reports for 90 days
@@ -335,6 +385,11 @@ if ENVIRONMENT in ['production', 'staging']:
     if not STRIPE_ANNUAL_PRICE_ID:
         print("WARNING: STRIPE_ANNUAL_PRICE_ID is not set in environment variables")
         STRIPE_ANNUAL_PRICE_ID = 'price_placeholder_annual'
+
+    # Payment amount validation settings (in cents)
+    PAYMENT_MIN_AMOUNT = 50  # $0.50 minimum
+    PAYMENT_MAX_AMOUNT = 1000000  # $10,000 maximum
+    PAYMENT_DUPLICATE_WINDOW = 60  # Prevent duplicate payments within 60 seconds
 else:
     # Local development - use .env file values or defaults
     STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_placeholder')
@@ -342,6 +397,11 @@ else:
     STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'whsec_placeholder')
     STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID', 'price_placeholder_monthly')
     STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID', 'price_placeholder_annual')
+
+    # Payment amount validation settings (in cents) - same for local dev
+    PAYMENT_MIN_AMOUNT = 50  # $0.50 minimum
+    PAYMENT_MAX_AMOUNT = 1000000  # $10,000 maximum
+    PAYMENT_DUPLICATE_WINDOW = 60  # Prevent duplicate payments within 60 seconds
 
 # =============================================================================
 # CELERY CONFIGURATION
@@ -466,6 +526,18 @@ SMS_RATE_LIMIT = int(os.environ.get('SMS_RATE_LIMIT', '100'))  # per hour
 SMS_MAX_LENGTH = int(os.environ.get('SMS_MAX_LENGTH', '1600'))  # characters
 
 # =============================================================================
+# PII PROTECTION AND ENCRYPTION
+# =============================================================================
+
+# Field-level encryption key for PII (generate a strong key in production)
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
+
+# PII Protection Settings
+PII_MASK_IN_RESPONSES = os.environ.get('PII_MASK_IN_RESPONSES', 'False').lower() == 'true'
+PII_AUDIT_LOGGING = os.environ.get('PII_AUDIT_LOGGING', 'True').lower() == 'true'
+SECURE_DELETE_OVERWRITE_PASSES = int(os.environ.get('SECURE_DELETE_OVERWRITE_PASSES', '3'))
+
+# =============================================================================
 # AWS S3 DOCUMENT STORAGE CONFIGURATION
 # =============================================================================
 
@@ -538,6 +610,73 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_CACHE_ALIAS = 'default'
 SESSION_COOKIE_AGE = 86400  # 24 hours
 
+# Concurrent session limits - limits each user to 3 active sessions
+MAX_CONCURRENT_SESSIONS = 3
+
+# Auto-logout configuration
+AUTO_LOGOUT_IDLE_TIMEOUT = 900  # 15 minutes of inactivity
+AUTO_LOGOUT_ABSOLUTE_TIMEOUT = 28800  # 8 hours absolute session limit
+AUTO_LOGOUT_WARNING_DURATION = 60  # Show warning 60 seconds before auto-logout
+
+# =============================================================================
+# SECURITY HEADERS AND CONFIGURATION
+# =============================================================================
+
+# Security headers for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Session security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'  # Changed from Strict to Lax for Auth0 compatibility
+CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript to read
+CSRF_COOKIE_SAMESITE = 'Lax'  # Changed from Strict to Lax for Auth0 compatibility
+
+# Additional security headers (to be added via middleware)
+SECURITY_HEADERS = {
+    'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+    'X-Content-Type-Options': 'nosniff',
+    'X-XSS-Protection': '1; mode=block',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+}
+
+# Password validation strength
+PASSWORD_MIN_LENGTH = 12
+PASSWORD_COMPLEXITY = {
+    'UPPERCASE': 1,
+    'LOWERCASE': 1,
+    'DIGITS': 1,
+    'SPECIAL_CHARS': 1,
+}
+
+# Content Security Policy (CSP) - to be implemented via middleware
+CSP_DIRECTIVES = {
+    'default-src': ["'self'"],
+    'script-src': ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://cdn.auth0.com"],
+    'style-src': ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    'font-src': ["'self'", "https://fonts.gstatic.com"],
+    'img-src': ["'self'", "data:", "https:"],
+    'connect-src': ["'self'", "https://*.auth0.com", "https://api.stripe.com"],
+    'frame-src': ["'self'", "https://js.stripe.com", "https://*.auth0.com"],
+    'report-uri': ["/api/csp-report/"],  # CSP violation reporting endpoint
+}
+
+# CSP Reporting Configuration
+CSP_REPORT_ONLY = False  # Set to True to test without blocking
+CSP_REPORT_URI = "/api/csp-report/"  # Endpoint to receive CSP violation reports
+CSP_REPORT_PERCENTAGE = 1.0  # Report 100% of violations
+
 # Performance monitoring cache settings
 CACHE_PERFORMANCE_MONITORING = True
 CACHE_SLOW_QUERY_THRESHOLD = 1.0  # seconds
@@ -591,15 +730,22 @@ LOGGING = {
             'style': '{',
         },
     },
+    'filters': {
+        'pii_filter': {
+            '()': 'core.pii_protection.PIILoggingFilter',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['pii_filter'],
         },
         'file': {
             'class': 'logging.FileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'django.log') if USE_FILE_LOGGING else '/dev/null',
             'formatter': 'verbose',
+            'filters': ['pii_filter'],
         },
     },
     'root': {
@@ -610,6 +756,11 @@ LOGGING = {
         'django': {
             'handlers': LOG_HANDLERS,
             'level': 'INFO',
+            'propagate': False,
+        },
+        'django.security': {
+            'handlers': LOG_HANDLERS,
+            'level': 'WARNING',  # Log all security-related warnings
             'propagate': False,
         },
         'celery': {
@@ -627,5 +778,32 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'core.audit': {
+            'handlers': LOG_HANDLERS,
+            'level': 'INFO',  # Log all audit events
+            'propagate': False,
+        },
+        'core.security': {
+            'handlers': LOG_HANDLERS,
+            'level': 'WARNING',  # Log security events
+            'propagate': False,
+        },
+        'core.payment': {
+            'handlers': LOG_HANDLERS,
+            'level': 'INFO',  # Log payment events
+            'propagate': False,
+        },
     },
 }
+
+# Audit logging configuration
+AUDIT_LOG_ENABLED = True
+AUDIT_LOG_RETENTION_DAYS = 365  # Keep audit logs for 1 year
+AUDIT_LOG_SENSITIVE_OPERATIONS = [
+    'login', 'logout', 'password_change', 'password_reset',
+    'payment_create', 'payment_update', 'payment_delete',
+    'client_create', 'client_update', 'client_delete',
+    'scenario_create', 'scenario_update', 'scenario_delete',
+    'admin_impersonation_start', 'admin_impersonation_end',
+    'user_create', 'user_update', 'user_delete',
+]

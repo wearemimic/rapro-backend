@@ -236,11 +236,11 @@
           
           <div class="result-content">
             <div class="result-header">
-              <h4 class="result-title" v-html="result.title"></h4>
+              <h4 class="result-title">{{ result.title }}</h4>
               <span class="result-type">{{ getTypeLabel(result.type) }}</span>
             </div>
             
-            <p class="result-description" v-html="result.description"></p>
+            <p class="result-description">{{ result.description }}</p>
             
             <div class="result-meta">
               <span v-if="result.metadata.created_at" class="result-date">
@@ -371,6 +371,7 @@ import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
+import { sanitizeHTML } from '@/utils/sanitizer';
 
 export default {
   name: 'GlobalSearch',

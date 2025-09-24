@@ -510,7 +510,7 @@ export default {
       document.body.classList.add('pdf-mode');
       // Add CSS to hide navigation elements
       const style = document.createElement('style');
-      style.innerHTML = `
+      style.textContent = `
         .pdf-mode .navbar-vertical,
         .pdf-mode .navbar-vertical-aside,
         .pdf-mode .header,

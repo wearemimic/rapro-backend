@@ -72,8 +72,10 @@ export default {
         const CirclesGlobal = window.Circles;
         const el = document.getElementById(this.circleId);
         if (!CirclesGlobal || !el) return;
-        // Clear previous SVG if any
-        el.innerHTML = '';
+        // Clear previous SVG if any (safe operation - not user input)
+        while (el.firstChild) {
+          el.removeChild(el.firstChild);
+        }
         CirclesGlobal.create({
           id: this.circleId,
           value: Math.round(this.value),

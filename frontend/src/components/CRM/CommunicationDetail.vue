@@ -375,6 +375,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useCommunicationStore } from '@/stores/communicationStore'
 import { useEmailStore } from '@/stores/emailStore'
 import AIResponseSuggestions from './AIResponseSuggestions.vue'
+import { sanitizeHTML } from '@/utils/sanitizer'
 
 // Props
 const props = defineProps({
@@ -414,12 +415,15 @@ const isHighPriority = computed(() => {
 
 const formattedContent = computed(() => {
   if (!communication.value?.content) return ''
-  
-  // Basic HTML formatting
-  return communication.value.content
+
+  // First format the content
+  let formatted = communication.value.content
     .replace(/\n/g, '<br>')
     .replace(/\r/g, '')
-    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+
+  // Then sanitize to prevent XSS
+  return sanitizeHTML(formatted, false)
 })
 
 // Methods

@@ -609,7 +609,7 @@
                         <h6>Relevant SSA Rules:</h6>
                         <div class="card bg-light">
                           <div class="card-body">
-                            <p class="mb-0 small" v-html="edgeCaseTest.relevantRules"></p>
+                            <p class="mb-0 small" v-html="sanitizeHTML(edgeCaseTest.relevantRules, false)"></p>
                           </div>
                         </div>
                       </div>
@@ -736,7 +736,7 @@
                       <div class="card bg-light mb-4">
                         <div class="card-body">
                           <h5 class="card-title">{{ explanationEngine.title }}</h5>
-                          <div v-html="explanationEngine.explanation"></div>
+                          <div v-html="sanitizeHTML(explanationEngine.explanation, false)"></div>
                         </div>
                       </div>
                       
@@ -861,7 +861,7 @@
                         </h2>
                         <div :id="`collapse-${index}`" class="accordion-collapse collapse" :aria-labelledby="`heading-${index}`" data-bs-parent="#rulesAccordion">
                           <div class="accordion-body">
-                            <p v-html="rule.description"></p>
+                            <p v-html="sanitizeHTML(rule.description, false)"></p>
                             
                             <div v-if="rule.table" class="table-responsive mt-3">
                               <table class="table table-sm table-bordered">
@@ -900,7 +900,7 @@
                             </div>
                           </div>
                           <div class="card-body">
-                            <p class="small" v-html="rule.description"></p>
+                            <p class="small" v-html="sanitizeHTML(rule.description, false)"></p>
                             <div class="mt-2 small">
                               <span class="badge bg-light text-muted me-1">Source:</span>
                               <a :href="rule.sourceUrl" target="_blank" class="small">{{ rule.source }}</a>
@@ -931,6 +931,7 @@ import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Graph from '../components/Graph.vue';
+import { sanitizeHTML } from '@/utils/sanitizer';
 
 // Apply the plugin to jsPDF
 applyPlugin(jsPDF);
@@ -1469,6 +1470,9 @@ export default {
     }
   },
   methods: {
+    // Import sanitizeHTML as a method so it can be used in templates
+    sanitizeHTML,
+
     toggleDropdown(tab) {
       this.isDropdownOpen[tab] = !this.isDropdownOpen[tab];
     },
