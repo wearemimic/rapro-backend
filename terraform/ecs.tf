@@ -291,11 +291,11 @@ resource "aws_ecs_task_definition" "backend" {
         # Redis Configuration
         {
           name  = "REDIS_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "REDIS_HOST"
-          value = aws_elasticache_replication_group.main.primary_endpoint_address
+          value = "rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com"
         },
         {
           name  = "REDIS_PORT"
@@ -303,11 +303,11 @@ resource "aws_ecs_task_definition" "backend" {
         },
         {
           name  = "CELERY_BROKER_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_RESULT_BACKEND"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         
         # Frontend URL for redirects
@@ -567,11 +567,11 @@ resource "aws_ecs_task_definition" "celery_worker" {
         # Redis Configuration - Critical for Celery
         {
           name  = "REDIS_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "REDIS_HOST"
-          value = aws_elasticache_replication_group.main.primary_endpoint_address
+          value = "rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com"
         },
         {
           name  = "REDIS_PORT"
@@ -579,11 +579,11 @@ resource "aws_ecs_task_definition" "celery_worker" {
         },
         {
           name  = "CELERY_BROKER_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_RESULT_BACKEND"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         
         # Frontend URL for redirects
@@ -728,11 +728,11 @@ resource "aws_ecs_task_definition" "celery_beat" {
         },
         {
           name  = "CELERY_BROKER_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_RESULT_BACKEND"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         }
       ]
 
@@ -788,11 +788,11 @@ resource "aws_ecs_task_definition" "celery_flower" {
       environment = [
         {
           name  = "CELERY_BROKER_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_RESULT_BACKEND"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         }
       ]
 

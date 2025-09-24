@@ -404,11 +404,11 @@ resource "aws_ecs_task_definition" "backend_staging" {
         # Redis Configuration
         {
           name  = "REDIS_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "REDIS_HOST"
-          value = aws_elasticache_replication_group.main.primary_endpoint_address
+          value = "rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com"
         },
         {
           name  = "REDIS_PORT"
@@ -416,11 +416,11 @@ resource "aws_ecs_task_definition" "backend_staging" {
         },
         {
           name  = "CELERY_BROKER_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_RESULT_BACKEND"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         
         # Frontend URL for redirects
@@ -639,15 +639,15 @@ resource "aws_ecs_task_definition" "celery_worker_staging" {
         # Redis Configuration - Critical for Celery
         {
           name  = "REDIS_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_BROKER_URL"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         {
           name  = "CELERY_RESULT_BACKEND"
-          value = "redis://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
+          value = "redis://rapro-prod-redis-001.rapro-prod-redis.ijkoc1.use1.cache.amazonaws.com:6379/0"
         },
         
         # AI Configuration - Needed for background tasks
