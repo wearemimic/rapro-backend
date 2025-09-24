@@ -31,8 +31,8 @@ class ALBHealthCheckMiddleware:
         ]
 
     def __call__(self, request):
-        # Only handle health check path
-        if request.path == '/health/' or request.path == '/':
+        # Only handle health check paths
+        if request.path in ['/health/', '/', '/api/health/', '/api/health']:
             # Get the host header
             host = request.META.get('HTTP_HOST', '')
 
