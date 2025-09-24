@@ -8,10 +8,10 @@ phases:
 
   build:
     commands:
-      - echo Building Docker image for Celery...
-      - docker build -f docker/Dockerfile.celery -t $IMAGE_REPO_NAME:latest .
+      - echo Building Docker image for Django backend...
+      - docker build -f docker/Dockerfile.backend -t $IMAGE_REPO_NAME:latest .
       - docker tag $IMAGE_REPO_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
-      - docker build -f docker/Dockerfile.celery -t $IMAGE_REPO_NAME:staging .
+      - docker build -f docker/Dockerfile.backend -t $IMAGE_REPO_NAME:staging .
       - docker tag $IMAGE_REPO_NAME:staging $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging
 
   post_build:
@@ -19,10 +19,10 @@ phases:
       - echo Pushing Docker images to ECR...
       - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest
       - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging
-      - printf '[{"name":"celery","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest > imagedefinitions-celery.json
-      - printf '[{"name":"celery","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging > imagedefinitions-celery-staging.json
+      - printf '[{"name":"backend","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest > imagedefinitions.json
+      - printf '[{"name":"backend","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:staging > imagedefinitions-staging.json
 
 artifacts:
   files:
-    - imagedefinitions-celery.json
-    - imagedefinitions-celery-staging.json
+    - imagedefinitions.json
+    - imagedefinitions-staging.json
