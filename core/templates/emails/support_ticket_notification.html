@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Ticket Update</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 24px;
+        }
+        .ticket-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .ticket-info h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-open { background: #28a745; color: white; }
+        .status-in_progress { background: #ffc107; color: #212529; }
+        .status-resolved { background: #17a2b8; color: white; }
+        .status-closed { background: #6c757d; color: white; }
+        .priority-low { color: #28a745; }
+        .priority-medium { color: #ffc107; }
+        .priority-high { color: #fd7e14; }
+        .priority-urgent { color: #dc3545; font-weight: bold; }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            margin: 20px 0;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .footer {
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .ticket-details td {
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .ticket-details td:first-child {
+            font-weight: 500;
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Support Ticket Update</h1>
+        </div>
+
+        <p>Hello {{ user.first_name|default:user.email }},</p>
+
+        {% if notification_type == 'created' %}
+            <p>Your support ticket has been created and assigned ID <strong>{{ ticket.ticket_id }}</strong>.</p>
+        {% elif notification_type == 'updated' %}
+            <p>Your support ticket <strong>{{ ticket.ticket_id }}</strong> has been updated.</p>
+        {% elif notification_type == 'resolved' %}
+            <p>Great news! Your support ticket <strong>{{ ticket.ticket_id }}</strong> has been resolved.</p>
+        {% elif notification_type == 'closed' %}
+            <p>Your support ticket <strong>{{ ticket.ticket_id }}</strong> has been closed.</p>
+        {% elif notification_type == 'comment_added' %}
+            <p>A new response has been added to your support ticket <strong>{{ ticket.ticket_id }}</strong>.</p>
+        {% elif notification_type == 'assigned' %}
+            <p>Your support ticket <strong>{{ ticket.ticket_id }}</strong> has been assigned to our support team.</p>
+        {% elif notification_type == 'escalated' %}
+            <p>Your support ticket <strong>{{ ticket.ticket_id }}</strong> has been escalated for priority handling.</p>
+        {% endif %}
+
+        <div class="ticket-info">
+            <h3>Ticket Details</h3>
+            <table class="ticket-details" style="width: 100%;">
+                <tr>
+                    <td>Ticket ID:</td>
+                    <td><strong>{{ ticket.ticket_id }}</strong></td>
+                </tr>
+                <tr>
+                    <td>Subject:</td>
+                    <td>{{ ticket.subject }}</td>
+                </tr>
+                <tr>
+                    <td>Status:</td>
+                    <td><span class="status-badge status-{{ ticket.status }}">{{ ticket.get_status_display }}</span></td>
+                </tr>
+                <tr>
+                    <td>Priority:</td>
+                    <td><span class="priority-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span></td>
+                </tr>
+                <tr>
+                    <td>Category:</td>
+                    <td>{{ ticket.get_category_display }}</td>
+                </tr>
+                <tr>
+                    <td>Created:</td>
+                    <td>{{ ticket.created_at|date:"F j, Y g:i A" }}</td>
+                </tr>
+                {% if assigned_admin %}
+                <tr>
+                    <td>Assigned to:</td>
+                    <td>{{ assigned_admin.first_name }} {{ assigned_admin.last_name }} ({{ assigned_admin.email }})</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        {% if ticket.description %}
+        <div style="margin: 20px 0;">
+            <h4>Description:</h4>
+            <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; border-radius: 0 4px 4px 0;">
+                {{ ticket.description|linebreaksbr }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if additional_comment %}
+        <div style="margin: 20px 0;">
+            <h4>Latest Update:</h4>
+            <div style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; border-radius: 0 4px 4px 0;">
+                {{ additional_comment|linebreaksbr }}
+            </div>
+        </div>
+        {% endif %}
+
+        <a href="{{ site_url }}/support/tickets/{{ ticket.ticket_id }}" class="btn">View Ticket Details</a>
+
+        {% if notification_type == 'resolved' %}
+        <div style="background: #d1ecf1; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <h4 style="color: #0c5460; margin-top: 0;">We'd love your feedback!</h4>
+            <p style="color: #0c5460; margin-bottom: 0;">
+                Please rate your support experience and let us know if we can improve our service.
+            </p>
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <p>
+                <strong>RetirementAdvisorPro Support Team</strong><br>
+                Need additional help? Reply to this email or visit our <a href="{{ site_url }}/support">support center</a>.
+            </p>
+            <p>
+                This is an automated notification. Please do not reply directly to this email unless you need to add information to your ticket.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,182 @@
+{
+  "cache_poisoning": [
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "X-Forwarded-Host",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "X-Forwarded-Scheme",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "X-Forwarded-Port",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "X-Original-URL",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "X-Rewrite-URL",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "X-HTTP-Host-Override",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://d1fxppmbbcb093.cloudfront.net/",
+      "header": "Host",
+      "reflected": false,
+      "status_code": 403
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "X-Forwarded-Host",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "X-Forwarded-Scheme",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "X-Forwarded-Port",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "X-Original-URL",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "X-Rewrite-URL",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "X-HTTP-Host-Override",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "header": "Host",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "X-Forwarded-Host",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "X-Forwarded-Scheme",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "X-Forwarded-Port",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "X-Original-URL",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "X-Rewrite-URL",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "X-HTTP-Host-Override",
+      "reflected": false,
+      "status_code": 200
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "header": "Host",
+      "reflected": false,
+      "status_code": 200
+    }
+  ],
+  "dns_rebinding": [
+    {
+      "domain": "retirementadvisorpro.com",
+      "error": "[Errno 2] No such file or directory: 'dig'"
+    },
+    {
+      "domain": "app.retirementadvisorpro.com",
+      "error": "[Errno 2] No such file or directory: 'dig'"
+    },
+    {
+      "domain": "staging.retirementadvisorpro.com",
+      "error": "[Errno 2] No such file or directory: 'dig'"
+    }
+  ],
+  "cdn_headers": [
+    {
+      "url": "https://app.retirementadvisorpro.com/",
+      "headers": {
+        "Date": "Wed, 24 Sep 2025 02:08:23 GMT",
+        "Content-Type": "text/html",
+        "Transfer-Encoding": "chunked",
+        "Connection": "keep-alive",
+        "Server": "nginx",
+        "Last-Modified": "Tue, 23 Sep 2025 15:06:21 GMT",
+        "Vary": "Accept-Encoding",
+        "ETag": "W/\"68d2b76d-e7c\"",
+        "Expires": "Wed, 24 Sep 2025 02:08:22 GMT",
+        "Cache-Control": "no-cache, no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Content-Encoding": "gzip"
+      },
+      "status": "vulnerable"
+    },
+    {
+      "url": "https://staging.retirementadvisorpro.com/",
+      "headers": {
+        "Date": "Wed, 24 Sep 2025 02:08:23 GMT",
+        "Content-Type": "text/html",
+        "Transfer-Encoding": "chunked",
+        "Connection": "keep-alive",
+        "Server": "nginx",
+        "Last-Modified": "Tue, 23 Sep 2025 15:06:47 GMT",
+        "Vary": "Accept-Encoding",
+        "ETag": "W/\"68d2b787-e7c\"",
+        "Expires": "Wed, 24 Sep 2025 02:08:22 GMT",
+        "Cache-Control": "no-cache, no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Content-Encoding": "gzip"
+      },
+      "status": "vulnerable"
+    }
+  ]
+}

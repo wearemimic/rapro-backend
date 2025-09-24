@@ -1,0 +1,36 @@
+filing_status,min_income,max_income,tax_rate
+Single,0,11925,0.10
+Single,11925,48475,0.12
+Single,48475,103350,0.22
+Single,103350,197300,0.24
+Single,197300,250525,0.32
+Single,250525,626350,0.35
+Single,626350,999999999,0.37
+Married Filing Jointly,0,23850,0.10
+Married Filing Jointly,23850,96950,0.12
+Married Filing Jointly,96950,206700,0.22
+Married Filing Jointly,206700,394600,0.24
+Married Filing Jointly,394600,501050,0.32
+Married Filing Jointly,501050,751600,0.35
+Married Filing Jointly,751600,999999999,0.37
+Married Filing Separately,0,11925,0.10
+Married Filing Separately,11925,48475,0.12
+Married Filing Separately,48475,103350,0.22
+Married Filing Separately,103350,197300,0.24
+Married Filing Separately,197300,250525,0.32
+Married Filing Separately,250525,375800,0.35
+Married Filing Separately,375800,999999999,0.37
+Head of Household,0,17000,0.10
+Head of Household,17000,64850,0.12
+Head of Household,64850,103350,0.22
+Head of Household,103350,197300,0.24
+Head of Household,197300,250500,0.32
+Head of Household,250500,626350,0.35
+Head of Household,626350,999999999,0.37
+Qualifying Widow(er),0,23850,0.10
+Qualifying Widow(er),23850,96950,0.12
+Qualifying Widow(er),96950,206700,0.22
+Qualifying Widow(er),206700,394600,0.24
+Qualifying Widow(er),394600,501050,0.32
+Qualifying Widow(er),501050,751600,0.35
+Qualifying Widow(er),751600,999999999,0.37

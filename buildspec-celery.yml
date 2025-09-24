@@ -1,0 +1,103 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image for Celery (worker + beat + flower)...
+
+      # Create a supervisor config to run all Celery processes in one container
+      - |
+        cat > backend/supervisord.conf << 'SUPERVISOR_EOF'
+        [supervisord]
+        nodaemon=true
+        logfile=/var/log/supervisord.log
+        pidfile=/var/run/supervisord.pid
+
+        [program:celery_worker]
+        command=celery -A retirementadvisorpro worker --loglevel=info --concurrency=4 --max-tasks-per-child=100
+        directory=/app
+        autostart=true
+        autorestart=true
+        stdout_logfile=/var/log/celery_worker.log
+        stderr_logfile=/var/log/celery_worker.err.log
+        environment=CELERY_BROKER_URL="%(ENV_CELERY_BROKER_URL)s",CELERY_RESULT_BACKEND="%(ENV_CELERY_RESULT_BACKEND)s"
+
+        [program:celery_beat]
+        command=celery -A retirementadvisorpro beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+        directory=/app
+        autostart=true
+        autorestart=true
+        stdout_logfile=/var/log/celery_beat.log
+        stderr_logfile=/var/log/celery_beat.err.log
+        environment=CELERY_BROKER_URL="%(ENV_CELERY_BROKER_URL)s",CELERY_RESULT_BACKEND="%(ENV_CELERY_RESULT_BACKEND)s"
+
+        [program:celery_flower]
+        command=celery -A retirementadvisorpro flower --port=5555 --address=0.0.0.0
+        directory=/app
+        autostart=true
+        autorestart=true
+        stdout_logfile=/var/log/celery_flower.log
+        stderr_logfile=/var/log/celery_flower.err.log
+        environment=CELERY_BROKER_URL="%(ENV_CELERY_BROKER_URL)s",CELERY_RESULT_BACKEND="%(ENV_CELERY_RESULT_BACKEND)s"
+        SUPERVISOR_EOF
+
+      # Create Dockerfile for combined Celery container
+      - |
+        cat > backend/Dockerfile.celery << 'DOCKER_EOF'
+        FROM python:3.12-slim
+
+        # Install system dependencies including supervisor
+        RUN apt-get update && apt-get install -y \
+            supervisor \
+            netcat-traditional \
+            && rm -rf /var/lib/apt/lists/*
+
+        WORKDIR /app
+
+        # Copy requirements and install Python dependencies
+        COPY backend/requirements.txt .
+        RUN pip install --no-cache-dir -r requirements.txt
+
+        # Copy application code
+        COPY backend/ .
+
+        # Copy supervisor configuration
+        COPY backend/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+        # Copy wait-for-it script
+        COPY backend/wait-for-it.sh .
+        RUN chmod +x wait-for-it.sh
+
+        # Create log directory
+        RUN mkdir -p /var/log
+
+        # Expose Flower port
+        EXPOSE 5555
+
+        # Use supervisor to run all Celery processes
+        CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+        DOCKER_EOF
+
+      # Build the Docker image
+      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG -f backend/Dockerfile.celery .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - echo Docker image pushed successfully
+
+      # Generate imagedefinitions.json for ECS deployment
+      - printf '[{"name":"celery","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json

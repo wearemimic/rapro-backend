@@ -1,0 +1,31 @@
+Welcome to Your Client Portal
+{{ advisor_name }} has invited you to access your financial planning information
+
+Hello {{ client.first_name }},
+
+{{ advisor_name }} has set up secure portal access for you to view your retirement planning scenarios, documents, and other important financial information.
+
+What you'll have access to:
+• Retirement Scenarios: View your personalized retirement planning projections
+• Important Documents: Access financial documents shared by your advisor  
+• Secure Communication: Message your advisor directly through the portal
+• Up-to-date Information: Always see the latest versions of your financial plans
+
+To access your portal, please visit:
+{{ invitation_url }}
+
+IMPORTANT SECURITY INFORMATION:
+• This invitation link expires on {{ expires_at|date:"F j, Y \a\t g:i A" }}
+• You'll be prompted to set up a secure password on your first visit
+• Never share your login credentials with anyone
+• Always log out when finished using the portal
+
+Need help? Contact {{ advisor_name }} directly at {{ client.advisor.email }} if you have any questions about accessing your portal.
+
+---
+
+This invitation was sent to {{ client.email }} by {{ advisor_name }}.
+If you received this email in error, please contact your advisor immediately.
+
+RetirementAdvisorPro - Secure Financial Planning Portal
+This is an automated message. Please do not reply to this email.

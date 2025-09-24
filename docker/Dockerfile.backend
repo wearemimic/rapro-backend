@@ -1,0 +1,24 @@
+FROM python:3.10-slim
+
+# Install LibreOffice and poppler-utils
+RUN apt-get update && apt-get install -y \
+    libreoffice \
+    poppler-utils \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY backend/requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+# Explicitly ensure pdfcrowd is installed
+RUN pip install pdfcrowd==6.5.2
+COPY backend/ .
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+CMD ["gunicorn", "retirementadvisorpro.wsgi:application", "--bind", "0.0.0.0:8000"]

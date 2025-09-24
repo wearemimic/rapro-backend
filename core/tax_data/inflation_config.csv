@@ -1,0 +1,5 @@
+item,inflation_rate,description
+irmaa_thresholds,1.0,Annual inflation rate for IRMAA income thresholds (%)
+medicare_rates,2.5,Annual inflation rate for Medicare base rates (%)
+tax_brackets,1.0,Annual inflation rate for federal tax brackets (%)
+standard_deductions,1.0,Annual inflation rate for standard deductions (%)

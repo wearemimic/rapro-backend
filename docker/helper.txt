@@ -1,0 +1,36 @@
+# access the DB via shell
+
+(venv) marka@Mac docker % docker compose exec db psql -U postgres -d retirementadvisorpro
+
+# Running migrate in the venv
+docker compose exec backend python manage.py migrate
+
+
+# Database Schema Dump to create schema doc for AI
+docker exec -it docker-db-1 pg_dump -U postgres -s retirementadvisorpro > schema.sql
+
+# pulling docker logs
+docker logs -f wlx-api-api-1 
+
+# Compare git branches agains t main
+
+git fetch --all > /dev/null 2>&1
+
+echo "Branch Status vs main:"
+echo "------------------------"
+
+for branch in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin/); do
+  local_branch=${branch#origin/}
+
+
+  if [[ "$local_branch" == "HEAD" || "$local_branch" == "main" ]]; then
+    continue
+  fi
+
+  echo -n "$local_branch: "
+  if git merge-base --is-ancestor origin/$local_branch origin/main; then
+    echo "✅ Safe to delete (fully merged into main)"
+  else
+    echo "❌ NOT safe to delete (main missing commits)"
+  fi
+done
