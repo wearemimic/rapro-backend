@@ -474,7 +474,7 @@ class AdvisorClientListView(generics.ListAPIView):
         return queryset
     
   
-class ClientDetailView(generics.RetrieveAPIView):
+class ClientDetailView(generics.RetrieveDestroyAPIView):
     queryset = Client.objects.all()
     serializer_class = ClientDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
