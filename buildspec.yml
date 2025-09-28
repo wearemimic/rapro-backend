@@ -15,7 +15,7 @@ phases:
       - echo Building the Docker image...
 
       # Build the production backend image
-      - docker build -f docker/Dockerfile.backend.prod -t $REPOSITORY_URI:latest .
+      - docker build -f docker/Dockerfile.backend -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
 
       # Also tag for staging
