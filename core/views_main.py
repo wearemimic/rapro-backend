@@ -1146,7 +1146,13 @@ class RothConversionAPIView(APIView):
             
             # Process the conversion and get results
             result = processor.process()
-            
+
+            # DEBUG: Check what keys are in result
+            print(f"DEBUG: Result keys from processor: {result.keys()}")
+            print(f"DEBUG: conversion_cost_metrics in result: {'conversion_cost_metrics' in result}")
+            if 'conversion_cost_metrics' in result:
+                print(f"DEBUG: conversion_cost_metrics value: {result['conversion_cost_metrics']}")
+
             # Transform the result to match the expected frontend structure
             transformed_result = {
                 'baseline': {
@@ -1166,7 +1172,8 @@ class RothConversionAPIView(APIView):
                     'score_breakdown': result['metrics']['conversion']
                 },
                 'asset_balances': result['asset_balances'],
-                'scenarioResults': result['conversion_results']  # Add scenarioResults for frontend
+                'scenarioResults': result['conversion_results'],  # Add scenarioResults for frontend
+                'conversion_cost_metrics': result.get('conversion_cost_metrics')  # Add conversion cost metrics
             }
             
             # DEBUG: Log what we're actually sending to the UI
@@ -1176,7 +1183,53 @@ class RothConversionAPIView(APIView):
             print(f"Annual conversion amount: ${transformed_result['optimal_schedule']['annual_amount']:,.0f}")
             print(f"Total conversion amount: ${transformed_result['optimal_schedule']['total_amount']:,.0f}")
             print(f"==========================================\n")
-            
+
+            # Save the calculation results to the scenario for debugging and prepopulation
+            scenario_id = scenario.get('id')
+            if scenario_id:
+                try:
+                    from .models import Scenario
+                    from decimal import Decimal
+                    import json
+
+                    # Helper function to convert Decimals to float for JSON serialization
+                    def decimal_to_float(obj):
+                        if isinstance(obj, Decimal):
+                            return float(obj)
+                        elif isinstance(obj, dict):
+                            return {k: decimal_to_float(v) for k, v in obj.items()}
+                        elif isinstance(obj, list):
+                            return [decimal_to_float(item) for item in obj]
+                        return obj
+
+                    scenario_obj = Scenario.objects.get(id=scenario_id)
+
+                    # Convert all Decimals to floats before saving
+                    serializable_data = {
+                        'input_data': decimal_to_float({
+                            'scenario': scenario,
+                            'client': client,
+                            'spouse': spouse,
+                            'assets': assets,
+                            'conversion_params': conversion_params
+                        }),
+                        'calculation_results': decimal_to_float(transformed_result),
+                        'version': '1.0'
+                    }
+
+                    scenario_obj.roth_conversion_results = serializable_data
+                    scenario_obj.roth_conversion_calculated_at = timezone.now()
+                    scenario_obj.roth_conversion_start_year = result['conversion_params']['conversion_start_year']
+                    scenario_obj.roth_conversion_duration = result['conversion_params']['years_to_convert']
+                    scenario_obj.roth_conversion_annual_amount = result['conversion_params']['annual_conversion']
+                    scenario_obj.save(update_fields=['roth_conversion_results', 'roth_conversion_calculated_at',
+                                                     'roth_conversion_start_year', 'roth_conversion_duration',
+                                                     'roth_conversion_annual_amount'])
+                    print(f"✅ Saved Roth conversion results to Scenario {scenario_id}")
+                except Exception as save_error:
+                    print(f"⚠️  Failed to save Roth conversion results: {str(save_error)}")
+                    # Don't fail the request if saving fails
+
             # Return the transformed results
             return Response(transformed_result, status=status.HTTP_200_OK)
             
@@ -1185,6 +1238,38 @@ class RothConversionAPIView(APIView):
             import traceback
             traceback.print_exc()
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_roth_conversion_results(request, scenario_id):
+    """
+    Retrieve saved Roth conversion calculation results for a scenario.
+    Returns the full calculation data for debugging and prepopulation.
+    """
+    try:
+        scenario = Scenario.objects.get(id=scenario_id)
+
+        # Check if user has access to this scenario
+        if scenario.client.advisor != request.user:
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        if not scenario.roth_conversion_results:
+            return Response({'error': 'No saved Roth conversion results found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            'results': scenario.roth_conversion_results,
+            'calculated_at': scenario.roth_conversion_calculated_at,
+            'start_year': scenario.roth_conversion_start_year,
+            'duration': scenario.roth_conversion_duration,
+            'annual_amount': scenario.roth_conversion_annual_amount
+        }, status=status.HTTP_200_OK)
+
+    except Scenario.DoesNotExist:
+        return Response({'error': 'Scenario not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"ERROR retrieving Roth conversion results: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

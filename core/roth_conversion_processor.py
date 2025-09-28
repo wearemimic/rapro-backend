@@ -353,13 +353,161 @@ class RothConversionProcessor:
         
         return conversion_scenario
     
+    def _calculate_conversion_cost_metrics(self, conversion_results):
+        """
+        Calculate total conversion cost metrics.
+
+        Parameters:
+        - conversion_results: List[Dict] - Conversion scenario year-by-year
+
+        Returns:
+        - dict with conversion cost breakdown
+        """
+        total_converted = Decimal('0')
+        total_conversion_tax = Decimal('0')
+        conversion_years = []
+
+        for year_data in conversion_results:
+            conversion_amount = year_data.get('roth_conversion', 0) or year_data.get('conversion_amount', 0)
+            conversion_tax = year_data.get('conversion_tax', 0)
+
+            if conversion_amount > 0:
+                total_converted += Decimal(str(conversion_amount))
+                total_conversion_tax += Decimal(str(conversion_tax))
+
+                conversion_years.append({
+                    'year': year_data.get('year'),
+                    'age': year_data.get('primary_age') or year_data.get('age'),
+                    'conversion_amount': float(conversion_amount),
+                    'regular_income': year_data.get('gross_income', 0),
+                    'regular_income_tax': year_data.get('regular_income_tax', 0),
+                    'total_tax': year_data.get('federal_tax', 0),
+                    'conversion_tax': float(conversion_tax)
+                })
+
+        effective_rate = (float(total_conversion_tax) / float(total_converted) * 100) if total_converted > 0 else 0
+
+        return {
+            'total_converted': float(total_converted),
+            'total_conversion_tax': float(total_conversion_tax),
+            'effective_conversion_tax_rate': effective_rate,
+            'number_of_conversion_years': len(conversion_years),
+            'conversion_years': conversion_years
+        }
+
+    def _calculate_conversion_tax_breakdown(self, conversion_results, baseline_results):
+        """
+        Calculate incremental conversion tax for each year.
+
+        For years with conversions, calculates:
+        - regular_income_tax: Tax on income without conversion
+        - conversion_tax: Extra tax due to conversion
+        - federal_tax: Total tax (already in data)
+
+        Parameters:
+        - conversion_results: List[Dict] - Conversion scenario year-by-year
+        - baseline_results: List[Dict] - Baseline scenario year-by-year
+
+        Returns:
+        - enhanced_results: List[Dict] - Conversion results with tax breakdown
+        """
+        enhanced = []
+
+        # Create lookup for baseline taxes by year
+        baseline_tax_by_year = {y['year']: y.get('federal_tax', 0) for y in baseline_results}
+
+        for year_data in conversion_results:
+            year_dict = dict(year_data)
+            year = year_dict.get('year')
+            conversion_amount = year_dict.get('roth_conversion', 0) or year_dict.get('conversion_amount', 0)
+            federal_tax = year_dict.get('federal_tax', 0)
+
+            if conversion_amount > 0:
+                # This year has a conversion
+                # Get baseline tax for same year (what tax would be without conversion)
+                baseline_tax = baseline_tax_by_year.get(year, 0)
+
+                # Incremental tax due to conversion
+                conversion_tax = float(federal_tax) - float(baseline_tax)
+
+                year_dict['regular_income_tax'] = float(baseline_tax)
+                year_dict['conversion_tax'] = conversion_tax
+            else:
+                # No conversion this year
+                year_dict['regular_income_tax'] = float(federal_tax)
+                year_dict['conversion_tax'] = 0
+
+            enhanced.append(year_dict)
+
+        return enhanced
+
+    def _enhance_year_data_with_rmd_details(self, year_by_year_results):
+        """
+        Enhance year-by-year data with calculated RMD amounts for CPA auditing.
+
+        For each year where client is age 73+, calculate RMDs based on qualified balances
+        and IRS Uniform Lifetime Table, then add to year data.
+
+        Parameters:
+        - year_by_year_results: List[Dict] - Year-by-year results from ScenarioProcessor
+
+        Returns:
+        - enhanced_results: List[Dict] - Same results with added RMD fields
+        """
+        enhanced = []
+
+        for year_data in year_by_year_results:
+            year_dict = dict(year_data)  # Create a copy
+
+            # Get age for this year
+            age = year_dict.get('primary_age')
+
+            # Calculate RMD if age 73+
+            if age and age >= 73:
+                # Get qualified balance (Traditional IRA/401k)
+                qualified_balance = year_dict.get('qualified_balance', 0) or year_dict.get('Qualified_balance', 0)
+
+                if qualified_balance > 0:
+                    # Get life expectancy factor from IRS table
+                    life_expectancy_factor = RMD_TABLE.get(age, 0)
+
+                    if life_expectancy_factor > 0:
+                        # RMD = Balance / Life Expectancy Factor
+                        rmd_amount = float(qualified_balance) / life_expectancy_factor
+                        year_dict['rmd'] = rmd_amount
+                        year_dict['rmd_amount'] = rmd_amount
+                        year_dict['rmd_calculation'] = {
+                            'balance': float(qualified_balance),
+                            'life_expectancy_factor': life_expectancy_factor,
+                            'age': age
+                        }
+                    else:
+                        year_dict['rmd'] = 0
+                        year_dict['rmd_amount'] = 0
+                else:
+                    year_dict['rmd'] = 0
+                    year_dict['rmd_amount'] = 0
+            else:
+                year_dict['rmd'] = 0
+                year_dict['rmd_amount'] = 0
+
+            # Add conversion amount if present (for tracking conversions)
+            if 'roth_conversion' in year_dict and year_dict['roth_conversion'] > 0:
+                year_dict['conversion_amount'] = year_dict['roth_conversion']
+            else:
+                year_dict['conversion_amount'] = 0
+
+            enhanced.append(year_dict)
+
+        return enhanced
+
     def _extract_metrics(self, results):
         """
         Extract key metrics from scenario results.
-        
+
         Parameters:
         - results: List of dictionaries - Year-by-year scenario results
-        
+
         Returns:
         - metrics: Dictionary - Extracted metrics
         """
@@ -859,18 +1007,32 @@ class RothConversionProcessor:
                             }
                             
                             # Calculate federal tax based on actual gross income + conversion using proper tax calculations
+                            standard_deduction = self._get_standard_deduction()
+
+                            # Calculate tax on regular income ONLY (without conversion)
+                            regular_taxable_income = max(0, float(gross_income) - float(standard_deduction))
+                            regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
+
+                            # Calculate tax on regular income + conversion
                             total_income = float(gross_income) + conversion_amount
                             if total_income > 0:
-                                # Apply standard deduction
-                                standard_deduction = self._get_standard_deduction()
                                 taxable_income = max(0, total_income - float(standard_deduction))
-                                
+
                                 # Calculate federal tax using CSV tax brackets
                                 federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
+
+                                # Calculate incremental tax due to conversion
+                                conversion_tax = float(federal_tax) - float(regular_income_tax)
+
                                 pre_retirement_row['federal_tax'] = float(federal_tax)
+                                pre_retirement_row['regular_income_tax'] = float(regular_income_tax)
+                                pre_retirement_row['conversion_tax'] = conversion_tax
                                 pre_retirement_row['tax_bracket'] = tax_bracket
                                 pre_retirement_row['taxable_income'] = taxable_income  # Update with actual taxable income
                                 pre_retirement_row['net_income'] = float(gross_income) - pre_retirement_row['federal_tax']
+                            else:
+                                pre_retirement_row['regular_income_tax'] = 0
+                                pre_retirement_row['conversion_tax'] = 0
                             
                             # Add Medicare/IRMAA if age >= 65
                             if primary_age and primary_age >= 65:
@@ -918,10 +1080,17 @@ class RothConversionProcessor:
                 traceback.print_exc()
                 # Provide a fallback for testing
                 conversion_results = copy.deepcopy(baseline_results)
-        
+
+        # Enhance year-by-year data with RMD details for CPA auditing
+        baseline_results = self._enhance_year_data_with_rmd_details(baseline_results)
+        conversion_results = self._enhance_year_data_with_rmd_details(conversion_results)
+
+        # Calculate conversion tax breakdown (regular income tax vs conversion tax)
+        conversion_results = self._calculate_conversion_tax_breakdown(conversion_results, baseline_results)
+
         # Extract baseline metrics
         baseline_metrics = self._extract_metrics(baseline_results)
-        
+
         # Extract conversion metrics
         conversion_metrics = self._extract_metrics(conversion_results)
         
@@ -932,7 +1101,11 @@ class RothConversionProcessor:
         
         # Compare metrics
         comparison = self._compare_metrics(baseline_metrics, conversion_metrics)
-        
+
+        # Calculate conversion cost metrics
+        conversion_cost_metrics = self._calculate_conversion_cost_metrics(conversion_results)
+        print(f"DEBUG: Conversion Cost Metrics = {conversion_cost_metrics}")
+
         # Extract asset balances
         asset_balances = self._extract_asset_balances(baseline_results, conversion_results)
         
@@ -955,6 +1128,7 @@ class RothConversionProcessor:
                 'roth_withdrawal_amount': float(self.roth_withdrawal_amount),
                 'roth_withdrawal_start_year': self.roth_withdrawal_start_year
             },
+            'conversion_cost_metrics': conversion_cost_metrics,
             'asset_balances': asset_balances,
             'optimal_schedule': {
                 'start_year': self.conversion_start_year,

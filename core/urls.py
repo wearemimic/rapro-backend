@@ -1,7 +1,7 @@
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from .views_main import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, register_advisor, complete_registration, mock_report_templates, mock_reports, mock_generate_report, mock_report_status
+from .views_main import login_view, logout_view, register_view, profile_view, AdvisorClientListView, ClientCreateView, ClientDetailView, ClientEditView, RothConversionAPIView, get_roth_conversion_results, register_advisor, complete_registration, mock_report_templates, mock_reports, mock_generate_report, mock_report_status
 from . import report_views
 from .views_main import ScenarioCreateView, create_scenario, run_scenario_calculation, comprehensive_financial_summary, start_scenario_calculation_async, get_task_status, cancel_task, proxy_to_wealthbox, get_scenario_assets, duplicate_scenario, get_scenario_detail, get_scenario_for_editing, get_scenario_comparison_data, comparison_preferences, get_federal_standard_deduction, get_irmaa_thresholds_for_years, medicare_inflation_rates
 from .views_main import ListCreateRealEstateView, RealEstateDetailView, ReportTemplateViewSet
@@ -196,6 +196,7 @@ urlpatterns = [
    #  path('proxy/<path:path>', proxy_to_wealthbox, name='proxy_to_wealthbox'),
     path('proxy/v1/me/', proxy_to_wealthbox, name='proxy_to_wealthbox'),
     path('roth-optimize/', RothConversionAPIView.as_view(), name='roth-optimize'),
+    path('scenarios/<int:scenario_id>/roth-conversion-results/', get_roth_conversion_results, name='roth-conversion-results'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('register-advisor/', register_advisor, name='register_advisor'),

@@ -276,6 +276,8 @@ class Scenario(models.Model):
     roth_conversion_start_year = models.PositiveIntegerField(null=True, blank=True)
     roth_conversion_duration = models.PositiveIntegerField(null=True, blank=True)
     roth_conversion_annual_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    roth_conversion_results = models.JSONField(null=True, blank=True, help_text="Stored Roth conversion calculation results for debugging and prepopulation")
+    roth_conversion_calculated_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp of last Roth conversion calculation")
     apply_standard_deduction = models.BooleanField(default=True, help_text="Apply IRS standard deduction in tax calculations.")
     income_vs_cost_percent = models.IntegerField(default=0, help_text="Percentage of federal tax + medicare to gross income")
     medicare_irmaa_percent = models.IntegerField(default=0, help_text="Percentage of IRMAA surcharges to total medicare costs")
