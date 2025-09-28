@@ -257,15 +257,88 @@ class TaxCSVLoader:
     def get_available_tax_years(self) -> List[int]:
         """Get list of available tax years based on CSV files."""
         years = set()
-        
+
         for file in self.data_dir.glob("*.csv"):
             # Extract year from filename
             parts = file.stem.split('_')
             for part in parts:
                 if part.isdigit() and len(part) == 4:
                     years.add(int(part))
-        
+
         return sorted(list(years))
+
+    def get_estate_tax_brackets(self) -> List[Dict[str, Any]]:
+        """Get federal estate tax brackets."""
+        # Try data dir first, then fall back to core/data directory
+        filename = f"federal_estate_tax_brackets_{self.tax_year}.csv"
+
+        # Try tax_data directory first
+        file_path = self.data_dir / filename
+
+        # Fall back to core/data directory
+        if not file_path.exists():
+            file_path = Path(__file__).parent / 'data' / filename
+
+        if not file_path.exists():
+            # Return default brackets if file not found
+            return [{
+                'income_min': Decimal('0'),
+                'income_max': Decimal('13610000'),
+                'tax_rate': Decimal('0.00'),
+                'base_tax': Decimal('0')
+            }, {
+                'income_min': Decimal('13610000'),
+                'income_max': Decimal('99999999999'),
+                'tax_rate': Decimal('0.40'),
+                'base_tax': Decimal('0')
+            }]
+
+        data = []
+        with open(file_path, 'r', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                data.append({
+                    'income_min': Decimal(row['income_min']),
+                    'income_max': Decimal(row['income_max']),
+                    'tax_rate': Decimal(row['tax_rate']),
+                    'base_tax': Decimal(row['base_tax'])
+                })
+
+        # Sort by min income
+        data.sort(key=lambda x: x['income_min'])
+        return data
+
+    def calculate_estate_tax(self, total_estate_value: Decimal) -> Decimal:
+        """Calculate federal estate tax on total estate value."""
+        brackets = self.get_estate_tax_brackets()
+
+        # Estate is below exemption threshold
+        if not brackets:
+            return Decimal('0')
+
+        tax = Decimal('0')
+
+        for bracket in brackets:
+            bracket_min = bracket['income_min']
+            bracket_max = bracket['income_max']
+            rate = bracket['tax_rate']
+            base_tax = bracket['base_tax']
+
+            # If estate is below this bracket, no tax
+            if total_estate_value <= bracket_min:
+                break
+
+            # If estate is in this bracket
+            if total_estate_value > bracket_min:
+                # Calculate amount subject to this bracket's rate
+                taxable_amount = min(total_estate_value - bracket_min, bracket_max - bracket_min)
+                tax = base_tax + (taxable_amount * rate)
+
+                # If estate is within this bracket, we're done
+                if total_estate_value <= bracket_max:
+                    break
+
+        return tax
 
 
 # Convenience functions for current year

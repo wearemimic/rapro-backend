@@ -5,14 +5,14 @@ WORKDIR /app
 # ✅ Disable native Rollup binary resolution for ARM (critical fix)
 # ENV ROLLUP_NO_BINARY=true
 
-COPY frontend/package*.json ./
+COPY rapro-frontend/package*.json ./
 
 # Reinstall everything fresh
 RUN npm install
 # Install sortablejs package
 RUN npm install --save sortablejs
 
-COPY frontend/ .
+COPY rapro-frontend/ .
 
 # Use existing node user for security (best practice)
 RUN chown -R node:node /app

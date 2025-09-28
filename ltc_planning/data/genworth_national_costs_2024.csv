@@ -1,0 +1,12 @@
+care_type,service_type,annual_cost,monthly_cost,hourly_cost,source,year,last_updated
+in_home_care,homemaker_services,61776,5148,28.00,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+in_home_care,home_health_aide,61776,5148,28.00,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+adult_day_care,adult_day_health_care,21840,1820,80.00,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+assisted_living,one_bedroom,57600,4800,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+assisted_living,studio,54000,4500,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+memory_care,monthly_private,75600,6300,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+memory_care,monthly_shared,69600,5800,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+skilled_nursing,semi_private_room,96360,8030,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+skilled_nursing,private_room,112200,9350,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+independent_living,one_bedroom,32400,2700,,Genworth 2024 Cost of Care Survey,2024,2024-01-15
+independent_living,studio,28800,2400,,Genworth 2024 Cost of Care Survey,2024,2024-01-15

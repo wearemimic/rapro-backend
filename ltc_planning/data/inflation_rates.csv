@@ -1,0 +1,8 @@
+care_type,annual_inflation_rate,source,year,notes
+in_home_care,0.0475,Genworth Historical Data 2010-2024,2024,Average 4.75% annual increase
+adult_day_care,0.0425,Genworth Historical Data 2010-2024,2024,Average 4.25% annual increase
+assisted_living,0.0450,Genworth Historical Data 2010-2024,2024,Average 4.50% annual increase
+memory_care,0.0525,Genworth Historical Data 2010-2024,2024,Average 5.25% annual increase (highest)
+skilled_nursing,0.0500,Genworth Historical Data 2010-2024,2024,Average 5.00% annual increase
+independent_living,0.0400,Genworth Historical Data 2010-2024,2024,Average 4.00% annual increase
+general,0.0450,Default rate for mixed scenarios,2024,Used when specific care type not specified

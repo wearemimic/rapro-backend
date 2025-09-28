@@ -1,0 +1,3 @@
+income_min,income_max,tax_rate,base_tax
+0,13610000,0.00,0
+13610000,99999999999,0.40,0

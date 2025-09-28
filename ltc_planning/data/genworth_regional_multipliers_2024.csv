@@ -1,0 +1,51 @@
+state,state_code,region,multiplier,source,year,notes
+Alabama,AL,Southeast,0.78,Genworth 2024 Cost of Care Survey,2024,Below national average
+Alaska,AK,West,1.32,Genworth 2024 Cost of Care Survey,2024,High cost state
+Arizona,AZ,Southwest,0.95,Genworth 2024 Cost of Care Survey,2024,Near national average
+Arkansas,AR,Southeast,0.72,Genworth 2024 Cost of Care Survey,2024,Below national average
+California,CA,West,1.52,Genworth 2024 Cost of Care Survey,2024,High cost state
+Colorado,CO,West,1.12,Genworth 2024 Cost of Care Survey,2024,Above national average
+Connecticut,CT,Northeast,1.45,Genworth 2024 Cost of Care Survey,2024,High cost state
+Delaware,DE,Northeast,1.15,Genworth 2024 Cost of Care Survey,2024,Above national average
+Florida,FL,Southeast,0.98,Genworth 2024 Cost of Care Survey,2024,Near national average
+Georgia,GA,Southeast,0.88,Genworth 2024 Cost of Care Survey,2024,Below national average
+Hawaii,HI,West,1.48,Genworth 2024 Cost of Care Survey,2024,High cost state
+Idaho,ID,West,0.89,Genworth 2024 Cost of Care Survey,2024,Below national average
+Illinois,IL,Midwest,1.08,Genworth 2024 Cost of Care Survey,2024,Above national average
+Indiana,IN,Midwest,0.91,Genworth 2024 Cost of Care Survey,2024,Below national average
+Iowa,IA,Midwest,0.87,Genworth 2024 Cost of Care Survey,2024,Below national average
+Kansas,KS,Midwest,0.85,Genworth 2024 Cost of Care Survey,2024,Below national average
+Kentucky,KY,Southeast,0.79,Genworth 2024 Cost of Care Survey,2024,Below national average
+Louisiana,LA,Southeast,0.82,Genworth 2024 Cost of Care Survey,2024,Below national average
+Maine,ME,Northeast,1.18,Genworth 2024 Cost of Care Survey,2024,Above national average
+Maryland,MD,Northeast,1.28,Genworth 2024 Cost of Care Survey,2024,Above national average
+Massachusetts,MA,Northeast,1.42,Genworth 2024 Cost of Care Survey,2024,High cost state
+Michigan,MI,Midwest,0.94,Genworth 2024 Cost of Care Survey,2024,Near national average
+Minnesota,MN,Midwest,1.11,Genworth 2024 Cost of Care Survey,2024,Above national average
+Mississippi,MS,Southeast,0.68,Genworth 2024 Cost of Care Survey,2024,Lowest cost state
+Missouri,MO,Midwest,0.84,Genworth 2024 Cost of Care Survey,2024,Below national average
+Montana,MT,West,0.93,Genworth 2024 Cost of Care Survey,2024,Below national average
+Nebraska,NE,Midwest,0.88,Genworth 2024 Cost of Care Survey,2024,Below national average
+Nevada,NV,West,1.06,Genworth 2024 Cost of Care Survey,2024,Above national average
+New Hampshire,NH,Northeast,1.35,Genworth 2024 Cost of Care Survey,2024,High cost state
+New Jersey,NJ,Northeast,1.38,Genworth 2024 Cost of Care Survey,2024,High cost state
+New Mexico,NM,Southwest,0.87,Genworth 2024 Cost of Care Survey,2024,Below national average
+New York,NY,Northeast,1.41,Genworth 2024 Cost of Care Survey,2024,High cost state
+North Carolina,NC,Southeast,0.92,Genworth 2024 Cost of Care Survey,2024,Below national average
+North Dakota,ND,Midwest,0.96,Genworth 2024 Cost of Care Survey,2024,Near national average
+Ohio,OH,Midwest,0.93,Genworth 2024 Cost of Care Survey,2024,Below national average
+Oklahoma,OK,Southwest,0.76,Genworth 2024 Cost of Care Survey,2024,Below national average
+Oregon,OR,West,1.22,Genworth 2024 Cost of Care Survey,2024,Above national average
+Pennsylvania,PA,Northeast,1.14,Genworth 2024 Cost of Care Survey,2024,Above national average
+Rhode Island,RI,Northeast,1.32,Genworth 2024 Cost of Care Survey,2024,High cost state
+South Carolina,SC,Southeast,0.86,Genworth 2024 Cost of Care Survey,2024,Below national average
+South Dakota,SD,Midwest,0.89,Genworth 2024 Cost of Care Survey,2024,Below national average
+Tennessee,TN,Southeast,0.81,Genworth 2024 Cost of Care Survey,2024,Below national average
+Texas,TX,Southwest,0.97,Genworth 2024 Cost of Care Survey,2024,Near national average
+Utah,UT,West,0.99,Genworth 2024 Cost of Care Survey,2024,Near national average
+Vermont,VT,Northeast,1.29,Genworth 2024 Cost of Care Survey,2024,Above national average
+Virginia,VA,Southeast,1.08,Genworth 2024 Cost of Care Survey,2024,Above national average
+Washington,WA,West,1.31,Genworth 2024 Cost of Care Survey,2024,High cost state
+West Virginia,WV,Southeast,0.74,Genworth 2024 Cost of Care Survey,2024,Below national average
+Wisconsin,WI,Midwest,0.98,Genworth 2024 Cost of Care Survey,2024,Near national average
+Wyoming,WY,West,0.91,Genworth 2024 Cost of Care Survey,2024,Below national average

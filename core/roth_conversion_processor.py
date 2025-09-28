@@ -567,22 +567,28 @@ class RothConversionProcessor:
             metrics['final_roth'] = float(roth_balance)  # Will be overwritten until last year
         
         # Calculate inheritance tax on final traditional account balances
-        # Use the last row to get final balances
+        # Use the last row to get final balances and calculate estate tax
         if results:
             final_year_data = results[-1]
-            inheritance_tax_rate = 0.25  # Default 25% rate
-            
+
+            # Get all taxable assets at death (traditional IRA/401k are subject to estate tax)
             traditional_balance = 0
             for key, value in final_year_data.items():
-                # Look for traditional IRA/401k balances
-                if (key.endswith('_balance') and 
+                # Look for traditional IRA/401k balances (subject to both income AND estate tax)
+                if (key.endswith('_balance') and
                     ('traditional' in key or 'ira' in key.lower() or '401k' in key.lower()) and
                     not 'roth' in key.lower() and
                     isinstance(value, (int, float, Decimal))):
                     traditional_balance += float(value)
-            
-            # Calculate inheritance tax
-            metrics['inheritance_tax'] = traditional_balance * inheritance_tax_rate
+
+            # Calculate estate tax using CSV-based brackets
+            from core.tax_csv_loader import get_tax_loader
+            tax_loader = get_tax_loader(2025)
+
+            # Only traditional (pre-tax) balances are subject to estate tax for beneficiaries
+            # Roth IRA balances pass tax-free
+            total_taxable_estate = Decimal(str(traditional_balance))
+            metrics['inheritance_tax'] = float(tax_loader.calculate_estate_tax(total_taxable_estate))
         
         # Calculate total expenses
         metrics['total_expenses'] = (
