@@ -13,7 +13,7 @@ phases:
 
       # Create a supervisor config to run all Celery processes in one container
       - |
-        cat > backend/supervisord.conf << 'SUPERVISOR_EOF'
+        cat > supervisord.conf << 'SUPERVISOR_EOF'
         [supervisord]
         nodaemon=true
         logfile=/var/log/supervisord.log
@@ -49,7 +49,7 @@ phases:
 
       # Create Dockerfile for combined Celery container
       - |
-        cat > backend/Dockerfile.celery << 'DOCKER_EOF'
+        cat > Dockerfile.celery << 'DOCKER_EOF'
         FROM python:3.12-slim
 
         # Install system dependencies including supervisor
