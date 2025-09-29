@@ -9,7 +9,7 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Building the Docker image for Celery (worker + beat + flower)...
+      - echo "Building the Docker image for Celery worker, beat, and flower..."
 
       # Create a supervisor config to run all Celery processes in one container
       - |
