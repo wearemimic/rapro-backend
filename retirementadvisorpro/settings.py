@@ -222,6 +222,10 @@ else:
             'PASSWORD': 'password',
             'HOST': 'db',  # Use 'db' for Docker with a service named `db`
             'PORT': '5432',
+            'CONN_MAX_AGE': 600,  # Keep database connections alive for 10 minutes
+            'OPTIONS': {
+                'connect_timeout': 10,
+            }
         }
     }
 
@@ -409,8 +413,10 @@ else:
 # =============================================================================
 
 # Celery Broker and Result Backend
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+# Use 'redis' as host in Docker, 'localhost' otherwise
+redis_host = 'redis' if os.environ.get('ENVIRONMENT') == 'development' or os.path.exists('/.dockerenv') else 'localhost'
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', f'redis://{redis_host}:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', f'redis://{redis_host}:6379/0')
 
 # Task serialization
 CELERY_TASK_SERIALIZER = 'json'
@@ -584,7 +590,7 @@ PRESIGNED_URL_EXPIRATION = int(os.environ.get('PRESIGNED_URL_EXPIRATION', '3600'
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/1'),
+        'LOCATION': os.environ.get('REDIS_URL', f'redis://{redis_host}:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
             # Remove PARSER_CLASS entirely - let Redis use its default

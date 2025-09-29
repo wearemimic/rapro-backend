@@ -1013,6 +1013,7 @@ def validate_coupon(request):
         
         # Try to retrieve coupon from Stripe
         try:
+            print(f"🔍 Attempting to retrieve coupon with Stripe API key starting with: {stripe.api_key[:7] if stripe.api_key else 'None'}")
             coupon = stripe.Coupon.retrieve(coupon_code)
             print(f"✅ Coupon found: {coupon.id}")
             
@@ -1070,6 +1071,7 @@ def validate_coupon(request):
             
         except stripe.error.StripeError as e:
             error_code = getattr(e, 'code', '')
+            print(f"❌ Stripe error code: {error_code}, message: {str(e)}")
             if error_code == 'resource_missing':
                 return Response({
                     'valid': False,
