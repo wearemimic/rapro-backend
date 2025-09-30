@@ -694,7 +694,8 @@ def auth0_complete_registration(request):
 
             # Generate idempotency key to prevent duplicate charges
             import hashlib
-            idempotency_key = hashlib.sha256(f"customer_{email}_{timestamp}".encode()).hexdigest()
+            timestamp = int(time.time())
+            idempotency_key = hashlib.sha256(f"customer_{registration_email}_{timestamp}".encode()).hexdigest()
 
             customer = stripe.Customer.create(**customer_data, idempotency_key=idempotency_key)
             print(f"✅ Stripe customer created: {customer.id}")
