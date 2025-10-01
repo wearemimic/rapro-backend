@@ -1551,38 +1551,67 @@ class ScenarioProcessor:
         return total_ss, primary_ss, spouse_ss
     
     def _calculate_social_security_without_decrease(self, year, primary_alive=True, spouse_alive=True):
-        """Calculate Social Security income as if no decrease was applied - for comparison purposes."""
-        total_ss = 0
-        primary_ss = 0
-        spouse_ss = 0
-        
+        """Calculate Social Security income as if no decrease was applied - for comparison purposes.
+        This includes survivor benefit logic."""
+
+        # Calculate both spouses' SS benefits (even if deceased) for survivor benefit comparison
+        primary_ss_raw = 0
+        spouse_ss_raw = 0
+
         for asset in self.assets:
             if asset.get("income_type") == "social_security":
                 owner = asset.get("owned_by", "primary")
-                if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
-                    continue
                 birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
                 if not birthdate:
                     continue
                 current_age = year - birthdate.year
                 start_age = asset.get("age_to_begin_withdrawal")
-                end_age = asset.get("age_to_end_withdrawal")
                 cola = Decimal('0.02')
-                if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
+
+                # Calculate SS even if past end_age for survivor benefit comparison
+                if start_age is not None and current_age >= start_age:
                     years_since_start = current_age - start_age
                     monthly_amount = asset.get("monthly_amount", 0)
                     inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                     annual_income = inflated_amount * 12
-                    
-                    # NO SS decrease applied - this is the raw amount
-                    total_ss += annual_income
-                    
-                    # Track primary vs spouse separately
+
                     if owner == "primary":
-                        primary_ss += annual_income
+                        primary_ss_raw += annual_income
                     else:
-                        spouse_ss += annual_income
-                        
+                        spouse_ss_raw += annual_income
+
+        # Apply survivor benefit logic (same as main _calculate_social_security)
+        primary_ss = 0
+        spouse_ss = 0
+
+        if getattr(self.scenario, 'survivor_takes_higher_benefit', False):
+            # Check if one spouse died and one is alive
+            if primary_alive and not spouse_alive and spouse_ss_raw > 0:
+                # Primary alive, spouse died - primary takes higher benefit
+                if spouse_ss_raw > primary_ss_raw:
+                    primary_ss = spouse_ss_raw
+                else:
+                    primary_ss = primary_ss_raw
+            elif spouse_alive and not primary_alive and primary_ss_raw > 0:
+                # Spouse alive, primary died - spouse takes higher benefit
+                if primary_ss_raw > spouse_ss_raw:
+                    spouse_ss = primary_ss_raw
+                else:
+                    spouse_ss = spouse_ss_raw
+            else:
+                # Both alive or both dead - normal processing
+                if primary_alive:
+                    primary_ss = primary_ss_raw
+                if spouse_alive:
+                    spouse_ss = spouse_ss_raw
+        else:
+            # Survivor benefit not enabled - standard logic
+            if primary_alive:
+                primary_ss = primary_ss_raw
+            if spouse_alive:
+                spouse_ss = spouse_ss_raw
+
+        total_ss = primary_ss + spouse_ss
         return total_ss, primary_ss, spouse_ss
     
     def _get_ss_decrease_amount(self):
@@ -1656,8 +1685,17 @@ class ScenarioProcessor:
             'married filing separately': 'Married Filing Separately'
         }
 
+        # Determine filing status based on whether both spouses are alive
+        # If one spouse dies, surviving spouse files as Single for IRMAA purposes
         normalized_status = (self.tax_status or '').strip().lower()
-        filing_status = status_mapping.get(normalized_status, 'Single')
+        original_filing_status = status_mapping.get(normalized_status, 'Single')
+
+        # Override to Single if originally married but one spouse is now deceased
+        if 'married' in normalized_status and not (primary_alive and spouse_alive):
+            filing_status = 'Single'
+            self._log_debug(f"Year {year} - One spouse deceased, using Single filing status for IRMAA (was {original_filing_status})")
+        else:
+            filing_status = original_filing_status
 
         # Calculate IRMAA surcharges using inflated thresholds for the target year
         part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
@@ -1697,7 +1735,10 @@ class ScenarioProcessor:
         if both_on_medicare:
             base_part_b *= 2
             base_part_d *= 2
-            self._log_debug(f"Year {year}: Both spouses Medicare eligible (Primary: {primary_age}, Spouse: {spouse_age}) - Doubling base costs")
+            # IRMAA surcharges are per person, so also double them when both spouses are on Medicare
+            part_b_surcharge *= 2
+            part_d_irmaa *= 2
+            self._log_debug(f"Year {year}: Both spouses Medicare eligible (Primary: {primary_age}, Spouse: {spouse_age}) - Doubling base costs and IRMAA surcharges")
 
         # Retrieve inflation rates from the scenario
         part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
