@@ -753,6 +753,7 @@ def get_scenario_for_editing(request, scenario_id):
             'spouse_lifespan': scenario.spouse_mortality_age,
             'model_tax_change': '',  # Reset to default
             'reduction_2030_ss': scenario.reduction_2030_ss,
+            'survivor_takes_higher_benefit': scenario.survivor_takes_higher_benefit,
             'ss_adjustment_year': scenario.ss_adjustment_year,
             'ss_adjustment_direction': scenario.ss_adjustment_direction,
             'ss_adjustment_type': scenario.ss_adjustment_type,
