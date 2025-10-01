@@ -33,10 +33,10 @@ from .billing_views import (
     update_payment_method, download_invoice
 )
 from .admin_views import (
-    admin_dashboard_stats, admin_user_list, update_user_admin_role, admin_analytics_overview, 
-    admin_system_monitoring, admin_support_overview, start_user_impersonation, 
-    end_user_impersonation, get_active_impersonation_sessions, get_impersonation_logs, 
-    get_impersonation_session_detail, delete_user_complete,
+    admin_dashboard_stats, admin_user_list, update_user_admin_role, admin_analytics_overview,
+    admin_system_monitoring, admin_support_overview, start_user_impersonation,
+    end_user_impersonation, get_active_impersonation_sessions, get_impersonation_logs,
+    get_impersonation_session_detail, delete_user_complete, force_end_impersonation_session,
     admin_revenue_analytics, admin_recalculate_revenue_metrics, admin_user_engagement_analytics,
     admin_client_portfolio_analytics, admin_run_analytics_calculation, admin_billing_data,
     # Phase 2.3: System Performance Monitoring
@@ -293,6 +293,7 @@ urlpatterns = [
     path('admin/users/<int:user_id>/impersonate/', start_user_impersonation, name='start-user-impersonation'),
     path('admin/users/<int:user_id>/delete/', delete_user_complete, name='delete-user-complete'),
     path('admin/impersonation/<int:session_id>/end/', end_user_impersonation, name='end-user-impersonation'),
+    path('admin/impersonation/<int:session_id>/force-end/', force_end_impersonation_session, name='force-end-impersonation-session'),
     path('admin/impersonation/active/', get_active_impersonation_sessions, name='get-active-impersonation-sessions'),
     path('admin/impersonation/logs/', get_impersonation_logs, name='get-impersonation-logs'),
     path('admin/impersonation/logs/<int:session_id>/', get_impersonation_session_detail, name='get-impersonation-session-detail'),

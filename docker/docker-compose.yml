@@ -2,8 +2,8 @@ version: "3.9"
 services:
   frontend:
     build:
-      context: ../..
-      dockerfile: rapro-backend/docker/Dockerfile.frontend
+      context: ../../rapro-frontend
+      dockerfile: docker/Dockerfile.frontend
     ports:
       - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
     volumes:
@@ -26,8 +26,8 @@ services:
   
   backend:
     build:
-      context: ../..
-      dockerfile: rapro-backend/docker/Dockerfile.backend
+      context: ..
+      dockerfile: docker/Dockerfile.backend
     ports:
       - "${BACKEND_PORT:-8000}:${BACKEND_PORT:-8000}"
     volumes:
@@ -101,8 +101,8 @@ services:
 
   celery_worker:
     build:
-      context: ../..
-      dockerfile: rapro-backend/docker/Dockerfile.backend
+      context: ..
+      dockerfile: docker/Dockerfile.backend
     working_dir: /app
     volumes:
       - ../../rapro-backend:/app
@@ -131,8 +131,8 @@ services:
 
   celery_beat:
     build:
-      context: ../..
-      dockerfile: rapro-backend/docker/Dockerfile.backend
+      context: ..
+      dockerfile: docker/Dockerfile.backend
     working_dir: /app
     volumes:
       - ../../rapro-backend:/app
@@ -161,8 +161,8 @@ services:
 
   celery_flower:
     build:
-      context: ../..
-      dockerfile: rapro-backend/docker/Dockerfile.backend
+      context: ..
+      dockerfile: docker/Dockerfile.backend
     working_dir: /app
     volumes:
       - ../../rapro-backend:/app

@@ -290,13 +290,49 @@ def admin_user_list(request):
         users = queryset[offset:offset + limit]
         
         # Serialize with additional admin data
+        from .models import UserImpersonationLog
+
+        # Get all active impersonation sessions for these users (optimize with single query)
+        user_ids = [u.id for u in users]
+        active_sessions = UserImpersonationLog.objects.filter(
+            target_user_id__in=user_ids,
+            is_active=True
+        ).select_related('admin_user', 'target_user').values(
+            'id', 'target_user_id', 'admin_user__email', 'admin_user__first_name',
+            'admin_user__last_name', 'start_timestamp', 'reason'
+        )
+
+        # Create lookup dict for quick access
+        session_lookup = {session['target_user_id']: session for session in active_sessions}
+
         user_data = []
         for user in users:
             # Get user activity stats
             client_count = Client.objects.filter(advisor=user, is_deleted=False).count()
             scenario_count = Scenario.objects.filter(client__advisor=user).count()
             last_login = getattr(user, 'last_login', None)
-            
+
+            # Check for active impersonation session
+            active_session = session_lookup.get(user.id)
+            impersonation_status = None
+            if active_session:
+                duration_minutes = int(
+                    (timezone.now() - active_session['start_timestamp']).total_seconds() / 60
+                )
+                admin_name = f"{active_session['admin_user__first_name']} {active_session['admin_user__last_name']}".strip()
+                if not admin_name:
+                    admin_name = active_session['admin_user__email']
+
+                impersonation_status = {
+                    'session_id': active_session['id'],
+                    'is_active': True,
+                    'admin_email': active_session['admin_user__email'],
+                    'admin_name': admin_name,
+                    'start_time': active_session['start_timestamp'].isoformat(),
+                    'duration_minutes': duration_minutes,
+                    'reason': active_session['reason']
+                }
+
             user_info = {
                 'id': user.id,
                 'email': user.email,
@@ -317,6 +353,7 @@ def admin_user_list(request):
                 'scenario_count': scenario_count,
                 'city': user.city,
                 'state': user.state,
+                'impersonation_session': impersonation_status
             }
             user_data.append(user_info)
         
@@ -844,12 +881,69 @@ def end_user_impersonation(request, session_id):
         )
 
 
+@api_view(['POST'])
+@admin_required(section='user_management')
+def force_end_impersonation_session(request, session_id):
+    """Force end an impersonation session (admin override)"""
+    from .models import UserImpersonationLog, AdminAuditLog
+
+    try:
+        # Find active impersonation session
+        impersonation_log = UserImpersonationLog.objects.get(
+            id=session_id,
+            is_active=True
+        )
+
+        # End the session (forced by admin)
+        impersonation_log.end_session(
+            actions=[],
+            pages=[]
+        )
+
+        # Create audit log entry
+        AdminAuditLog.log_action(
+            admin_user=request.user,
+            action_type='admin_action',
+            description=f'Force-ended impersonation session: {impersonation_log.admin_user.email} -> {impersonation_log.target_user_email}',
+            target_user=impersonation_log.target_user,
+            metadata={
+                'impersonation_session_id': impersonation_log.id,
+                'original_admin': impersonation_log.admin_user.email,
+                'session_duration_minutes': int(
+                    (impersonation_log.end_timestamp - impersonation_log.start_timestamp).total_seconds() / 60
+                ),
+                'forced_by_admin': True
+            },
+            risk_level='high'
+        )
+
+        return Response({
+            'message': 'Impersonation session force-ended successfully',
+            'session_id': session_id,
+            'target_user': impersonation_log.target_user_email,
+            'duration_minutes': int(
+                (impersonation_log.end_timestamp - impersonation_log.start_timestamp).total_seconds() / 60
+            )
+        })
+
+    except UserImpersonationLog.DoesNotExist:
+        return Response(
+            {'error': 'Active impersonation session not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to force-end impersonation: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['GET'])
 @admin_required()
 def get_active_impersonation_sessions(request):
     """Get list of active impersonation sessions for the current admin"""
     from .models import UserImpersonationLog
-    
+
     try:
         active_sessions = UserImpersonationLog.objects.filter(
             admin_user=request.user,
