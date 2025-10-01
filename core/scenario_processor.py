@@ -600,7 +600,7 @@ class ScenarioProcessor:
             # Removed duplicate calculation
 
             # STEP 4: Federal Tax & AMT Engine
-            federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
+            federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income, primary_alive, spouse_alive)
             cumulative_federal_tax += federal_tax
 
             # Initialize state tax (will be calculated later based on state rules)
@@ -1638,25 +1638,36 @@ class ScenarioProcessor:
     def _calculate_taxable_income(self, gross_income, ss_income):
         return gross_income + ss_income * Decimal("0.85")
 
-    def _calculate_federal_tax_and_bracket(self, taxable_income):
-        """Calculate federal tax using CSV-based tax bracket data."""
+    def _calculate_federal_tax_and_bracket(self, taxable_income, primary_alive=True, spouse_alive=True):
+        """Calculate federal tax using CSV-based tax bracket data.
+
+        When one spouse dies, the surviving spouse switches to Single filing status
+        for federal tax purposes.
+        """
         tax_loader = get_tax_loader()
-        
+
         # Normalize tax status for CSV lookup
         status_mapping = {
             'single': 'Single',
             'married filing jointly': 'Married Filing Jointly',
-            'married filing separately': 'Married Filing Separately', 
+            'married filing separately': 'Married Filing Separately',
             'head of household': 'Head of Household',
             'qualifying widow(er)': 'Qualifying Widow(er)'
         }
-        
+
         normalized_status = (self.tax_status or '').strip().lower()
-        filing_status = status_mapping.get(normalized_status, 'Single')
-        
+        original_filing_status = status_mapping.get(normalized_status, 'Single')
+
+        # Override to Single if originally married but one spouse is now deceased
+        if 'married' in normalized_status and not (primary_alive and spouse_alive):
+            filing_status = 'Single'
+            self._log_debug(f"One spouse deceased, using Single filing status for federal tax (was {original_filing_status})")
+        else:
+            filing_status = original_filing_status
+
         # Use CSV loader to calculate tax
         tax, bracket_str = tax_loader.calculate_federal_tax(Decimal(taxable_income), filing_status)
-        
+
         return tax, bracket_str
 
     def _calculate_medicare_costs(self, magi, year, primary_age, spouse_age, primary_alive, spouse_alive):
