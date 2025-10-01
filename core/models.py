@@ -290,6 +290,7 @@ class Scenario(models.Model):
     
     # Social Security adjustment fields
     reduction_2030_ss = models.BooleanField(default=False, help_text="Apply Social Security benefit reduction")
+    survivor_takes_higher_benefit = models.BooleanField(default=False, help_text="Surviving spouse takes higher SS benefit")
     ss_adjustment_year = models.PositiveIntegerField(default=2030, help_text="Year to start Social Security adjustment")
     ss_adjustment_direction = models.CharField(max_length=20, default='decrease', help_text="Direction of SS adjustment")
     ss_adjustment_type = models.CharField(max_length=20, default='percentage', help_text="Type of SS adjustment")

@@ -1310,13 +1310,16 @@ class ScenarioProcessor:
         spouse_ss = 0
         ss_asset_incomes = {}  # Track individual SS asset incomes
 
-        # First pass - calculate raw SS benefits without adjustments
-        ss_assets = []
+        # First pass - calculate raw SS benefits for both spouses (even if deceased)
+        # We need to know both benefits to determine if survivor should take higher benefit
+        primary_ss_raw = 0
+        spouse_ss_raw = 0
+        primary_ss_assets = []
+        spouse_ss_assets = []
+
         for asset in self.assets:
             if asset.get("income_type") == "social_security":
                 owner = asset.get("owned_by", "primary")
-                if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
-                    continue
                 birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
                 if not birthdate:
                     continue
@@ -1324,23 +1327,85 @@ class ScenarioProcessor:
                 start_age = asset.get("age_to_begin_withdrawal")
                 end_age = asset.get("age_to_end_withdrawal")
                 cola = Decimal('0.02')
-                if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
+
+                # Calculate SS benefit even if past end_age for survivor benefit comparison
+                # We need to know what the deceased spouse's benefit would be
+                if start_age is not None and current_age >= start_age:
                     years_since_start = current_age - start_age
                     monthly_amount = asset.get("monthly_amount", 0)
                     inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
                     annual_income = inflated_amount * 12
-                    
-                    ss_assets.append({
-                        'owner': owner,
-                        'annual_income': annual_income,
-                        'asset_id': asset.get('id')
-                    })
-                    
-                    # Track primary vs spouse separately (before adjustments)
+
                     if owner == "primary":
-                        primary_ss += annual_income
+                        primary_ss_raw += annual_income
+                        primary_ss_assets.append({
+                            'owner': owner,
+                            'annual_income': annual_income,
+                            'asset_id': asset.get('id')
+                        })
                     else:
-                        spouse_ss += annual_income
+                        spouse_ss_raw += annual_income
+                        spouse_ss_assets.append({
+                            'owner': owner,
+                            'annual_income': annual_income,
+                            'asset_id': asset.get('id')
+                        })
+
+        # Handle survivor benefit logic
+        ss_assets = []
+        survivor_benefit_applied = False
+
+        survivor_toggle = getattr(self.scenario, 'survivor_takes_higher_benefit', False)
+        import logging
+        logger = logging.getLogger(__name__)
+        if year >= 2068 and year <= 2070:  # Only log around death year
+            logger.warning(f"🔔 Year {year} - Survivor benefit toggle: {survivor_toggle}, Primary alive: {primary_alive}, Spouse alive: {spouse_alive}")
+            logger.warning(f"🔔 Year {year} - Primary SS raw: ${primary_ss_raw:,.2f}, Spouse SS raw: ${spouse_ss_raw:,.2f}")
+
+        if survivor_toggle:
+            # Check if one spouse died and one is alive
+            if primary_alive and not spouse_alive and spouse_ss_raw > 0:
+                # Primary is alive, spouse died - primary takes higher benefit
+                if spouse_ss_raw > primary_ss_raw:
+                    logger.warning(f"✅ Year {year} - Primary taking spouse's higher SS benefit: ${spouse_ss_raw:,.2f} vs ${primary_ss_raw:,.2f}")
+                    primary_ss = spouse_ss_raw  # Primary gets spouse's higher benefit
+                    survivor_benefit_applied = True
+                    # Add both primary and spouse assets to ss_assets for tracking
+                    ss_assets.extend(primary_ss_assets)
+                    ss_assets.extend(spouse_ss_assets)
+                else:
+                    # Primary's benefit is higher or equal, keep their own
+                    primary_ss = primary_ss_raw
+                    ss_assets.extend(primary_ss_assets)
+            elif spouse_alive and not primary_alive and primary_ss_raw > 0:
+                # Spouse is alive, primary died - spouse takes higher benefit
+                if primary_ss_raw > spouse_ss_raw:
+                    logger.warning(f"✅ Year {year} - Spouse taking primary's higher SS benefit: ${primary_ss_raw:,.2f} vs ${spouse_ss_raw:,.2f}")
+                    spouse_ss = primary_ss_raw  # Spouse gets primary's higher benefit
+                    survivor_benefit_applied = True
+                    # Add both primary and spouse assets to ss_assets for tracking
+                    ss_assets.extend(primary_ss_assets)
+                    ss_assets.extend(spouse_ss_assets)
+                else:
+                    # Spouse's benefit is higher or equal, keep their own
+                    spouse_ss = spouse_ss_raw
+                    ss_assets.extend(spouse_ss_assets)
+            else:
+                # Both alive or both dead - normal processing
+                if primary_alive:
+                    primary_ss = primary_ss_raw
+                    ss_assets.extend(primary_ss_assets)
+                if spouse_alive:
+                    spouse_ss = spouse_ss_raw
+                    ss_assets.extend(spouse_ss_assets)
+        else:
+            # Survivor benefit not enabled - standard logic
+            if primary_alive:
+                primary_ss = primary_ss_raw
+                ss_assets.extend(primary_ss_assets)
+            if spouse_alive:
+                spouse_ss = spouse_ss_raw
+                ss_assets.extend(spouse_ss_assets)
         
         # Apply SS decrease adjustment only if enabled and conditions are met
         if (self.scenario.reduction_2030_ss and 
