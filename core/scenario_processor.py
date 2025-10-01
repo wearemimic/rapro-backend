@@ -1199,8 +1199,49 @@ class ScenarioProcessor:
                 continue
 
             owner = asset.get("owned_by", "primary")
-            if (owner == "primary" and not primary_alive) or (owner == "spouse" and not spouse_alive):
-                continue
+            original_owner = asset.get("original_owner", owner)  # Track who originally owned it
+
+            # Handle asset inheritance when owner dies
+            # Key logic:
+            # - If original owner dies → transfer to surviving spouse (they inherit)
+            # - If spouse already died → primary keeps their own assets
+            # - If primary already died → spouse keeps their own assets
+            # - Skip only if BOTH are dead
+            if owner == "primary" and not primary_alive:
+                if spouse_alive:
+                    # Primary died, spouse is alive → spouse inherits primary's assets
+                    if not asset.get('inherited_by_spouse'):
+                        asset['inherited_by_spouse'] = True
+                        asset['inherited_from'] = 'primary'
+                        asset['original_owner'] = 'primary'
+                        # Update withdrawal end age to surviving spouse's mortality age
+                        spouse_mortality_age = getattr(self.scenario, 'spouse_mortality_age', None) or self.scenario.mortality_age or 90
+                        asset['age_to_end_withdrawal'] = spouse_mortality_age
+                        if not asset.get('age_to_begin_withdrawal'):
+                            asset['age_to_begin_withdrawal'] = year - self.spouse_birthdate.year
+                        self._log_debug(f"Year {year} - Asset {asset.get('income_name')} inherited by spouse from deceased primary, end age updated to {spouse_mortality_age}")
+                    owner = "spouse"  # Transfer ownership
+                    asset['owned_by'] = "spouse"
+                else:
+                    continue  # Both dead, stop processing
+            elif owner == "spouse" and not spouse_alive:
+                if primary_alive:
+                    # Spouse died, primary is alive → primary inherits spouse's assets
+                    if not asset.get('inherited_by_spouse'):
+                        asset['inherited_by_spouse'] = True
+                        asset['inherited_from'] = 'spouse'
+                        asset['original_owner'] = 'spouse'
+                        # Update withdrawal end age to surviving primary's mortality age
+                        primary_mortality_age = self.scenario.mortality_age or 90
+                        asset['age_to_end_withdrawal'] = primary_mortality_age
+                        if not asset.get('age_to_begin_withdrawal'):
+                            asset['age_to_begin_withdrawal'] = year - self.primary_birthdate.year
+                        self._log_debug(f"Year {year} - Asset {asset.get('income_name')} inherited by primary from deceased spouse, end age updated to {primary_mortality_age}")
+                    owner = "primary"  # Transfer ownership
+                    asset['owned_by'] = "primary"
+                else:
+                    continue  # Both dead, stop processing
+
             self._update_asset_balance(asset, year)
 
             # Capture balance AFTER update but BEFORE withdrawals
@@ -1208,6 +1249,7 @@ class ScenarioProcessor:
                 asset_id = asset.get('id')
                 if asset_id:
                     start_of_year_balances[asset_id] = float(asset.get('current_asset_balance', 0))
+
             birthdate = self.primary_birthdate if owner == "primary" else self.spouse_birthdate
             if not birthdate:
                 continue
@@ -1215,17 +1257,28 @@ class ScenarioProcessor:
             start_age = asset.get("age_to_begin_withdrawal")
             end_age = asset.get("age_to_end_withdrawal")
             cola = Decimal(asset.get("cola", 0)) / 100
-            if start_age is not None and end_age is not None and start_age <= current_age <= end_age:
-                years_since_start = current_age - start_age
+
+            # Check if RMD was already calculated and stored for this asset
+            # RMD is now calculated ONCE in the main calculate loop
+            asset_rmd = asset.get('current_year_rmd', 0)
+
+            # CRITICAL: If asset has RMDs, they must continue until death regardless of planned end age
+            # RMDs are legally required and override the age_to_end_withdrawal setting
+            # This ensures income continues after inheritance or when owner outlives planned withdrawal period
+            in_rmd_period = asset_rmd > 0
+            in_withdrawal_period = start_age is not None and end_age is not None and start_age <= current_age <= end_age
+
+            # Process income if in withdrawal period OR if RMDs are required
+            if in_withdrawal_period or in_rmd_period:
+                years_since_start = current_age - start_age if start_age else 0
                 monthly_amount = Decimal(asset.get("monthly_amount") or 0)
-                inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start)
+                inflated_amount = monthly_amount * (Decimal(1 + cola) ** years_since_start) if start_age else 0
                 annual_income = inflated_amount * 12
-                # Check if RMD was already calculated and stored for this asset
-                # RMD is now calculated ONCE in the main calculate loop
-                asset_rmd = asset.get('current_year_rmd', 0)
+
                 if asset_rmd > annual_income:
                     annual_income = asset_rmd
                     self._log_debug(f"Year {year} - Using RMD amount ${asset_rmd:,.2f} instead of planned withdrawal ${annual_income:,.2f}")
+
                 # Track RMD amount separately
                 if asset_rmd > 0:
                     total_rmd += asset_rmd
@@ -1235,6 +1288,14 @@ class ScenarioProcessor:
                 asset_id = asset.get('id')
                 if asset_id:
                     asset_incomes[asset_id] = float(annual_income)
+
+                # CRITICAL FIX: Subtract withdrawal/RMD from asset balance
+                # The annual_income is already the HIGHER of withdrawal or RMD
+                # This withdrawal must be deducted from the account balance
+                current_balance = Decimal(str(asset.get('current_asset_balance', 0)))
+                new_balance = current_balance - annual_income
+                asset['current_asset_balance'] = max(Decimal('0'), new_balance)  # Don't go negative
+                self._log_debug(f"Year {year} - {asset.get('income_name', 'Asset')}: Withdrew ${annual_income:,.2f}, Balance: ${current_balance:,.2f} -> ${asset['current_asset_balance']:,.2f}")
 
         # Store asset incomes for this year to be accessed by the main calculate method
         self._current_year_asset_incomes = asset_incomes
