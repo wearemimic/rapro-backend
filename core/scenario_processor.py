@@ -640,7 +640,7 @@ class ScenarioProcessor:
             else:
                 self._log_debug(f"Year {year}: No {lookback_year} MAGI history, using current MAGI (${magi:,.2f})")
 
-            medicare_base, irmaa_surcharge_annual, total_medicare, base_part_d, part_d_irmaa_annual, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year)
+            medicare_base, irmaa_surcharge_annual, total_medicare, base_part_d, part_d_irmaa_annual, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year, primary_age, spouse_age, primary_alive, spouse_alive)
             total_medicare = Decimal(total_medicare)
             
             # print(f"\nMEDICARE COSTS:")
@@ -1504,45 +1504,53 @@ class ScenarioProcessor:
         
         return tax, bracket_str
 
-    def _calculate_medicare_costs(self, magi, year):
-        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds."""
+    def _calculate_medicare_costs(self, magi, year, primary_age, spouse_age, primary_alive, spouse_alive):
+        """
+        Calculate Medicare costs using CSV-based rates and IRMAA thresholds.
+
+        Medicare costs should be doubled only when:
+        - Both spouses are alive AND
+        - Both spouses are Medicare eligible (age 65+)
+
+        If only one spouse is Medicare eligible or one dies, costs are for single person.
+        """
         self._log_debug(f"Calculating Medicare costs based on MAGI: {magi}")
-        
+
         tax_loader = get_tax_loader()
-        
+
         # Get base Medicare rates from CSV
         medicare_rates = tax_loader.get_medicare_base_rates()
         base_part_b = medicare_rates.get('part_b', Decimal('185'))
         base_part_d = medicare_rates.get('part_d', Decimal('71'))
-        
+
         # Normalize tax status for CSV lookup
         status_mapping = {
             'single': 'Single',
             'married filing jointly': 'Married Filing Jointly',
             'married filing separately': 'Married Filing Separately'
         }
-        
+
         normalized_status = (self.tax_status or '').strip().lower()
         filing_status = status_mapping.get(normalized_status, 'Single')
-        
+
         # Calculate IRMAA surcharges using inflated thresholds for the target year
         part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
-        
+
         # Get the inflated IRMAA thresholds for this year to include in results
         irmaa_thresholds_for_year = tax_loader.get_inflated_irmaa_thresholds(filing_status, year)
-        
+
         # Find which IRMAA bracket we're in
         current_irmaa_bracket = None
         irmaa_bracket_number = 0
         first_irmaa_threshold = None
-        
+
         # Sort thresholds by MAGI amount
-        sorted_thresholds = sorted([t for t in irmaa_thresholds_for_year if t['magi_threshold'] > 0], 
+        sorted_thresholds = sorted([t for t in irmaa_thresholds_for_year if t['magi_threshold'] > 0],
                                  key=lambda x: x['magi_threshold'])
-        
+
         if sorted_thresholds:
             first_irmaa_threshold = float(sorted_thresholds[0]['magi_threshold'])
-            
+
             # Find the current bracket
             for i, threshold in enumerate(sorted_thresholds):
                 if Decimal(magi) >= threshold['magi_threshold']:
@@ -1550,11 +1558,20 @@ class ScenarioProcessor:
                     irmaa_bracket_number = i + 1
                 else:
                     break
-        
-        # For married filing jointly, double the base rates
-        if filing_status == "Married Filing Jointly":
+
+        # Determine if Medicare costs should be doubled
+        # Medicare eligibility starts at age 65
+        medicare_eligible_age = 65
+        primary_medicare_eligible = primary_alive and primary_age >= medicare_eligible_age
+        spouse_medicare_eligible = spouse_alive and spouse_age and spouse_age >= medicare_eligible_age
+
+        # Double costs only if BOTH spouses are alive AND both are Medicare eligible
+        both_on_medicare = primary_medicare_eligible and spouse_medicare_eligible
+
+        if both_on_medicare:
             base_part_b *= 2
             base_part_d *= 2
+            self._log_debug(f"Year {year}: Both spouses Medicare eligible (Primary: {primary_age}, Spouse: {spouse_age}) - Doubling base costs")
 
         # Retrieve inflation rates from the scenario
         part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
