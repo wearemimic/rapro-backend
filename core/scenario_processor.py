@@ -70,7 +70,22 @@ class ScenarioProcessor:
         # income_sources.values() returns dictionaries when using values()
         # income_sources.all() returns model objects
         asset_dicts = []
+
+        # Get mortality ages first to use as defaults for Social Security
+        mortality_age_primary = self.scenario.mortality_age or 90
+        mortality_age_spouse = getattr(self.scenario, 'spouse_mortality_age', None) or mortality_age_primary
+
         for asset in self.scenario.income_sources.all():
+            # For Social Security, use mortality age as the end age (not hard-coded 90)
+            # Social Security continues until death
+            default_end_age = 90
+            if asset.income_type == 'social_security':
+                # Use the appropriate mortality age based on who owns the asset
+                if asset.owned_by == 'spouse':
+                    default_end_age = mortality_age_spouse
+                else:  # primary
+                    default_end_age = mortality_age_primary
+
             # Convert Django model to dictionary, using getattr for optional fields
             asset_dict = {
                 'id': asset.id,
@@ -83,7 +98,7 @@ class ScenarioProcessor:
                 'monthly_contribution': getattr(asset, 'monthly_contribution', 0),
                 'rate_of_return': getattr(asset, 'rate_of_return', 0),
                 'age_to_begin_withdrawal': getattr(asset, 'age_to_begin_withdrawal', 65),
-                'age_to_end_withdrawal': getattr(asset, 'age_to_end_withdrawal', 90),
+                'age_to_end_withdrawal': getattr(asset, 'age_to_end_withdrawal', default_end_age),
                 'inflation_rate': getattr(asset, 'inflation_rate', 0),
                 'withdrawal_amount': getattr(asset, 'withdrawal_amount', 0),
                 'cola': getattr(asset, 'cola', 0),
@@ -259,6 +274,10 @@ class ScenarioProcessor:
             # print("WARNING: No assets provided, using empty list")
             instance.assets = []
         else:
+            # Get mortality ages for Social Security defaults
+            mortality_age_primary = getattr(instance.scenario, 'mortality_age', 90)
+            mortality_age_spouse = getattr(instance.scenario, 'spouse_mortality_age', None) or mortality_age_primary
+
             # Validate each asset has required fields
             validated_assets = []
             for asset in assets:
@@ -266,24 +285,32 @@ class ScenarioProcessor:
                 if 'income_type' not in asset:
                     # print(f"WARNING: Asset missing income_type, skipping: {asset}")
                     continue
-                
+
                 # Ensure numeric fields are properly set
                 for field in ['current_asset_balance', 'monthly_amount', 'monthly_contribution', 'rate_of_return']:
                     if field not in asset or asset[field] is None:
                         asset[field] = 0
-                
+
                 # Ensure age fields are set
+                # For Social Security, use mortality age instead of hard-coded 90
                 if 'age_to_begin_withdrawal' not in asset or asset['age_to_begin_withdrawal'] is None:
                     asset['age_to_begin_withdrawal'] = 65
                 if 'age_to_end_withdrawal' not in asset or asset['age_to_end_withdrawal'] is None:
-                    asset['age_to_end_withdrawal'] = 90
+                    # Social Security continues until death
+                    if asset.get('income_type') == 'social_security':
+                        if asset.get('owned_by') == 'spouse':
+                            asset['age_to_end_withdrawal'] = mortality_age_spouse
+                        else:
+                            asset['age_to_end_withdrawal'] = mortality_age_primary
+                    else:
+                        asset['age_to_end_withdrawal'] = 90
 
                 # Initialize previous_year_balance for RMD calculations
                 if 'previous_year_balance' not in asset or asset['previous_year_balance'] is None:
                     asset['previous_year_balance'] = asset.get('current_asset_balance', 0)
 
                 validated_assets.append(asset)
-            
+
             instance.assets = validated_assets
         
         # Log initialization
@@ -1687,6 +1714,9 @@ class ScenarioProcessor:
         
         if roth_account is None and initial_balance > 0:
             # Create new Roth account with the converted balance
+            # Use mortality age for withdrawal end age
+            mortality_age = self.scenario.mortality_age or 90
+
             roth_account = {
                 "income_type": "roth_ira",
                 "investment_name": "Roth IRA (Converted)",
@@ -1698,7 +1728,7 @@ class ScenarioProcessor:
                 "owned_by": "primary",
                 "is_converted_roth": True,
                 "age_to_begin_withdrawal": 65,
-                "age_to_end_withdrawal": 90,
+                "age_to_end_withdrawal": mortality_age,
                 "monthly_amount": 0,
                 "monthly_contribution": 0,
             }
