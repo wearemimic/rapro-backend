@@ -382,7 +382,13 @@ class ScenarioPDFGenerator:
 
         html.append('<h1>Retirement Scenario Report</h1>')
         html.append('<div class="summary-box" style="width: 80%; max-width: 600px;">')
-        html.append(f'<h2>Client: {client.first_name} {client.last_name}</h2>')
+
+        # Show both spouses if married
+        if hasattr(client, 'spouse') and client.spouse:
+            html.append(f'<h2>Clients: {client.first_name} {client.last_name} & {client.spouse.first_name} {client.spouse.last_name}</h2>')
+        else:
+            html.append(f'<h2>Client: {client.first_name} {client.last_name}</h2>')
+
         html.append(f'<p style="font-size: 20px; margin: 15px 0; color: #6c757d;"><strong>Scenario:</strong> {scenario.name}</p>')
         html.append(f'<p style="font-size: 16px; color: #6c757d;"><strong>Generated:</strong> {scenario.created_at.strftime("%B %d, %Y")}</p>')
         html.append('</div>')
@@ -391,11 +397,37 @@ class ScenarioPDFGenerator:
         # Page break after title page
         html.append('<div class="page-break"></div>')
 
-        # Financial Overview - starts on page 2
+        # Scenario Overview - starts on page 2 (matching frontend overview tab without sidebar)
         if 'overview' in tabs:
-            # Start financial overview page
+            # Calculate totals for metrics
+            if results:
+                lifetime_gross_income = sum(float(r.get('gross_income', 0)) for r in results)
+                lifetime_federal_tax = sum(float(r.get('federal_tax', 0)) for r in results)
+                lifetime_medicare = sum(float(r.get('total_medicare', 0)) for r in results)
+                lifetime_irmaa = sum(float(r.get('irmaa_surcharge', 0)) for r in results)
+                # Calculate Medicare out-of-pocket (matching frontend logic)
+                medicare_out_of_pocket = 0
+                for r in results:
+                    primary_ssi = float(r.get('ss_income_primary_gross', 0))
+                    spouse_ssi = float(r.get('ss_income_spouse_gross', 0))
+                    total_ssi = primary_ssi + spouse_ssi
+                    ss_decrease = float(r.get('ss_decrease_amount', 0))
+                    medicare = float(r.get('total_medicare', 0))
+                    remaining_ssi = total_ssi - ss_decrease - medicare
+                    if remaining_ssi < 0:
+                        medicare_out_of_pocket += abs(remaining_ssi)
+                lifetime_net = lifetime_gross_income - lifetime_federal_tax - lifetime_medicare
+
+                # Debug logging
+                logger.info(f"PDF Metrics - Gross: ${lifetime_gross_income:,.0f}, Tax: ${lifetime_federal_tax:,.0f}, Medicare: ${lifetime_medicare:,.0f}, Medicare OOP: ${medicare_out_of_pocket:,.0f}")
+
+                # Calculate percentage for circle chart
+                total_tax_and_medicare = lifetime_federal_tax + lifetime_medicare
+                tax_medicare_percentage = round((total_tax_and_medicare / lifetime_gross_income) * 100) if lifetime_gross_income > 0 else 0
+
+            # Start overview page
             html.append('<div>')
-            
+
             # Add small logo to all pages except first
             if logo_base64:
                 html.append(f'''
@@ -403,36 +435,139 @@ class ScenarioPDFGenerator:
                         <img src="data:image/png;base64,{logo_base64}" alt="Logo" style="max-height: 30px; width: auto;" />
                     </div>
                 ''')
-            
-            # Add the h2 after the floated logo
-            html.append('<h2 style="margin-top: 0; padding-top: 5px; clear: left;">Financial Overview</h2>')
-            
-            # Key metrics matching frontend
-            html.append('<div class="metrics-row">')
-            html.append(f'<div class="metric-card"><div class="metric-value">{scenario.retirement_age}</div><div class="metric-label">Retirement Age</div></div>')
-            html.append(f'<div class="metric-card"><div class="metric-value">{scenario.mortality_age}</div><div class="metric-label">Life Expectancy</div></div>')
-            if results:
-                # Calculate totals matching frontend (convert Decimal to float)
-                lifetime_gross_income = sum(float(r.get('gross_income', 0)) for r in results)
-                lifetime_federal_tax = sum(float(r.get('federal_tax', 0)) for r in results)
-                lifetime_medicare = sum(float(r.get('total_medicare', 0)) for r in results)
-                lifetime_net = lifetime_gross_income - lifetime_federal_tax - lifetime_medicare
-                
-                html.append(f'<div class="metric-card"><div class="metric-value">${lifetime_gross_income:,.0f}</div><div class="metric-label">Total Gross Income</div></div>')
-                html.append(f'<div class="metric-card"><div class="metric-value">${lifetime_federal_tax:,.0f}</div><div class="metric-label">Total Federal Tax</div></div>')
-                html.append(f'<div class="metric-card"><div class="metric-value">${lifetime_medicare:,.0f}</div><div class="metric-label">Total Medicare</div></div>')
-                html.append(f'<div class="metric-card"><div class="metric-value">${lifetime_net:,.0f}</div><div class="metric-label">Net Income</div></div>')
+
+            html.append('<h2 style="margin-top: 0; padding-top: 5px; clear: left;">Scenario Overview</h2>')
+
+            # Key metrics row at top (3 cards horizontally)
+            html.append('<div style="display: table; width: 100%; margin: 20px 0;">')
+
+            # Total Federal Tax
+            html.append('<div style="display: table-cell; width: 33%; padding-right: 10px;">')
+            html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; background: #f8f9fa; text-align: center;">')
+            html.append('<div style="font-size: 11px; color: #666; margin-bottom: 8px;">TOTAL FEDERAL TAX</div>')
+            html.append(f'<div style="font-size: 24px; font-weight: bold; color: #377dff;">${lifetime_federal_tax:,.0f}</div>')
+            html.append('</div></div>')
+
+            # Total Medicare
+            html.append('<div style="display: table-cell; width: 33%; padding-right: 10px;">')
+            html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; background: #f8f9fa; text-align: center;">')
+            html.append('<div style="font-size: 11px; color: #666; margin-bottom: 8px;">TOTAL MEDICARE</div>')
+            html.append(f'<div style="font-size: 24px; font-weight: bold; color: #377dff;">${lifetime_medicare:,.0f}</div>')
+            html.append('</div></div>')
+
+            # Medicare Out Of Pocket
+            html.append('<div style="display: table-cell; width: 33%;">')
+            html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; background: #f8f9fa; text-align: center;">')
+            html.append('<div style="font-size: 11px; color: #666; margin-bottom: 8px;">MEDICARE OUT OF POCKET</div>')
+            html.append(f'<div style="font-size: 24px; font-weight: bold; color: #377dff;">${medicare_out_of_pocket:,.0f}</div>')
+            html.append('</div></div>')
+
+            html.append('</div>')  # End metrics row
+
+            # Client Information and Scenario Details cards (top section)
+            html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; margin: 20px 0; background: white;">')
+            html.append('<div style="display: table; width: 100%;">')
+
+            # Client Information (50%)
+            html.append('<div style="display: table-cell; width: 50%; padding-right: 15px; vertical-align: top;">')
+            html.append('<h5 style="margin-bottom: 10px;">Client Information</h5>')
+
+            # Calculate current ages
+            from datetime import date
+            current_year = date.today().year
+
+            # Primary client info
+            if hasattr(client, 'birthdate') and client.birthdate:
+                primary_age = current_year - client.birthdate.year
+                html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Name:</span> <span>{client.first_name} {client.last_name}</span></div>')
+                html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Age:</span> <span>{primary_age}</span></div>')
+            else:
+                html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Name:</span> <span>{client.first_name} {client.last_name}</span></div>')
+
+            # Spouse info if married
+            if hasattr(client, 'spouse') and client.spouse:
+                html.append(f'<div style="margin-bottom: 8px; margin-top: 12px;"><span style="color: #666;">Spouse Name:</span> <span>{client.spouse.first_name} {client.spouse.last_name}</span></div>')
+
+                if hasattr(client.spouse, 'birthdate') and client.spouse.birthdate:
+                    spouse_age = current_year - client.spouse.birthdate.year
+                    html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Spouse Age:</span> <span>{spouse_age}</span></div>')
+
+            html.append(f'<div style="margin-bottom: 8px; margin-top: 12px;"><span style="color: #666;">Tax Status:</span> <span>{client.tax_status or "Not specified"}</span></div>')
             html.append('</div>')
-            
-            # Financial Overview Chart - matching frontend
-            html.append('<div class="chart-container">')
-            html.append('<canvas id="financialChart"></canvas>')
+
+            # Scenario Details (50%)
+            html.append('<div style="display: table-cell; width: 50%; vertical-align: top;">')
+            html.append('<h5 style="margin-bottom: 10px;">Scenario Details</h5>')
+            html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Name:</span> <span>{scenario.name}</span></div>')
+            html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Retirement Year:</span> <span>{scenario.retirement_year or "Not specified"}</span></div>')
+            html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Mortality Age:</span> <span>{scenario.mortality_age or "Not specified"}</span></div>')
+            if hasattr(scenario, 'spouse_mortality_age') and scenario.spouse_mortality_age:
+                html.append(f'<div style="margin-bottom: 8px;"><span style="color: #666;">Spouse Mortality Age:</span> <span>{scenario.spouse_mortality_age}</span></div>')
             html.append('</div>')
-            
+
+            html.append('</div>')  # End table
+            html.append('</div>')  # End Client/Scenario card
+
+            # Charts section - Financial chart (66%) and Circle chart (34%)
+            html.append('<div style="display: table; width: 100%; margin-top: 15px;">')
+
+            # Main financial chart (66%)
+            html.append('<div style="display: table-cell; width: 66%; vertical-align: top; padding-right: 15px;">')
+            html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; background: white; height: 320px;">')
+            html.append('<canvas id="overviewChart" style="max-height: 290px;"></canvas>')
+            html.append('</div>')
+            html.append('</div>')
+
+            # Circle chart (34%) - Simple SVG circle
+            html.append('<div style="display: table-cell; width: 34%; vertical-align: top;">')
+            html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; background: white; height: 320px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">')
+            html.append('<h5 style="margin-bottom: 15px;">Taxes & Medicare as % of Gross Income</h5>')
+
+            # SVG circle chart
+            radius = 60
+            circumference = 2 * 3.14159 * radius
+            offset = circumference - (tax_medicare_percentage / 100) * circumference
+
+            html.append(f'''
+                <svg width="150" height="150" style="margin: 20px auto;">
+                    <!-- Background circle -->
+                    <circle cx="75" cy="75" r="{radius}" fill="none" stroke="#f0f0f0" stroke-width="15"/>
+                    <!-- Progress circle -->
+                    <circle cx="75" cy="75" r="{radius}" fill="none" stroke="#377dff" stroke-width="15"
+                            stroke-dasharray="{circumference}" stroke-dashoffset="{offset}"
+                            transform="rotate(-90 75 75)"/>
+                    <!-- Percentage text -->
+                    <text x="75" y="80" text-anchor="middle" font-size="24" font-weight="bold" fill="#377dff">{tax_medicare_percentage}%</text>
+                </svg>
+                <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;">
+                    <div style="text-align: center;">
+                        <small style="color: #666;">Total Gross Income</small>
+                        <div style="font-weight: bold; color: #377dff;">${lifetime_gross_income:,.0f}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <small style="color: #666;">Total Taxes</small>
+                        <div style="font-weight: bold; color: #ea4335;">${lifetime_federal_tax:,.0f}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <small style="color: #666;">Total Medicare</small>
+                        <div style="font-weight: bold; color: #fbbc05;">${lifetime_medicare:,.0f}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <small style="color: #666;">Net Income</small>
+                        <div style="font-weight: bold; color: #34a853;">${lifetime_net:,.0f}</div>
+                    </div>
+                </div>
+            ''')
+            html.append('</div>')
+            html.append('</div>')
+
+            html.append('</div>')  # End charts section
+
+            # Chart.js script for overview chart
             html.append(f'''
 <script>
-const ctx1 = document.getElementById('financialChart').getContext('2d');
-new Chart(ctx1, {{
+const overviewCtx = document.getElementById('overviewChart').getContext('2d');
+new Chart(overviewCtx, {{
     type: 'bar',
     data: {{
         labels: {json.dumps(years[:30])},
@@ -480,11 +615,6 @@ new Chart(ctx1, {{
         responsive: true,
         maintainAspectRatio: false,
         plugins: {{
-            title: {{
-                display: true,
-                text: 'Financial Overview',
-                font: {{ size: 16 }}
-            }},
             legend: {{
                 display: true,
                 position: 'bottom'
@@ -514,89 +644,11 @@ new Chart(ctx1, {{
 }});
 </script>
 ''')
-            
-            # Close the page container
-            html.append('</div>')
-        
-        # Add Financial Overview Table matching the frontend
-        if 'financial' in tabs and results:
-            html.append('<div class="page-break"></div>')
 
-            # Start a new page container
-            html.append('<div>')
-            
-            # Add small logo to all pages except first
-            if logo_base64:
-                html.append(f'''
-                    <div style="float: right; margin: 5px 10px 10px 10px;">
-                        <img src="data:image/png;base64,{logo_base64}" alt="Logo" style="max-height: 30px; width: auto;" />
-                    </div>
-                ''')
-            
-            # Add content
-            html.append('<h2 style="padding-top: 5px; clear: left;">Financial Overview Table</h2>')
-            
-            # Calculate totals (convert Decimal to float)
-            total_federal_tax = sum(float(r.get('federal_tax', 0)) for r in results)
-            total_medicare_sum = sum(float(r.get('total_medicare', 0)) for r in results)
-            
-            # Financial Overview Table matching frontend
-            html.append('<table>')
-            html.append('<thead><tr>')
-            html.append('<th>Year</th>')
-            html.append('<th>Primary Age</th>')
-            if hasattr(client, 'spouse') and client.spouse:
-                html.append('<th>Spouse Age</th>')
-            html.append('<th>Gross Income</th>')
-            html.append('<th>AGI</th>')
-            html.append('<th>MAGI</th>')
-            html.append('<th>Tax Bracket</th>')
-            html.append('<th>Federal Tax</th>')
-            html.append('<th>Total Medicare</th>')
-            html.append('<th>Remaining Income</th>')
-            html.append('</tr></thead>')
-            html.append('<tbody>')
-            
-            for year_data in results[:20]:  # Show first 20 years
-                html.append('<tr>')
-                html.append(f'<td>{year_data.get("year", "")}</td>')
-                html.append(f'<td>{year_data.get("primary_age", year_data.get("age", ""))}</td>')
-                if hasattr(client, 'spouse') and client.spouse:
-                    html.append(f'<td>{year_data.get("spouse_age", "")}</td>')
-                
-                gross = year_data.get("gross_income", 0)
-                fed_tax = year_data.get("federal_tax", 0)
-                medicare = year_data.get("total_medicare", 0)
-                remaining = gross - fed_tax - medicare
-                
-                html.append(f'<td>${gross:,.0f}</td>')
-                html.append(f'<td>${year_data.get("agi", 0):,.0f}</td>')
-                html.append(f'<td>${year_data.get("magi", 0):,.0f}</td>')
-                html.append(f'<td>{year_data.get("tax_bracket", "")}</td>')
-                html.append(f'<td>${fed_tax:,.0f}</td>')
-                html.append(f'<td>${medicare:,.0f}</td>')
-                html.append(f'<td>${remaining:,.0f}</td>')
-                html.append('</tr>')
-            
-            # Add totals row
-            html.append('<tr style="font-weight: bold;">')
-            html.append('<td>Total</td>')
-            html.append('<td></td>')
-            if hasattr(client, 'spouse') and client.spouse:
-                html.append('<td></td>')
-            html.append('<td></td>')
-            html.append('<td></td>')
-            html.append('<td></td>')
-            html.append('<td></td>')
-            html.append(f'<td>${total_federal_tax:,.0f}</td>')
-            html.append(f'<td>${total_medicare_sum:,.0f}</td>')
-            html.append('<td></td>')
-            html.append('</tr>')
-            html.append('</tbody></table>')
-            
             # Close the page container
             html.append('</div>')
         
+        # Financial Overview Table removed per user request
         # Social Security Overview Section
         if 'socialSecurity' in tabs and results:
             html.append('<div class="page-break"></div>')
@@ -616,7 +668,7 @@ new Chart(ctx1, {{
             html.append('<h2 style="margin-top: 0; padding-top: 5px; clear: left;">Social Security Overview</h2>')
             
             # Prepare SS data for chart - filter for rows with SS income
-            ss_filtered_results = [r for r in results if float(r.get('ss_income_primary_gross', 0)) > 0 or float(r.get('ss_income_spouse_gross', 0)) > 0][:30]
+            ss_filtered_results = [r for r in results if float(r.get('ss_income_primary_gross', 0)) > 0 or float(r.get('ss_income_spouse_gross', 0)) > 0]
             ss_years = [str(r['year']) for r in ss_filtered_results]
             ss_primary = [float(r.get('ss_income_primary_gross', 0)) for r in ss_filtered_results]
             ss_spouse = [float(r.get('ss_income_spouse_gross', 0)) for r in ss_filtered_results]
@@ -748,7 +800,7 @@ new Chart(ctxSS, {{
             html.append('</tr></thead>')
             html.append('<tbody>')
             
-            for year_data in results[:20]:
+            for year_data in results:
                 if year_data.get('ss_income_primary_gross', 0) > 0 or year_data.get('ss_income_spouse_gross', 0) > 0:
                     html.append('<tr>')
                     html.append(f'<td>{year_data.get("year", "")}</td>')
@@ -808,10 +860,10 @@ new Chart(ctxSS, {{
             html.append('</div>')
             
             # Prepare Medicare data for chart
-            medicare_years = [str(r['year']) for r in results if float(r.get('total_medicare', 0)) > 0][:30]
-            part_b_data = [float(r.get('part_b', 0)) for r in results if float(r.get('total_medicare', 0)) > 0][:30]
-            part_d_data = [float(r.get('part_d', 0)) for r in results if float(r.get('total_medicare', 0)) > 0][:30]
-            irmaa_data = [float(r.get('irmaa_surcharge', 0)) for r in results if float(r.get('total_medicare', 0)) > 0][:30]
+            medicare_years = [str(r['year']) for r in results if float(r.get('total_medicare', 0)) > 0]
+            part_b_data = [float(r.get('part_b', 0)) for r in results if float(r.get('total_medicare', 0)) > 0]
+            part_d_data = [float(r.get('part_d', 0)) for r in results if float(r.get('total_medicare', 0)) > 0]
+            irmaa_data = [float(r.get('irmaa_surcharge', 0)) for r in results if float(r.get('total_medicare', 0)) > 0]
             
             # Medicare Chart
             html.append('<div class="chart-container">')
@@ -828,17 +880,17 @@ new Chart(ctxMedicare, {{
         datasets: [{{
             label: 'Part B',
             data: {json.dumps(part_b_data)},
-            backgroundColor: '#4285f4',
+            backgroundColor: '#377dff',
             stack: 'Stack 0'
         }}, {{
             label: 'Part D',
             data: {json.dumps(part_d_data)},
-            backgroundColor: '#0f9d58',
+            backgroundColor: '#00c9db',
             stack: 'Stack 0'
         }}, {{
             label: 'IRMAA Surcharge',
             data: {json.dumps(irmaa_data)},
-            backgroundColor: '#ea4335',
+            backgroundColor: '#ffc107',
             stack: 'Stack 0'
         }}]
     }},
@@ -889,7 +941,7 @@ new Chart(ctxMedicare, {{
             html.append('</tr></thead>')
             html.append('<tbody>')
             
-            for year_data in results[:20]:
+            for year_data in results:
                 if float(year_data.get('total_medicare', 0)) > 0:
                     html.append('<tr>')
                     html.append(f'<td>{year_data.get("year", "")}</td>')
