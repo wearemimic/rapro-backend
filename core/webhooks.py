@@ -29,7 +29,7 @@ def stripe_webhook(request):
     except ValueError as e:
         logger.error(f"Invalid payload received from Stripe: {str(e)}")
         return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.SignatureVerificationError as e:
         logger.error(f"Invalid signature from Stripe: {str(e)}")
         return HttpResponse(status=400)
 

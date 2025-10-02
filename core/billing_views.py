@@ -76,7 +76,7 @@ def subscription_details(request):
                     'canceled_at': getattr(subscription, 'canceled_at', None),
                     'cancel_at_period_end': getattr(subscription, 'cancel_at_period_end', False),
                 }
-            except stripe.error.StripeError as e:
+            except stripe.StripeError as e:
                 logger.error(f"Failed to retrieve subscription: {str(e)}")
         
         # Get billing history (invoices)
@@ -100,7 +100,7 @@ def subscription_details(request):
                     'period_start': invoice.period_start,
                     'period_end': invoice.period_end,
                 })
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Failed to retrieve invoices: {str(e)}")
         
         # Get default payment method
@@ -120,7 +120,7 @@ def subscription_details(request):
                         'exp_month': payment_method.card.exp_month,
                         'exp_year': payment_method.card.exp_year,
                     }
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Failed to retrieve payment method: {str(e)}")
         
         return Response({
@@ -183,7 +183,7 @@ def cancel_subscription(request):
             'current_period_end': getattr(subscription, 'current_period_end', None)
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe cancellation error: {str(e)}")
         return Response(
             {'error': f'Failed to cancel subscription: {str(e)}'},
@@ -230,7 +230,7 @@ def reactivate_subscription(request):
             'status': subscription.status
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe reactivation error: {str(e)}")
         return Response(
             {'error': f'Failed to reactivate subscription: {str(e)}'},
@@ -270,7 +270,7 @@ def update_payment_method(request):
             'setup_intent_id': setup_intent.id
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Setup intent creation error: {str(e)}")
         return Response(
             {'error': f'Failed to setup payment method update: {str(e)}'},
@@ -307,7 +307,7 @@ def download_invoice(request, invoice_id):
             'hosted_url': invoice.hosted_invoice_url
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Invoice retrieval error: {str(e)}")
         return Response(
             {'error': 'Invoice not found'},

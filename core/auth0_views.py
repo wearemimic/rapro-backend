@@ -700,7 +700,7 @@ def auth0_complete_registration(request):
             customer = stripe.Customer.create(**customer_data, idempotency_key=idempotency_key)
             print(f"✅ Stripe customer created: {customer.id}")
             
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             print(f"❌ Stripe customer creation failed: {str(e)}")
             return Response(
                 {'message': f'Payment setup failed: {str(e)}'}, 
@@ -843,7 +843,7 @@ def auth0_complete_registration(request):
             
             return Response(response_data)
             
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             print(f"❌ Stripe subscription creation failed: {str(e)}")
             # Try to delete the customer if subscription failed
             try:
@@ -1070,7 +1070,7 @@ def validate_coupon(request):
             print(f"✅ Coupon valid: {response_data}")
             return Response(response_data)
             
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             error_code = getattr(e, 'code', '')
             print(f"❌ Stripe error code: {error_code}, message: {str(e)}")
             if error_code == 'resource_missing':

@@ -1399,7 +1399,7 @@ def complete_registration(request):
             }
         })
 
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         return Response({
             'status': 'error',
             'message': str(e)

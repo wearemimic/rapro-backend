@@ -205,7 +205,7 @@ def validate_coupon_dynamic(request):
                 'duration_in_months': getattr(coupon, 'duration_in_months', None)
             })
             
-        except stripe.error.InvalidRequestError:
+        except stripe.InvalidRequestError:
             # Coupon doesn't exist
             return Response({
                 'valid': False,

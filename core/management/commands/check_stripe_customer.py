@@ -56,7 +56,7 @@ class Command(BaseCommand):
                                 self.stdout.write(f"    Plan: ${price.unit_amount/100:.2f}/{price.recurring.interval}")
                     else:
                         self.stdout.write("\nNo subscriptions found")
-                except stripe.error.StripeError as e:
+                except stripe.StripeError as e:
                     self.stdout.write(f"Error fetching subscriptions: {str(e)}")
                 
                 # Get recent invoices
@@ -71,10 +71,10 @@ class Command(BaseCommand):
                             self.stdout.write(f"    Date: {invoice.created}")
                     else:
                         self.stdout.write("\nNo invoices found")
-                except stripe.error.StripeError as e:
+                except stripe.StripeError as e:
                     self.stdout.write(f"Error fetching invoices: {str(e)}")
                 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             self.stdout.write(
                 self.style.ERROR(f"Stripe API error: {str(e)}")
             )

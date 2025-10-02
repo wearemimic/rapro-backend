@@ -53,7 +53,7 @@ def get_active_prices(product_id: Optional[str] = None) -> List[Dict]:
         cache.set(cache_key, formatted_prices, 3600)
         return formatted_prices
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Failed to fetch Stripe prices: {e}")
         return []
 
@@ -135,7 +135,7 @@ def get_products_with_prices() -> List[Dict]:
         cache.set(cache_key, result, 3600)
         return result
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Failed to fetch Stripe products: {e}")
         return []
 
@@ -147,7 +147,7 @@ def validate_price_id(price_id: str) -> bool:
     try:
         price = stripe.Price.retrieve(price_id)
         return price.active
-    except stripe.error.StripeError:
+    except stripe.StripeError:
         return False
 
 
@@ -184,7 +184,7 @@ def get_price_details(price_id: str) -> Optional[Dict]:
         cache.set(cache_key, result, 3600)
         return result
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Failed to fetch price details for {price_id}: {e}")
         return None
 

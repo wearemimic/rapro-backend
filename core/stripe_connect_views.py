@@ -73,7 +73,7 @@ def create_connect_account(request):
             'message': 'Stripe Connect account created successfully'
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -133,7 +133,7 @@ def create_account_link(request):
             'expires_at': account_link.expires_at
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -190,7 +190,7 @@ def get_account_status(request):
             'business_profile': account.business_profile
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -283,7 +283,7 @@ def create_payout(request):
             'status': 'completed'
         })
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -410,7 +410,7 @@ def process_batch_payouts(request):
                     'commissions_paid': unpaid_commissions.count()
                 })
                 
-            except stripe.error.StripeError as e:
+            except stripe.StripeError as e:
                 results.append({
                     'affiliate': affiliate.business_name,
                     'status': 'failed',
