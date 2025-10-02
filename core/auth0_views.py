@@ -730,10 +730,10 @@ def auth0_complete_registration(request):
             if not is_zero_cost:
                 subscription_data['payment_behavior'] = 'default_incomplete'
             
-            # Apply coupon if provided (using new discounts format)
+            # Apply coupon if provided (using direct coupon parameter for better compatibility)
             if coupon_code:
-                subscription_data['discounts'] = [{'coupon': coupon_code}]
-                print(f"✅ Applying coupon via discounts: {coupon_code}")
+                subscription_data['coupon'] = coupon_code
+                print(f"✅ Applying coupon: {coupon_code}")
 
             # Generate idempotency key for subscription to prevent duplicate charges
             sub_idempotency_key = hashlib.sha256(f"subscription_{customer.id}_{price_id}_{timestamp}".encode()).hexdigest()
