@@ -1015,8 +1015,31 @@ def validate_coupon(request):
         # Try to retrieve coupon from Stripe
         try:
             print(f"🔍 Attempting to retrieve coupon with Stripe API key starting with: {stripe.api_key[:7] if stripe.api_key else 'None'}")
-            coupon = stripe.Coupon.retrieve(coupon_code)
-            print(f"✅ Coupon found: {coupon.id}")
+
+            # First try to retrieve by ID
+            try:
+                coupon = stripe.Coupon.retrieve(coupon_code)
+                print(f"✅ Coupon found by ID: {coupon.id}")
+            except stripe.StripeError:
+                # If not found by ID, search by name (case-insensitive)
+                print(f"🔍 Coupon not found by ID, searching by name...")
+                all_coupons = stripe.Coupon.list(limit=100)
+                coupon = None
+                for c in all_coupons.auto_paging_iter():
+                    if c.name and c.name.upper() == coupon_code.upper():
+                        coupon = c
+                        print(f"✅ Coupon found by name: {c.id} (name: {c.name})")
+                        break
+
+                if not coupon:
+                    # Also check promotion codes
+                    print(f"🔍 Checking promotion codes...")
+                    promo_codes = stripe.PromotionCode.list(code=coupon_code, active=True, limit=1)
+                    if promo_codes.data:
+                        coupon = stripe.Coupon.retrieve(promo_codes.data[0].coupon.id)
+                        print(f"✅ Coupon found via promotion code: {coupon.id}")
+                    else:
+                        raise stripe.StripeError(f"No coupon or promotion code found for: {coupon_code}")
             
             # Check if coupon is valid
             if not coupon.valid:
