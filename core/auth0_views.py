@@ -725,12 +725,10 @@ def auth0_complete_registration(request):
                 'items': [{'price': price_id}],
                 'expand': ['latest_invoice.payment_intent'],
             }
-            
-            # For paid subscriptions, set incomplete payment behavior
-            if not is_zero_cost:
-                subscription_data['payment_behavior'] = 'default_incomplete'
-            
+
             # Apply coupon if provided (using discounts array per Stripe API requirements)
+            # IMPORTANT: Coupon must be added BEFORE creating subscription
+            # Using default_incomplete or allow_incomplete finalizes invoice before discount applies
             if coupon_code:
                 subscription_data['discounts'] = [{'coupon': coupon_code}]
                 print(f"✅ Applying coupon via discounts: {coupon_code}")
