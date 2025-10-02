@@ -750,14 +750,16 @@ def auth0_complete_registration(request):
             # Handle payment intent if needed (only for paid subscriptions)
             payment_intent = None
             requires_action = False
-            
-            if not is_zero_cost and subscription.latest_invoice and subscription.latest_invoice.payment_intent:
+
+            if not is_zero_cost and subscription.latest_invoice and hasattr(subscription.latest_invoice, 'payment_intent') and subscription.latest_invoice.payment_intent:
                 payment_intent = subscription.latest_invoice.payment_intent
                 if payment_intent.status == 'requires_action':
                     requires_action = True
                     print(f"⚠️  Payment requires additional action")
             elif is_zero_cost:
                 print(f"✅ Zero-cost subscription activated immediately")
+            else:
+                print(f"✅ Subscription payment completed automatically")
             
             # SECURITY: Create Django user ONLY after successful payment
             print(f"🔐 Payment successful, now creating Django user: {registration_email}")
