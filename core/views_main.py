@@ -1864,6 +1864,7 @@ def get_scenario_comparison_data(request, scenario_id):
                 'id': scenario.id,
                 'name': scenario.name,
                 'irmaa_reached': False,
+                'irmaa_percentage': 0,
                 'medicare_cost': 0,
                 'federal_taxes': 0,
                 'solution_cost': 0,
@@ -1901,9 +1902,11 @@ def get_scenario_comparison_data(request, scenario_id):
         total_federal_taxes = 0
         total_medicare_costs = 0
         total_gross_income = 0
+        total_irmaa_surcharge = 0
         irmaa_reached = False
-        
+
         # The calculation result is a list of yearly data
+        medicare_out_of_pocket = 0
         if isinstance(calculation_result, list):
             for year_data in calculation_result:
                 if isinstance(year_data, dict):
@@ -1912,36 +1915,53 @@ def get_scenario_comparison_data(request, scenario_id):
                     medicare_raw = year_data.get('total_medicare', 0)
                     gross_raw = year_data.get('gross_income', 0)
                     irmaa_raw = year_data.get('irmaa_surcharge', 0)
-                    
+
                     # Convert to float, handling Decimal objects
                     fed_tax_float = float(fed_tax_raw) if fed_tax_raw is not None else 0
                     medicare_float = float(medicare_raw) if medicare_raw is not None else 0
                     gross_float = float(gross_raw) if gross_raw is not None else 0
                     irmaa_float = float(irmaa_raw) if irmaa_raw is not None else 0
-                    
+
                     # Add to totals
                     total_federal_taxes += fed_tax_float
                     total_medicare_costs += medicare_float
                     total_gross_income += gross_float
-                    
+                    total_irmaa_surcharge += irmaa_float
+
                     # Check if IRMAA is reached (any year with IRMAA surcharge > 0)
                     if irmaa_float > 0:
                         irmaa_reached = True
-        
+
+                    # Calculate Medicare Out of Pocket (matching frontend logic)
+                    primary_ssi = float(year_data.get('ss_income_primary_gross', 0))
+                    spouse_ssi = float(year_data.get('ss_income_spouse_gross', 0))
+                    total_ssi = primary_ssi + spouse_ssi
+                    ss_decrease = float(year_data.get('ss_decrease_amount', 0))
+                    remaining_ssi = total_ssi - ss_decrease - medicare_float
+
+                    # Only add negative amounts (when Medicare exceeds SSI)
+                    if remaining_ssi < 0:
+                        medicare_out_of_pocket += abs(remaining_ssi)
+
         # Calculate derived values
         total_costs = total_federal_taxes + total_medicare_costs
-        out_of_pocket = total_gross_income - total_costs  # Net income
         solution_cost = 0  # This might need to be calculated differently based on business logic
+
+        # Calculate IRMAA percentage (matching frontend logic)
+        irmaa_percentage = 0
+        if total_medicare_costs > 0:
+            irmaa_percentage = round((total_irmaa_surcharge / total_medicare_costs) * 100)
         
         comparison_data = {
             'id': scenario.id,
             'name': scenario.name,
             'irmaa_reached': irmaa_reached,
+            'irmaa_percentage': irmaa_percentage,
             'medicare_cost': total_medicare_costs,
             'federal_taxes': total_federal_taxes,
             'solution_cost': solution_cost,
             'total_costs': total_costs,
-            'out_of_pocket': out_of_pocket
+            'out_of_pocket': medicare_out_of_pocket
         }
         
         logger.info(f"Final comparison data: {comparison_data}")
