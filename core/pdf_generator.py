@@ -372,30 +372,29 @@ class ScenarioPDFGenerator:
 ''')
         
         # Don't add a global logo header - we'll add it per page instead
-        
-        # Title Page - wrap in container to isolate it
-        html.append('<div style="position: relative; min-height: 100vh; page-break-after: always;">')
+
+        # Title Page
         html.append('<div class="title-page">')
-        
+
         # Add large logo to title page only
         if logo_base64:
             html.append(f'<img src="data:image/png;base64,{logo_base64}" alt="Company Logo" class="title-page-logo" />')
-        
+
         html.append('<h1>Retirement Scenario Report</h1>')
         html.append('<div class="summary-box" style="width: 80%; max-width: 600px;">')
         html.append(f'<h2>Client: {client.first_name} {client.last_name}</h2>')
         html.append(f'<p style="font-size: 20px; margin: 15px 0; color: #6c757d;"><strong>Scenario:</strong> {scenario.name}</p>')
         html.append(f'<p style="font-size: 16px; color: #6c757d;"><strong>Generated:</strong> {scenario.created_at.strftime("%B %d, %Y")}</p>')
         html.append('</div>')
-        html.append('</div>')
-        html.append('</div>')  # Close the title page container
-        
-        # Page break is handled by the container above, no need for explicit page break
-        
+        html.append('</div>')  # Close the title page
+
+        # Page break after title page
+        html.append('<div class="page-break"></div>')
+
         # Financial Overview - starts on page 2
         if 'overview' in tabs:
-            # Start a new page container (page break already handled by title page)
-            html.append('<div style="min-height: 100vh;">')
+            # Start financial overview page
+            html.append('<div>')
             
             # Add small logo to all pages except first
             if logo_base64:
@@ -522,9 +521,9 @@ new Chart(ctx1, {{
         # Add Financial Overview Table matching the frontend
         if 'financial' in tabs and results:
             html.append('<div class="page-break"></div>')
-            
+
             # Start a new page container
-            html.append('<div style="min-height: 100vh;">')
+            html.append('<div>')
             
             # Add small logo to all pages except first
             if logo_base64:
@@ -601,9 +600,9 @@ new Chart(ctx1, {{
         # Social Security Overview Section
         if 'socialSecurity' in tabs and results:
             html.append('<div class="page-break"></div>')
-            
+
             # Start a new page container
-            html.append('<div style="min-height: 100vh;">')
+            html.append('<div>')
             
             # Add small logo to all pages except first
             if logo_base64:
@@ -781,7 +780,7 @@ new Chart(ctxSS, {{
             html.append('<div class="page-break"></div>')
             
             # Start a new page container
-            html.append('<div style="min-height: 100vh;">')
+            html.append('<div>')
             
             # Add small logo to all pages except first
             if logo_base64:
