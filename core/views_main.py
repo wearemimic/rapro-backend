@@ -561,8 +561,8 @@ def duplicate_scenario(request, scenario_id):
             roth_conversion_duration=original_scenario.roth_conversion_duration,
             roth_conversion_annual_amount=original_scenario.roth_conversion_annual_amount,
             apply_standard_deduction=original_scenario.apply_standard_deduction,
-            income_vs_cost_percent=0,  # Reset to 0 for new scenario
-            medicare_irmaa_percent=0   # Reset to 0 for new scenario
+            income_vs_cost_percent=original_scenario.income_vs_cost_percent,  # Copy from original
+            medicare_irmaa_percent=original_scenario.medicare_irmaa_percent   # Copy from original
         )
         
         # Duplicate all income sources
@@ -583,11 +583,17 @@ def duplicate_scenario(request, scenario_id):
                 tax_rate=income_source.tax_rate,
                 max_to_convert=income_source.max_to_convert
             )
-        
+
+        # Trigger full recalculation for the duplicated scenario
+        print(f"💰 DUPLICATE: Triggering recalculation for duplicated scenario {duplicated_scenario.id}")
+        task = calculate_scenario_async.delay(duplicated_scenario.id, request.user.id)
+
         return Response({
             'id': duplicated_scenario.id,
             'name': duplicated_scenario.name,
-            'message': 'Scenario duplicated successfully'
+            'task_id': task.id,
+            'status': 'PENDING',
+            'message': 'Scenario duplicated successfully and recalculation started'
         }, status=status.HTTP_201_CREATED)
         
     except Scenario.DoesNotExist:
@@ -883,11 +889,17 @@ def update_scenario(request, scenario_id):
                     mapped_data = {k: v for k, v in mapped_data.items() if v is not None}
                     
                     IncomeSource.objects.create(scenario=scenario, **mapped_data)
-            
-            # Return updated scenario with income sources
+
+            # Trigger full recalculation after update
+            print(f"💰 INCOME_EDIT: Triggering recalculation for scenario {scenario_id}")
+            task = calculate_scenario_async.delay(scenario_id, request.user.id)
+
+            # Return updated scenario with calculation task info
             return Response({
                 'id': scenario.id,
-                'message': 'Scenario updated successfully'
+                'task_id': task.id,
+                'status': 'PENDING',
+                'message': 'Scenario updated successfully and recalculation started'
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Scenario.DoesNotExist:
