@@ -268,6 +268,8 @@ class Scenario(models.Model):
     spouse_mortality_age = models.PositiveIntegerField(blank=True, null=True, default=90)
     retirement_year = models.PositiveIntegerField(default=2025)
     share_with_client = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False, help_text="Archived scenarios are hidden but retained for RIA compliance")
+    archived_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when scenario was archived")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     part_b_inflation_rate = models.FloatField(default=6.0)

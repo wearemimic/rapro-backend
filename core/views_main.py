@@ -909,20 +909,25 @@ def update_scenario(request, scenario_id):
 @permission_classes([IsAuthenticated])
 def delete_scenario(request, client_id, scenario_id):
     """
-    Delete a scenario
+    Archive a scenario (soft delete for RIA compliance)
     """
     try:
         # Get the scenario and verify ownership
         scenario = Scenario.objects.get(id=scenario_id, client_id=client_id)
-        
+
         # Check if the user owns the client associated with this scenario
         if scenario.client.advisor != request.user:
             return Response({"error": "Access denied."}, status=403)
-        
-        # Delete the scenario
-        scenario.delete()
-        
-        return Response({"message": "Scenario deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+        # Archive the scenario instead of deleting (RIA compliance)
+        scenario.is_archived = True
+        scenario.archived_at = timezone.now()
+        scenario.save(update_fields=['is_archived', 'archived_at'])
+
+        return Response({
+            "message": "Scenario archived successfully",
+            "archived_at": scenario.archived_at
+        }, status=status.HTTP_200_OK)
     except Scenario.DoesNotExist:
         return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
 
