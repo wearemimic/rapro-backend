@@ -24,11 +24,16 @@ class CookieJWTAuthentication(JWTAuthentication):
         """
         Authenticate request using JWT from httpOnly cookie
         """
+        # Debug: Log all cookies
+        logger.info(f"🍪 Cookies received: {list(request.COOKIES.keys())}")
+
         # Try cookie-based authentication first
         access_token = request.COOKIES.get('access_token')
+        logger.info(f"🔑 Access token from cookie: {'Found' if access_token else 'NOT FOUND'}")
 
         if not access_token:
             # Fall back to header-based auth for backward compatibility
+            logger.info("⬇️ Falling back to header-based auth")
             return super().authenticate(request)
 
         # Validate the token
@@ -57,14 +62,18 @@ def set_auth_cookies(response, user):
     access_lifetime = settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
     refresh_lifetime = settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=1))
 
-    # Set httpOnly cookies
+    # Set httpOnly cookies with environment-aware security
+    # Development: SameSite='Lax' for localhost cross-port (3000→8000)
+    # Production: SameSite='Strict' for maximum security
+    samesite_setting = 'Lax' if settings.DEBUG else 'Strict'
+
     response.set_cookie(
         key='access_token',
         value=str(access),
         max_age=int(access_lifetime.total_seconds()),
         httponly=True,  # Prevents JavaScript access
-        secure=True,    # HTTPS only in production
-        samesite='Strict',  # CSRF protection
+        secure=settings.DEBUG == False,    # HTTPS only in production
+        samesite=samesite_setting,
         path='/'
     )
 
@@ -73,8 +82,8 @@ def set_auth_cookies(response, user):
         value=str(refresh),
         max_age=int(refresh_lifetime.total_seconds()),
         httponly=True,
-        secure=True,
-        samesite='Strict',
+        secure=settings.DEBUG == False,
+        samesite=samesite_setting,
         path='/api/token/'  # Limit refresh token to token endpoints
     )
 

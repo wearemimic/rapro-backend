@@ -17,7 +17,9 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .authentication import create_jwt_pair_for_user, get_enhanced_user_data
 from .session_manager import SessionManager
+from .cookie_auth import set_auth_cookies, clear_auth_cookies
 from urllib.parse import urlencode, quote
+from django.middleware.csrf import get_token
 
 # Initialize Stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -420,16 +422,38 @@ def auth0_exchange_code(request):
                     
                     # Generate Django JWT tokens for authenticated user
                     jwt_tokens = create_jwt_pair_for_user(existing_user)
-                    
-                    # Prepare response data with flag indicating they already had an account
-                    response_data = {
-                        'access': jwt_tokens['access'],
-                        'refresh': jwt_tokens['refresh'],
+
+                    # Enforce concurrent session limits
+                    if jwt_tokens.get('access'):
+                        SessionManager.enforce_session_limit(
+                            existing_user,
+                            jwt_tokens['access'],
+                            request
+                        )
+
+                    # Prepare response with cookies (no tokens in response body)
+                    response = Response({
                         'user': get_enhanced_user_data(existing_user),
                         'is_new_user': False,
                         'registration_complete': True,
                         'already_registered': True  # Flag to show they already had an account
-                    }
+                    })
+
+                    # Set httpOnly cookies with JWT tokens
+                    response = set_auth_cookies(response, existing_user)
+
+                    # Set CSRF token cookie (environment-aware)
+                    response.set_cookie(
+                        key='csrftoken',
+                        value=get_token(request),
+                        max_age=60 * 60 * 24 * 7,  # 1 week
+                        httponly=False,  # Must be accessible to JavaScript for CSRF
+                        secure=settings.DEBUG == False,
+                        samesite='Lax' if settings.DEBUG else 'Strict'  # Lax for dev, Strict for prod
+                    )
+
+                    print(f"✅ Authenticated user (registration flow) with httpOnly cookies: {existing_user.email}")
+                    return response
                 else:
                     print(f"🔄 Registration flow: existing user without subscription: {email}")
                     # Continue with registration flow to complete payment
@@ -456,15 +480,37 @@ def auth0_exchange_code(request):
                     
                     # Generate Django JWT tokens for authenticated user
                     jwt_tokens = create_jwt_pair_for_user(existing_user)
-                    
-                    # Prepare response data
-                    response_data = {
-                        'access': jwt_tokens['access'],
-                        'refresh': jwt_tokens['refresh'],
+
+                    # Enforce concurrent session limits
+                    if jwt_tokens.get('access'):
+                        SessionManager.enforce_session_limit(
+                            existing_user,
+                            jwt_tokens['access'],
+                            request
+                        )
+
+                    # Prepare response with cookies (no tokens in response body)
+                    response = Response({
                         'user': get_enhanced_user_data(existing_user),
                         'is_new_user': False,
                         'registration_complete': True
-                    }
+                    })
+
+                    # Set httpOnly cookies with JWT tokens
+                    response = set_auth_cookies(response, existing_user)
+
+                    # Set CSRF token cookie (environment-aware)
+                    response.set_cookie(
+                        key='csrftoken',
+                        value=get_token(request),
+                        max_age=60 * 60 * 24 * 7,  # 1 week
+                        httponly=False,  # Must be accessible to JavaScript for CSRF
+                        secure=settings.DEBUG == False,
+                        samesite='Lax' if settings.DEBUG else 'Strict'  # Lax for dev, Strict for prod
+                    )
+
+                    print(f"✅ Authenticated user (login flow) with httpOnly cookies: {existing_user.email}")
+                    return response
                 else:
                     print(f"❌ Login flow: existing user without active subscription: {email}")
                     # Block login and tell them to complete registration
@@ -506,11 +552,7 @@ def auth0_exchange_code(request):
                     'social_login': True,
                     'is_new_user': True
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)  # Payment Required
-        
-        print(f"✅ Authenticated user response prepared")
-        
-        return Response(response_data)
-        
+
     except Exception as e:
         print(f"Auth0 exchange code error: {str(e)}")
         import traceback
@@ -818,12 +860,19 @@ def auth0_complete_registration(request):
             
             # Generate Django JWT tokens
             jwt_tokens = create_jwt_pair_for_user(user)
-            
+
+            # Enforce concurrent session limits
+            if jwt_tokens.get('access'):
+                SessionManager.enforce_session_limit(
+                    user,
+                    jwt_tokens['access'],
+                    request
+                )
+
+            # Prepare response data (no tokens in body)
             response_data = {
                 'status': 'success',
                 'message': 'Registration completed successfully' if not is_zero_cost else 'Free account activated successfully',
-                'access': jwt_tokens['access'],  # Return JWT tokens
-                'refresh': jwt_tokens['refresh'],
                 'user': get_enhanced_user_data(user),
                 'is_zero_cost': is_zero_cost,
                 'subscription': {
@@ -833,15 +882,30 @@ def auth0_complete_registration(request):
                     'current_period_end': getattr(subscription, 'current_period_end', None)
                 }
             }
-            
+
             # Add payment intent info if action required
             if requires_action and payment_intent:
                 response_data['payment_intent'] = {
                     'client_secret': payment_intent.client_secret,
                     'status': payment_intent.status
                 }
-            
-            return Response(response_data)
+
+            # Create response with httpOnly cookies
+            response = Response(response_data)
+            response = set_auth_cookies(response, user)
+
+            # Set CSRF token cookie
+            response.set_cookie(
+                key='csrftoken',
+                value=get_token(request),
+                max_age=60 * 60 * 24 * 7,  # 1 week
+                httponly=False,  # Must be accessible to JavaScript for CSRF
+                secure=settings.DEBUG == False,
+                samesite='Lax'
+            )
+
+            print(f"✅ Registration completed with httpOnly cookies for: {user.email}")
+            return response
             
         except stripe.StripeError as e:
             print(f"❌ Stripe subscription creation failed: {str(e)}")

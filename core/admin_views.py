@@ -762,26 +762,37 @@ def start_user_impersonation(request, user_id):
             risk_level='high' if target_user.is_admin_user else 'medium'
         )
         
-        # Create impersonation JWT token for the target user
+        # Store admin's current cookies in session for later restoration
+        # We'll use the database to store the original admin session
+        from .cookie_auth import set_auth_cookies
         from .authentication import create_jwt_pair_for_user
-        
+
+        # Get admin's current tokens from cookies (if they exist)
+        admin_access_token = request.COOKIES.get('access_token', '')
+        admin_refresh_token = request.COOKIES.get('refresh_token', '')
+
+        # Store admin tokens in the impersonation log for restoration
+        impersonation_log.admin_session_data = json.dumps({
+            'admin_access_token': admin_access_token,
+            'admin_refresh_token': admin_refresh_token,
+            'admin_user_id': admin_user.id
+        })
+        impersonation_log.save()
+
         # Generate JWT tokens for the impersonated user
         tokens = create_jwt_pair_for_user(target_user)
-        
-        # Add impersonation metadata to the token payload
-        impersonation_data = {
-            'session_id': impersonation_log.id,
-            'session_key': session_key,
-            'admin_user_id': admin_user.id,
-            'target_user_id': target_user.id,
-            'started_at': impersonation_log.start_timestamp.isoformat(),
-            'access_token': tokens['access'],
-            'refresh_token': tokens['refresh']
-        }
-        
-        return Response({
+
+        # Prepare response
+        response = Response({
             'message': f'Impersonation session started for {target_user.email}',
-            'session_data': impersonation_data,
+            'session_data': {
+                'session_id': impersonation_log.id,
+                'session_key': session_key,
+                'admin_user_id': admin_user.id,
+                'target_user_id': target_user.id,
+                'started_at': impersonation_log.start_timestamp.isoformat()
+                # NOTE: Tokens NOT included in response - they're in httpOnly cookies
+            },
             'target_user': {
                 'id': target_user.id,
                 'email': target_user.email,
@@ -797,6 +808,23 @@ def start_user_impersonation(request, user_id):
             'expires_in_minutes': 60,  # Default 1 hour session
             'warning': 'All actions performed during impersonation will be logged.'
         })
+
+        # Set httpOnly cookies for impersonated user
+        response = set_auth_cookies(response, target_user)
+
+        # Set CSRF token cookie
+        from django.middleware.csrf import get_token
+        from django.conf import settings
+        response.set_cookie(
+            key='csrftoken',
+            value=get_token(request),
+            max_age=60 * 60 * 24 * 7,  # 1 week
+            httponly=False,  # Must be accessible to JavaScript for CSRF
+            secure=settings.DEBUG == False,
+            samesite='Lax' if settings.DEBUG else 'Strict'
+        )
+
+        return response
         
     except User.DoesNotExist:
         return Response(
@@ -840,7 +868,7 @@ def end_user_impersonation(request, session_id):
             actions=actions_performed,
             pages=pages_accessed
         )
-        
+
         # Create audit log entry (use the original admin user, not current request user)
         AdminAuditLog.log_action(
             admin_user=impersonation_log.admin_user,
@@ -857,8 +885,15 @@ def end_user_impersonation(request, session_id):
             },
             risk_level='medium'
         )
-        
-        return Response({
+
+        # Restore admin's original cookies
+        from .cookie_auth import set_auth_cookies
+        from django.conf import settings
+        from datetime import timedelta
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        # Prepare response
+        response = Response({
             'message': 'Impersonation session ended successfully',
             'session_summary': {
                 'duration_minutes': int(
@@ -868,6 +903,60 @@ def end_user_impersonation(request, session_id):
                 'pages_accessed_count': len(pages_accessed)
             }
         })
+
+        # Retrieve and restore admin's original session
+        if impersonation_log.admin_session_data:
+            try:
+                admin_session = json.loads(impersonation_log.admin_session_data)
+                admin_access_token = admin_session.get('admin_access_token')
+                admin_refresh_token = admin_session.get('admin_refresh_token')
+
+                # Get token lifetimes from settings
+                access_lifetime = settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
+                refresh_lifetime = settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=1))
+                samesite_setting = 'Lax' if settings.DEBUG else 'Strict'
+
+                # Restore admin's access token cookie
+                if admin_access_token:
+                    response.set_cookie(
+                        key='access_token',
+                        value=admin_access_token,
+                        max_age=int(access_lifetime.total_seconds()),
+                        httponly=True,
+                        secure=settings.DEBUG == False,
+                        samesite=samesite_setting,
+                        path='/'
+                    )
+
+                # Restore admin's refresh token cookie
+                if admin_refresh_token:
+                    response.set_cookie(
+                        key='refresh_token',
+                        value=admin_refresh_token,
+                        max_age=int(refresh_lifetime.total_seconds()),
+                        httponly=True,
+                        secure=settings.DEBUG == False,
+                        samesite=samesite_setting,
+                        path='/api/token/'
+                    )
+
+                # Set CSRF token cookie
+                from django.middleware.csrf import get_token
+                response.set_cookie(
+                    key='csrftoken',
+                    value=get_token(request),
+                    max_age=60 * 60 * 24 * 7,  # 1 week
+                    httponly=False,  # Must be accessible to JavaScript for CSRF
+                    secure=settings.DEBUG == False,
+                    samesite=samesite_setting
+                )
+
+            except (json.JSONDecodeError, KeyError) as e:
+                # If we can't restore cookies, at least clear impersonation cookies
+                from .cookie_auth import clear_auth_cookies
+                response = clear_auth_cookies(response)
+
+        return response
         
     except UserImpersonationLog.DoesNotExist:
         return Response(
