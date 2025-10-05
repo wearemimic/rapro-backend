@@ -70,13 +70,14 @@ def cookie_login(request):
 def cookie_auth0_exchange(request):
     """
     Exchange Auth0 authorization code for cookies (instead of localStorage tokens)
+    Determines login vs registration flow from database state (no frontend localStorage)
     """
     import requests
     from django.conf import settings
+    import stripe
 
     code = request.data.get('code')
-    flow_type = request.data.get('flow_type', 'login')
-    affiliate_code = request.data.get('affiliate_code')
+    state = request.data.get('state')
 
     if not code:
         return Response(
@@ -85,10 +86,8 @@ def cookie_auth0_exchange(request):
         )
 
     try:
-        # Use the same logic as auth0_views but return cookies
-        redirect_uri = f'{settings.FRONTEND_URL}/auth/callback'
-
         # Exchange code for tokens with Auth0
+        redirect_uri = f'{settings.FRONTEND_URL}/auth/callback'
         domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
         client_secret = settings.AUTH0_CLIENT_SECRET
@@ -130,6 +129,7 @@ def cookie_auth0_exchange(request):
 
         user_info = user_info_response.json()
         email = user_info.get('email')
+        auth0_sub = user_info.get('sub', '')
 
         # Get or create user
         user, created = User.objects.get_or_create(
@@ -138,12 +138,60 @@ def cookie_auth0_exchange(request):
                 'username': email,
                 'first_name': user_info.get('given_name', ''),
                 'last_name': user_info.get('family_name', ''),
-                'is_active': True
+                'is_active': True,
+                'auth0_sub': auth0_sub
             }
         )
 
+        # Determine flow from database state (not localStorage!)
+        has_active_subscription = False
+        if hasattr(user, 'stripe_customer_id') and user.stripe_customer_id:
+            try:
+                # Check if user has active Stripe subscription
+                subscriptions = stripe.Subscription.list(
+                    customer=user.stripe_customer_id,
+                    status='active',
+                    limit=1
+                )
+                has_active_subscription = len(subscriptions.data) > 0
+            except Exception as e:
+                logger.warning(f"Failed to check Stripe subscription for {email}: {str(e)}")
+
+        # Set response data based on user state
+        response_data = {
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'auth0_sub': auth0_sub
+            }
+        }
+
+        if created:
+            # Brand new user - needs to complete registration
+            response_data.update({
+                'is_new_user': True,
+                'registration_complete': False,
+                'already_registered': False
+            })
+        elif has_active_subscription:
+            # Existing user with active subscription - go to dashboard
+            response_data.update({
+                'is_new_user': False,
+                'registration_complete': True,
+                'already_registered': True
+            })
+        else:
+            # Existing user without subscription - complete registration
+            response_data.update({
+                'is_new_user': False,
+                'registration_complete': False,
+                'already_registered': False
+            })
+
         # Create response with cookies
-        response = Response(status=status.HTTP_200_OK)
+        response = Response(response_data, status=status.HTTP_200_OK)
         response = set_auth_cookies(response, user)
 
         # Set CSRF token
@@ -153,10 +201,10 @@ def cookie_auth0_exchange(request):
             max_age=60 * 60 * 24 * 7,
             httponly=False,
             secure=True,
-            samesite='Lax' if settings.DEBUG else 'Strict'  # Environment-aware
+            samesite='Lax' if settings.DEBUG else 'Strict'
         )
 
-        logger.info(f"User {user.email} authenticated via Auth0 with cookie auth")
+        logger.info(f"User {user.email} authenticated via Auth0 - flow determined from DB: new={created}, subscription={has_active_subscription}")
 
         return response
 

@@ -39,6 +39,7 @@ from .affiliate_serializers import (
     TrackClickSerializer
 )
 from .permissions import IsAdminUser
+from .cookie_auth import set_auth_cookies, clear_auth_cookies
 
 logger = logging.getLogger(__name__)
 
@@ -312,32 +313,24 @@ class AffiliateViewSet(viewsets.ModelViewSet):
         # Update last activity
         affiliate.last_activity_at = timezone.now()
         affiliate.save(update_fields=['last_activity_at'])
-        
-        # Generate JWT tokens for the affiliate
-        refresh = RefreshToken()
-        refresh['user_id'] = str(affiliate.id)  # Convert UUID to string
-        refresh['is_affiliate_portal'] = True
-        refresh['affiliate_code'] = affiliate.affiliate_code
-        
-        # Create session data (convert UUID to string)
-        session_data = {
-            'affiliate_id': str(affiliate.id),
-            'affiliate_code': affiliate.affiliate_code,
-            'name': affiliate.business_name,
-            'email': affiliate.email,
-            'company': affiliate.business_name,
-            'is_affiliate_portal': True
-        }
-        
-        return Response({
+
+        # Create response and set httpOnly cookies (affiliate acts as user)
+        # Note: We'll create a mock user object for set_auth_cookies
+        from django.contrib.auth.models import User
+        mock_user, _ = User.objects.get_or_create(
+            username=f"affiliate_{affiliate.id}",
+            defaults={'email': affiliate.email}
+        )
+
+        response = Response({
             'success': True,
-            'affiliate': AffiliateSerializer(affiliate).data,
-            'session': {
-                'token': str(refresh.access_token),
-                'refresh': str(refresh),
-                'affiliate': session_data
-            }
+            'affiliate': AffiliateSerializer(affiliate).data
         })
+
+        # Set httpOnly cookies with auth tokens
+        response = set_auth_cookies(response, mock_user)
+
+        return response
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def setup_password(self, request):
@@ -372,51 +365,40 @@ class AffiliateViewSet(viewsets.ModelViewSet):
         affiliate.portal_password = make_password(password)
         affiliate.last_activity_at = timezone.now()
         affiliate.save(update_fields=['portal_password', 'last_activity_at'])
-        
-        # Generate JWT tokens
-        refresh = RefreshToken()
-        refresh['user_id'] = str(affiliate.id)  # Convert UUID to string
-        refresh['is_affiliate_portal'] = True
-        refresh['affiliate_code'] = affiliate.affiliate_code
-        
-        # Create session data (convert UUID to string)
-        session_data = {
-            'affiliate_id': str(affiliate.id),
-            'affiliate_code': affiliate.affiliate_code,
-            'name': affiliate.business_name,
-            'email': affiliate.email,
-            'company': affiliate.business_name,
-            'is_affiliate_portal': True
-        }
-        
-        return Response({
+
+        # Create response and set httpOnly cookies
+        from django.contrib.auth.models import User
+        mock_user, _ = User.objects.get_or_create(
+            username=f"affiliate_{affiliate.id}",
+            defaults={'email': affiliate.email}
+        )
+
+        response = Response({
             'success': True,
-            'affiliate': AffiliateSerializer(affiliate).data,
-            'session': {
-                'token': str(refresh.access_token),
-                'refresh': str(refresh),
-                'affiliate': session_data
-            }
+            'affiliate': AffiliateSerializer(affiliate).data
         })
+
+        # Set httpOnly cookies with auth tokens
+        response = set_auth_cookies(response, mock_user)
+
+        return response
     
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def portal_dashboard(self, request):
         """
         Get dashboard data for authenticated affiliate.
-        Uses affiliate_id from JWT token or query parameter.
+        Extracts affiliate_id from httpOnly cookie JWT token.
         """
-        # Get affiliate_id from request (would be set by authentication middleware)
-        affiliate_id = request.GET.get('affiliate_id')
-        
-        if not affiliate_id:
-            # Try to get from JWT token if available
-            if hasattr(request, 'user') and hasattr(request.user, 'id'):
-                affiliate_id = request.user.id
-            else:
-                return Response(
-                    {'error': 'Authentication required'},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+        # Get affiliate_id from authenticated user (set by cookie JWT middleware)
+        # Extract from username format: affiliate_{uuid}
+        username = request.user.username
+        if not username.startswith('affiliate_'):
+            return Response(
+                {'error': 'Invalid affiliate authentication'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        affiliate_id = username.replace('affiliate_', '')
         
         try:
             affiliate = Affiliate.objects.get(id=affiliate_id)
@@ -464,7 +446,13 @@ class AffiliateViewSet(viewsets.ModelViewSet):
         )
         
         return Response({
-            'affiliate': AffiliateSerializer(affiliate).data,
+            'affiliate': {
+                'affiliate_id': str(affiliate.id),
+                'affiliate_code': affiliate.affiliate_code,
+                'name': affiliate.business_name,
+                'email': affiliate.email,
+                'company': affiliate.business_name
+            },
             'metrics': {
                 'total_clicks': total_clicks,
                 'total_conversions': total_conversions,
@@ -492,6 +480,35 @@ class AffiliateViewSet(viewsets.ModelViewSet):
             },
             'links': AffiliateLinkSerializer(active_links, many=True).data
         })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def portal_logout(self, request):
+        """
+        Log out affiliate from portal and clear httpOnly cookies
+        """
+        try:
+            # Create response and clear httpOnly cookies
+            response = Response({
+                'success': True,
+                'message': 'Logged out successfully'
+            })
+
+            # Clear httpOnly cookies
+            response = clear_auth_cookies(response)
+
+            logger.info(f"Affiliate {request.user.username} logged out from portal")
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Affiliate logout error: {str(e)}")
+            # Still clear cookies even if error occurs
+            response = Response({
+                'success': True,
+                'message': 'Logged out'
+            })
+            response = clear_auth_cookies(response)
+            return response
 
 
 class AffiliateLinkViewSet(viewsets.ModelViewSet):

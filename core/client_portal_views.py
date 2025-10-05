@@ -20,11 +20,12 @@ from django.db import transaction
 
 from .models import Client, Scenario, Document
 from .authentication import (
-    ClientPortalBackend, 
-    ClientInvitationManager, 
+    ClientPortalBackend,
+    ClientInvitationManager,
     ClientSessionManager,
     ClientPortalSecurity
 )
+from .cookie_auth import set_auth_cookies, clear_auth_cookies
 from .serializers_main import ScenarioSummarySerializer
 
 
@@ -63,19 +64,19 @@ class ClientPortalAuthView(APIView):
                 'error': 'Client not found'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Create session
+        # Create session (backend session tracking, not returned to client)
         session_data = ClientSessionManager.create_client_session(client, request)
-        
+
         # Log activity
         ClientPortalSecurity.log_client_activity(
-            client, 
-            'login', 
+            client,
+            'login',
             request
         )
-        
-        return Response({
+
+        # Create response and set httpOnly cookies
+        response = Response({
             'success': True,
-            'session': session_data,
             'client': {
                 'id': client.id,
                 'first_name': client.first_name,
@@ -83,6 +84,11 @@ class ClientPortalAuthView(APIView):
                 'email': client.email
             }
         }, status=status.HTTP_200_OK)
+
+        # Set httpOnly cookies with auth tokens
+        response = set_auth_cookies(response, user)
+
+        return response
 
 
 class ClientPortalPasswordSetupView(APIView):
@@ -129,15 +135,20 @@ class ClientPortalPasswordSetupView(APIView):
             # Clear invitation token after successful setup
             client.portal_invitation_token = None
             client.save()
-            
-            # Create session
+
+            # Create session (backend session tracking, not returned to client)
             session_data = ClientSessionManager.create_client_session(client, request)
-            
-            return Response({
+
+            # Create response and set httpOnly cookies
+            response = Response({
                 'success': True,
-                'message': 'Portal access activated successfully',
-                'session': session_data
+                'message': 'Portal access activated successfully'
             }, status=status.HTTP_200_OK)
+
+            # Set httpOnly cookies with auth tokens
+            response = set_auth_cookies(response, portal_user)
+
+            return response
             
         except Client.DoesNotExist:
             return Response({
@@ -327,23 +338,29 @@ class ClientPortalDocumentsView(APIView):
 @permission_classes([permissions.IsAuthenticated])
 def client_portal_logout(request):
     """
-    Log out client from portal
+    Log out client from portal and clear httpOnly cookies
     """
     try:
         client = Client.objects.get(portal_user=request.user)
         ClientSessionManager.terminate_client_session(client)
-        
+
         # Log activity
         ClientPortalSecurity.log_client_activity(
-            client, 
-            'logout', 
+            client,
+            'logout',
             request
         )
-        
-        return Response({
+
+        # Create response and clear httpOnly cookies
+        response = Response({
             'success': True,
             'message': 'Logged out successfully'
         })
+
+        # Clear httpOnly cookies
+        response = clear_auth_cookies(response)
+
+        return response
     except Client.DoesNotExist:
         return Response({
             'error': 'Client not found'
