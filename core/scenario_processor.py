@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from core.models import Scenario, Client, Spouse, IncomeSource
 from core.tax_csv_loader import get_tax_loader
 
@@ -57,6 +57,18 @@ RMD_TABLE = {
     120: 2.0,  # IRS table uses 2.0 for ages 120 and older
 }
 
+def round_decimal(value, places=2):
+    """
+    Round a Decimal value to specified decimal places for consistency.
+    Ensures all monetary calculations use the same precision.
+    """
+    if value is None:
+        return Decimal('0')
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
+    quantizer = Decimal('0.01') if places == 2 else Decimal(10) ** -places
+    return value.quantize(quantizer, rounding=ROUND_HALF_UP)
+
 class ScenarioProcessor:
     def __init__(self, scenario_id, debug=False):
         self.debug = debug
@@ -75,7 +87,7 @@ class ScenarioProcessor:
         mortality_age_primary = self.scenario.mortality_age or 90
         mortality_age_spouse = getattr(self.scenario, 'spouse_mortality_age', None) or mortality_age_primary
 
-        for asset in self.scenario.income_sources.all():
+        for asset in self.scenario.income_sources.all().order_by('id'):
             # For Social Security, use mortality age as the end age (not hard-coded 90)
             # Social Security continues until death
             default_end_age = 90
@@ -465,9 +477,12 @@ class ScenarioProcessor:
 
             if primary_alive or spouse_alive:
 
-                gross_income = self._calculate_gross_income(year, primary_alive, spouse_alive, start_of_year_balances)
+                gross_income = round_decimal(self._calculate_gross_income(year, primary_alive, spouse_alive, start_of_year_balances))
                 # RMD is now tracked in total_rmd_amount above
                 ss_income, ss_income_primary, ss_income_spouse = self._calculate_social_security(year, primary_alive, spouse_alive)
+                ss_income = round_decimal(ss_income)
+                ss_income_primary = round_decimal(ss_income_primary)
+                ss_income_spouse = round_decimal(ss_income_spouse)
                 
                 # Check if SS decrease is applied this year and calculate actual amount
                 if (self.scenario.reduction_2030_ss and 
@@ -489,11 +504,11 @@ class ScenarioProcessor:
                     gross_income += pre_retirement_income_decimal
                     # print(f"  Adding pre-retirement income: ${pre_retirement_income_decimal:,.2f}")
                     
-            agi_excl_ss = Decimal(gross_income)
-            taxable_ss = calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status)
+            agi_excl_ss = round_decimal(Decimal(gross_income))
+            taxable_ss = round_decimal(calculate_taxable_social_security(Decimal(ss_income), agi_excl_ss, 0, self.tax_status))
 
             # Calculate provisional income for debug
-            provisional_income = agi_excl_ss + Decimal('0.5') * Decimal(ss_income)
+            provisional_income = round_decimal(agi_excl_ss + Decimal('0.5') * Decimal(ss_income))
             # Commented:             print(f"\nPROVISIONAL INCOME CALCULATION:")
             # print(f"  AGI excluding SS: ${agi_excl_ss:,.2f}")
             # print(f"  + 50% of SS (${ss_income:,.2f} × 0.5): ${Decimal('0.5') * Decimal(ss_income):,.2f}")
@@ -526,26 +541,26 @@ class ScenarioProcessor:
             # print(f"  Calculated Taxable SS: ${taxable_ss:,.2f}")
             # print(f"  % of SS Taxable: {(taxable_ss / ss_income * 100) if ss_income > 0 else 0:.1f}%")
 
-            taxable_income = agi_excl_ss + taxable_ss
-            
+            taxable_income = round_decimal(agi_excl_ss + taxable_ss)
+
             # Apply standard deduction from CSV data if enabled
             if getattr(self.scenario, 'apply_standard_deduction', True):
                 tax_loader = get_tax_loader()
-                
+
                 # Normalize tax status for CSV lookup
                 status_mapping = {
                     'single': 'Single',
                     'married filing jointly': 'Married Filing Jointly',
-                    'married filing separately': 'Married Filing Separately', 
+                    'married filing separately': 'Married Filing Separately',
                     'head of household': 'Head of Household',
                     'qualifying widow(er)': 'Qualifying Widow(er)'
                 }
-                
+
                 normalized_status = (self.tax_status or '').strip().lower()
                 filing_status = status_mapping.get(normalized_status, 'Single')
-                
+
                 standard_deduction = tax_loader.get_standard_deduction(filing_status)
-                taxable_income = max(Decimal('0'), taxable_income - standard_deduction)
+                taxable_income = round_decimal(max(Decimal('0'), taxable_income - standard_deduction))
                 # print(f"\nSTANDARD DEDUCTION APPLIED: {standard_deduction} for {self.tax_status}. Taxable Income after deduction: ${taxable_income:,.2f}")
 
             # print(f"\nTAXABLE INCOME CALCULATION:")
@@ -560,8 +575,8 @@ class ScenarioProcessor:
             
             # For retirement planning, MAGI is AGI plus tax-exempt interest and certain other income
             # AGI = income from all sources - specific deductions, but including taxable SS
-            agi = agi_excl_ss + taxable_ss
-            
+            agi = round_decimal(agi_excl_ss + taxable_ss)
+
             # Additional income sources for MAGI (these would be 0 in most cases but could be added in future)
             excluded_municipal_bond_interest = tax_exempt_interest  # Tax-exempt municipal bond interest
             excluded_series_ee_bond_interest = Decimal('0')  # Used for education expenses
@@ -570,15 +585,15 @@ class ScenarioProcessor:
             passive_income_loss = Decimal('0')
             student_loan_interest = Decimal('0')
             ira_contribution_deduction = Decimal('0')
-            
+
             # The MAGI adjustment factors can be set based on tax situation
             # For Medicare IRMAA purposes, MAGI includes ALL Social Security benefits (not just taxable portion)
             # plus tax-exempt interest and excluded foreign income
-            untaxed_ss = Decimal(ss_income) - taxable_ss  # The portion of SS not included in AGI
-            magi_adjustments = excluded_municipal_bond_interest + excluded_series_ee_bond_interest + \
-                             excluded_foreign_income + ira_contribution_deduction + untaxed_ss
-            
-            magi = agi + magi_adjustments
+            untaxed_ss = round_decimal(Decimal(ss_income) - taxable_ss)  # The portion of SS not included in AGI
+            magi_adjustments = round_decimal(excluded_municipal_bond_interest + excluded_series_ee_bond_interest +
+                             excluded_foreign_income + ira_contribution_deduction + untaxed_ss)
+
+            magi = round_decimal(agi + magi_adjustments)
 
             # Store MAGI for future 2-year lookback
             magi_history[year] = magi
@@ -689,16 +704,16 @@ class ScenarioProcessor:
                         # print(f"  Hold Harmless protection: ${hold_harmless_amount:,.2f}")
 
             # Calculate net income fields per PRD requirements
-            total_income = gross_income + ss_income  # Total income before deductions
-            after_tax_income = total_income - federal_tax - state_tax  # Income after taxes
-            after_medicare_income = after_tax_income - effective_medicare  # Income after taxes and Medicare
+            total_income = round_decimal(gross_income + ss_income)  # Total income before deductions
+            after_tax_income = round_decimal(total_income - federal_tax - state_tax)  # Income after taxes
+            after_medicare_income = round_decimal(after_tax_income - effective_medicare)  # Income after taxes and Medicare
             remaining_income = after_medicare_income  # Final remaining income (same as after_medicare_income)
 
             # Legacy calculations (kept for backward compatibility)
-            net_income = gross_income + ss_income - federal_tax - effective_medicare
-            remaining_ss = ss_income - effective_medicare
+            net_income = round_decimal(gross_income + ss_income - federal_tax - effective_medicare)
+            remaining_ss = round_decimal(ss_income - effective_medicare)
             # Total IRMAA surcharge (Part B + Part D) for annual reporting
-            total_irmaa_surcharge_annual = irmaa_surcharge_annual + part_d_irmaa_annual
+            total_irmaa_surcharge_annual = round_decimal(irmaa_surcharge_annual + part_d_irmaa_annual)
             
             # print(f"\nFINAL RESULTS FOR YEAR {year}:")
             # print(f"  Gross Income: ${gross_income:,.2f}")
@@ -752,22 +767,28 @@ class ScenarioProcessor:
 
             # Calculate state tax (already initialized above)
             state_name = ''
-            if hasattr(self.scenario, 'state') and self.scenario.state:
+            if hasattr(self.scenario, 'primary_state') and self.scenario.primary_state:
                 tax_loader = get_tax_loader()
-                state_info = tax_loader.get_state_tax_info(self.scenario.state)
-                state_name = state_info.get('state', self.scenario.state)
+                state_info = tax_loader.get_state_tax_info(self.scenario.primary_state)
+                state_name = state_info.get('state', self.scenario.primary_state)
 
                 # Simple state tax calculation - can be enhanced based on state rules
-                if not state_info.get('retirement_income_exempt', False):
+                retirement_exempt = state_info.get('retirement_income_exempt', 'false')
+                # Only skip tax calculation if retirement income is FULLY exempt (true)
+                # For 'partial' or 'false', we calculate tax
+                if retirement_exempt != 'true':
                     state_tax_rate = Decimal(str(state_info.get('income_tax_rate', 0)))
-                    # Apply state tax to AGI (simplified - states have different rules)
-                    state_tax = agi * state_tax_rate
 
-                    # Some states don't tax Social Security
-                    if not state_info.get('ss_taxed', False):
-                        # Adjust state taxable income to exclude SS
+                    # Start with AGI as the base for state taxation
+                    state_taxable_income = agi
+
+                    # Some states don't tax Social Security - exclude it from taxable income
+                    ss_taxed = state_info.get('ss_taxed', 'false')
+                    if ss_taxed == 'false' or ss_taxed is False:
                         state_taxable_income = agi - Decimal(str(taxable_ss))
-                        state_tax = max(Decimal('0'), state_taxable_income * state_tax_rate)
+
+                    # Apply state tax rate
+                    state_tax = max(Decimal('0'), state_taxable_income * state_tax_rate)
 
             summary = {
                 "year": year,
