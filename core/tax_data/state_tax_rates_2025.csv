@@ -22,7 +22,7 @@ Maryland,MD,0.0575,partial,false,Some retirement exemptions
 Massachusetts,MA,0.05,partial,false,Flat rate with some exemptions
 Michigan,MI,0.0425,partial,false,Some retirement exemptions
 Minnesota,MN,0.0985,false,false,Taxes most retirement income
-Mississippi,MS,0.05,true,false,No tax on retirement income
+Mississippi,MS,0.05,false,false,Taxes most retirement income including RMDs
 Missouri,MO,0.048,partial,false,Some retirement exemptions
 Montana,MT,0.0675,partial,false,Some retirement exemptions
 Nebraska,NE,0.0684,partial,false,Some retirement exemptions

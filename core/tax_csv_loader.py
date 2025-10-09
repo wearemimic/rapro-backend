@@ -46,8 +46,11 @@ class TaxCSVLoader:
                             converted_row[key] = Decimal(value)
                         except:
                             converted_row[key] = value
-                    elif key in ['retirement_income_exempt', 'ss_taxed']:
+                    elif key in ['ss_taxed']:
                         converted_row[key] = value.lower() == 'true'
+                    elif key == 'retirement_income_exempt':
+                        # Keep as string: 'true', 'false', or 'partial'
+                        converted_row[key] = value.lower()
                     else:
                         converted_row[key] = value
                 data.append(converted_row)
@@ -200,7 +203,7 @@ class TaxCSVLoader:
             'state': 'Unknown',
             'state_code': state_code.upper(),
             'income_tax_rate': Decimal('0'),
-            'retirement_income_exempt': True,
+            'retirement_income_exempt': 'true',
             'ss_taxed': False,
             'description': 'State not found'
         }
