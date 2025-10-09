@@ -50,14 +50,14 @@ def cookie_login(request):
     response = Response(status=status.HTTP_200_OK)
     response = set_auth_cookies(response, user)
 
-    # Set CSRF token
+    # Set CSRF token (Safari-compatible)
     response.set_cookie(
         key='csrftoken',
         value=get_token(request),
         max_age=60 * 60 * 24 * 7,  # 1 week
         httponly=False,  # Must be accessible to JavaScript for CSRF
         secure=True,
-        samesite='Lax' if settings.DEBUG else 'Strict'  # Environment-aware
+        samesite='None'  # Safari compatibility
     )
 
     logger.info(f"User {user.email} logged in via cookie auth")
@@ -194,14 +194,14 @@ def cookie_auth0_exchange(request):
         response = Response(response_data, status=status.HTTP_200_OK)
         response = set_auth_cookies(response, user)
 
-        # Set CSRF token
+        # Set CSRF token (Safari-compatible)
         response.set_cookie(
             key='csrftoken',
             value=get_token(request),
             max_age=60 * 60 * 24 * 7,
             httponly=False,
             secure=True,
-            samesite='Lax' if settings.DEBUG else 'Strict'
+            samesite='None'  # Safari compatibility
         )
 
         logger.info(f"User {user.email} authenticated via Auth0 - flow determined from DB: new={created}, subscription={has_active_subscription}")
@@ -354,7 +354,7 @@ def migrate_to_cookie_auth(request):
             max_age=int(access_lifetime.total_seconds()),
             httponly=True,
             secure=True,
-            samesite='Lax' if settings.DEBUG else 'Strict',  # Environment-aware
+            samesite='None',  # Safari compatibility
             path='/'
         )
 
@@ -364,18 +364,18 @@ def migrate_to_cookie_auth(request):
             max_age=int(refresh_lifetime.total_seconds()),
             httponly=True,
             secure=True,
-            samesite='Lax' if settings.DEBUG else 'Strict',  # Environment-aware
-            path='/api/token/'
+            samesite='None',  # Safari compatibility
+            path='/'  # Changed from '/api/token/' for Safari
         )
 
-        # Set CSRF token
+        # Set CSRF token (Safari-compatible)
         response.set_cookie(
             key='csrftoken',
             value=get_token(request),
             max_age=60 * 60 * 24 * 7,
             httponly=False,
             secure=True,
-            samesite='Lax' if settings.DEBUG else 'Strict'  # Environment-aware
+            samesite='None'  # Safari compatibility
         )
 
         logger.info(f"User {user.email} migrated to cookie auth")
