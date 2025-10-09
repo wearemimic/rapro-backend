@@ -541,7 +541,7 @@ def duplicate_scenario(request, scenario_id):
         if original_scenario.client.advisor != request.user:
             return Response({"error": "Access denied."}, status=403)
         
-        # Create a copy of the scenario
+        # Create a copy of the scenario - copy ALL fields
         duplicated_scenario = Scenario.objects.create(
             client=original_scenario.client,
             name=f"{original_scenario.name} (Copy)",
@@ -561,8 +561,27 @@ def duplicate_scenario(request, scenario_id):
             roth_conversion_duration=original_scenario.roth_conversion_duration,
             roth_conversion_annual_amount=original_scenario.roth_conversion_annual_amount,
             apply_standard_deduction=original_scenario.apply_standard_deduction,
-            income_vs_cost_percent=original_scenario.income_vs_cost_percent,  # Copy from original
-            medicare_irmaa_percent=original_scenario.medicare_irmaa_percent   # Copy from original
+            income_vs_cost_percent=original_scenario.income_vs_cost_percent,
+            medicare_irmaa_percent=original_scenario.medicare_irmaa_percent,
+            primary_state=original_scenario.primary_state,
+            # Social Security claiming strategy fields
+            primary_ss_claiming_age=original_scenario.primary_ss_claiming_age,
+            spouse_ss_claiming_age=original_scenario.spouse_ss_claiming_age,
+            ss_include_irmaa=original_scenario.ss_include_irmaa,
+            # Social Security adjustment fields
+            reduction_2030_ss=original_scenario.reduction_2030_ss,
+            survivor_takes_higher_benefit=original_scenario.survivor_takes_higher_benefit,
+            ss_adjustment_year=original_scenario.ss_adjustment_year,
+            ss_adjustment_direction=original_scenario.ss_adjustment_direction,
+            ss_adjustment_type=original_scenario.ss_adjustment_type,
+            ss_adjustment_amount=original_scenario.ss_adjustment_amount,
+            # Tax Settings fields
+            federal_standard_deduction=original_scenario.federal_standard_deduction,
+            state_standard_deduction=original_scenario.state_standard_deduction,
+            custom_annual_deduction=original_scenario.custom_annual_deduction,
+            primary_blind=original_scenario.primary_blind,
+            spouse_blind=original_scenario.spouse_blind,
+            is_dependent=original_scenario.is_dependent
         )
         
         # Duplicate all income sources
@@ -679,8 +698,8 @@ def get_scenario_detail(request, scenario_id):
             'primary_blind': scenario.primary_blind,
             'spouse_blind': scenario.spouse_blind,
             'is_dependent': scenario.is_dependent,
-            'part_b_inflation_rate': str(int(scenario.part_b_inflation_rate)),
-            'part_d_inflation_rate': str(int(scenario.part_d_inflation_rate)),
+            'part_b_inflation_rate': str(scenario.part_b_inflation_rate),
+            'part_d_inflation_rate': str(scenario.part_d_inflation_rate),
             'primary_state': scenario.primary_state or '',  # Use stored value or default
             'income': income_data
         }
@@ -771,8 +790,8 @@ def get_scenario_for_editing(request, scenario_id):
             'primary_blind': scenario.primary_blind,
             'spouse_blind': scenario.spouse_blind,
             'is_dependent': scenario.is_dependent,
-            'part_b_inflation_rate': str(int(scenario.part_b_inflation_rate)),
-            'part_d_inflation_rate': str(int(scenario.part_d_inflation_rate)),
+            'part_b_inflation_rate': str(scenario.part_b_inflation_rate),
+            'part_d_inflation_rate': str(scenario.part_d_inflation_rate),
             'primary_state': scenario.primary_state or '',
             'income': income_data
         }

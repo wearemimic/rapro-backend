@@ -62,18 +62,22 @@ def set_auth_cookies(response, user):
     access_lifetime = settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
     refresh_lifetime = settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=1))
 
-    # Set httpOnly cookies with environment-aware security
-    # Development: SameSite='Lax' for localhost cross-port (3000→8000)
-    # Production: SameSite='Strict' for maximum security
-    samesite_setting = 'Lax' if settings.DEBUG else 'Strict'
+    # Set httpOnly cookies with Safari-compatible settings
+    # Safari requires 'None' SameSite for cross-origin cookies, with Secure=True
+    # Use 'None' for both dev and prod to ensure Safari compatibility
+    samesite_setting = 'None'
+
+    # CRITICAL: Safari requires Secure=True when SameSite=None
+    # This works in development because localhost is treated as secure context
+    secure_setting = True
 
     response.set_cookie(
         key='access_token',
         value=str(access),
         max_age=int(access_lifetime.total_seconds()),
         httponly=True,  # Prevents JavaScript access
-        secure=settings.DEBUG == False,    # HTTPS only in production
-        samesite=samesite_setting,
+        secure=secure_setting,  # Required for Safari with SameSite=None
+        samesite=samesite_setting,  # None allows cross-origin
         path='/'
     )
 
@@ -82,9 +86,9 @@ def set_auth_cookies(response, user):
         value=str(refresh),
         max_age=int(refresh_lifetime.total_seconds()),
         httponly=True,
-        secure=settings.DEBUG == False,
-        samesite=samesite_setting,
-        path='/api/token/'  # Limit refresh token to token endpoints
+        secure=secure_setting,  # Required for Safari with SameSite=None
+        samesite=samesite_setting,  # None allows cross-origin
+        path='/'  # Changed from '/api/token/' to '/' for Safari compatibility
     )
 
     # Also return tokens in response for initial setup
@@ -147,7 +151,7 @@ def refresh_access_token(request):
             'message': 'Token refreshed successfully'
         })
 
-        # Set new access token cookie
+        # Set new access token cookie with Safari-compatible settings
         access_lifetime = settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
         response.set_cookie(
             key='access_token',
@@ -155,7 +159,7 @@ def refresh_access_token(request):
             max_age=int(access_lifetime.total_seconds()),
             httponly=True,
             secure=True,
-            samesite='Strict',
+            samesite='None',  # Safari compatibility
             path='/'
         )
 
@@ -171,8 +175,8 @@ def refresh_access_token(request):
                 max_age=int(refresh_lifetime.total_seconds()),
                 httponly=True,
                 secure=True,
-                samesite='Strict',
-                path='/api/token/'
+                samesite='None',  # Safari compatibility
+                path='/'  # Changed from '/api/token/' for Safari compatibility
             )
 
         return response
