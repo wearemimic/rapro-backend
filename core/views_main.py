@@ -451,7 +451,10 @@ class AdvisorClientListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = Client.objects.filter(advisor=self.request.user)
-        
+
+        # Filter out archived clients by default
+        queryset = queryset.exclude(status='archived')
+
         # Add search functionality
         search = self.request.query_params.get('search', None)
         if search:
@@ -461,7 +464,7 @@ class AdvisorClientListView(generics.ListAPIView):
                 models.Q(last_name__icontains=search) |
                 models.Q(email__icontains=search)
             )
-        
+
         # Add limit parameter for search results
         limit = self.request.query_params.get('limit', None)
         if limit:
@@ -470,11 +473,11 @@ class AdvisorClientListView(generics.ListAPIView):
                 queryset = queryset[:limit]
             except ValueError:
                 pass  # Ignore invalid limit values
-                
+
         return queryset
     
   
-class ClientDetailView(generics.RetrieveDestroyAPIView):
+class ClientDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Client.objects.all()
     serializer_class = ClientDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
