@@ -178,7 +178,12 @@ class ScenarioSummarySerializer(SerializerSanitizerMixin, serializers.ModelSeria
 class ClientDetailSerializer(serializers.ModelSerializer):
     spouse = SpouseSerializer(read_only=True)
     notes = serializers.CharField(required=False, allow_blank=True)
-    scenarios = ScenarioSummarySerializer(many=True, read_only=True)
+    scenarios = serializers.SerializerMethodField()
+
+    def get_scenarios(self, obj):
+        # Filter out archived scenarios
+        active_scenarios = obj.scenarios.filter(is_archived=False)
+        return ScenarioSummarySerializer(active_scenarios, many=True).data
 
     class Meta:
         model = Client
