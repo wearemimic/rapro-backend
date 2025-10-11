@@ -28,8 +28,9 @@ urlpatterns = [
     path('api/', include('core.urls')),  # <-- this is what makes /api/login/ work
     path('api/client-portal/', include('core.client_portal_urls')),  # Client portal API endpoints
     path('api/', include('report_center.urls')),  # Report Center API endpoints
+    path('api/ss-planning/', include('ss_planning.urls')),  # Social Security Planning API endpoints
     # path("api/clients/", AdvisorClientListView.as_view(), name="advisor-clients"),
-   
+
 ]
 
 if settings.DEBUG:
