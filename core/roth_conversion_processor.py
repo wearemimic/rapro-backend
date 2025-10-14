@@ -934,6 +934,7 @@ class RothConversionProcessor:
                 'primary_age': 0,
                 'spouse_age': None,
                 'gross_income': 0,
+                'pre_retirement_income': 0,  # Pre-retirement income (e.g., salary/wages before retirement)
                 'ss_income': 0,
                 'taxable_ss': 0,
                 'magi': 0,
@@ -976,6 +977,64 @@ class RothConversionProcessor:
                 # Approximate split: Part B is ~72% of base cost, Part D is ~28%
                 enhanced_row['part_b'] = enhanced_row['medicare_base'] * 0.72
                 enhanced_row['part_d'] = enhanced_row['medicare_base'] * 0.28
+
+            # Build income_by_source structure from flat fields
+            income_by_source = {}
+            for asset in self.assets:
+                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_type = asset.get('income_type', '').lower()
+
+                # Look for income fields in the row
+                # Check various possible field names
+                income_value = 0
+                if f"{asset_type}_income" in enhanced_row:
+                    income_value = enhanced_row[f"{asset_type}_income"]
+                elif f"{asset_id}_income" in enhanced_row:
+                    income_value = enhanced_row[f"{asset_id}_income"]
+                elif asset_type == 'social_security' and 'ss_income' in enhanced_row:
+                    income_value = enhanced_row['ss_income']
+
+                if income_value:
+                    income_by_source[asset_id] = float(income_value)
+
+            enhanced_row['income_by_source'] = income_by_source
+
+            # Build asset_balances structure from flat fields
+            asset_balances_dict = {}
+            for asset in self.assets:
+                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_type = asset.get('income_type', '').lower()
+
+                # Look for balance fields in the row
+                balance_value = 0
+                if f"{asset_type}_balance" in enhanced_row:
+                    balance_value = enhanced_row[f"{asset_type}_balance"]
+                elif f"{asset_id}_balance" in enhanced_row:
+                    balance_value = enhanced_row[f"{asset_id}_balance"]
+
+                if balance_value or asset.get('current_asset_balance', 0) > 0:
+                    asset_balances_dict[asset_id] = float(balance_value)
+
+            enhanced_row['asset_balances'] = asset_balances_dict
+
+            # Build RMD required structure (detailed RMDs by asset)
+            rmd_required = {}
+            for asset in self.assets:
+                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_type = asset.get('income_type', '').lower()
+
+                # Look for RMD fields
+                rmd_value = 0
+                if f"{asset_type}_rmd" in enhanced_row:
+                    rmd_value = enhanced_row[f"{asset_type}_rmd"]
+                elif f"{asset_id}_rmd" in enhanced_row:
+                    rmd_value = enhanced_row[f"{asset_id}_rmd"]
+
+                if rmd_value:
+                    rmd_required[asset_id] = float(rmd_value)
+
+            if rmd_required:
+                enhanced_row['rmd_required'] = rmd_required
 
             comprehensive_years.append(enhanced_row)
 
@@ -1398,6 +1457,7 @@ class RothConversionProcessor:
                         'spouse_age': spouse_age,
                         'is_synthetic': True,
                         'gross_income': float(gross_income),
+                        'pre_retirement_income': float(self.pre_retirement_income),  # Dedicated field for pre-retirement income column
                         'ss_income': 0,
                         'taxable_ss': 0,
                         'magi': float(gross_income) + conversion_amount,

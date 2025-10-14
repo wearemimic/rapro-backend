@@ -1174,7 +1174,12 @@ class RothConversionAPIView(APIView):
                 error_msg = f"Missing required fields: {', '.join(missing)}"
                 print(f"ERROR: {error_msg}")
                 return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+            # Extract pre_retirement_income from scenario and add to conversion_params if not already there
+            if 'pre_retirement_income' not in conversion_params and 'pre_retirement_income' in scenario:
+                conversion_params['pre_retirement_income'] = scenario['pre_retirement_income']
+                print(f"DEBUG: Added pre_retirement_income to conversion_params: {scenario['pre_retirement_income']}")
+
             # Create and process the Roth conversion
             processor = RothConversionProcessor(
                 scenario=scenario,
@@ -1215,7 +1220,9 @@ class RothConversionAPIView(APIView):
                 'scenarioResults': result['conversion_results'],  # Add scenarioResults for frontend
                 'conversion_cost_metrics': result.get('conversion_cost_metrics'),  # Add conversion cost metrics
                 'baseline_results': result['baseline_results'],  # Add at root level for audit table
-                'conversion_results': result['conversion_results']  # Add at root level for audit table
+                'conversion_results': result['conversion_results'],  # Add at root level for audit table
+                'baseline_comprehensive': result.get('baseline_comprehensive'),  # Add comprehensive format for Before Conversion table
+                'conversion_comprehensive': result.get('conversion_comprehensive')  # Add comprehensive format for After Conversion table
             }
             
             # DEBUG: Log what we're actually sending to the UI
