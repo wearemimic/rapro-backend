@@ -1213,7 +1213,9 @@ class RothConversionAPIView(APIView):
                 },
                 'asset_balances': result['asset_balances'],
                 'scenarioResults': result['conversion_results'],  # Add scenarioResults for frontend
-                'conversion_cost_metrics': result.get('conversion_cost_metrics')  # Add conversion cost metrics
+                'conversion_cost_metrics': result.get('conversion_cost_metrics'),  # Add conversion cost metrics
+                'baseline_results': result['baseline_results'],  # Add at root level for audit table
+                'conversion_results': result['conversion_results']  # Add at root level for audit table
             }
             
             # DEBUG: Log what we're actually sending to the UI

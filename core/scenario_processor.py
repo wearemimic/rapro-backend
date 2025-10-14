@@ -649,14 +649,39 @@ class ScenarioProcessor:
             lookback_year = year - 2
             lookback_magi = magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
 
-            # For debugging/logging
-            if lookback_year in magi_history:
-                self._log_debug(f"Year {year}: Using MAGI from {lookback_year} (${lookback_magi:,.2f}) for IRMAA determination")
-            else:
-                self._log_debug(f"Year {year}: No {lookback_year} MAGI history, using current MAGI (${magi:,.2f})")
+            # Check if anyone has reached Medicare eligibility age
+            primary_medicare_start_age = self.scenario.medicare_age
+            spouse_medicare_start_age = self.scenario.spouse_medicare_age
 
-            medicare_base, irmaa_surcharge_annual, total_medicare, base_part_d, part_d_irmaa_annual, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year, primary_age, spouse_age, primary_alive, spouse_alive)
-            total_medicare = Decimal(total_medicare)
+            self._log_debug(f"Year {year}: Medicare start ages - Primary: {primary_medicare_start_age}, Spouse: {spouse_medicare_start_age}")
+            self._log_debug(f"Year {year}: Current ages - Primary: {primary_age}, Spouse: {spouse_age}")
+
+            primary_medicare_eligible = primary_alive and primary_age >= primary_medicare_start_age
+            spouse_medicare_eligible = spouse_alive and spouse_age and spouse_age >= spouse_medicare_start_age
+            anyone_on_medicare = primary_medicare_eligible or spouse_medicare_eligible
+
+            self._log_debug(f"Year {year}: Medicare eligible - Primary: {primary_medicare_eligible}, Spouse: {spouse_medicare_eligible}, Anyone: {anyone_on_medicare}")
+
+            if anyone_on_medicare:
+                # For debugging/logging
+                if lookback_year in magi_history:
+                    self._log_debug(f"Year {year}: Using MAGI from {lookback_year} (${lookback_magi:,.2f}) for IRMAA determination")
+                else:
+                    self._log_debug(f"Year {year}: No {lookback_year} MAGI history, using current MAGI (${magi:,.2f})")
+
+                medicare_base, irmaa_surcharge_annual, total_medicare, base_part_d, part_d_irmaa_annual, first_irmaa_threshold, current_irmaa_bracket, irmaa_bracket_number = self._calculate_medicare_costs(lookback_magi, year, primary_age, spouse_age, primary_alive, spouse_alive)
+                total_medicare = Decimal(total_medicare)
+            else:
+                # No one is Medicare eligible yet - zero costs
+                medicare_base = Decimal('0')
+                irmaa_surcharge_annual = Decimal('0')
+                total_medicare = Decimal('0')
+                base_part_d = Decimal('0')
+                part_d_irmaa_annual = Decimal('0')
+                first_irmaa_threshold = Decimal('0')
+                current_irmaa_bracket = None
+                irmaa_bracket_number = 0
+                self._log_debug(f"Year {year}: No one Medicare eligible yet (Primary: {primary_age}, Spouse: {spouse_age or 'N/A'})")
             
             # print(f"\nMEDICARE COSTS:")
             # print(f"  Medicare Base: ${medicare_base:,.2f}")
@@ -1098,57 +1123,44 @@ class ScenarioProcessor:
             if years_to_grow > 0:
                 current_balance = asset["previous_year_balance"]
                 
-                # Check if we need to apply Roth conversions during projection years
-                roth_conversion_start = getattr(self.scenario, 'roth_conversion_start_year', None)
-                roth_conversion_duration = getattr(self.scenario, 'roth_conversion_duration', None)
-                roth_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
-                
+                # DISABLED: Check if we need to apply Roth conversions during projection years
+                # This is disabled to prevent automatic application of saved conversion parameters
+                # roth_conversion_start = getattr(self.scenario, 'roth_conversion_start_year', None)
+                # roth_conversion_duration = getattr(self.scenario, 'roth_conversion_duration', None)
+                # roth_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
+
                 for yr in range(years_to_grow):
                     # Check if we should apply contributions for this year
                     projection_year = current_year + yr
                     projection_age = projection_year - birthdate.year
-                    
+
                     # Apply contributions only if before withdrawal age
                     if start_age is not None and projection_age < start_age:
                         current_balance += annual_contribution
                         self._log_debug(f"Projection Year {projection_year} - Age {projection_age} < {start_age}, added contribution: ${annual_contribution}")
-                    
+
                     # Apply growth
                     current_balance *= (1 + rate_of_return)
-                    
-                    # Apply Roth conversions if this asset is eligible and we're in conversion window
-                    if (roth_conversion_start and roth_conversion_duration and roth_annual_amount > 0 and
-                        asset.get("income_type") in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"] and
-                        projection_year >= roth_conversion_start and 
-                        projection_year < roth_conversion_start + roth_conversion_duration):
-                        
-                        # Calculate this asset's share of the conversion
-                        # For simplicity during projection, assume this is the only eligible asset
-                        # The actual pro-rata calculation happens during the main calculation loop
-                        conversion_amount = Decimal(str(roth_annual_amount))
-                        
-                        # Don't convert more than available
-                        conversion_amount = min(conversion_amount, current_balance)
-                        current_balance -= conversion_amount
-                        
-                        self._log_debug(f"Projection Year {projection_year} - Applied Roth conversion: ${conversion_amount:,.2f}, New balance: ${current_balance:,.2f}")
-                        
-                        # Track that conversions happened
-                        if not hasattr(asset, 'pre_retirement_conversions'):
-                            asset['pre_retirement_conversions'] = Decimal('0')
-                        asset['pre_retirement_conversions'] += conversion_amount
-                    
+
+                    # DISABLED: Apply Roth conversions during projection
+                    # Conversions should only be applied by RothConversionProcessor
+                    # if (roth_conversion_start and roth_conversion_duration and roth_annual_amount > 0 and
+                    #     asset.get("income_type") in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"] and
+                    #     projection_year >= roth_conversion_start and
+                    #     projection_year < roth_conversion_start + roth_conversion_duration):
+                    #
+                    #     # Calculate this asset's share of the conversion
+                    #     # For simplicity during projection, assume this is the only eligible asset
+                    #     # The actual pro-rata calculation happens during the main calculation loop
+                    #     conversion_amount = Decimal(str(roth_annual_amount))
+                    #
+                    #     # Don't convert more than available
+                    #     conversion_amount = min(conversion_amount, current_balance)
+                    #     current_balance -= conversion_amount
+                    #
+                    #     self._log_debug(f"Projection Year {projection_year} - Applied Roth conversion: ${conversion_amount:,.2f}, New balance: ${current_balance:,.2f}")
+
                 asset["previous_year_balance"] = current_balance
-
-                # If this account was fully converted, mark it
-                if current_balance <= Decimal('0.01'):
-                    asset["fully_converted_to_roth"] = True
-                    asset["current_asset_balance"] = Decimal('0')
-                    self._log_debug(f"Asset fully converted during pre-retirement years")
-
-                # If conversions happened, ensure we have a Roth account to track them
-                if asset.get('pre_retirement_conversions', 0) > 0:
-                    self._ensure_roth_account_exists(asset['pre_retirement_conversions'])
 
                 # IMPORTANT FIX: We've already grown the asset through all projection years
                 # up to and including the target year. Don't apply growth again below.
@@ -1756,10 +1768,12 @@ class ScenarioProcessor:
                     break
 
         # Determine if Medicare costs should be doubled
-        # Medicare eligibility starts at age 65
-        medicare_eligible_age = 65
-        primary_medicare_eligible = primary_alive and primary_age >= medicare_eligible_age
-        spouse_medicare_eligible = spouse_alive and spouse_age and spouse_age >= medicare_eligible_age
+        # Medicare eligibility uses the scenario's medicare_age setting
+        primary_medicare_eligible_age = self.scenario.medicare_age
+        spouse_medicare_eligible_age = self.scenario.spouse_medicare_age
+
+        primary_medicare_eligible = primary_alive and primary_age >= primary_medicare_eligible_age
+        spouse_medicare_eligible = spouse_alive and spouse_age and spouse_age >= spouse_medicare_eligible_age
 
         # Double costs only if BOTH spouses are alive AND both are Medicare eligible
         both_on_medicare = primary_medicare_eligible and spouse_medicare_eligible
@@ -1813,58 +1827,68 @@ class ScenarioProcessor:
         Calculate Roth conversion amounts for the year without modifying balances.
         Returns total conversion amount and stores per-asset conversion amounts.
         Balance modifications happen in _apply_roth_conversions().
+
+        NOTE: This method is DISABLED for normal ScenarioProcessor calculations.
+        Roth conversions should ONLY be applied by RothConversionProcessor explicitly.
+        The saved roth_conversion_* fields on the Scenario model are for UI prepopulation only.
         """
-        roth_conversion_start_year = getattr(self.scenario, 'roth_conversion_start_year', None)
-        roth_conversion_duration = getattr(self.scenario, 'roth_conversion_duration', None)
-        roth_conversion_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
-        
-        # Debug logging
-        self._log_debug(f"Year {year} - Roth conversion check: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}, annual_amount={roth_conversion_annual_amount}")
-        
-        # Convert to Decimal if it's not already
-        if not isinstance(roth_conversion_annual_amount, Decimal):
-            try:
-                roth_conversion_annual_amount = Decimal(str(roth_conversion_annual_amount))
-            except:
-                roth_conversion_annual_amount = Decimal('0')
+        # DISABLED: Do not automatically apply saved Roth conversion parameters
+        # This prevents the Overview tab from showing "after conversion" numbers
+        # Roth conversions are only applied when explicitly called by RothConversionProcessor
+        return Decimal('0')
 
-        # Add error handling for None values
-        if roth_conversion_start_year is None or roth_conversion_duration is None:
-            self._log_debug(f"Roth conversion parameters are not set: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}")
-            return Decimal('0')
-
-        if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
-            # Calculate pro-rata distribution WITHOUT modifying balances
-            eligible_assets = [asset for asset in self.assets if 
-                             asset["income_type"] in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"]
-                             and asset.get("current_asset_balance", 0) > 0]
-            
-            if not eligible_assets:
-                self._log_debug(f"Year {year} - No eligible assets for Roth conversion")
-                return Decimal('0')
-            
-            total_eligible_balance = sum(Decimal(str(asset.get("current_asset_balance", 0))) for asset in eligible_assets)
-            
-            if total_eligible_balance == 0:
-                self._log_debug(f"Year {year} - Total eligible balance is 0, no conversion possible")
-                return Decimal('0')
-            
-            # Store conversion amounts for each asset (will be applied later)
-            for asset in eligible_assets:
-                asset_balance = Decimal(str(asset.get("current_asset_balance", 0)))
-                depletion_ratio = asset_balance / total_eligible_balance
-                asset_conversion_amount = roth_conversion_annual_amount * depletion_ratio
-                # Store but don't apply yet
-                asset["pending_roth_conversion"] = min(asset_conversion_amount, asset_balance)
-                self._log_debug(f"Year {year} - Asset {asset.get('income_name', 'Unknown')} balance: ${asset_balance:,.2f}, pending conversion: ${asset['pending_roth_conversion']:,.2f}")
-            
-            # Return total conversion amount for tax calculations
-            return roth_conversion_annual_amount
-        else:
-            # Clear any pending conversions outside conversion window
-            for asset in self.assets:
-                asset["pending_roth_conversion"] = Decimal('0')
-            return Decimal('0')
+        # ORIGINAL CODE DISABLED - Keeping for reference:
+        # roth_conversion_start_year = getattr(self.scenario, 'roth_conversion_start_year', None)
+        # roth_conversion_duration = getattr(self.scenario, 'roth_conversion_duration', None)
+        # roth_conversion_annual_amount = getattr(self.scenario, 'roth_conversion_annual_amount', 0)
+        #
+        # # Debug logging
+        # self._log_debug(f"Year {year} - Roth conversion check: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}, annual_amount={roth_conversion_annual_amount}")
+        #
+        # # Convert to Decimal if it's not already
+        # if not isinstance(roth_conversion_annual_amount, Decimal):
+        #     try:
+        #         roth_conversion_annual_amount = Decimal(str(roth_conversion_annual_amount))
+        #     except:
+        #         roth_conversion_annual_amount = Decimal('0')
+        #
+        # # Add error handling for None values
+        # if roth_conversion_start_year is None or roth_conversion_duration is None:
+        #     self._log_debug(f"Roth conversion parameters are not set: start_year={roth_conversion_start_year}, duration={roth_conversion_duration}")
+        #     return Decimal('0')
+        #
+        # if year >= roth_conversion_start_year and year < roth_conversion_start_year + roth_conversion_duration:
+        #     # Calculate pro-rata distribution WITHOUT modifying balances
+        #     eligible_assets = [asset for asset in self.assets if
+        #                      asset["income_type"] in ["Qualified", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"]
+        #                      and asset.get("current_asset_balance", 0) > 0]
+        #
+        #     if not eligible_assets:
+        #         self._log_debug(f"Year {year} - No eligible assets for Roth conversion")
+        #         return Decimal('0')
+        #
+        #     total_eligible_balance = sum(Decimal(str(asset.get("current_asset_balance", 0))) for asset in eligible_assets)
+        #
+        #     if total_eligible_balance == 0:
+        #         self._log_debug(f"Year {year} - Total eligible balance is 0, no conversion possible")
+        #         return Decimal('0')
+        #
+        #     # Store conversion amounts for each asset (will be applied later)
+        #     for asset in eligible_assets:
+        #         asset_balance = Decimal(str(asset.get("current_asset_balance", 0)))
+        #         depletion_ratio = asset_balance / total_eligible_balance
+        #         asset_conversion_amount = roth_conversion_annual_amount * depletion_ratio
+        #         # Store but don't apply yet
+        #         asset["pending_roth_conversion"] = min(asset_conversion_amount, asset_balance)
+        #         self._log_debug(f"Year {year} - Asset {asset.get('income_name', 'Unknown')} balance: ${asset_balance:,.2f}, pending conversion: ${asset['pending_roth_conversion']:,.2f}")
+        #
+        #     # Return total conversion amount for tax calculations
+        #     return roth_conversion_annual_amount
+        # else:
+        #     # Clear any pending conversions outside conversion window
+        #     for asset in self.assets:
+        #         asset["pending_roth_conversion"] = Decimal('0')
+        #     return Decimal('0')
 
     def _calculate_asset_spend_down(self, year):
         """
