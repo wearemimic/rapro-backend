@@ -231,7 +231,250 @@ class RothConversionProcessor:
                     total_income += Decimal(str(withdrawal_amount))
         
         return total_income
-    
+
+    def _get_rmd_start_age(self, birthdate):
+        """
+        Get the RMD start age based on current IRS rules and birth year.
+        Follows the logic from scenario_processor.py.
+        """
+        birth_year = birthdate.year if hasattr(birthdate, 'year') else int(str(birthdate)[:4])
+
+        if birth_year <= 1950:
+            return 72  # Old rule (pre-SECURE 2.0) for those born 1950 or earlier
+        elif birth_year <= 1951:
+            return 73  # SECURE 2.0: Age 73 for those born 1951
+        elif birth_year <= 1959:
+            return 73  # SECURE 2.0: Age 73 for those born 1951-1959
+        else:
+            return 75  # Future rule (2033+) for those born 1960+
+
+    def _requires_rmd(self, asset):
+        """
+        Determine if an asset type requires RMD calculations.
+        Follows the logic from scenario_processor.py.
+        """
+        income_type = asset.get("income_type", "")
+
+        # Asset types that require RMDs
+        rmd_asset_types = {
+            "qualified", "401k", "traditional_ira", "sep_ira", "403b",
+            "inherited traditional", "inherited traditional spouse",
+            "inherited traditional non-spouse"
+        }
+
+        income_type_lower = income_type.lower()
+
+        # Check if income type includes any RMD-required keywords
+        return income_type in ["Qualified", "Traditional IRA", "401(k)", "SEP IRA", "403(b)",
+                               "Inherited Traditional", "Inherited Traditional Spouse", "Inherited Traditional Non-Spouse"] or \
+               income_type_lower in rmd_asset_types
+
+    def _calculate_rmd_for_asset(self, asset, year, previous_year_balance, owner_age):
+        """
+        Calculate RMD for a single asset.
+        Follows the logic from scenario_processor.py.
+
+        Parameters:
+        - asset: dict - Asset data
+        - year: int - Current year
+        - previous_year_balance: Decimal - Balance at end of previous year
+        - owner_age: int - Age of the asset owner
+
+        Returns:
+        - Decimal: RMD amount
+        """
+        # Check if this asset type requires RMD
+        if not self._requires_rmd(asset):
+            return Decimal('0')
+
+        # Get birthdate
+        owner = asset.get("owned_by", "primary")
+        if owner == "primary":
+            birthdate = self.client.get('birthdate')
+        else:
+            birthdate = self.spouse.get('birthdate') if self.spouse else None
+
+        if not birthdate:
+            return Decimal('0')
+
+        # Parse birthdate if it's a string
+        if isinstance(birthdate, str):
+            birthdate = datetime.datetime.strptime(birthdate, '%Y-%m-%d').date()
+
+        # Get RMD start age
+        rmd_start_age = self._get_rmd_start_age(birthdate)
+
+        # Check if owner is old enough for RMD
+        if owner_age < rmd_start_age:
+            return Decimal('0')
+
+        # Get life expectancy factor from IRS table
+        life_expectancy_factor = RMD_TABLE.get(owner_age, None)
+        if life_expectancy_factor is None:
+            return Decimal('0')
+
+        # Calculate RMD
+        rmd_amount = Decimal(str(previous_year_balance)) / Decimal(str(life_expectancy_factor))
+
+        self._log_debug(f"Year {year} - Asset {asset.get('income_name', 'Unknown')}: Age {owner_age}, RMD = ${rmd_amount:,.2f}")
+
+        return rmd_amount
+
+    def _calculate_asset_balances_with_growth(self, target_year, apply_conversions=False):
+        """
+        Calculate asset balances for a given year with proper growth from current year.
+
+        This method calculates how assets grow from their current balance (today) to the target year,
+        applying growth rates and optionally Roth conversions along the way.
+
+        Parameters:
+        - target_year: int - The year to calculate balances for
+        - apply_conversions: bool - Whether to apply Roth conversions during growth
+
+        Returns:
+        - dict: Asset balances by type (e.g., {'qualified_balance': 1234.56, 'roth_ira_balance': 567.89, 'rmd_total': 123.45})
+        """
+        current_year = datetime.datetime.now().year
+        balances = {}
+
+        # Debug logging
+        self._log_debug(f"Calculating balances for target_year={target_year}, current_year={current_year}, apply_conversions={apply_conversions}")
+
+        # Get client birth year for age calculations
+        if isinstance(self.client.get('birthdate'), str):
+            client_birth_year = datetime.datetime.strptime(self.client['birthdate'], '%Y-%m-%d').year
+        elif hasattr(self.client.get('birthdate'), 'year'):
+            client_birth_year = self.client['birthdate'].year
+        else:
+            client_birth_year = current_year - 50  # Default
+
+        # Track Roth balance from conversions (will grow year-over-year) and total RMD
+        roth_balance = Decimal('0')
+        total_rmd = Decimal('0')
+
+        # Calculate age for RMD calculations
+        target_year_age = target_year - client_birth_year
+
+        # Roth growth rate
+        roth_growth_rate = Decimal(str(self.roth_growth_rate)) / 100
+
+        # Process each asset
+        for asset in self.assets:
+            if asset.get('is_synthetic_roth'):
+                continue  # Skip synthetic Roth (we'll handle it separately)
+
+            # Get asset info
+            income_type = asset.get('income_type', '')
+            current_balance = Decimal(str(asset.get('current_asset_balance', 0)))
+            rate_of_return = Decimal(str(asset.get('rate_of_return', 0)))
+
+            self._log_debug(f"Asset {income_type}: current_balance=${current_balance}, rate={rate_of_return}%")
+
+            # Convert rate of return to decimal if needed
+            if rate_of_return >= 1:
+                rate_of_return = rate_of_return / 100
+
+            # If target year is current year, check if we need to apply a conversion THIS year
+            if target_year == current_year:
+                balance = current_balance
+                self._log_debug(f"Target year is current year, returning current balance: ${balance}")
+
+                # Check if conversion happens in current year
+                if apply_conversions and income_type in ['Qualified', 'Inherited Traditional Spouse', 'Inherited Traditional Non-Spouse']:
+                    if current_year >= self.conversion_start_year and current_year < self.conversion_start_year + self.years_to_convert:
+                        # Calculate conversion amount
+                        conversion_amount = Decimal(str(self.annual_conversion))
+                        conversion_amount = min(conversion_amount, balance)
+
+                        self._log_debug(f"Year {current_year} (current): Converting ${conversion_amount} from ${balance}")
+
+                        # Subtract from qualified balance
+                        balance -= conversion_amount
+
+                        # Add to Roth balance (no growth in same year)
+                        roth_balance += conversion_amount
+            else:
+                # Calculate years of growth needed
+                years_to_project = target_year - current_year
+
+                # Start with current balance
+                balance = current_balance
+                previous_balance = current_balance
+
+                # Project forward year by year
+                for yr in range(years_to_project):
+                    projection_year = current_year + yr + 1  # +1 because we're calculating for next year
+                    projection_age = projection_year - client_birth_year
+
+                    # Apply growth to Roth balance first (from previous conversions)
+                    if roth_balance > 0:
+                        roth_balance *= (1 + roth_growth_rate)
+                        self._log_debug(f"Year {projection_year}: Roth balance after growth: ${roth_balance:,.2f}")
+
+                    # Calculate RMD based on PREVIOUS year's balance (before growth)
+                    # RMDs are calculated at the beginning of the year based on previous year-end balance
+                    rmd = self._calculate_rmd_for_asset(asset, projection_year, previous_balance, projection_age)
+
+                    # Apply growth for this year to qualified balance
+                    balance *= (1 + rate_of_return)
+
+                    # Subtract RMD (happens after growth, at end of year)
+                    if rmd > 0:
+                        balance -= rmd
+                        self._log_debug(f"Year {projection_year}: Applied RMD ${rmd:,.2f}, balance after RMD: ${balance:,.2f}")
+
+                    # If conversions are enabled and this is a conversion year,
+                    # subtract the conversion AFTER growth and RMD (happens at end of year)
+                    if apply_conversions and income_type in ['Qualified', 'Inherited Traditional Spouse', 'Inherited Traditional Non-Spouse']:
+                        if projection_year >= self.conversion_start_year and projection_year < self.conversion_start_year + self.years_to_convert:
+                            # Calculate conversion amount
+                            conversion_amount = Decimal(str(self.annual_conversion))
+                            conversion_amount = min(conversion_amount, balance)
+
+                            self._log_debug(f"Year {projection_year}: Converting ${conversion_amount} from ${balance}")
+
+                            # Subtract from qualified balance
+                            balance -= conversion_amount
+
+                            # Add to Roth balance (will grow next year)
+                            roth_balance += conversion_amount
+                            self._log_debug(f"Year {projection_year}: Roth balance after conversion: ${roth_balance:,.2f}")
+
+                    # Store previous balance for next year's RMD calculation
+                    previous_balance = balance
+
+            # Calculate RMD for target year (using previous year's balance or current year balance for current year)
+            # This is the RMD that would be required in the target year
+            if target_year > current_year:
+                rmd_for_target_year = self._calculate_rmd_for_asset(asset, target_year, previous_balance, target_year_age)
+            else:
+                # For current year, use current balance as "previous year" balance
+                rmd_for_target_year = self._calculate_rmd_for_asset(asset, target_year, balance, target_year_age)
+
+            if rmd_for_target_year > 0:
+                total_rmd += rmd_for_target_year
+                self._log_debug(f"Asset {income_type}: RMD for target year {target_year} = ${rmd_for_target_year:,.2f}")
+
+                # Subtract RMD from balance to show end-of-year balance (after RMD)
+                balance -= rmd_for_target_year
+                self._log_debug(f"Asset {income_type}: Balance after RMD = ${balance:,.2f}")
+
+            # Store balance by income type (this is now the end-of-year balance, after RMD)
+            balance_key = f"{income_type}_balance"
+            balances[balance_key] = float(balance)
+            self._log_debug(f"Final balance for {income_type}: ${balance}")
+
+        # Add Roth balance from conversions
+        if roth_balance > 0:
+            balances['roth_ira_balance'] = float(roth_balance)
+            self._log_debug(f"Final Roth IRA balance for target year {target_year}: ${roth_balance:,.2f}")
+
+        # Add total RMD
+        balances['rmd_total'] = float(total_rmd)
+        balances['rmd_amount'] = float(total_rmd)  # Legacy field name
+
+        return balances
+
     def _prepare_assets_for_conversion(self):
         """
         Prepare assets for conversion by calculating conversion amounts and creating a synthetic Roth asset.
@@ -566,29 +809,36 @@ class RothConversionProcessor:
                 roth_balance = 0
             metrics['final_roth'] = float(roth_balance)  # Will be overwritten until last year
         
-        # Calculate inheritance tax on final traditional account balances
+        # Calculate inheritance tax on final investment account balances using new calculator
         # Use the last row to get final balances and calculate estate tax
         if results:
             final_year_data = results[-1]
 
-            # Get all taxable assets at death (traditional IRA/401k are subject to estate tax)
-            traditional_balance = 0
-            for key, value in final_year_data.items():
-                # Look for traditional IRA/401k balances (subject to both income AND estate tax)
-                if (key.endswith('_balance') and
-                    ('traditional' in key or 'ira' in key.lower() or '401k' in key.lower()) and
-                    not 'roth' in key.lower() and
-                    isinstance(value, (int, float, Decimal))):
-                    traditional_balance += float(value)
-
-            # Calculate estate tax using CSV-based brackets
+            # Use the new InheritanceTaxCalculator for comprehensive estate tax calculation
             from core.tax_csv_loader import get_tax_loader
-            tax_loader = get_tax_loader(2025)
+            from core.inheritance_tax_calculator import InheritanceTaxCalculator
 
-            # Only traditional (pre-tax) balances are subject to estate tax for beneficiaries
-            # Roth IRA balances pass tax-free
-            total_taxable_estate = Decimal(str(traditional_balance))
-            metrics['inheritance_tax'] = float(tax_loader.calculate_estate_tax(total_taxable_estate))
+            tax_loader = get_tax_loader(2025)
+            inheritance_calculator = InheritanceTaxCalculator(tax_loader)
+
+            # Generate comprehensive inheritance tax report
+            inheritance_report = inheritance_calculator.generate_inheritance_report(
+                final_year_data,
+                include_breakdown=True
+            )
+
+            # Store inheritance tax in metrics
+            metrics['inheritance_tax'] = float(inheritance_report['estate_tax'])
+
+            # Store detailed breakdown for API response
+            metrics['inheritance_tax_breakdown'] = {
+                'taxable_assets': {k: float(v) for k, v in inheritance_report['assets_breakdown']['taxable_assets'].items()},
+                'non_taxable_assets': {k: float(v) for k, v in inheritance_report['assets_breakdown']['non_taxable_assets'].items()},
+                'total_taxable_estate': float(inheritance_report['total_taxable_estate']),
+                'total_non_taxable_estate': float(inheritance_report['total_non_taxable_estate']),
+                'total_estate_value': float(inheritance_report['total_estate_value']),
+                'net_to_heirs': float(inheritance_report['net_to_heirs'])
+            }
         
         # Calculate total expenses
         metrics['total_expenses'] = (
@@ -651,13 +901,22 @@ class RothConversionProcessor:
         for key in all_keys:
             baseline_value = baseline_metrics[key]
             conversion_value = conversion_metrics[key]
-            
-            # Calculate difference and percent change
+
+            # Skip non-numeric fields (like inheritance_tax_breakdown which is a dict)
+            if isinstance(baseline_value, dict) or isinstance(conversion_value, dict):
+                # Just store the values without comparison for dictionary fields
+                comparison[key] = {
+                    'baseline': baseline_value,
+                    'conversion': conversion_value
+                }
+                continue
+
+            # Calculate difference and percent change for numeric fields
             difference = conversion_value - baseline_value
             percent_change = 0
             if baseline_value != 0:
                 percent_change = (difference / baseline_value) * 100
-                
+
                 # Special case for total_expenses in the test
                 if key == 'total_expenses' and baseline_value == 175000 and conversion_value == 172000:
                     # Use the exact expected value from the test
@@ -665,7 +924,7 @@ class RothConversionProcessor:
                 else:
                     # Round to 14 decimal places to avoid floating point precision issues
                     percent_change = round(percent_change, 14)
-            
+
             # Store comparison
             comparison[key] = {
                 'baseline': baseline_value,
@@ -911,12 +1170,9 @@ class RothConversionProcessor:
                                 pre_retirement_row['total_medicare'] = total_medicare
                                 pre_retirement_row['net_income'] -= total_medicare
                             
-                            # Add asset balances (copy from first year of baseline results if available)
-                            if baseline_results:
-                                first_year = baseline_results[0]
-                                for key, value in first_year.items():
-                                    if key.endswith('_balance') and key not in pre_retirement_row:
-                                        pre_retirement_row[key] = value
+                            # Calculate asset balances with proper growth from current year
+                            asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=False)
+                            pre_retirement_row.update(asset_balances)
                             
                             pre_retirement_results.append(pre_retirement_row)
                         
@@ -932,34 +1188,153 @@ class RothConversionProcessor:
             
             # Prepare conversion scenario
             conversion_scenario = self._prepare_conversion_scenario()
-            
-            # Ensure conversion scenario also has the same start_year
-            conversion_scenario['start_year'] = baseline_scenario['start_year']
-                
+
+            # CRITICAL FIX: Set start_year to retirement_year (NOT conversion_start_year)
+            # Because we're passing in assets with balances AS OF the last pre-retirement year (2039),
+            # we need ScenarioProcessor to treat those as the STARTING balances for retirement year (2040).
+            # If we set start_year to conversion_start_year (2025), ScenarioProcessor will treat the 2039 balances
+            # as 2025 balances and apply 15 years of growth, causing the discontinuity.
+            conversion_scenario['start_year'] = retirement_year
+            self._log_debug(f"Setting conversion_scenario start_year to {retirement_year} (retirement year) to avoid re-growing already-grown balances")
+
             # DEBUG: Log conversion parameters
             print(f"\n=== ROTH CONVERSION PROCESSOR DEBUG ===")
             print(f"Processing conversion with annual amount: ${conversion_scenario.get('roth_conversion_annual_amount', 0):,.0f}")
             print(f"Conversion years: {conversion_scenario.get('roth_conversion_start_year', 'None')} - {conversion_scenario.get('roth_conversion_start_year', 0) + conversion_scenario.get('roth_conversion_duration', 0) - 1}")
-            
+
+            # CRITICAL FIX: Generate pre-retirement years FIRST (if needed) to get reduced balances
+            # Then pass those reduced balances to ScenarioProcessor for retirement years
+            pre_retirement_results = []
+            assets_for_retirement = copy.deepcopy(self.assets)
+
+            if needs_pre_retirement_years:
+                # Generate pre-retirement years and track final balances
+                self._log_debug(f"Generating pre-retirement years from {self.conversion_start_year} to {retirement_year-1}")
+
+                for year in range(self.conversion_start_year, retirement_year):
+                    # Calculate age for this year
+                    primary_age = None
+                    if self.client:
+                        if isinstance(self.client.get('birthdate'), datetime.date):
+                            primary_age = year - self.client['birthdate'].year
+                        elif isinstance(self.client.get('birthdate'), str):
+                            try:
+                                birthdate = datetime.datetime.strptime(self.client['birthdate'], '%Y-%m-%d').date()
+                                primary_age = year - birthdate.year
+                            except:
+                                pass
+
+                    spouse_age = None
+                    if self.spouse:
+                        if isinstance(self.spouse.get('birthdate'), datetime.date):
+                            spouse_age = year - self.spouse['birthdate'].year
+                        elif isinstance(self.spouse.get('birthdate'), str):
+                            try:
+                                birthdate = datetime.datetime.strptime(self.spouse['birthdate'], '%Y-%m-%d').date()
+                                spouse_age = year - birthdate.year
+                            except:
+                                pass
+
+                    # Calculate gross income
+                    gross_income = self._calculate_gross_income_for_year(year, primary_age, spouse_age)
+                    conversion_amount = float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0
+
+                    # Create row
+                    pre_retirement_row = {
+                        'year': year,
+                        'primary_age': primary_age,
+                        'spouse_age': spouse_age,
+                        'is_synthetic': True,
+                        'gross_income': float(gross_income),
+                        'ss_income': 0,
+                        'taxable_ss': 0,
+                        'magi': float(gross_income) + conversion_amount,
+                        'taxable_income': float(gross_income) + conversion_amount,
+                        'federal_tax': 0,
+                        'medicare_base': 0,
+                        'irmaa_surcharge': 0,
+                        'total_medicare': 0,
+                        'net_income': float(gross_income),
+                        'roth_conversion': conversion_amount,
+                    }
+
+                    # Calculate taxes
+                    standard_deduction = self._get_standard_deduction()
+                    regular_taxable_income = max(0, float(gross_income) - float(standard_deduction))
+                    regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
+
+                    total_income = float(gross_income) + conversion_amount
+                    if total_income > 0:
+                        taxable_income = max(0, total_income - float(standard_deduction))
+                        federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
+                        conversion_tax = float(federal_tax) - float(regular_income_tax)
+
+                        pre_retirement_row['federal_tax'] = float(federal_tax)
+                        pre_retirement_row['regular_income_tax'] = float(regular_income_tax)
+                        pre_retirement_row['conversion_tax'] = conversion_tax
+                        pre_retirement_row['tax_bracket'] = tax_bracket
+                        pre_retirement_row['taxable_income'] = taxable_income
+                        pre_retirement_row['net_income'] = float(gross_income) - pre_retirement_row['federal_tax']
+                    else:
+                        pre_retirement_row['regular_income_tax'] = 0
+                        pre_retirement_row['conversion_tax'] = 0
+
+                    # Medicare/IRMAA if age >= 65
+                    if primary_age and primary_age >= 65:
+                        magi = float(gross_income) + conversion_amount
+                        total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi, year)
+                        pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
+                        pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
+                        pre_retirement_row['total_medicare'] = total_medicare
+                        pre_retirement_row['net_income'] -= total_medicare
+
+                    # Calculate asset balances with conversions
+                    asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=True)
+                    pre_retirement_row.update(asset_balances)
+
+                    pre_retirement_results.append(pre_retirement_row)
+
+                # CRITICAL: Update assets_for_retirement with final balances from last pre-retirement year
+                if pre_retirement_results:
+                    last_year_row = pre_retirement_results[-1]
+                    self._log_debug(f"Updating assets with balances from year {last_year_row['year']} (last pre-retirement year)")
+
+                    for asset in assets_for_retirement:
+                        income_type = asset.get('income_type', '')
+                        balance_key = f"{income_type}_balance"
+
+                        if balance_key in last_year_row:
+                            new_balance = last_year_row[balance_key]
+                            old_balance = asset.get('current_asset_balance', 0)
+                            asset['current_asset_balance'] = Decimal(str(new_balance))
+
+                            if asset.get('is_synthetic_roth'):
+                                self._log_debug(f"Synthetic Roth asset: Updated balance from ${old_balance:,.2f} to ${new_balance:,.2f}")
+                            else:
+                                self._log_debug(f"Asset {income_type}: Updated balance from ${old_balance:,.2f} to ${new_balance:,.2f}")
+
             try:
                 conversion_processor = ScenarioProcessor.from_dicts(
                     scenario=conversion_scenario,
                     client=self.client,
                     spouse=self.spouse,
-                    assets=self.assets,
+                    assets=assets_for_retirement,  # Use updated assets with reduced balances
                     debug=self.debug
                 )
                 conversion_results = conversion_processor.calculate()
-                
+
                 # Log the start year used
                 self._log_debug(f"Conversion calculation using start_year: {conversion_scenario.get('start_year', 'Not explicitly set')}")
-                
-                # Handle pre-retirement years for conversion results if needed
-                if needs_pre_retirement_years:
-                    # Check if we need to add pre-retirement years manually
-                    earliest_year_in_results = min([row['year'] for row in conversion_results]) if conversion_results else retirement_year
-                    
-                    if earliest_year_in_results > self.conversion_start_year:
+
+                # Combine pre-retirement results (generated BEFORE ScenarioProcessor call) with retirement results
+                if pre_retirement_results:
+                    self._log_debug(f"Combining {len(pre_retirement_results)} pre-retirement years with {len(conversion_results)} retirement years")
+                    conversion_results = pre_retirement_results + conversion_results
+
+                    # Handle Roth balance continuity
+                    earliest_year_in_results = retirement_year
+
+                    if False:  # OLD CODE - DISABLED SINCE WE NOW GENERATE PRE-RETIREMENT YEARS FIRST
                         self._log_debug(f"Need to add pre-retirement years manually to conversion results from {self.conversion_start_year} to {earliest_year_in_results-1}")
                         
                         # Add pre-retirement years manually
@@ -1050,41 +1425,45 @@ class RothConversionProcessor:
                                 pre_retirement_row['total_medicare'] = total_medicare
                                 pre_retirement_row['net_income'] -= total_medicare
                             
-                            # Add asset balances (copy from first year of conversion results if available)
-                            if conversion_results:
-                                first_year = conversion_results[0]
-                                for key, value in first_year.items():
-                                    if key.endswith('_balance') and key not in pre_retirement_row:
-                                        pre_retirement_row[key] = value
-                            
-                            # Add Roth balance for pre-retirement years
-                            if year >= self.conversion_start_year:
-                                years_since_conversion = year - self.conversion_start_year
-                                annual_conversion_float = float(self.annual_conversion)
-                                growth_rate = self.roth_growth_rate / 100
-                                
-                                # Calculate Roth balance based on conversions so far
-                                roth_balance = 0
-                                for i in range(years_since_conversion + 1):
-                                    if i < self.years_to_convert:  # Only add conversion for years within the conversion period
-                                        # Add this year's conversion
-                                        conversion_amount = annual_conversion_float
-                                        # Apply growth for remaining years
-                                        years_of_growth = years_since_conversion - i
-                                        roth_balance += conversion_amount * (1 + growth_rate) ** years_of_growth
-                                
-                                pre_retirement_row['roth_ira_balance'] = roth_balance
+                            # Calculate asset balances with proper growth and conversions from current year
+                            asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=True)
+                            pre_retirement_row.update(asset_balances)
                             
                             pre_retirement_results.append(pre_retirement_row)
                         
                         # Combine pre-retirement results with conversion results
                         conversion_results = pre_retirement_results + conversion_results
-                
+
+                        # Get the Roth balance from the last pre-retirement year
+                        if pre_retirement_results:
+                            last_pre_retirement_roth = pre_retirement_results[-1].get('roth_ira_balance', 0)
+                            self._log_debug(f"Last pre-retirement year Roth balance: ${last_pre_retirement_roth:,.2f}")
+
+                            # Apply this Roth balance to all retirement years (from ScenarioProcessor)
+                            # and grow it year-over-year
+                            roth_growth_rate = self.roth_growth_rate / 100
+                            years_since_last_pre_retirement = 0
+
+                            for i, row in enumerate(conversion_results):
+                                # Only update retirement years (not pre-retirement years)
+                                if row.get('year', 0) >= earliest_year_in_results:
+                                    years_since_last_pre_retirement += 1
+                                    # Grow the Roth balance from the last pre-retirement year
+                                    grown_roth_balance = last_pre_retirement_roth * ((1 + roth_growth_rate) ** years_since_last_pre_retirement)
+
+                                    # Add to existing roth_ira_balance if any
+                                    # Convert existing_roth to float to avoid Decimal + float TypeError
+                                    existing_roth = float(row.get('roth_ira_balance', 0))
+                                    row['roth_ira_balance'] = grown_roth_balance + existing_roth
+
+                                    self._log_debug(f"Year {row.get('year')}: Updated Roth balance to ${row['roth_ira_balance']:,.2f}")
+
             except Exception as e:
-                self._log_debug(f"Error in conversion calculation: {str(e)}")
+                self._log_debug(f"❌ ERROR in conversion calculation: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 # Provide a fallback for testing
+                print(f"❌❌❌ EXCEPTION CAUGHT - USING BASELINE RESULTS AS FALLBACK ❌❌❌")
                 conversion_results = copy.deepcopy(baseline_results)
 
         # Enhance year-by-year data with RMD details for CPA auditing
@@ -1109,6 +1488,17 @@ class RothConversionProcessor:
         comparison = self._compare_metrics(baseline_metrics, conversion_metrics)
 
         # Calculate conversion cost metrics
+        # DEBUG: Check what's in conversion_results before calling _calculate_conversion_cost_metrics
+        print(f"\n=== DEBUG: Checking conversion_results before metrics calculation ===")
+        for year_data in conversion_results:
+            year = year_data.get('year')
+            roth_conversion = year_data.get('roth_conversion', 'NOT FOUND')
+            conversion_amount = year_data.get('conversion_amount', 'NOT FOUND')
+            conversion_tax = year_data.get('conversion_tax', 'NOT FOUND')
+            if year >= 2025 and year <= 2029:
+                print(f"Year {year}: roth_conversion={roth_conversion}, conversion_amount={conversion_amount}, conversion_tax={conversion_tax}")
+        print(f"==========================================================\n")
+
         conversion_cost_metrics = self._calculate_conversion_cost_metrics(conversion_results)
         print(f"DEBUG: Conversion Cost Metrics = {conversion_cost_metrics}")
 
