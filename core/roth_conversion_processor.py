@@ -850,14 +850,225 @@ class RothConversionProcessor:
         
         return metrics
     
+    def _transform_to_comprehensive_format(self, year_by_year_results, scenario_name="Roth Conversion"):
+        """
+        Transform year-by-year results into comprehensive format matching
+        /api/scenarios/{id}/comprehensive-summary/ structure.
+
+        This creates a comprehensive view with:
+        - Structured income_by_source
+        - Structured asset_balances
+        - Detailed tax breakdowns
+        - Medicare/IRMAA details
+        - Conversion-specific fields
+
+        Parameters:
+        - year_by_year_results: List[Dict] - Year-by-year results with all calculated fields
+        - scenario_name: str - Name for this scenario
+
+        Returns:
+        - dict - Comprehensive format matching ComprehensiveFinancialTable structure
+        """
+        if not year_by_year_results:
+            return {
+                'scenario_name': scenario_name,
+                'years': [],
+                'income_source_names': {},
+                'asset_names': {}
+            }
+
+        # Extract unique income sources and assets from the data
+        income_source_names = {}
+        asset_names = {}
+
+        # Analyze first row to determine what sources/assets exist
+        first_row = year_by_year_results[0]
+
+        # Map common income/asset types to display names
+        type_to_name_map = {
+            'social_security': 'Social Security',
+            'pension': 'Pension',
+            'wages': 'Wages',
+            'rental_income': 'Rental Income',
+            'other': 'Other Income',
+            'qualified': 'Traditional IRA',
+            'traditional_ira': 'Traditional IRA',
+            '401k': '401(k)',
+            'roth_ira': 'Roth IRA',
+            'taxable': 'Taxable Account',
+            'hsa': 'HSA',
+            'inherited_traditional': 'Inherited Traditional IRA',
+            'inherited_traditional_spouse': 'Inherited Traditional (Spouse)',
+            'inherited_traditional_non_spouse': 'Inherited Traditional (Non-Spouse)'
+        }
+
+        # Build mappings from assets
+        for asset in self.assets:
+            asset_type = asset.get('income_type', '').lower()
+            asset_id = str(asset.get('id', asset_type))
+            display_name = asset.get('income_name') or type_to_name_map.get(asset_type, asset_type.replace('_', ' ').title())
+
+            # Add to income source names
+            income_source_names[asset_id] = display_name
+
+            # Add to asset names if it has a balance
+            if asset.get('current_asset_balance', 0) > 0:
+                asset_names[asset_id] = display_name
+
+        # Ensure conversion_results have all required comprehensive fields
+        comprehensive_years = []
+        for row in year_by_year_results:
+            enhanced_row = dict(row)
+
+            # Ensure conversion-specific fields exist
+            if 'roth_conversion' not in enhanced_row:
+                enhanced_row['roth_conversion'] = 0
+            if 'conversion_tax' not in enhanced_row:
+                enhanced_row['conversion_tax'] = 0
+            if 'regular_income_tax' not in enhanced_row:
+                enhanced_row['regular_income_tax'] = enhanced_row.get('federal_tax', 0)
+
+            # Ensure all standard fields exist with defaults
+            field_defaults = {
+                'year': 0,
+                'primary_age': 0,
+                'spouse_age': None,
+                'gross_income': 0,
+                'pre_retirement_income': 0,  # Pre-retirement income (e.g., salary/wages before retirement)
+                'ss_income': 0,
+                'taxable_ss': 0,
+                'magi': 0,
+                'taxable_income': 0,
+                'federal_tax': 0,
+                'state_tax': 0,
+                'tax_bracket': '',
+                'marginal_rate': 0,
+                'effective_rate': 0,
+                'medicare_base': 0,
+                'irmaa_surcharge': 0,
+                'total_medicare': 0,
+                'part_b': 0,
+                'part_d': 0,
+                'irmaa_bracket_number': 0,
+                'irmaa_threshold': 0,
+                'irmaa_bracket_threshold': 0,
+                'net_income': 0,
+                'rmd_amount': 0
+            }
+
+            for field, default in field_defaults.items():
+                if field not in enhanced_row:
+                    enhanced_row[field] = default
+
+            # Calculate effective rate if not present
+            if enhanced_row['effective_rate'] == 0 and enhanced_row['gross_income'] > 0:
+                enhanced_row['effective_rate'] = (enhanced_row['federal_tax'] / enhanced_row['gross_income']) * 100
+
+            # Extract marginal rate from tax_bracket if present
+            if enhanced_row['marginal_rate'] == 0 and enhanced_row.get('tax_bracket'):
+                # Try to extract percentage from bracket string like "22% - $89,075 to $170,050"
+                import re
+                match = re.match(r'(\d+(?:\.\d+)?)%', enhanced_row['tax_bracket'])
+                if match:
+                    enhanced_row['marginal_rate'] = float(match.group(1))
+
+            # Split Medicare costs if not already split
+            if enhanced_row['part_b'] == 0 and enhanced_row['medicare_base'] > 0:
+                # Approximate split: Part B is ~72% of base cost, Part D is ~28%
+                enhanced_row['part_b'] = enhanced_row['medicare_base'] * 0.72
+                enhanced_row['part_d'] = enhanced_row['medicare_base'] * 0.28
+
+            # Build income_by_source structure from flat fields
+            income_by_source = {}
+            for asset in self.assets:
+                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_type = asset.get('income_type', '').lower()
+
+                # Look for income fields in the row
+                # Check various possible field names
+                income_value = 0
+                if f"{asset_type}_income" in enhanced_row:
+                    income_value = enhanced_row[f"{asset_type}_income"]
+                elif f"{asset_id}_income" in enhanced_row:
+                    income_value = enhanced_row[f"{asset_id}_income"]
+                elif asset_type == 'social_security' and 'ss_income' in enhanced_row:
+                    income_value = enhanced_row['ss_income']
+
+                if income_value:
+                    income_by_source[asset_id] = float(income_value)
+
+            enhanced_row['income_by_source'] = income_by_source
+
+            # Build asset_balances structure from flat fields
+            asset_balances_dict = {}
+            for asset in self.assets:
+                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_type = asset.get('income_type', '').lower()
+
+                # Look for balance fields in the row
+                balance_value = 0
+                if f"{asset_type}_balance" in enhanced_row:
+                    balance_value = enhanced_row[f"{asset_type}_balance"]
+                elif f"{asset_id}_balance" in enhanced_row:
+                    balance_value = enhanced_row[f"{asset_id}_balance"]
+
+                if balance_value or asset.get('current_asset_balance', 0) > 0:
+                    asset_balances_dict[asset_id] = float(balance_value)
+
+            enhanced_row['asset_balances'] = asset_balances_dict
+
+            # Build RMD required structure (detailed RMDs by asset)
+            rmd_required = {}
+            for asset in self.assets:
+                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_type = asset.get('income_type', '').lower()
+
+                # Look for RMD fields
+                rmd_value = 0
+                if f"{asset_type}_rmd" in enhanced_row:
+                    rmd_value = enhanced_row[f"{asset_type}_rmd"]
+                elif f"{asset_id}_rmd" in enhanced_row:
+                    rmd_value = enhanced_row[f"{asset_id}_rmd"]
+
+                if rmd_value:
+                    rmd_required[asset_id] = float(rmd_value)
+
+            if rmd_required:
+                enhanced_row['rmd_required'] = rmd_required
+
+            comprehensive_years.append(enhanced_row)
+
+        # Build comprehensive response
+        response = {
+            'scenario_name': scenario_name,
+            'client_name': f"{self.client.get('first_name', '')} {self.client.get('last_name', '')}".strip(),
+            'retirement_age': self.scenario.get('retirement_age', 65),
+            'mortality_age': self.scenario.get('mortality_age', 90),
+            'years': comprehensive_years,
+            'income_source_names': income_source_names,
+            'asset_names': asset_names
+        }
+
+        # Add summary metadata
+        if comprehensive_years:
+            response['summary'] = {
+                'total_years': len(comprehensive_years),
+                'start_year': comprehensive_years[0].get('year'),
+                'end_year': comprehensive_years[-1].get('year'),
+                'start_age': comprehensive_years[0].get('primary_age'),
+                'end_age': comprehensive_years[-1].get('primary_age'),
+            }
+
+        return response
+
     def _compare_metrics(self, baseline_metrics, conversion_metrics):
         """
         Compare metrics between baseline and conversion scenarios.
-        
+
         Parameters:
         - baseline_metrics: Dictionary - Metrics from baseline scenario
         - conversion_metrics: Dictionary - Metrics from conversion scenario
-        
+
         Returns:
         - comparison: Dictionary - Comparison of metrics
         """
@@ -1246,6 +1457,7 @@ class RothConversionProcessor:
                         'spouse_age': spouse_age,
                         'is_synthetic': True,
                         'gross_income': float(gross_income),
+                        'pre_retirement_income': float(self.pre_retirement_income),  # Dedicated field for pre-retirement income column
                         'ss_income': 0,
                         'taxable_ss': 0,
                         'magi': float(gross_income) + conversion_amount,
@@ -1504,11 +1716,17 @@ class RothConversionProcessor:
 
         # Extract asset balances
         asset_balances = self._extract_asset_balances(baseline_results, conversion_results)
-        
+
+        # Transform results to comprehensive format
+        baseline_comprehensive = self._transform_to_comprehensive_format(baseline_results, "Before Conversion")
+        conversion_comprehensive = self._transform_to_comprehensive_format(conversion_results, "After Conversion")
+
         # Prepare result
         result = {
             'baseline_results': baseline_results,
             'conversion_results': conversion_results,
+            'baseline_comprehensive': baseline_comprehensive,
+            'conversion_comprehensive': conversion_comprehensive,
             'metrics': {
                 'baseline': baseline_metrics,
                 'conversion': conversion_metrics,
@@ -1534,5 +1752,5 @@ class RothConversionProcessor:
                 'score_breakdown': conversion_metrics
             }
         }
-        
+
         return result
