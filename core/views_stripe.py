@@ -194,7 +194,37 @@ def validate_coupon_dynamic(request):
                     'valid': False,
                     'message': 'This coupon is no longer valid'
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
+
+            # Check if coupon is restricted to specific products/prices
+            # First check the applies_to field (if available from Stripe API)
+            applies_to_products = []
+            if hasattr(coupon, 'applies_to') and coupon.applies_to:
+                applies_to_products = coupon.applies_to.get('products', [])
+
+            # If applies_to is not available, check metadata for product restrictions
+            # This is a workaround since Stripe API doesn't always return applies_to field
+            if not applies_to_products and coupon.metadata:
+                metadata_products = coupon.metadata.get('applies_to_products', '')
+                if metadata_products:
+                    # Support comma-separated list of product IDs in metadata
+                    applies_to_products = [p.strip() for p in metadata_products.split(',')]
+
+            # If coupon is restricted to specific products, verify the current price's product is in the list
+            if applies_to_products:
+                product_info = price_details.get("product")
+                # Extract product ID from dict if necessary
+                if isinstance(product_info, dict):
+                    product_id = product_info.get("id")
+                else:
+                    product_id = product_info
+
+                if product_id not in applies_to_products:
+                    logger.info(f"Coupon {coupon.id} does not apply to product {product_id}. Applies to: {applies_to_products}")
+                    return Response({
+                        'valid': False,
+                        'message': f'This coupon is not valid for the {plan_type} plan'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
             # Calculate discount
             original_price = price_details["unit_amount"] / 100  # Convert from cents
             
