@@ -237,10 +237,11 @@ class ScenarioPDFGenerator:
         # Convert Decimal to float for JSON serialization
         years = [str(r['year']) for r in results]
         gross_income = [float(r.get('gross_income', 0)) for r in results]
-        federal_tax = [float(r.get('federal_tax', 0)) for r in results]
+        # Use total_taxes (federal + state) to match UI
+        total_taxes = [float(r.get('total_taxes', 0) or (r.get('federal_tax', 0) + r.get('state_tax', 0))) for r in results]
         total_medicare = [float(r.get('total_medicare', 0)) for r in results]
         net_income_values = [
-            float(r.get('gross_income', 0)) - float(r.get('federal_tax', 0)) - float(r.get('total_medicare', 0))
+            float(r.get('gross_income', 0)) - float(r.get('total_taxes', 0) or (r.get('federal_tax', 0) + r.get('state_tax', 0))) - float(r.get('total_medicare', 0))
             for r in results
         ]
         agi = [float(r.get('agi', 0)) for r in results]
@@ -402,7 +403,8 @@ class ScenarioPDFGenerator:
             # Calculate totals for metrics
             if results:
                 lifetime_gross_income = sum(float(r.get('gross_income', 0)) for r in results)
-                lifetime_federal_tax = sum(float(r.get('federal_tax', 0)) for r in results)
+                # Calculate total taxes (federal + state) to match UI
+                lifetime_total_taxes = sum(float(r.get('total_taxes', 0) or (r.get('federal_tax', 0) + r.get('state_tax', 0))) for r in results)
                 lifetime_medicare = sum(float(r.get('total_medicare', 0)) for r in results)
                 lifetime_irmaa = sum(float(r.get('irmaa_surcharge', 0)) for r in results)
                 # Calculate Medicare out-of-pocket (matching frontend logic)
@@ -416,13 +418,13 @@ class ScenarioPDFGenerator:
                     remaining_ssi = total_ssi - ss_decrease - medicare
                     if remaining_ssi < 0:
                         medicare_out_of_pocket += abs(remaining_ssi)
-                lifetime_net = lifetime_gross_income - lifetime_federal_tax - lifetime_medicare
+                lifetime_net = lifetime_gross_income - lifetime_total_taxes - lifetime_medicare
 
                 # Debug logging
-                logger.info(f"PDF Metrics - Gross: ${lifetime_gross_income:,.0f}, Tax: ${lifetime_federal_tax:,.0f}, Medicare: ${lifetime_medicare:,.0f}, Medicare OOP: ${medicare_out_of_pocket:,.0f}")
+                logger.info(f"PDF Metrics - Gross: ${lifetime_gross_income:,.0f}, Total Taxes: ${lifetime_total_taxes:,.0f}, Medicare: ${lifetime_medicare:,.0f}, Medicare OOP: ${medicare_out_of_pocket:,.0f}")
 
                 # Calculate percentage for circle chart
-                total_tax_and_medicare = lifetime_federal_tax + lifetime_medicare
+                total_tax_and_medicare = lifetime_total_taxes + lifetime_medicare
                 tax_medicare_percentage = round((total_tax_and_medicare / lifetime_gross_income) * 100) if lifetime_gross_income > 0 else 0
 
             # Start overview page
@@ -441,11 +443,11 @@ class ScenarioPDFGenerator:
             # Key metrics row at top (3 cards horizontally)
             html.append('<div style="display: table; width: 100%; margin: 20px 0;">')
 
-            # Total Federal Tax
+            # Total Federal and State Taxes
             html.append('<div style="display: table-cell; width: 33%; padding-right: 10px;">')
             html.append('<div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 15px; background: #f8f9fa; text-align: center;">')
-            html.append('<div style="font-size: 11px; color: #666; margin-bottom: 8px;">TOTAL FEDERAL TAX</div>')
-            html.append(f'<div style="font-size: 24px; font-weight: bold; color: #377dff;">${lifetime_federal_tax:,.0f}</div>')
+            html.append('<div style="font-size: 11px; color: #666; margin-bottom: 8px;">FEDERAL AND STATE TAXES</div>')
+            html.append(f'<div style="font-size: 24px; font-weight: bold; color: #377dff;">${lifetime_total_taxes:,.0f}</div>')
             html.append('</div></div>')
 
             # Total Medicare
@@ -546,7 +548,7 @@ class ScenarioPDFGenerator:
                     </div>
                     <div style="text-align: center;">
                         <small style="color: #666;">Total Taxes</small>
-                        <div style="font-weight: bold; color: #ea4335;">${lifetime_federal_tax:,.0f}</div>
+                        <div style="font-weight: bold; color: #ea4335;">${lifetime_total_taxes:,.0f}</div>
                     </div>
                     <div style="text-align: center;">
                         <small style="color: #666;">Total Medicare</small>
@@ -597,8 +599,8 @@ new Chart(overviewCtx, {{
             fill: false
         }}, {{
             type: 'bar',
-            label: 'Federal Tax',
-            data: {json.dumps(federal_tax[:30])},
+            label: 'Total Taxes',
+            data: {json.dumps(total_taxes[:30])},
             backgroundColor: '#ea4335',
             stack: 'Stack 0',
             order: 2
