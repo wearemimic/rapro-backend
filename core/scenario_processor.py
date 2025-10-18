@@ -415,8 +415,11 @@ class ScenarioProcessor:
             table_start_year = retirement_year
         else:
             table_start_year = min(retirement_year, int(conversion_start_year))
-            
-        # Debug info: retirement_year, conversion_start_year, table_start_year
+
+        # CRITICAL FIX: Override self.start_year to use table_start_year
+        # This ensures the table starts from the earlier of retirement or conversion start
+        self.start_year = table_start_year
+        self._log_debug(f"Table start year: {table_start_year} (retirement: {retirement_year}, conversion: {conversion_start_year})")
 
         pre_retirement_income = getattr(self.scenario, 'pre_retirement_income', 0)
 
@@ -909,7 +912,24 @@ class ScenarioProcessor:
                 else:
                     asset["previous_year_balance"] = Decimal('0')
 
-        return results
+        # Filter out leading years with no financial activity
+        # Find the first year with income, conversions, or RMDs
+        first_activity_idx = 0
+        for idx, year_data in enumerate(results):
+            has_activity = (
+                (year_data.get('gross_income_total', 0) or 0) > 0 or
+                (year_data.get('roth_conversion', 0) or 0) > 0 or
+                (year_data.get('rmd_total', 0) or 0) > 0
+            )
+            if has_activity:
+                first_activity_idx = idx
+                break
+
+        # Return results starting from first year with activity
+        filtered_results = results[first_activity_idx:]
+        self._log_debug(f"Filtered {first_activity_idx} leading empty years. Results now start at year {filtered_results[0]['year'] if filtered_results else 'N/A'}")
+
+        return filtered_results
 
     def _requires_rmd(self, asset):
         """
