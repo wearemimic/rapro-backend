@@ -741,53 +741,31 @@ class RothConversionProcessor:
 
     def _enhance_year_data_with_rmd_details(self, year_by_year_results):
         """
-        Enhance year-by-year data with calculated RMD amounts for CPA auditing.
+        Enhance year-by-year data with RMD fields.
 
-        For each year where client is age 73+, calculate RMDs based on qualified balances
-        and IRS Uniform Lifetime Table, then add to year data.
+        This method ensures rmd_total matches the sum of individual RMD fields that were
+        already calculated correctly in _calculate_asset_balances_with_growth(). It does
+        NOT recalculate RMDs because that would ignore birth-year-specific RMD start ages.
 
         Parameters:
         - year_by_year_results: List[Dict] - Year-by-year results from ScenarioProcessor
 
         Returns:
-        - enhanced_results: List[Dict] - Same results with added RMD fields
+        - enhanced_results: List[Dict] - Same results with rmd fields ensured
         """
         enhanced = []
 
         for year_data in year_by_year_results:
             year_dict = dict(year_data)  # Create a copy
 
-            # Get age for this year
-            age = year_dict.get('primary_age')
+            # If rmd_total is already set from _calculate_asset_balances_with_growth, use it
+            # Otherwise, ensure it's set to 0
+            if 'rmd_total' not in year_dict:
+                year_dict['rmd_total'] = 0
 
-            # Calculate RMD if age 73+
-            if age and age >= 73:
-                # Get qualified balance (Traditional IRA/401k)
-                qualified_balance = year_dict.get('qualified_balance', 0) or year_dict.get('Qualified_balance', 0)
-
-                if qualified_balance > 0:
-                    # Get life expectancy factor from IRS table
-                    life_expectancy_factor = RMD_TABLE.get(age, 0)
-
-                    if life_expectancy_factor > 0:
-                        # RMD = Balance / Life Expectancy Factor
-                        rmd_amount = float(qualified_balance) / life_expectancy_factor
-                        year_dict['rmd'] = rmd_amount
-                        year_dict['rmd_amount'] = rmd_amount
-                        year_dict['rmd_calculation'] = {
-                            'balance': float(qualified_balance),
-                            'life_expectancy_factor': life_expectancy_factor,
-                            'age': age
-                        }
-                    else:
-                        year_dict['rmd'] = 0
-                        year_dict['rmd_amount'] = 0
-                else:
-                    year_dict['rmd'] = 0
-                    year_dict['rmd_amount'] = 0
-            else:
-                year_dict['rmd'] = 0
-                year_dict['rmd_amount'] = 0
+            # Ensure rmd_amount matches rmd_total
+            if 'rmd_amount' not in year_dict:
+                year_dict['rmd_amount'] = year_dict.get('rmd_total', 0)
 
             # Add conversion amount if present (for tracking conversions)
             if 'roth_conversion' in year_dict and year_dict['roth_conversion'] > 0:
@@ -1079,22 +1057,41 @@ class RothConversionProcessor:
 
             # Build RMD required structure (detailed RMDs by asset)
             rmd_required = {}
+
+            # DEBUG: For years 2034-2035, log all RMD-related keys
+            year = enhanced_row.get('year')
+            if year in [2034, 2035]:
+                rmd_keys = [k for k in enhanced_row.keys() if 'rmd' in k.lower()]
+                self._log_debug(f"Year {year} - All RMD-related keys in row: {rmd_keys}")
+                for k in rmd_keys:
+                    self._log_debug(f"  {k} = {enhanced_row[k]}")
+
             for asset in self.assets:
                 asset_id = str(asset.get('id', asset.get('income_type', '')))
                 asset_type = asset.get('income_type', '').lower()
+                income_name = asset.get('income_name', '')
 
-                # Look for RMD fields
+                # Look for RMD fields (check all possible key patterns)
                 rmd_value = 0
                 if f"{asset_type}_rmd" in enhanced_row:
                     rmd_value = enhanced_row[f"{asset_type}_rmd"]
+                    self._log_debug(f"Found RMD via asset_type: {asset_type}_rmd = {rmd_value}")
                 elif f"{asset_id}_rmd" in enhanced_row:
                     rmd_value = enhanced_row[f"{asset_id}_rmd"]
+                    self._log_debug(f"Found RMD via asset_id: {asset_id}_rmd = {rmd_value}")
+                elif income_name and f"{income_name}_rmd" in enhanced_row:
+                    rmd_value = enhanced_row[f"{income_name}_rmd"]
+                    self._log_debug(f"Found RMD via income_name: {income_name}_rmd = {rmd_value}")
 
                 if rmd_value:
                     rmd_required[asset_id] = float(rmd_value)
+                    self._log_debug(f"Added to rmd_required: {asset_id} = {rmd_value}")
 
             if rmd_required:
                 enhanced_row['rmd_required'] = rmd_required
+                self._log_debug(f"Year {enhanced_row.get('year')}: rmd_required = {rmd_required}")
+            else:
+                self._log_debug(f"Year {enhanced_row.get('year')}: No RMDs found (rmd_required will not be set)")
 
             comprehensive_years.append(enhanced_row)
 
@@ -1507,6 +1504,7 @@ class RothConversionProcessor:
                         'pre_retirement_income': float(self.pre_retirement_income),  # Dedicated field for pre-retirement income column
                         'ss_income': 0,
                         'taxable_ss': 0,
+                        'agi': float(gross_income) + conversion_amount,  # AGI includes conversion amount
                         'magi': float(gross_income) + conversion_amount,
                         'taxable_income': float(gross_income) + conversion_amount,
                         'federal_tax': 0,
@@ -1554,78 +1552,63 @@ class RothConversionProcessor:
                     conversion_results.append(pre_retirement_row)
 
             # Now generate retirement years (from retirement_year to mortality)
-            # Use ScenarioProcessor for baseline-like calculations (SS, pension, etc.)
-            # But asset balances come from our own tracking to avoid discontinuity
+            # Use baseline results to get SS, pension, etc. and overlay conversion changes
             self._log_debug(f"Generating retirement years from {retirement_year} to mortality")
 
-            # Get client birth year for age calculations
-            if isinstance(self.client.get('birthdate'), str):
-                client_birth_year = datetime.datetime.strptime(self.client['birthdate'], '%Y-%m-%d').year
-            elif hasattr(self.client.get('birthdate'), 'year'):
-                client_birth_year = self.client['birthdate'].year
-            else:
-                client_birth_year = datetime.datetime.now().year - 60
+            # Create a lookup for baseline results by year
+            baseline_by_year = {row['year']: row for row in baseline_results if row['year'] >= retirement_year}
 
-            # Generate retirement years through mortality
-            end_age = mortality_age
-            end_year = client_birth_year + end_age
+            for baseline_row in baseline_results:
+                if baseline_row['year'] < retirement_year:
+                    continue  # Skip pre-retirement years (already handled)
 
-            for year in range(retirement_year, end_year + 1):
-                # Calculate ages
-                primary_age = year - client_birth_year
-                spouse_age = None
-                if self.spouse:
-                    if isinstance(self.spouse.get('birthdate'), datetime.date):
-                        spouse_age = year - self.spouse['birthdate'].year
-                    elif isinstance(self.spouse.get('birthdate'), str):
-                        try:
-                            spouse_birthdate = datetime.datetime.strptime(self.spouse['birthdate'], '%Y-%m-%d').date()
-                            spouse_age = year - spouse_birthdate.year
-                        except:
-                            pass
+                year = baseline_row['year']
 
-                # Calculate gross income (will be from SS, pensions, etc. in retirement)
-                gross_income = self._calculate_gross_income_for_year(year, primary_age, spouse_age)
+                # Check if this year is still within the conversion period
+                conversion_amount = float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0
 
-                # No more conversions after conversion period
-                conversion_amount = 0
+                # Start with baseline row data and overlay conversion changes
+                retirement_row = dict(baseline_row)
+                retirement_row['is_synthetic'] = True
+                retirement_row['roth_conversion'] = conversion_amount
 
-                # Create retirement row
-                retirement_row = {
-                    'year': year,
-                    'primary_age': primary_age,
-                    'spouse_age': spouse_age,
-                    'is_synthetic': True,
-                    'gross_income': float(gross_income),
-                    'pre_retirement_income': 0,  # No pre-retirement income in retirement
-                    'ss_income': 0,  # TODO: Calculate SS properly
-                    'taxable_ss': 0,
-                    'magi': float(gross_income),
-                    'taxable_income': float(gross_income),
-                    'federal_tax': 0,
-                    'medicare_base': 0,
-                    'irmaa_surcharge': 0,
-                    'total_medicare': 0,
-                    'net_income': float(gross_income),
-                    'roth_conversion': 0,  # No more conversions
-                }
+                # Get baseline values
+                gross_income = float(baseline_row.get('gross_income', 0))
+                ss_income = float(baseline_row.get('ss_income', 0))
+                taxable_ss = float(baseline_row.get('taxable_ss', 0))
+                agi_excl_ss = gross_income  # Baseline gross income excludes SS
 
-                # Calculate taxes
+                # Calculate AGI and MAGI with conversion amount
+                agi = agi_excl_ss + taxable_ss + conversion_amount  # AGI includes conversion
+                magi = agi  # MAGI same as AGI (conversion already included)
+
+                # Update fields for conversion scenario
+                retirement_row['agi'] = agi
+                retirement_row['magi'] = magi
+                retirement_row['pre_retirement_income'] = 0
+
+                # Calculate taxes with conversion
                 standard_deduction = self._get_standard_deduction()
-                if gross_income > 0:
-                    taxable_income = max(0, float(gross_income) - float(standard_deduction))
-                    federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(taxable_income)
+                regular_taxable_income = max(0, agi - float(standard_deduction))
+                regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
 
-                    retirement_row['federal_tax'] = float(federal_tax)
-                    retirement_row['tax_bracket'] = tax_bracket
-                    retirement_row['taxable_income'] = taxable_income
-                    retirement_row['net_income'] = float(gross_income) - retirement_row['federal_tax']
-                    retirement_row['regular_income_tax'] = float(federal_tax)
-                    retirement_row['conversion_tax'] = 0
+                # Total taxable income includes conversion
+                total_taxable_income = max(0, (agi + conversion_amount) - float(standard_deduction))
+                federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(total_taxable_income)
+                conversion_tax = float(federal_tax) - float(regular_income_tax)
 
-                # Medicare/IRMAA if age >= 65
-                if primary_age >= 65:
-                    magi = float(gross_income)
+                retirement_row['federal_tax'] = float(federal_tax)
+                retirement_row['regular_income_tax'] = float(regular_income_tax)
+                retirement_row['conversion_tax'] = conversion_tax
+                retirement_row['tax_bracket'] = tax_bracket
+                retirement_row['taxable_income'] = total_taxable_income
+
+                # Update net income
+                retirement_row['net_income'] = gross_income - retirement_row['federal_tax']
+
+                # Recalculate Medicare/IRMAA with new MAGI (includes conversion)
+                primary_age = retirement_row.get('primary_age')
+                if primary_age and primary_age >= 65:
                     total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi, year)
                     retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
                     retirement_row['irmaa_surcharge'] = irmaa_surcharge
