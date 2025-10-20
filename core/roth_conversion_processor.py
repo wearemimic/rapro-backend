@@ -851,11 +851,16 @@ class RothConversionProcessor:
         
         # Calculate metrics from results
         for row in results:
-            # Add federal tax
+            # Add federal tax and state tax
             federal_tax = row.get('federal_tax', 0)
             if not isinstance(federal_tax, (int, float, Decimal)):
                 federal_tax = 0
-            metrics['lifetime_tax'] += float(federal_tax)
+
+            state_tax = row.get('state_tax', 0)
+            if not isinstance(state_tax, (int, float, Decimal)):
+                state_tax = 0
+
+            metrics['lifetime_tax'] += float(federal_tax) + float(state_tax)
             
             # Add Medicare costs
             medicare_base = row.get('medicare_base', 0)
@@ -869,17 +874,14 @@ class RothConversionProcessor:
                 irmaa = 0
             metrics['total_irmaa'] += float(irmaa)
             
-            # Add RMDs
+            # Add RMDs - use rmd_amount which already equals rmd_total (sum of all individual RMDs)
+            # Do NOT loop through individual *_rmd fields as that would double-count
             rmd_amount = row.get('rmd_amount', 0)
             if isinstance(rmd_amount, (int, float, Decimal)):
                 metrics['total_rmds'] += float(rmd_amount)
                 # DEBUG: Log each RMD
                 if float(rmd_amount) > 0:
                     print(f"Year {row.get('year', 'unknown')}: Adding RMD ${float(rmd_amount):,.0f} to total")
-            # Also check for any other RMD fields
-            for key, value in row.items():
-                if key.endswith('_rmd') and key != 'rmd_amount' and isinstance(value, (int, float, Decimal)):
-                    metrics['total_rmds'] += float(value)
             
             # Add net income
             net_income = row.get('net_income', 0)
