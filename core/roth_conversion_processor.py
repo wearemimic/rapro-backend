@@ -1,7 +1,7 @@
 import datetime
 import copy
 from decimal import Decimal, InvalidOperation
-from .scenario_processor import ScenarioProcessor, RMD_TABLE
+from .scenario_processor import ScenarioProcessor, RMD_TABLE, calculate_taxable_social_security
 from .tax_csv_loader import get_tax_loader
 from .roth_tax_calculator import RothTaxCalculator
 from .roth_medicare_calculator import RothMedicareCalculator
@@ -780,20 +780,28 @@ class RothConversionProcessor:
                 self.asset_balances_by_year[target_year][asset_id] = balance
                 self._log_debug(f"✓ Stored end-of-year balance for asset {asset_id} in year {target_year}: ${balance:,.2f} (will be used for year {target_year + 1})")
 
-        # Apply growth to Roth balance for the year
-        # This happens ONCE per year, after all conversions are added
-        if roth_balance > 0 and apply_conversions:
-            # Check if this is a conversion year - if so, don't grow (conversion happens end of year)
-            is_conversion_year = (target_year >= self.conversion_start_year and
-                                 target_year < self.conversion_start_year + self.years_to_convert)
+        # CRITICAL: The conversions have already been added to roth_balance in the asset loop above
+        # We need to separate the beginning balance from the conversions, apply growth, then re-add conversions
 
-            if not is_conversion_year:
-                # Not a conversion year, so apply growth to beginning balance
-                roth_balance *= (1 + roth_growth_rate)
-                self._log_debug(f"Year {target_year}: Applied {self.roth_growth_rate}% growth to Roth balance = ${roth_balance:,.2f}")
-            else:
-                # Conversion year - no growth on the converted amount in the same year
-                self._log_debug(f"Year {target_year}: No Roth growth (conversion year)")
+        # Get the beginning balance from previous year (before this year's conversions)
+        beginning_roth_balance = self.roth_balance_by_year.get(target_year - 1, Decimal('0'))
+
+        # Calculate this year's total conversions
+        is_conversion_year = (target_year >= self.conversion_start_year and
+                             target_year < self.conversion_start_year + self.years_to_convert)
+        conversion_this_year = Decimal(str(self.annual_conversion)) if is_conversion_year else Decimal('0')
+
+        if apply_conversions and beginning_roth_balance > 0:
+            # Apply growth to ONLY the beginning balance (not the new conversion)
+            grown_beginning_balance = beginning_roth_balance * (1 + roth_growth_rate)
+            self._log_debug(f"Year {target_year}: Beginning balance ${beginning_roth_balance:,.2f} grown to ${grown_beginning_balance:,.2f}")
+
+            # New total = grown beginning balance + this year's conversion
+            roth_balance = grown_beginning_balance + conversion_this_year
+            self._log_debug(f"Year {target_year}: Final Roth = grown ${grown_beginning_balance:,.2f} + conversion ${conversion_this_year:,.2f} = ${roth_balance:,.2f}")
+        else:
+            # First year or no conversions - roth_balance already has the conversions added from asset loop
+            self._log_debug(f"Year {target_year}: Roth balance = ${roth_balance:,.2f} (no growth on beginning balance)")
 
         # Calculate Roth withdrawals (tax-free income)
         roth_withdrawal = Decimal('0')
@@ -1914,11 +1922,9 @@ class RothConversionProcessor:
                     'pre_retirement_income': 0,  # Retired
                 }
 
-                # Get Social Security income from baseline (not affected by conversion)
+                # Get Social Security income from baseline (SS amount doesn't change with conversion)
                 ss_income = float(baseline_row.get('ss_income', 0))
-                taxable_ss = float(baseline_row.get('taxable_ss', 0))
                 retirement_row['ss_income'] = ss_income
-                retirement_row['taxable_ss'] = taxable_ss
 
                 # CRITICAL: Also create social_security_income for frontend column display
                 retirement_row['social_security_income'] = ss_income
@@ -1929,8 +1935,8 @@ class RothConversionProcessor:
                 retirement_row.update(asset_balances)
 
                 # Calculate gross income from conversion data (NOT baseline!)
-                # Gross income = SS + all asset incomes
-                gross_income = ss_income
+                # Gross income = all asset incomes (NOT including SS - that's handled separately)
+                gross_income = 0  # Start with 0, will add asset incomes
                 for asset in self.assets:
                     asset_id = str(asset.get('id'))
                     asset_type = asset.get('income_type', '').lower()
@@ -1956,13 +1962,33 @@ class RothConversionProcessor:
                 # Add tax-free income from Roth (doesn't count toward gross for tax purposes)
                 tax_free_income = float(retirement_row.get('tax_free_income', 0))
 
-                retirement_row['gross_income'] = gross_income
-                retirement_row['gross_income_total'] = gross_income
+                # CRITICAL: gross_income for DISPLAY includes SS + asset incomes + tax-free
+                # But for AGI calculation, we use asset incomes + taxable_ss (no tax-free)
+                total_gross_income = ss_income + gross_income + tax_free_income  # Total: SS + assets + tax-free
+                taxable_gross_income = gross_income  # Just asset incomes (401k RMDs, etc.) - NO SS, NO tax-free
+
+                retirement_row['gross_income'] = total_gross_income
+                retirement_row['gross_income_total'] = total_gross_income
+
+                # CRITICAL: Recalculate taxable SS based on the CONVERSION scenario's actual income
+                # The baseline's taxable_ss is wrong because it's based on different income levels
+                # Taxable SS depends on: AGI (excluding SS) + 50% of SS benefits
+                # For provisional income calculation, we need AGI excluding SS
+                agi_excluding_ss = taxable_gross_income + conversion_amount  # Asset income + conversion
+                filing_status = self.scenario.get('tax_filing_status', 'Single')
+
+                # Recalculate taxable SS based on actual conversion scenario income
+                taxable_ss = float(calculate_taxable_social_security(
+                    ss_benefits=ss_income,
+                    agi=agi_excluding_ss,  # AGI excluding SS
+                    tax_exempt_interest=0,  # Assume 0 for now
+                    filing_status=filing_status
+                ))
+                retirement_row['taxable_ss'] = taxable_ss
 
                 # Calculate AGI and MAGI with conversion amount
-                # CRITICAL: Subtract tax_free_income because it's not included in AGI/MAGI
-                # AGI only includes TAXABLE income, not tax-free Roth withdrawals
-                taxable_gross_income = gross_income - tax_free_income
+                # AGI = asset incomes (taxable_gross_income) + taxable portion of SS + conversions
+                # Does NOT include tax-free Roth withdrawals
                 agi = taxable_gross_income + taxable_ss + conversion_amount  # AGI includes conversion
                 magi = agi  # MAGI same as AGI (conversion already included)
 
@@ -2010,7 +2036,8 @@ class RothConversionProcessor:
                 retirement_row['taxable_income'] = total_taxable_income
 
                 # Calculate income phases
-                after_tax_income = gross_income - float(federal_tax) - float(state_tax)
+                # Use total_gross_income (includes tax-free) since you keep all the tax-free money
+                after_tax_income = total_gross_income - float(federal_tax) - float(state_tax)
                 retirement_row['after_tax_income'] = after_tax_income
                 retirement_row['net_income'] = after_tax_income  # Will be reduced by Medicare below
 
