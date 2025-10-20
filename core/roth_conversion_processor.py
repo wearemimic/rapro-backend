@@ -47,10 +47,13 @@ class RothConversionProcessor:
         self.total_conversion = Decimal('0')
         self.asset_conversion_map = {}
         self.debug = True  # Enable debug logging
-        
+
+        # Track MAGI history for 2-year lookback (IRMAA determination)
+        self.magi_history = {}  # year -> MAGI value
+
         # Calculate retirement year
         self.retirement_year = self._calculate_retirement_year()
-        
+
         # Validate and prepare conversion parameters
         self._validate_conversion_params()
         
@@ -156,10 +159,13 @@ class RothConversionProcessor:
         return tax_loader.get_standard_deduction(filing_status)
     
     def _calculate_medicare_costs(self, magi, year=None):
-        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds with inflation."""
+        """Calculate Medicare costs using CSV-based rates and IRMAA thresholds with inflation.
+
+        Returns annual costs (monthly rates * 12).
+        """
         tax_loader = get_tax_loader()
 
-        # Get base Medicare rates from CSV
+        # Get base Medicare rates from CSV (these are MONTHLY rates)
         medicare_rates = tax_loader.get_medicare_base_rates()
         base_part_b = medicare_rates.get('part_b', Decimal('185'))
         base_part_d = medicare_rates.get('part_d', Decimal('71'))
@@ -176,23 +182,29 @@ class RothConversionProcessor:
         normalized_status = (tax_status or '').strip().lower()
         filing_status = status_mapping.get(normalized_status, 'Single')
 
-        # Calculate IRMAA surcharges using inflation-adjusted thresholds if year is provided
+        # Calculate IRMAA surcharges (these are MONTHLY amounts) using inflation-adjusted thresholds if year is provided
         if year:
             part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
         else:
             # Fallback to non-inflated calculation if no year provided
             part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)
 
-        # For married filing jointly, double the base rates
+        # For married filing jointly, double the base rates and IRMAA surcharges
         if filing_status == "Married Filing Jointly":
             base_part_b *= 2
             base_part_d *= 2
+            part_b_surcharge *= 2
+            part_d_irmaa *= 2
 
-        # Total costs
-        total_medicare = base_part_b + part_b_surcharge + base_part_d + part_d_irmaa
-        irmaa_surcharge = part_b_surcharge + part_d_irmaa
+        # Convert monthly costs to ANNUAL costs
+        total_medicare_monthly = base_part_b + part_b_surcharge + base_part_d + part_d_irmaa
+        irmaa_surcharge_monthly = part_b_surcharge + part_d_irmaa
 
-        return float(total_medicare), float(irmaa_surcharge)
+        # Multiply by 12 to get annual amounts
+        total_medicare_annual = total_medicare_monthly * 12
+        irmaa_surcharge_annual = irmaa_surcharge_monthly * 12
+
+        return float(total_medicare_annual), float(irmaa_surcharge_annual)
 
     def _calculate_state_tax(self, agi, taxable_ss=0):
         """Calculate state tax based on scenario's primary state."""
@@ -1472,11 +1484,17 @@ class RothConversionProcessor:
                                 pre_retirement_row['state_tax'] = state_tax
                                 pre_retirement_row['net_income'] -= state_tax
 
+                            # Store MAGI for 2-year lookback (IRMAA determination)
+                            magi = float(gross_income)
+                            self.magi_history[year] = magi
+
                             # Add Medicare/IRMAA if age >= 65
                             if primary_age and primary_age >= 65:
-                                # Calculate Medicare costs using proper MAGI and IRMAA calculations with inflation
-                                magi = float(self.pre_retirement_income)  # MAGI is same as income for baseline
-                                total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi, year)
+                                # IRMAA is based on MAGI from 2 years prior per IRS rules
+                                lookback_year = year - 2
+                                lookback_magi = self.magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
+
+                                total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
                                 pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
                                 pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
                                 pre_retirement_row['total_medicare'] = total_medicare
@@ -1586,10 +1604,17 @@ class RothConversionProcessor:
                         pre_retirement_row['regular_income_tax'] = 0
                         pre_retirement_row['conversion_tax'] = 0
 
+                    # Store MAGI for 2-year lookback (IRMAA determination)
+                    magi = float(gross_income) + conversion_amount
+                    self.magi_history[year] = magi
+
                     # Medicare/IRMAA if age >= 65
                     if primary_age and primary_age >= 65:
-                        magi = float(gross_income) + conversion_amount
-                        total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi, year)
+                        # IRMAA is based on MAGI from 2 years prior per IRS rules
+                        lookback_year = year - 2
+                        lookback_magi = self.magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
+
+                        total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
                         pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
                         pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
                         pre_retirement_row['total_medicare'] = total_medicare
@@ -1632,6 +1657,9 @@ class RothConversionProcessor:
                 agi = agi_excl_ss + taxable_ss + conversion_amount  # AGI includes conversion
                 magi = agi  # MAGI same as AGI (conversion already included)
 
+                # Store MAGI for 2-year lookback (IRMAA determination)
+                self.magi_history[year] = magi
+
                 # Update fields for conversion scenario
                 retirement_row['agi'] = agi
                 retirement_row['magi'] = magi
@@ -1661,10 +1689,14 @@ class RothConversionProcessor:
                 # Update net income
                 retirement_row['net_income'] = gross_income - retirement_row['federal_tax']
 
-                # Recalculate Medicare/IRMAA with new MAGI (includes conversion)
+                # Recalculate Medicare/IRMAA with 2-year MAGI lookback
                 primary_age = retirement_row.get('primary_age')
                 if primary_age and primary_age >= 65:
-                    total_medicare, irmaa_surcharge = self._calculate_medicare_costs(magi, year)
+                    # IRMAA is based on MAGI from 2 years prior per IRS rules
+                    lookback_year = year - 2
+                    lookback_magi = self.magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
+
+                    total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
                     retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
                     retirement_row['irmaa_surcharge'] = irmaa_surcharge
                     retirement_row['total_medicare'] = total_medicare
