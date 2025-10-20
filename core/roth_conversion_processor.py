@@ -213,10 +213,20 @@ class RothConversionProcessor:
         """
         tax_loader = get_tax_loader()
 
-        # Get base Medicare rates from CSV (these are MONTHLY rates)
+        # Get base Medicare rates from CSV (these are MONTHLY rates for base year)
         medicare_rates = tax_loader.get_medicare_base_rates()
         base_part_b = medicare_rates.get('part_b', Decimal('185'))
         base_part_d = medicare_rates.get('part_d', Decimal('71'))
+
+        # Inflate base Medicare costs year-over-year (default 5% medical inflation)
+        if year:
+            current_year = datetime.datetime.now().year
+            years_from_now = year - current_year
+            if years_from_now > 0:
+                medical_inflation_rate = Decimal('0.05')  # 5% annual medical inflation
+                inflation_factor = (1 + medical_inflation_rate) ** years_from_now
+                base_part_b = base_part_b * inflation_factor
+                base_part_d = base_part_d * inflation_factor
 
         # Normalize tax status for CSV lookup
         status_mapping = {
@@ -1950,7 +1960,10 @@ class RothConversionProcessor:
                 retirement_row['gross_income_total'] = gross_income
 
                 # Calculate AGI and MAGI with conversion amount
-                agi = gross_income + taxable_ss + conversion_amount  # AGI includes conversion
+                # CRITICAL: Subtract tax_free_income because it's not included in AGI/MAGI
+                # AGI only includes TAXABLE income, not tax-free Roth withdrawals
+                taxable_gross_income = gross_income - tax_free_income
+                agi = taxable_gross_income + taxable_ss + conversion_amount  # AGI includes conversion
                 magi = agi  # MAGI same as AGI (conversion already included)
 
                 # Store MAGI for 2-year lookback (IRMAA determination)
@@ -1964,8 +1977,8 @@ class RothConversionProcessor:
                 standard_deduction = self._get_standard_deduction()
 
                 # Regular income tax: Tax on income WITHOUT conversion
-                # Use gross_income (which now comes from conversion data, not baseline!)
-                agi_without_conversion = gross_income + taxable_ss
+                # Use taxable_gross_income (gross minus tax-free income) for tax calculations
+                agi_without_conversion = taxable_gross_income + taxable_ss
                 regular_taxable_income = max(0, agi_without_conversion - float(standard_deduction))
                 regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
 

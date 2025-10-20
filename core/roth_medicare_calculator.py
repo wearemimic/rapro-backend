@@ -33,24 +33,35 @@ class RothMedicareCalculator:
         normalized_status = (tax_status or '').strip().lower()
         return status_mapping.get(normalized_status, 'Single')
 
-    def calculate_medicare_costs(self, magi, year=None):
+    def calculate_medicare_costs(self, magi, year=None, medical_inflation_rate=0.05):
         """
         Calculate Medicare costs using CSV-based rates and IRMAA thresholds with inflation.
 
         Args:
             magi: float/Decimal - Modified Adjusted Gross Income
-            year: int - Year for inflation-adjusted IRMAA thresholds (optional)
+            year: int - Year for inflation-adjusted costs (optional)
+            medical_inflation_rate: float - Annual medical inflation rate (default 5%)
 
         Returns:
             tuple: (total_medicare_annual, irmaa_surcharge_annual)
                 Both are annual costs (monthly rates * 12)
         """
         tax_loader = get_tax_loader()
+        import datetime
 
-        # Get base Medicare rates from CSV (these are MONTHLY rates)
+        # Get base Medicare rates from CSV (these are MONTHLY rates for base year)
         medicare_rates = tax_loader.get_medicare_base_rates()
         base_part_b = medicare_rates.get('part_b', Decimal('185'))
         base_part_d = medicare_rates.get('part_d', Decimal('71'))
+
+        # Inflate base Medicare costs year-over-year if year is provided
+        if year:
+            current_year = datetime.datetime.now().year
+            years_from_now = year - current_year
+            if years_from_now > 0:
+                inflation_factor = (1 + Decimal(str(medical_inflation_rate))) ** years_from_now
+                base_part_b = base_part_b * inflation_factor
+                base_part_d = base_part_d * inflation_factor
 
         filing_status = self._get_filing_status()
 

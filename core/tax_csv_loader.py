@@ -161,15 +161,26 @@ class TaxCSVLoader:
             return base_thresholds
         
         # Apply compound inflation to each threshold
+        # Use 5% medical inflation for surcharge amounts (matching Medicare base cost inflation)
+        medical_inflation_rate = Decimal('0.05')
+
         inflated_thresholds = []
         for threshold in base_thresholds:
             inflated_threshold = threshold.copy()
-            
-            # Inflate the MAGI threshold (income levels)
+
+            # Inflate the MAGI threshold (income levels) using IRMAA-specific inflation
             original_magi = threshold['magi_threshold']
             inflated_magi = original_magi * ((1 + irmaa_inflation_rate) ** years_to_inflate)
             inflated_threshold['magi_threshold'] = inflated_magi
-            
+
+            # Inflate the IRMAA surcharge amounts using medical inflation (5%)
+            original_part_b = threshold['part_b_surcharge']
+            original_part_d = threshold['part_d_surcharge']
+            inflated_part_b = original_part_b * ((1 + medical_inflation_rate) ** years_to_inflate)
+            inflated_part_d = original_part_d * ((1 + medical_inflation_rate) ** years_to_inflate)
+            inflated_threshold['part_b_surcharge'] = inflated_part_b
+            inflated_threshold['part_d_surcharge'] = inflated_part_d
+
             inflated_thresholds.append(inflated_threshold)
         
         return inflated_thresholds
