@@ -3,6 +3,9 @@ import copy
 from decimal import Decimal, InvalidOperation
 from .scenario_processor import ScenarioProcessor, RMD_TABLE
 from .tax_csv_loader import get_tax_loader
+from .roth_tax_calculator import RothTaxCalculator
+from .roth_medicare_calculator import RothMedicareCalculator
+from .roth_rmd_calculator import RothRMDCalculator
 
 class RothConversionProcessor:
     """
@@ -51,8 +54,19 @@ class RothConversionProcessor:
         # Track MAGI history for 2-year lookback (IRMAA determination)
         self.magi_history = {}  # year -> MAGI value
 
+        # Track Roth balance year-over-year to prevent it from resetting
+        self.roth_balance_by_year = {}  # year -> Roth IRA balance at end of that year
+
+        # Track asset balances year-over-year for proper calculation continuity
+        self.asset_balances_by_year = {}  # {year: {asset_id: balance}}
+
         # Calculate retirement year
         self.retirement_year = self._calculate_retirement_year()
+
+        # Initialize utility calculators
+        self.tax_calc = RothTaxCalculator(scenario)
+        self.medicare_calc = RothMedicareCalculator(scenario)
+        self.rmd_calc = RothRMDCalculator(client, spouse)
 
         # Validate and prepare conversion parameters
         self._validate_conversion_params()
@@ -114,6 +128,40 @@ class RothConversionProcessor:
         """Print debug messages if debug mode is enabled."""
         if self.debug:
             print(f"[RothConversionProcessor] {message}")
+
+    def _validate_balance_continuity(self, year, asset_id, previous_balance, current_balance, conversion_amount, growth_rate):
+        """
+        Validate that balance calculations are consistent year-over-year.
+
+        This checks that: current_balance = (previous_balance - conversion) * (1 + growth_rate) - RMD
+
+        Parameters:
+        - year: int - Current year
+        - asset_id: str/int - Asset identifier
+        - previous_balance: Decimal - Balance at end of previous year
+        - current_balance: Decimal - Calculated balance for current year
+        - conversion_amount: Decimal - Amount converted this year
+        - growth_rate: Decimal - Growth rate applied
+        """
+        if previous_balance <= 0:
+            return  # Skip validation for zero balances
+
+        # Calculate expected balance before RMD
+        expected_before_rmd = (previous_balance - conversion_amount) * (1 + growth_rate)
+
+        # Allow for small floating point differences (0.01 = 1 cent)
+        tolerance = Decimal('0.01')
+
+        # We can't validate exact match because RMD is subtracted after this calculation
+        # But we can check that current balance is not wildly different
+        if abs(current_balance - expected_before_rmd) > expected_before_rmd * Decimal('0.5'):  # More than 50% difference
+            self._log_debug(f"⚠️ WARNING: Year {year}, Asset {asset_id} - Balance discontinuity detected!")
+            self._log_debug(f"   Previous balance: ${previous_balance:,.2f}")
+            self._log_debug(f"   Conversion: ${conversion_amount:,.2f}")
+            self._log_debug(f"   Growth rate: {growth_rate * 100:.2f}%")
+            self._log_debug(f"   Expected (before RMD): ${expected_before_rmd:,.2f}")
+            self._log_debug(f"   Actual: ${current_balance:,.2f}")
+            self._log_debug(f"   Difference: ${abs(current_balance - expected_before_rmd):,.2f}")
     
     def _calculate_federal_tax_and_bracket(self, taxable_income):
         """Calculate federal tax using CSV-based tax bracket data."""
@@ -234,6 +282,100 @@ class RothConversionProcessor:
                 state_tax = max(Decimal('0'), state_taxable_income * state_tax_rate)
 
         return float(state_tax)
+
+    def _calculate_year_taxes(self, year, gross_income, conversion_amount, taxable_ss=0):
+        """
+        Calculate all taxes for a given year with conversion.
+
+        Parameters:
+        - year: int - Year to calculate taxes for
+        - gross_income: Decimal - Gross income for the year
+        - conversion_amount: Decimal - Roth conversion amount
+        - taxable_ss: Decimal - Taxable Social Security amount
+
+        Returns:
+        - dict with tax calculations: {
+            'regular_income_tax': float,
+            'conversion_tax': float,
+            'federal_tax': float,
+            'state_tax': float,
+            'tax_bracket': str,
+            'taxable_income': float,
+            'agi': float,
+            'magi': float
+          }
+        """
+        standard_deduction = self._get_standard_deduction()
+
+        # Calculate AGI and MAGI
+        agi = float(gross_income) + float(taxable_ss) + conversion_amount
+        magi = agi
+
+        # Calculate regular income tax (without conversion)
+        agi_without_conversion = float(gross_income) + float(taxable_ss)
+        regular_taxable_income = max(0, agi_without_conversion - float(standard_deduction))
+        regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
+
+        # Calculate total tax (with conversion)
+        total_taxable_income = max(0, agi - float(standard_deduction))
+        federal_tax, tax_bracket = self._calculate_federal_tax_and_bracket(total_taxable_income)
+
+        # Conversion tax is the incremental tax
+        conversion_tax = float(federal_tax) - float(regular_income_tax)
+
+        # Calculate state tax on total income
+        state_tax = self._calculate_state_tax(agi, taxable_ss)
+
+        return {
+            'regular_income_tax': float(regular_income_tax),
+            'conversion_tax': conversion_tax,
+            'federal_tax': float(federal_tax),
+            'state_tax': state_tax,
+            'tax_bracket': tax_bracket,
+            'taxable_income': total_taxable_income,
+            'agi': agi,
+            'magi': magi
+        }
+
+    def _calculate_year_medicare(self, year, primary_age, magi):
+        """
+        Calculate Medicare costs for a given year with IRMAA 2-year lookback.
+
+        Parameters:
+        - year: int - Year to calculate Medicare for
+        - primary_age: int - Primary client age
+        - magi: float - MAGI for this year
+
+        Returns:
+        - dict with Medicare calculations: {
+            'medicare_base': float,
+            'irmaa_surcharge': float,
+            'total_medicare': float
+          }
+        """
+        # Store MAGI for 2-year lookback
+        self.magi_history[year] = magi
+
+        # Only calculate Medicare if age >= 65
+        if not primary_age or primary_age < 65:
+            return {
+                'medicare_base': 0,
+                'irmaa_surcharge': 0,
+                'total_medicare': 0
+            }
+
+        # IRMAA uses MAGI from 2 years prior
+        lookback_year = year - 2
+        lookback_magi = self.magi_history.get(lookback_year, magi)
+
+        total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
+        medicare_base = total_medicare - irmaa_surcharge
+
+        return {
+            'medicare_base': medicare_base,
+            'irmaa_surcharge': irmaa_surcharge,
+            'total_medicare': total_medicare
+        }
     
     def _calculate_gross_income_for_year(self, year, primary_age, spouse_age):
         """Calculate gross income from all sources for a given year."""
@@ -389,8 +531,23 @@ class RothConversionProcessor:
         else:
             client_birth_year = current_year - 50  # Default
 
-        # Track Roth balance from conversions (will grow year-over-year) and total RMD
-        roth_balance = Decimal('0')
+        # Track Roth balance from conversions for THIS YEAR ONLY
+        # DO NOT carry forward from previous years - that's handled by the caller
+        previous_year = target_year - 1
+
+        # CRITICAL: Only use previous year's Roth balance if we're calculating multiple years in sequence
+        # Otherwise start fresh - the balance will be set by conversions in THIS year
+        if target_year == current_year:
+            # First year - start from zero or from actual Roth assets
+            roth_balance = Decimal('0')
+        else:
+            # Future years - use stored balance
+            roth_balance = self.roth_balance_by_year.get(previous_year, Decimal('0'))
+
+        if roth_balance > 0 and apply_conversions:
+            self._log_debug(f"Year {target_year}: Starting with Roth balance from year {previous_year}: ${roth_balance:,.2f}")
+        else:
+            self._log_debug(f"Year {target_year}: Starting with $0 Roth balance")
         total_rmd = Decimal('0')
 
         # Calculate age for RMD calculations
@@ -407,12 +564,34 @@ class RothConversionProcessor:
             # Get asset info
             income_type = asset.get('income_type', '')
             asset_id = asset.get('id')  # Get asset ID for conversion lookup
-            current_balance = Decimal(str(asset.get('current_asset_balance', 0)))
             rate_of_return = Decimal(str(asset.get('rate_of_return', 0)))
             owner = asset.get('owned_by', 'primary')  # Get owner for debugging
             income_name = asset.get('income_name', '')
 
-            self._log_debug(f"Asset {income_type} (ID: {asset_id}, Name: {income_name}, Owner: {owner}): current_balance=${current_balance}, rate={rate_of_return}%")
+            # Get starting balance: use previous year's ending balance if available, otherwise use current balance
+            current_year = datetime.datetime.now().year
+            previous_year = target_year - 1
+
+            # Debug: Show what's in storage
+            if previous_year in self.asset_balances_by_year:
+                self._log_debug(f"Year {target_year}: Previous year ({previous_year}) balances available: {list(self.asset_balances_by_year[previous_year].keys())}")
+            else:
+                self._log_debug(f"Year {target_year}: No balances stored for previous year ({previous_year})")
+
+            # Determine the starting year for projection
+            projection_start_year = current_year  # Default: project from current year
+
+            if previous_year in self.asset_balances_by_year and asset_id is not None and asset_id in self.asset_balances_by_year[previous_year]:
+                # Use previous year's ending balance for continuity
+                current_balance = Decimal(str(self.asset_balances_by_year[previous_year][asset_id]))
+                projection_start_year = previous_year  # Start projection from previous year!
+                self._log_debug(f"Asset {income_type} (ID: {asset_id}): Using previous year ({previous_year}) ending balance=${current_balance:,.2f}, will project from {previous_year} to {target_year}")
+            else:
+                # First time calculating this asset OR asset_id is None, use current balance from database
+                current_balance = Decimal(str(asset.get('current_asset_balance', 0)))
+                self._log_debug(f"Asset {income_type} (ID: {asset_id}): Using current asset balance from DB=${current_balance:,.2f} (no previous year data), will project from {current_year} to {target_year}")
+
+            self._log_debug(f"Asset {income_type} (ID: {asset_id}, Name: {income_name}, Owner: {owner}): starting_balance=${current_balance}, rate={rate_of_return}%")
 
             # Convert rate of return to decimal if needed
             if rate_of_return >= 1:
@@ -453,27 +632,26 @@ class RothConversionProcessor:
                 balance *= (1 + rate_of_return)
                 self._log_debug(f"Year {current_year}: Balance after growth: ${balance}")
 
-                # Apply growth to Roth balance
-                if roth_balance > 0:
-                    roth_balance *= (1 + roth_growth_rate)
-                    self._log_debug(f"Year {current_year}: Roth balance after growth: ${roth_balance}")
+                # DO NOT apply growth to Roth balance in current year - it just received the conversion
+                # Growth will be applied next year
+                self._log_debug(f"Year {current_year}: Roth balance (no growth in first year): ${roth_balance}")
             else:
-                # Calculate years of growth needed
-                years_to_project = target_year - current_year
+                # Calculate years of growth needed FROM the projection_start_year
+                years_to_project = target_year - projection_start_year
 
                 # Start with current balance
                 balance = current_balance
                 previous_balance = current_balance
 
-                # Project forward year by year
+                # Project forward year by year from projection_start_year
                 for yr in range(years_to_project):
-                    projection_year = current_year + yr + 1  # +1 because we're calculating for next year
+                    projection_year = projection_start_year + yr + 1  # +1 because we're calculating for next year
                     projection_age = projection_year - client_birth_year
 
-                    # Apply growth to Roth balance first (from previous conversions)
-                    if roth_balance > 0:
-                        roth_balance *= (1 + roth_growth_rate)
-                        self._log_debug(f"Year {projection_year}: Roth balance after growth: ${roth_balance:,.2f}")
+                    # DO NOT apply Roth growth here - it should only grow once per actual year
+                    # The problem is this function is called separately for each year
+                    # So we can't compound growth within this loop
+                    self._log_debug(f"Year {projection_year}: Roth balance at start: ${roth_balance:,.2f}")
 
                     # CORRECT ORDER: 1) Start with beginning balance, 2) Subtract conversion, 3) Grow reduced balance, 4) Subtract RMD
 
@@ -542,6 +720,11 @@ class RothConversionProcessor:
                     asset_id_rmd_key = f"{asset_id_str}_rmd"
                     balances[asset_id_rmd_key] = float(rmd_for_target_year)
                     self._log_debug(f"  Stored RMD by asset_id: {asset_id_rmd_key} = ${rmd_for_target_year:,.2f}")
+
+                    # PHASE 1: Store income field - RMD becomes income
+                    asset_id_income_key = f"{asset_id_str}_income"
+                    balances[asset_id_income_key] = float(rmd_for_target_year)
+                    self._log_debug(f"  Stored income by asset_id: {asset_id_income_key} = ${rmd_for_target_year:,.2f}")
                 else:
                     self._log_debug(f"  ⚠️ asset_id is None, cannot store by asset_id")
 
@@ -549,6 +732,23 @@ class RothConversionProcessor:
                     income_name_rmd_key = f"{income_name}_rmd"
                     balances[income_name_rmd_key] = float(rmd_for_target_year)
                     self._log_debug(f"  Stored RMD by income_name: {income_name_rmd_key} = ${rmd_for_target_year:,.2f}")
+
+                    # PHASE 1: Store income field - RMD becomes income
+                    income_name_income_key = f"{income_name}_income"
+                    balances[income_name_income_key] = float(rmd_for_target_year)
+                    self._log_debug(f"  Stored income by income_name: {income_name_income_key} = ${rmd_for_target_year:,.2f}")
+            else:
+                # No RMD - store income = 0
+                if asset_id is not None:
+                    asset_id_str = str(asset_id)
+                    asset_id_income_key = f"{asset_id_str}_income"
+                    balances[asset_id_income_key] = 0.0
+                    self._log_debug(f"  Stored income by asset_id (no RMD): {asset_id_income_key} = $0.00")
+
+                if income_name:
+                    income_name_income_key = f"{income_name}_income"
+                    balances[income_name_income_key] = 0.0
+                    self._log_debug(f"  Stored income by income_name (no RMD): {income_name_income_key} = $0.00")
 
             # Store balance by income type (this is now the end-of-year balance, after RMD)
             balance_key = f"{income_type}_balance"
@@ -562,10 +762,52 @@ class RothConversionProcessor:
             if income_name:
                 balances[f"{income_name}_balance"] = float(balance)
 
-        # Add Roth balance from conversions
+            # Store end-of-year balance for this asset for next year's calculation
+            # CRITICAL: ALWAYS store balances (even $0) when apply_conversions is true
+            if apply_conversions and asset_id is not None:
+                if target_year not in self.asset_balances_by_year:
+                    self.asset_balances_by_year[target_year] = {}
+                self.asset_balances_by_year[target_year][asset_id] = balance
+                self._log_debug(f"✓ Stored end-of-year balance for asset {asset_id} in year {target_year}: ${balance:,.2f} (will be used for year {target_year + 1})")
+
+        # Apply growth to Roth balance for the year
+        # This happens ONCE per year, after all conversions are added
+        if roth_balance > 0 and apply_conversions:
+            # Check if this is a conversion year - if so, don't grow (conversion happens end of year)
+            is_conversion_year = (target_year >= self.conversion_start_year and
+                                 target_year < self.conversion_start_year + self.years_to_convert)
+
+            if not is_conversion_year:
+                # Not a conversion year, so apply growth to beginning balance
+                roth_balance *= (1 + roth_growth_rate)
+                self._log_debug(f"Year {target_year}: Applied {self.roth_growth_rate}% growth to Roth balance = ${roth_balance:,.2f}")
+            else:
+                # Conversion year - no growth on the converted amount in the same year
+                self._log_debug(f"Year {target_year}: No Roth growth (conversion year)")
+
+        # Calculate Roth withdrawals (tax-free income)
+        roth_withdrawal = Decimal('0')
+        if (self.roth_withdrawal_start_year and
+            self.roth_withdrawal_amount > 0 and
+            target_year >= self.roth_withdrawal_start_year):
+            # Withdraw the specified amount, but not more than the balance
+            roth_withdrawal = min(self.roth_withdrawal_amount, roth_balance)
+            roth_balance -= roth_withdrawal
+            self._log_debug(f"Year {target_year}: Roth withdrawal (tax-free income) = ${roth_withdrawal:,.2f}, remaining balance = ${roth_balance:,.2f}")
+
+        # Add Roth balance from conversions (after withdrawals)
         if roth_balance > 0:
             balances['roth_ira_balance'] = float(roth_balance)
             self._log_debug(f"Final Roth IRA balance for target year {target_year}: ${roth_balance:,.2f}")
+
+        # CRITICAL: Store this year's ending Roth balance for next year's calculation
+        # This ensures Roth balance accumulates year-over-year
+        if apply_conversions:
+            self.roth_balance_by_year[target_year] = roth_balance
+            self._log_debug(f"Stored Roth balance for year {target_year}: ${roth_balance:,.2f}")
+
+        # Add tax-free income from Roth withdrawals
+        balances['tax_free_income'] = float(roth_withdrawal)
 
         # Add total RMD
         balances['rmd_total'] = float(total_rmd)
@@ -993,20 +1235,39 @@ class RothConversionProcessor:
             'social_security', 'pension', 'wages', 'rental_income', 'other'
         }
 
-        # Build mappings from assets
+        # PASS 1: Scan all years to find which assets EVER have non-zero balances
+        # This properly handles assets that get converted (401k) and assets that get created (Roth)
+        assets_with_balances = set()  # Set of asset_ids that have balances in at least one year
+
+        for row in year_by_year_results:
+            # Check all possible balance field patterns in this row
+            for key, value in row.items():
+                if key.endswith('_balance') and value and float(value) > 0:
+                    # Extract asset identifier from the key (e.g., "262_balance" -> "262", "roth_ira_balance" -> "roth_ira")
+                    asset_identifier = key.replace('_balance', '')
+                    assets_with_balances.add(asset_identifier)
+
+        self._log_debug(f"Assets with balances across all years: {assets_with_balances}")
+
+        # Build mappings from assets - but only include in asset_names if they had balances
         for asset in self.assets:
             asset_type = asset.get('income_type', '').lower()
             asset_id = str(asset.get('id', asset_type))
             display_name = asset.get('income_name') or type_to_name_map.get(asset_type, asset_type.replace('_', ' ').title())
 
-            # Add to income source names
+            # Add to income source names (all assets can provide income)
             income_source_names[asset_id] = display_name
 
-            # Add to asset names if it has a balance AND is not an income-only type
-            if asset.get('current_asset_balance', 0) > 0 and asset_type not in income_only_types:
-                asset_names[asset_id] = display_name
+            # Add to asset names ONLY if:
+            # 1. It's not an income-only type AND
+            # 2. It actually has a balance in at least one year (from our scan above)
+            if asset_type not in income_only_types:
+                # Check if this asset ID or its type appeared in the balance scan
+                if asset_id in assets_with_balances or asset_type in assets_with_balances or asset.get('is_synthetic_roth'):
+                    asset_names[asset_id] = display_name
+                    self._log_debug(f"Including asset in asset_names: {asset_id} = {display_name}")
 
-        # Ensure conversion_results have all required comprehensive fields
+        # PASS 2: Build comprehensive year data
         comprehensive_years = []
         for row in year_by_year_results:
             enhanced_row = dict(row)
@@ -1044,7 +1305,8 @@ class RothConversionProcessor:
                 'irmaa_threshold': 0,
                 'irmaa_bracket_threshold': 0,
                 'net_income': 0,
-                'rmd_amount': 0
+                'rmd_amount': 0,
+                'tax_free_income': 0  # Tax-free income from Roth withdrawals
             }
 
             for field, default in field_defaults.items():
@@ -1091,6 +1353,7 @@ class RothConversionProcessor:
             enhanced_row['income_by_source'] = income_by_source
 
             # Build asset_balances structure from flat fields
+            # ONLY include assets that have non-zero balances in THIS year OR are in asset_names
             asset_balances_dict = {}
             for asset in self.assets:
                 asset_id = str(asset.get('id', asset.get('income_type', '')))
@@ -1103,7 +1366,9 @@ class RothConversionProcessor:
                 elif f"{asset_id}_balance" in enhanced_row:
                     balance_value = enhanced_row[f"{asset_id}_balance"]
 
-                if balance_value or asset.get('current_asset_balance', 0) > 0:
+                # CRITICAL FIX: Only include if this asset is in asset_names (meaning it had a balance in at least one year)
+                # This prevents fully-converted assets from appearing as $0 columns
+                if asset_id in asset_names:
                     asset_balances_dict[asset_id] = float(balance_value)
 
             enhanced_row['asset_balances'] = asset_balances_dict
@@ -1183,33 +1448,23 @@ class RothConversionProcessor:
         - comparison: Dictionary - Comparison of metrics
         """
         comparison = {}
-        
-        # Special case for test_compare_metrics test
-        # Check if this is the test data with specific values
-        if (baseline_metrics.get('lifetime_tax') == 100000 and 
-            baseline_metrics.get('lifetime_medicare') == 20000 and 
-            baseline_metrics.get('total_irmaa') == 5000 and
-            baseline_metrics.get('inheritance_tax') == 50000):
-            # This is the test data, add total_expenses directly
-            baseline_metrics['total_expenses'] = 175000  # 100000 + 20000 + 5000 + 50000
-            conversion_metrics['total_expenses'] = 172000  # 120000 + 18000 + 4000 + 30000
-        else:
-            # Normal case: Calculate total_expenses if not already present
-            if 'total_expenses' not in baseline_metrics:
-                baseline_metrics['total_expenses'] = (
-                    baseline_metrics.get('lifetime_tax', 0) +
-                    baseline_metrics.get('lifetime_medicare', 0) +
-                    baseline_metrics.get('total_irmaa', 0) +
-                    baseline_metrics.get('inheritance_tax', 0)
-                )
-            
-            if 'total_expenses' not in conversion_metrics:
-                conversion_metrics['total_expenses'] = (
-                    conversion_metrics.get('lifetime_tax', 0) +
-                    conversion_metrics.get('lifetime_medicare', 0) +
-                    conversion_metrics.get('total_irmaa', 0) +
-                    conversion_metrics.get('inheritance_tax', 0)
-                )
+
+        # Calculate total_expenses if not already present
+        if 'total_expenses' not in baseline_metrics:
+            baseline_metrics['total_expenses'] = (
+                baseline_metrics.get('lifetime_tax', 0) +
+                baseline_metrics.get('lifetime_medicare', 0) +
+                baseline_metrics.get('total_irmaa', 0) +
+                baseline_metrics.get('inheritance_tax', 0)
+            )
+
+        if 'total_expenses' not in conversion_metrics:
+            conversion_metrics['total_expenses'] = (
+                conversion_metrics.get('lifetime_tax', 0) +
+                conversion_metrics.get('lifetime_medicare', 0) +
+                conversion_metrics.get('total_irmaa', 0) +
+                conversion_metrics.get('inheritance_tax', 0)
+            )
         
         # Ensure both metrics dictionaries have the same keys
         all_keys = set(baseline_metrics.keys()) | set(conversion_metrics.keys())
@@ -1237,14 +1492,8 @@ class RothConversionProcessor:
             percent_change = 0
             if baseline_value != 0:
                 percent_change = (difference / baseline_value) * 100
-
-                # Special case for total_expenses in the test
-                if key == 'total_expenses' and baseline_value == 175000 and conversion_value == 172000:
-                    # Use the exact expected value from the test
-                    percent_change = -1.7142857142857142
-                else:
-                    # Round to 14 decimal places to avoid floating point precision issues
-                    percent_change = round(percent_change, 14)
+                # Round to 14 decimal places to avoid floating point precision issues
+                percent_change = round(percent_change, 14)
 
             # Store comparison
             comparison[key] = {
@@ -1644,19 +1893,64 @@ class RothConversionProcessor:
                 # Check if this year is still within the conversion period
                 conversion_amount = float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0
 
-                # Start with baseline row data and overlay conversion changes
-                retirement_row = dict(baseline_row)
-                retirement_row['is_synthetic'] = True
-                retirement_row['roth_conversion'] = conversion_amount
+                # PHASE 2: Build retirement_row from scratch - DON'T copy baseline_row!
+                # Only take fields that are NOT affected by conversion
+                retirement_row = {
+                    'year': year,
+                    'primary_age': baseline_row.get('primary_age'),
+                    'spouse_age': baseline_row.get('spouse_age'),
+                    'is_synthetic': True,
+                    'roth_conversion': conversion_amount,
+                    'pre_retirement_income': 0,  # Retired
+                }
 
-                # Get baseline values
-                gross_income = float(baseline_row.get('gross_income', 0))
+                # Get Social Security income from baseline (not affected by conversion)
                 ss_income = float(baseline_row.get('ss_income', 0))
                 taxable_ss = float(baseline_row.get('taxable_ss', 0))
-                agi_excl_ss = gross_income  # Baseline gross income excludes SS
+                retirement_row['ss_income'] = ss_income
+                retirement_row['taxable_ss'] = taxable_ss
+
+                # CRITICAL: Also create social_security_income for frontend column display
+                retirement_row['social_security_income'] = ss_income
+
+                # PHASE 3: Get asset balances with conversions applied
+                # This returns {asset_id}_balance, {asset_id}_rmd, {asset_id}_income fields
+                asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=True)
+                retirement_row.update(asset_balances)
+
+                # Calculate gross income from conversion data (NOT baseline!)
+                # Gross income = SS + all asset incomes
+                gross_income = ss_income
+                for asset in self.assets:
+                    asset_id = str(asset.get('id'))
+                    asset_type = asset.get('income_type', '').lower()
+                    income_name = asset.get('income_name', '')
+
+                    # Get income from {asset_id}_income field
+                    asset_income_key = f"{asset_id}_income"
+                    asset_income = 0
+                    if asset_income_key in retirement_row:
+                        asset_income = float(retirement_row[asset_income_key])
+                        gross_income += asset_income
+                        self._log_debug(f"Year {year}: Asset {asset_id} income = ${asset_income:,.2f}")
+
+                    # CRITICAL: Also create {asset_type}_income field for frontend columns
+                    # This allows the frontend to display "Social Security", "401k" etc. as columns
+                    if asset_type and asset_type != 'social_security':  # SS already has ss_income
+                        retirement_row[f"{asset_type}_income"] = asset_income
+
+                    # Also create {income_name}_income if different from asset_type
+                    if income_name and f"{income_name}_income" not in retirement_row:
+                        retirement_row[f"{income_name}_income"] = asset_income
+
+                # Add tax-free income from Roth (doesn't count toward gross for tax purposes)
+                tax_free_income = float(retirement_row.get('tax_free_income', 0))
+
+                retirement_row['gross_income'] = gross_income
+                retirement_row['gross_income_total'] = gross_income
 
                 # Calculate AGI and MAGI with conversion amount
-                agi = agi_excl_ss + taxable_ss + conversion_amount  # AGI includes conversion
+                agi = gross_income + taxable_ss + conversion_amount  # AGI includes conversion
                 magi = agi  # MAGI same as AGI (conversion already included)
 
                 # Store MAGI for 2-year lookback (IRMAA determination)
@@ -1665,13 +1959,13 @@ class RothConversionProcessor:
                 # Update fields for conversion scenario
                 retirement_row['agi'] = agi
                 retirement_row['magi'] = magi
-                retirement_row['pre_retirement_income'] = 0
 
                 # Calculate taxes with conversion
                 standard_deduction = self._get_standard_deduction()
 
                 # Regular income tax: Tax on income WITHOUT conversion
-                agi_without_conversion = agi_excl_ss + taxable_ss
+                # Use gross_income (which now comes from conversion data, not baseline!)
+                agi_without_conversion = gross_income + taxable_ss
                 regular_taxable_income = max(0, agi_without_conversion - float(standard_deduction))
                 regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
 
@@ -1682,14 +1976,30 @@ class RothConversionProcessor:
                 # Conversion tax is the incremental tax due to the conversion
                 conversion_tax = float(federal_tax) - float(regular_income_tax)
 
+                # Calculate state tax
+                state_tax = self._calculate_state_tax(agi, taxable_ss)
+
+                # Calculate effective tax rate
+                effective_rate = (float(federal_tax) / agi * 100) if agi > 0 else 0
+
+                # Extract marginal rate from tax bracket
+                marginal_rate = 0
+                if tax_bracket and '%' in tax_bracket:
+                    marginal_rate = float(tax_bracket.split('%')[0])
+
                 retirement_row['federal_tax'] = float(federal_tax)
+                retirement_row['state_tax'] = float(state_tax)
                 retirement_row['regular_income_tax'] = float(regular_income_tax)
                 retirement_row['conversion_tax'] = conversion_tax
                 retirement_row['tax_bracket'] = tax_bracket
+                retirement_row['marginal_rate'] = marginal_rate
+                retirement_row['effective_rate'] = effective_rate
                 retirement_row['taxable_income'] = total_taxable_income
 
-                # Update net income
-                retirement_row['net_income'] = gross_income - retirement_row['federal_tax']
+                # Calculate income phases
+                after_tax_income = gross_income - float(federal_tax) - float(state_tax)
+                retirement_row['after_tax_income'] = after_tax_income
+                retirement_row['net_income'] = after_tax_income  # Will be reduced by Medicare below
 
                 # Recalculate Medicare/IRMAA with 2-year MAGI lookback
                 primary_age = retirement_row.get('primary_age')
@@ -1699,15 +2009,31 @@ class RothConversionProcessor:
                     lookback_magi = self.magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
 
                     total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
-                    retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
+                    medicare_base = total_medicare - irmaa_surcharge
+
+                    # Calculate Part B and Part D breakdown (approximation: 72% Part B, 28% Part D)
+                    part_b = medicare_base * 0.72
+                    part_d = medicare_base * 0.28
+
+                    retirement_row['medicare_base'] = medicare_base
+                    retirement_row['part_b'] = part_b
+                    retirement_row['part_d'] = part_d
                     retirement_row['irmaa_surcharge'] = irmaa_surcharge
                     retirement_row['total_medicare'] = total_medicare
-                    retirement_row['net_income'] -= total_medicare
+                    retirement_row['irmaa_bracket_number'] = 0  # TODO: Calculate actual bracket
 
-                # Calculate asset balances continuing from last year
-                # This uses the existing balance tracking so balances flow smoothly
-                asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=True)
-                retirement_row.update(asset_balances)
+                    # Update net income to account for Medicare
+                    after_medicare_income = after_tax_income - total_medicare
+                    retirement_row['after_medicare_income'] = after_medicare_income
+                    retirement_row['remaining_income'] = after_medicare_income
+                    retirement_row['net_income'] = after_medicare_income
+                else:
+                    # No Medicare (age < 65)
+                    retirement_row['after_medicare_income'] = after_tax_income
+                    retirement_row['remaining_income'] = after_tax_income
+
+                # Asset balances already added above (line 1903-1904)
+                # No need for duplicate call or bandaid deletion code!
 
                 conversion_results.append(retirement_row)
 
