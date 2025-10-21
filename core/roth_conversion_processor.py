@@ -693,15 +693,20 @@ class RothConversionProcessor:
                     balance *= (1 + rate_of_return)
                     self._log_debug(f"Year {projection_year}: Balance after growth: ${balance:,.2f}")
 
-                    # Step 4: Calculate RMD based on end-of-year balance (after growth) and subtract it
-                    # RMDs are calculated at the beginning of the year based on previous year-end balance
+                    # CRITICAL: Save balance BEFORE RMD for next year's RMD calculation
+                    # RMD is always based on the PREVIOUS year's ENDING balance (after growth, before RMD)
+                    balance_before_rmd = balance
+
+                    # Step 4: Calculate RMD based on previous year's ending balance
+                    # For the first iteration, previous_balance is the starting balance
+                    # For subsequent iterations, it's the balance from the previous year (after growth, before RMD)
                     rmd = self._calculate_rmd_for_asset(asset, projection_year, previous_balance, projection_age)
                     if rmd > 0:
                         balance -= rmd
-                        self._log_debug(f"Year {projection_year}: Applied RMD ${rmd:,.2f}, balance after RMD: ${balance:,.2f}")
+                        self._log_debug(f"Year {projection_year}: Applied RMD ${rmd:,.2f} (based on prev year balance ${previous_balance:,.2f}), balance after RMD: ${balance:,.2f}")
 
-                    # Store previous balance for next year's RMD calculation
-                    previous_balance = balance
+                    # Store balance BEFORE RMD for next year's RMD calculation
+                    previous_balance = balance_before_rmd
 
             # Calculate RMD for target year (using previous year's balance or current year balance for current year)
             # This is the RMD that would be required in the target year
@@ -1353,17 +1358,17 @@ class RothConversionProcessor:
             income_by_source = {}
             for asset in self.assets:
                 asset_id = str(asset.get('id', asset.get('income_type', '')))
-                asset_type = asset.get('income_type', '').lower()
+                asset_type = asset.get('income_type', '')  # FIXED: Don't lowercase - match storage
 
                 # Look for income fields in the row
-                # Check various possible field names
+                # CRITICAL: Check asset_id FIRST because multiple assets can have the same income_type!
                 income_value = 0
-                if f"{asset_type}_income" in enhanced_row:
-                    income_value = enhanced_row[f"{asset_type}_income"]
-                elif f"{asset_id}_income" in enhanced_row:
+                if f"{asset_id}_income" in enhanced_row:
                     income_value = enhanced_row[f"{asset_id}_income"]
-                elif asset_type == 'social_security' and 'ss_income' in enhanced_row:
+                elif asset_type.lower() == 'social_security' and 'ss_income' in enhanced_row:
                     income_value = enhanced_row['ss_income']
+                elif f"{asset_type}_income" in enhanced_row:
+                    income_value = enhanced_row[f"{asset_type}_income"]
 
                 if income_value:
                     income_by_source[asset_id] = float(income_value)
@@ -1375,14 +1380,15 @@ class RothConversionProcessor:
             asset_balances_dict = {}
             for asset in self.assets:
                 asset_id = str(asset.get('id', asset.get('income_type', '')))
-                asset_type = asset.get('income_type', '').lower()
+                asset_type = asset.get('income_type', '')  # FIXED: Don't lowercase - match storage
 
                 # Look for balance fields in the row
+                # CRITICAL: Check asset_id FIRST because multiple assets can have the same income_type!
                 balance_value = 0
-                if f"{asset_type}_balance" in enhanced_row:
-                    balance_value = enhanced_row[f"{asset_type}_balance"]
-                elif f"{asset_id}_balance" in enhanced_row:
+                if f"{asset_id}_balance" in enhanced_row:
                     balance_value = enhanced_row[f"{asset_id}_balance"]
+                elif f"{asset_type}_balance" in enhanced_row:
+                    balance_value = enhanced_row[f"{asset_type}_balance"]
 
                 # CRITICAL FIX: Only include if this asset is in asset_names (meaning it had a balance in at least one year)
                 # This prevents fully-converted assets from appearing as $0 columns
@@ -1404,20 +1410,21 @@ class RothConversionProcessor:
 
             for asset in self.assets:
                 asset_id = str(asset.get('id', asset.get('income_type', '')))
-                asset_type = asset.get('income_type', '').lower()
+                asset_type = asset.get('income_type', '')  # FIXED: Don't lowercase - match storage at line 723
                 income_name = asset.get('income_name', '')
 
                 # Look for RMD fields (check all possible key patterns)
+                # CRITICAL: Check asset_id FIRST because multiple assets can have the same income_type!
                 rmd_value = 0
-                if f"{asset_type}_rmd" in enhanced_row:
-                    rmd_value = enhanced_row[f"{asset_type}_rmd"]
-                    self._log_debug(f"Found RMD via asset_type: {asset_type}_rmd = {rmd_value}")
-                elif f"{asset_id}_rmd" in enhanced_row:
+                if f"{asset_id}_rmd" in enhanced_row:
                     rmd_value = enhanced_row[f"{asset_id}_rmd"]
                     self._log_debug(f"Found RMD via asset_id: {asset_id}_rmd = {rmd_value}")
                 elif income_name and f"{income_name}_rmd" in enhanced_row:
                     rmd_value = enhanced_row[f"{income_name}_rmd"]
                     self._log_debug(f"Found RMD via income_name: {income_name}_rmd = {rmd_value}")
+                elif f"{asset_type}_rmd" in enhanced_row:
+                    rmd_value = enhanced_row[f"{asset_type}_rmd"]
+                    self._log_debug(f"Found RMD via asset_type: {asset_type}_rmd = {rmd_value}")
 
                 if rmd_value:
                     rmd_required[asset_id] = float(rmd_value)
@@ -1425,7 +1432,11 @@ class RothConversionProcessor:
 
             if rmd_required:
                 enhanced_row['rmd_required'] = rmd_required
-                self._log_debug(f"Year {enhanced_row.get('year')}: rmd_required = {rmd_required}")
+                rmd_required_sum = sum(rmd_required.values())
+                rmd_total_value = enhanced_row.get('rmd_total', 0)
+                self._log_debug(f"Year {enhanced_row.get('year')}: rmd_required = {rmd_required}, sum={rmd_required_sum}, rmd_total={rmd_total_value}")
+                if abs(rmd_required_sum - rmd_total_value) > 0.01:
+                    print(f"⚠️ WARNING: Year {enhanced_row.get('year')} RMD mismatch! rmd_required sum={rmd_required_sum:,.2f} but rmd_total={rmd_total_value:,.2f}")
             else:
                 self._log_debug(f"Year {enhanced_row.get('year')}: No RMDs found (rmd_required will not be set)")
 
