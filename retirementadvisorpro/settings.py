@@ -410,6 +410,29 @@ else:
     PAYMENT_DUPLICATE_WINDOW = 60  # Prevent duplicate payments within 60 seconds
 
 # =============================================================================
+# KAJABI CONFIGURATION (NSSA Partnership)
+# =============================================================================
+# Kajabi webhook secret for signature verification
+KAJABI_WEBHOOK_SECRET = os.environ.get('KAJABI_WEBHOOK_SECRET', '')
+
+# Kajabi API credentials (for checking subscription status)
+KAJABI_API_KEY = os.environ.get('KAJABI_API_KEY', '')
+KAJABI_API_BASE_URL = os.environ.get('KAJABI_API_BASE_URL', 'https://api.kajabi.com')
+
+# NSSA Product Configuration
+NSSA_KAJABI_PRODUCT_ID = os.environ.get('NSSA_KAJABI_PRODUCT_ID', '')  # The Kajabi product ID for NSSA membership
+NSSA_ANNUAL_PRICE = 299  # $299 annual membership
+
+# Admin notification email
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@retirementadvisorpro.com')
+
+# Frontend URL for password setup links
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
+# Default from email
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@retirementadvisorpro.com')
+
+# =============================================================================
 # CELERY CONFIGURATION
 # =============================================================================
 
