@@ -11,7 +11,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 import logging
 
-from .cookie_auth import create_jwt_pair_for_user, set_auth_cookies
+from .authentication import create_jwt_pair_for_user
+from .cookie_auth import set_auth_cookies
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
