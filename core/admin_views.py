@@ -18,7 +18,7 @@ from .models import (
     Client, Scenario, Communication, Task, Lead, CustomUser,
     ActivityLog, EmailAccount, CalendarEvent, Document,
     RevenueMetric, UserEngagementMetric, ClientPortfolioAnalytics,
-    SystemPerformanceMetric, SupportTicket, AlertRule
+    SystemPerformanceMetric, SupportTicket, AlertRule, KajabiWebhookEvent
 )
 from .decorators import admin_required
 from .serializers_main import UserSerializer
@@ -4341,5 +4341,107 @@ def delete_user_complete(request, user_id):
         return Response({
             'error': f'Failed to delete user: {str(e)}',
             'success': False
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@admin_required()
+def kajabi_webhook_logs(request):
+    """
+    Get Kajabi webhook logs for admin dashboard.
+    Returns webhook events with extracted user details for easy viewing.
+    """
+    try:
+        # Get query parameters for filtering
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 50))
+        event_type = request.GET.get('event_type', '')
+        processed = request.GET.get('processed', '')
+        search = request.GET.get('search', '')
+
+        # Build query
+        query = KajabiWebhookEvent.objects.all()
+
+        # Apply filters
+        if event_type:
+            query = query.filter(event_type=event_type)
+
+        if processed == 'true':
+            query = query.filter(processed=True)
+        elif processed == 'false':
+            query = query.filter(processed=False)
+
+        if search:
+            query = query.filter(
+                Q(user__email__icontains=search) |
+                Q(user__first_name__icontains=search) |
+                Q(user__last_name__icontains=search) |
+                Q(event_id__icontains=search)
+            )
+
+        # Get total count
+        total_count = query.count()
+
+        # Paginate
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        events = query[start_idx:end_idx]
+
+        # Format the results
+        results = []
+        for event in events:
+            # Extract user details from payload or linked user
+            if event.user:
+                first_name = event.user.first_name
+                last_name = event.user.last_name
+                email = event.user.email
+                token = event.user.metadata.get('password_setup_token', 'N/A') if event.user.metadata else 'N/A'
+            else:
+                # Try to extract from payload
+                member = event.payload.get('member', {})
+                first_name = member.get('first_name', 'N/A')
+                last_name = member.get('last_name', 'N/A')
+                email = member.get('email', 'N/A')
+                token = 'N/A'
+
+            # Determine result status
+            if event.processed:
+                result = 'Success'
+            elif event.error_message:
+                result = f'Failed: {event.error_message[:100]}'
+            else:
+                result = 'Pending'
+
+            results.append({
+                'id': event.id,
+                'date': event.created_at.strftime('%Y-%m-%d'),
+                'time': event.created_at.strftime('%H:%M:%S'),
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': email,
+                'event_type': event.event_type,
+                'event_id': event.event_id,
+                'token': token if token != 'N/A' else '',
+                'result': result,
+                'processed': event.processed,
+                'error_message': event.error_message or '',
+                'created_at': event.created_at.isoformat(),
+                'processed_at': event.processed_at.isoformat() if event.processed_at else None,
+            })
+
+        return Response({
+            'results': results,
+            'total_count': total_count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total_count + page_size - 1) // page_size
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"❌ Error fetching webhook logs: {str(e)}")
+        print(traceback.format_exc())
+        return Response({
+            'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

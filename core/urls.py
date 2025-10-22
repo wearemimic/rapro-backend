@@ -55,7 +55,9 @@ from .admin_views import (
     admin_restore_tax_data_backup, admin_tax_data_validation_rules,
     # Phase 3.2: Configuration Management
     FeatureFlagViewSet, SystemConfigurationViewSet, IntegrationSettingsViewSet,
-    EmailTemplateViewSet, ConfigurationAuditLogViewSet, configuration_summary
+    EmailTemplateViewSet, ConfigurationAuditLogViewSet, configuration_summary,
+    # Kajabi Integration
+    kajabi_webhook_logs
 )
 
 # Create routers for ViewSets
@@ -319,6 +321,9 @@ urlpatterns = [
     
     # Billing Management API endpoints
     path('admin/billing/', admin_billing_data, name='admin-billing-data'),
+
+    # Kajabi Integration API endpoints
+    path('admin/kajabi/webhooks/', kajabi_webhook_logs, name='admin-kajabi-webhook-logs'),
     
     # User Billing API endpoints  
     path('billing/subscription/', subscription_details, name='billing-subscription'),

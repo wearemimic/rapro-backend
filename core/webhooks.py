@@ -268,6 +268,10 @@ def kajabi_webhook(request):
     """
     Handle incoming webhooks from Kajabi for NSSA partnership.
     Events: purchase.created, subscription.canceled, subscription.renewed, subscription.expired
+
+    Authentication:
+    - Bearer Token: Send "Authorization: Bearer <token>" header (for testing/simple integration)
+    - HMAC Signature: Send "X-Kajabi-Signature" header (production Kajabi webhooks)
     """
     payload = request.body
 
@@ -278,11 +282,10 @@ def kajabi_webhook(request):
 
         logger.info(f"📩 Received Kajabi webhook: {event_type} (ID: {event_id})")
 
-        # Verify webhook signature (if configured)
-        if hasattr(settings, 'KAJABI_WEBHOOK_SECRET') and settings.KAJABI_WEBHOOK_SECRET:
-            if not verify_kajabi_signature(request):
-                logger.error("❌ Kajabi webhook signature verification failed")
-                return HttpResponse(status=401)
+        # Verify authentication (bearer token OR HMAC signature)
+        if not verify_kajabi_auth(request):
+            logger.error("❌ Kajabi webhook authentication failed")
+            return HttpResponse(status=401)
 
         # Check for duplicate event (idempotency)
         if KajabiWebhookEvent.objects.filter(event_id=event_id).exists():
@@ -329,13 +332,37 @@ def kajabi_webhook(request):
         return HttpResponse(status=500)
 
 
+def verify_bearer_token(request):
+    """
+    Verify bearer token authentication.
+    Checks for "Authorization: Bearer <token>" header.
+    """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+
+    if not auth_header.startswith('Bearer '):
+        return False
+
+    token = auth_header[7:]  # Remove "Bearer " prefix
+
+    # Check if bearer token is configured
+    if not hasattr(settings, 'KAJABI_WEBHOOK_BEARER_TOKEN') or not settings.KAJABI_WEBHOOK_BEARER_TOKEN:
+        return False
+
+    # Compare tokens using constant-time comparison
+    return hmac.compare_digest(token, settings.KAJABI_WEBHOOK_BEARER_TOKEN)
+
+
 def verify_kajabi_signature(request):
     """
-    Verify the Kajabi webhook signature.
+    Verify the Kajabi webhook HMAC signature.
     Kajabi typically sends a signature in the X-Kajabi-Signature header.
     """
     signature = request.META.get('HTTP_X_KAJABI_SIGNATURE')
     if not signature:
+        return False
+
+    # Check if HMAC secret is configured
+    if not hasattr(settings, 'KAJABI_WEBHOOK_SECRET') or not settings.KAJABI_WEBHOOK_SECRET:
         return False
 
     secret = settings.KAJABI_WEBHOOK_SECRET
@@ -348,6 +375,26 @@ def verify_kajabi_signature(request):
     ).hexdigest()
 
     return hmac.compare_digest(signature, expected_signature)
+
+
+def verify_kajabi_auth(request):
+    """
+    Verify Kajabi webhook authentication.
+    Accepts either bearer token OR HMAC signature.
+    """
+    # Try bearer token first (simpler for testing)
+    if verify_bearer_token(request):
+        logger.info("✅ Kajabi webhook authenticated via bearer token")
+        return True
+
+    # Try HMAC signature (production Kajabi)
+    if verify_kajabi_signature(request):
+        logger.info("✅ Kajabi webhook authenticated via HMAC signature")
+        return True
+
+    # No valid authentication found
+    logger.warning("⚠️ Kajabi webhook authentication failed - no valid bearer token or signature")
+    return False
 
 
 def handle_kajabi_purchase(payload, webhook_event):

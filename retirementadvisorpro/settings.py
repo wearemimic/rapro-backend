@@ -416,8 +416,9 @@ else:
 # =============================================================================
 # KAJABI CONFIGURATION (NSSA Partnership)
 # =============================================================================
-# Kajabi webhook secret for signature verification
-KAJABI_WEBHOOK_SECRET = os.environ.get('KAJABI_WEBHOOK_SECRET', '')
+# Kajabi webhook authentication
+KAJABI_WEBHOOK_SECRET = os.environ.get('KAJABI_WEBHOOK_SECRET', '')  # HMAC signature verification
+KAJABI_WEBHOOK_BEARER_TOKEN = os.environ.get('KAJABI_WEBHOOK_BEARER_TOKEN', '')  # Bearer token auth (alternative)
 
 # Kajabi API credentials (for checking subscription status)
 KAJABI_API_KEY = os.environ.get('KAJABI_API_KEY', '')
