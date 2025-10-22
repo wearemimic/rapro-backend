@@ -90,6 +90,7 @@ class CustomUser(AbstractUser):
             ('apple', 'Apple'),
             ('linkedin', 'LinkedIn'),
             ('microsoft', 'Microsoft'),
+            ('kajabi', 'Kajabi'),
         ],
         help_text="Authentication provider used for login"
     )
@@ -167,7 +168,38 @@ class CustomUser(AbstractUser):
         
         allowed_roles = section_permissions.get(section, [])
         return self.admin_role in allowed_roles
-    
+
+
+class KajabiWebhookEvent(models.Model):
+    """Log all incoming Kajabi webhook events for audit and debugging"""
+    event_id = models.CharField(max_length=255, unique=True, help_text="Kajabi event ID for idempotency")
+    event_type = models.CharField(max_length=100, help_text="Type of event (e.g., purchase.created, subscription.canceled)")
+    payload = models.JSONField(help_text="Full webhook payload from Kajabi")
+    processed = models.BooleanField(default=False, help_text="Whether this event was successfully processed")
+    error_message = models.TextField(blank=True, help_text="Error message if processing failed")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='kajabi_events',
+        help_text="User associated with this event (if any)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['event_type', 'processed']),
+            models.Index(fields=['event_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} - {self.event_id} ({'processed' if self.processed else 'pending'})"
+
+
 class Client(models.Model):
     # advisor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clients')
     advisor = models.ForeignKey(

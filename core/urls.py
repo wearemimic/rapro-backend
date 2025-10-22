@@ -22,7 +22,9 @@ from .views_main import celery_health_check, task_status, queue_monitoring
 from . import views_main as views
 from .pdf_generator import generate_scenario_pdf_view
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .webhooks import stripe_webhook
+from .webhooks import stripe_webhook, kajabi_webhook
+from .kajabi_views import setup_password as kajabi_setup_password, resend_setup_email as kajabi_resend_setup_email
+from .kajabi_admin_views import verify_kajabi_subscription, list_nssa_users, sync_kajabi_subscription
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
 from .auth0_views import auth0_login_redirect, auth0_login_google, auth0_callback, auth0_logout, auth0_exchange_code, complete_professional_info, auth0_complete_registration, validate_coupon, embedded_signup, create_account, change_password
@@ -202,6 +204,12 @@ urlpatterns = [
     path('register-advisor/', register_advisor, name='register_advisor'),
     path('complete-registration/', complete_registration, name='complete_registration'),
     path('webhook/stripe/', stripe_webhook, name='stripe_webhook'),
+    path('webhook/kajabi/', kajabi_webhook, name='kajabi_webhook'),
+
+    # Kajabi/NSSA user setup endpoints
+    path('kajabi/setup-password/', kajabi_setup_password, name='kajabi_setup_password'),
+    path('kajabi/resend-setup-email/', kajabi_resend_setup_email, name='kajabi_resend_setup_email'),
+
     path('clients/<int:client_id>/realestate/', ListCreateRealEstateView.as_view(), name='realestate-list-create'),
     path('realestate/<int:pk>/', RealEstateDetailView.as_view(), name='realestate-detail'),
     
@@ -360,7 +368,12 @@ urlpatterns = [
     
     # Phase 4: Optimization & Enhancement
     path('admin/workflows/dashboard/', workflow_dashboard, name='admin-workflows-dashboard'),
-    
+
+    # NSSA/Kajabi Admin Endpoints
+    path('admin/users/<int:user_id>/verify-kajabi-subscription/', verify_kajabi_subscription, name='verify-kajabi-subscription'),
+    path('admin/users/<int:user_id>/sync-kajabi-subscription/', sync_kajabi_subscription, name='sync-kajabi-subscription'),
+    path('admin/nssa-users/', list_nssa_users, name='list-nssa-users'),
+
     # Report Center endpoints - PRODUCTION READY
     path('report-center/reports/<uuid:report_id>/download/', report_views.download_report, name='download-report'),
     path('report-center/templates/', report_views.ReportTemplateListView.as_view(), name='report-templates'),

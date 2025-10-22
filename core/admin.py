@@ -3,8 +3,9 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from .models import (
-    CustomUser, Client, LeadSource, Lead, EmailAccount, 
-    Communication, SMSMessage, TwilioConfiguration, ActivityLog
+    CustomUser, Client, LeadSource, Lead, EmailAccount,
+    Communication, SMSMessage, TwilioConfiguration, ActivityLog,
+    KajabiWebhookEvent
 )
 
 # =============================================================================
@@ -285,3 +286,42 @@ class ActivityLogAdmin(admin.ModelAdmin):
             return f"Lead: {obj.lead}"
         return "-"
     target.short_description = 'Target'
+
+
+@admin.register(KajabiWebhookEvent)
+class KajabiWebhookEventAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'event_id', 'user', 'processed', 'created_at', 'processed_status')
+    list_filter = ('event_type', 'processed', 'created_at')
+    search_fields = ('event_id', 'event_type', 'user__email', 'error_message')
+    date_hierarchy = 'created_at'
+    raw_id_fields = ('user',)
+    readonly_fields = ('created_at', 'processed_at', 'payload_display')
+
+    fieldsets = (
+        ('Event Details', {
+            'fields': ('event_id', 'event_type', 'user')
+        }),
+        ('Processing Status', {
+            'fields': ('processed', 'processed_at', 'error_message')
+        }),
+        ('Payload', {
+            'fields': ('payload_display',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',)
+        })
+    )
+
+    def payload_display(self, obj):
+        import json
+        return format_html('<pre>{}</pre>', json.dumps(obj.payload, indent=2))
+    payload_display.short_description = 'Webhook Payload'
+
+    def processed_status(self, obj):
+        if obj.processed:
+            return format_html('<span style="color: green;">✓ Processed</span>')
+        elif obj.error_message:
+            return format_html('<span style="color: red;">✗ Error</span>')
+        return format_html('<span style="color: orange;">⋯ Pending</span>')
+    processed_status.short_description = 'Status'
