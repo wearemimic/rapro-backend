@@ -612,7 +612,8 @@ def send_nssa_welcome_email(user, password_token):
     """Send welcome email to new NSSA member with password setup link"""
     try:
         frontend_url = settings.FRONTEND_URL
-        password_setup_url = f"{frontend_url}/nssa/setup-password?token={password_token}&email={user.email}"
+        # Token-only URL for better security (no PII in URL)
+        password_setup_url = f"{frontend_url}/nssa/setup-password?token={password_token}"
 
         subject = "Welcome to Your NSSA Retirement Advisor Pro Account!"
 

@@ -23,7 +23,7 @@ from . import views_main as views
 from .pdf_generator import generate_scenario_pdf_view
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .webhooks import stripe_webhook, kajabi_webhook
-from .kajabi_views import setup_password as kajabi_setup_password, resend_setup_email as kajabi_resend_setup_email
+from .kajabi_views import setup_password as kajabi_setup_password, resend_setup_email as kajabi_resend_setup_email, validate_token as kajabi_validate_token
 from .kajabi_admin_views import verify_kajabi_subscription, list_nssa_users, sync_kajabi_subscription
 from django.http import HttpResponse
 from rest_framework.routers import DefaultRouter
@@ -207,6 +207,7 @@ urlpatterns = [
     path('webhook/kajabi/', kajabi_webhook, name='kajabi_webhook'),
 
     # Kajabi/NSSA user setup endpoints
+    path('kajabi/validate-token/', kajabi_validate_token, name='kajabi_validate_token'),
     path('kajabi/setup-password/', kajabi_setup_password, name='kajabi_setup_password'),
     path('kajabi/resend-setup-email/', kajabi_resend_setup_email, name='kajabi_resend_setup_email'),
 

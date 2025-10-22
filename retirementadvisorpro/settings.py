@@ -140,6 +140,10 @@ AUTH0_CLIENT_SECRET = os.environ.get('AUTH0_CLIENT_SECRET', 'your-auth0-client-s
 AUTH0_AUDIENCE = os.environ.get('AUTH0_AUDIENCE', 'https://api.retirementadvisorpro.com')
 AUTH0_ALGORITHM = os.environ.get('AUTH0_ALGORITHM', 'RS256')
 
+# Auth0 Management API (for programmatic user creation - NSSA/Kajabi integration)
+AUTH0_MANAGEMENT_CLIENT_ID = os.environ.get('AUTH0_MANAGEMENT_CLIENT_ID', AUTH0_CLIENT_ID)
+AUTH0_MANAGEMENT_CLIENT_SECRET = os.environ.get('AUTH0_MANAGEMENT_CLIENT_SECRET', AUTH0_CLIENT_SECRET)
+
 # Social Auth settings
 SOCIAL_AUTH_TRAILING_SLASH = False
 SOCIAL_AUTH_AUTH0_DOMAIN = AUTH0_DOMAIN
