@@ -664,7 +664,8 @@ def send_nssa_welcome_email(user, password_token):
 
         subject = "Welcome to Your NSSA Retirement Advisor Pro Account!"
 
-        message = f"""
+        # Plain text version (fallback)
+        text_message = f"""
 Welcome to Retirement Advisor Pro, {user.first_name}!
 
 Thank you for joining through the National Social Security Advisors (NSSA).
@@ -679,22 +680,30 @@ This link will expire in 24 hours.
 Once you've set your password, you'll have full access to:
 • Comprehensive retirement planning tools
 • Social Security optimization strategies
-• Long-term care planning
-• Tax-efficient withdrawal strategies
+• Client portal for secure client collaboration
+• Professional report generation
 • And much more!
 
-If you have any questions, please contact our support team.
+If you have any questions, please contact our support team at support@retirementadvisorpro.com.
 
 Best regards,
 The Retirement Advisor Pro Team
 """
 
+        # HTML version
+        html_message = render_to_string('emails/nssa_welcome.html', {
+            'first_name': user.first_name,
+            'email': user.email,
+            'setup_url': password_setup_url,
+        })
+
         send_mail(
             subject,
-            message,
+            text_message,
             settings.DEFAULT_FROM_EMAIL if hasattr(settings, 'DEFAULT_FROM_EMAIL') else 'noreply@retirementadvisorpro.com',
             [user.email],
             fail_silently=False,
+            html_message=html_message,
         )
 
         logger.info(f"📧 Welcome email sent to {user.email}")

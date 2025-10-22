@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Retirement Advisor Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #377dff 0%, #2c5ccc 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.95;
+        }
+        .nssa-badge {
+            display: inline-block;
+            background-color: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .content h2 {
+            color: #2c3e50;
+            font-size: 22px;
+            margin: 0 0 20px 0;
+        }
+        .content p {
+            margin: 0 0 16px 0;
+            color: #555;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #377dff 0%, #2c5ccc 100%);
+            color: white !important;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 30px 0;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(55, 125, 255, 0.3);
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(55, 125, 255, 0.4);
+        }
+        .cta-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .features-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #377dff;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .features-box h3 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin: 0 0 15px 0;
+        }
+        .features-box ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .features-box li {
+            margin: 10px 0;
+            color: #555;
+        }
+        .features-box strong {
+            color: #377dff;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 6px;
+            padding: 15px 20px;
+            margin: 25px 0;
+        }
+        .warning-box p {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .warning-box strong {
+            color: #856404;
+        }
+        .support-box {
+            background-color: #e7f3ff;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .support-box p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 30px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .footer p {
+            margin: 8px 0;
+            opacity: 0.9;
+        }
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #dee2e6;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🎉 Welcome to Retirement Advisor Pro!</h1>
+            <p>Your comprehensive retirement planning platform</p>
+            <div class="nssa-badge">
+                🤝 NSSA Partnership Member
+            </div>
+        </div>
+
+        <div class="content">
+            <h2>Hello {{ first_name }}!</h2>
+
+            <p>Thank you for joining Retirement Advisor Pro through the <strong>National Social Security Advisors (NSSA)</strong> partnership. We're thrilled to have you on board!</p>
+
+            <p>Your account has been created and you're just one step away from accessing powerful retirement planning tools designed specifically for financial advisors like you.</p>
+
+            <div class="cta-container">
+                <a href="{{ setup_url }}" class="cta-button">Set Up Your Password →</a>
+            </div>
+
+            <div class="warning-box">
+                <p><strong>⏰ Important:</strong> This setup link expires in <strong>24 hours</strong>. Please complete your account setup as soon as possible.</p>
+            </div>
+
+            <div class="features-box">
+                <h3>📊 What's Included in Your Account:</h3>
+                <ul>
+                    <li><strong>Social Security Optimization:</strong> Advanced tools to help maximize your clients' Social Security benefits</li>
+                    <li><strong>Comprehensive Planning:</strong> Retirement income projections, tax strategies, and withdrawal planning</li>
+                    <li><strong>Client Portal:</strong> Share secure, personalized retirement scenarios with your clients</li>
+                    <li><strong>Report Generation:</strong> Professional PDF reports for client presentations</li>
+                </ul>
+            </div>
+
+            <hr>
+
+            <div class="support-box">
+                <p><strong>💡 Need Help Getting Started?</strong></p>
+                <p>Our support team is here to help you make the most of Retirement Advisor Pro.</p>
+                <p>Email us at <strong>support@retirementadvisorpro.com</strong></p>
+            </div>
+
+            <p style="font-size: 14px; color: #6c757d; margin-top: 30px;">
+                This email was sent to <strong>{{ email }}</strong> as part of your NSSA membership benefits.
+                If you didn't request this account or received this email in error, please contact us immediately.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>Retirement Advisor Pro</strong></p>
+            <p>Empowering Financial Advisors to Deliver Better Retirement Outcomes</p>
+            <p style="margin-top: 15px; opacity: 0.7;">
+                This is an automated message. Please do not reply to this email.<br>
+                For support, contact <a href="mailto:support@retirementadvisorpro.com">support@retirementadvisorpro.com</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
