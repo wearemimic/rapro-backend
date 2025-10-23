@@ -962,8 +962,8 @@ def change_password(request):
         
         # Get Auth0 Management API token
         domain = settings.AUTH0_DOMAIN
-        client_id = settings.AUTH0_CLIENT_ID
-        client_secret = settings.AUTH0_CLIENT_SECRET
+        client_id = settings.AUTH0_MANAGEMENT_CLIENT_ID
+        client_secret = settings.AUTH0_MANAGEMENT_CLIENT_SECRET
         
         # Get management API token
         token_url = f'https://{domain}/oauth/token'
@@ -1038,6 +1038,13 @@ def change_password(request):
             print(f"Failed to update password: {update_response.text}")
             error_data = update_response.json() if update_response.text else {}
             error_message = error_data.get('message', 'Failed to update password')
+
+            # Provide user-friendly error messages
+            if 'PasswordStrengthError' in error_message or 'too weak' in error_message.lower():
+                error_message = 'Password is too weak. Please use at least 8 characters with a mix of uppercase, lowercase, numbers, and special characters.'
+            elif 'PasswordHistoryError' in error_message:
+                error_message = 'This password has been used recently. Please choose a different password.'
+
             return Response({
                 'message': error_message
             }, status=status.HTTP_400_BAD_REQUEST)
