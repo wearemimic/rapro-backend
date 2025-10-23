@@ -166,7 +166,12 @@ def refresh_access_token(request):
         # Rotate refresh token if configured
         if settings.SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS', False):
             refresh.blacklist()
-            new_refresh = RefreshToken.for_user(refresh.user)
+            # Get user from token payload
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user_id = refresh.payload.get('user_id')
+            user = User.objects.get(id=user_id)
+            new_refresh = RefreshToken.for_user(user)
 
             refresh_lifetime = settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=1))
             response.set_cookie(
