@@ -1180,6 +1180,17 @@ class RothConversionAPIView(APIView):
                 conversion_params['pre_retirement_income'] = scenario['pre_retirement_income']
                 print(f"DEBUG: Added pre_retirement_income to conversion_params: {scenario['pre_retirement_income']}")
 
+            # Set max_to_convert on each asset from per_asset_conversions
+            per_asset_conversions = conversion_params.get('per_asset_conversions', {})
+            if per_asset_conversions:
+                print(f"DEBUG: Setting max_to_convert from per_asset_conversions: {per_asset_conversions}")
+                for asset in assets:
+                    asset_id = str(asset.get('id'))
+                    if asset_id in per_asset_conversions:
+                        amount = per_asset_conversions[asset_id].get('amount', 0)
+                        asset['max_to_convert'] = amount
+                        print(f"DEBUG: Set max_to_convert={amount} for asset {asset_id} ({asset.get('income_name')})")
+
             # Create and process the Roth conversion
             processor = RothConversionProcessor(
                 scenario=scenario,
