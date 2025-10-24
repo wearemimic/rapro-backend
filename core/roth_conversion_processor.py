@@ -93,6 +93,9 @@ class RothConversionProcessor:
         Calculate global conversion parameters from per-asset conversion schedules.
         Sets conversion_start_year and years_to_convert based on the range of all assets.
         """
+        self._log_debug(f"🔍 _calculate_global_params_from_per_asset called")
+        self._log_debug(f"🔍 per_asset_conversions: {self.per_asset_conversions}")
+
         if not self.per_asset_conversions:
             raise ValueError("No per-asset conversions provided")
 
@@ -101,12 +104,21 @@ class RothConversionProcessor:
         end_years = []
 
         for asset_key, params in self.per_asset_conversions.items():
+            self._log_debug(f"🔍 Processing asset_key: {asset_key}")
+            self._log_debug(f"🔍 params: {params}")
             start_year = params.get('start_year')
             years = params.get('years')
+            self._log_debug(f"🔍 start_year: {start_year}, years: {years}")
 
             if start_year and years:
                 start_years.append(int(start_year))
                 end_years.append(int(start_year) + int(years) - 1)
+                self._log_debug(f"✅ Added start_year {start_year} and end_year {int(start_year) + int(years) - 1}")
+            else:
+                self._log_debug(f"❌ Skipping asset {asset_key} - missing start_year or years")
+
+        self._log_debug(f"🔍 start_years list: {start_years}")
+        self._log_debug(f"🔍 end_years list: {end_years}")
 
         if not start_years or not end_years:
             raise ValueError("Per-asset conversions must have start_year and years")
@@ -116,7 +128,7 @@ class RothConversionProcessor:
         latest_end_year = max(end_years)
         self.years_to_convert = latest_end_year - self.conversion_start_year + 1
 
-        self._log_debug(f"Calculated global params from per-asset conversions: start={self.conversion_start_year}, years={self.years_to_convert}")
+        self._log_debug(f"✅ Calculated global params from per-asset conversions: start={self.conversion_start_year}, years={self.years_to_convert}")
 
     def _calculate_retirement_year(self):
         """
@@ -366,7 +378,12 @@ class RothConversionProcessor:
             'magi': float
           }
         """
-        standard_deduction = self._get_standard_deduction()
+        # Respect apply_standard_deduction setting
+        apply_deduction = self.scenario.get('apply_standard_deduction', False)
+        if apply_deduction:
+            standard_deduction = self._get_standard_deduction()
+        else:
+            standard_deduction = 0
 
         # Calculate AGI and MAGI
         agi = float(gross_income) + float(taxable_ss) + conversion_amount
@@ -529,6 +546,11 @@ class RothConversionProcessor:
         """
         # Check if this asset type requires RMD
         if not self._requires_rmd(asset):
+            return Decimal('0')
+
+        # CRITICAL: If the balance is $0 or negative, there can be no RMD
+        # This handles cases where an asset has been fully converted
+        if previous_year_balance <= 0:
             return Decimal('0')
 
         # Get birthdate
@@ -1862,8 +1884,12 @@ class RothConversionProcessor:
                             
                             # Calculate federal tax based on actual gross income using proper tax calculations
                             if gross_income > 0:
-                                # Apply standard deduction
-                                standard_deduction = self._get_standard_deduction()
+                                # Apply standard deduction only if enabled
+                                apply_deduction = self.scenario.get('apply_standard_deduction', False)
+                                if apply_deduction:
+                                    standard_deduction = self._get_standard_deduction()
+                                else:
+                                    standard_deduction = 0
                                 taxable_income = max(0, float(gross_income) - float(standard_deduction))
 
                                 # Calculate federal tax using CSV tax brackets
@@ -1978,8 +2004,12 @@ class RothConversionProcessor:
                         'roth_conversion': conversion_amount,
                     }
 
-                    # Calculate taxes
-                    standard_deduction = self._get_standard_deduction()
+                    # Calculate taxes - respect apply_standard_deduction setting
+                    apply_deduction = self.scenario.get('apply_standard_deduction', False)
+                    if apply_deduction:
+                        standard_deduction = self._get_standard_deduction()
+                    else:
+                        standard_deduction = 0
                     regular_taxable_income = max(0, float(gross_income) - float(standard_deduction))
                     regular_income_tax, _ = self._calculate_federal_tax_and_bracket(regular_taxable_income)
 
@@ -2064,31 +2094,22 @@ class RothConversionProcessor:
                 # Get Social Security income from baseline (SS amount doesn't change with conversion)
                 ss_income = float(baseline_row.get('ss_income', 0))
                 retirement_row['ss_income'] = ss_income
-
-                # CRITICAL: Also create social_security_income for frontend column display
                 retirement_row['social_security_income'] = ss_income
-
-                # CRITICAL: Copy income_by_source from baseline to preserve SS breakdown for display
-                if 'income_by_source' in baseline_row:
-                    retirement_row['income_by_source'] = baseline_row['income_by_source']
 
                 # PHASE 3: Get asset balances with conversions applied
                 # This returns {asset_id}_balance, {asset_id}_rmd, {asset_id}_income fields
+                # The income values are already correctly calculated based on conversion scenario balances
                 asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=True)
                 retirement_row.update(asset_balances)
 
-                # CRITICAL: Use baseline income amounts for withdrawal strategy
-                # The conversion scenario should have the SAME withdrawal amounts as baseline
-                # Only the asset balances and tax consequences change, not the withdrawal strategy
-                # This ensures voluntary distributions (before RMD age) are properly included in AGI
-
-                gross_income = 0  # Start with 0, will add asset incomes
-
-                # Use income_by_source from baseline to get actual withdrawal amounts
-                baseline_income_by_source = baseline_row.get('income_by_source', {})
+                # CRITICAL: Build income_by_source for conversion scenario
+                # Start with baseline's income_by_source (includes SS and all non-converted assets)
+                # Then OVERWRITE only the converted assets with conversion scenario values
+                income_by_source = dict(baseline_row.get('income_by_source', {}))
+                gross_income = 0
 
                 print(f"\n=== DEBUG Year {year} Income Calculation ===")
-                print(f"Baseline income_by_source: {baseline_income_by_source}")
+                print(f"Starting with baseline income_by_source: {income_by_source}")
 
                 for asset in self.assets:
                     asset_id_raw = asset.get('id')
@@ -2096,36 +2117,29 @@ class RothConversionProcessor:
                     asset_type = asset.get('income_type', '').lower()
                     income_name = asset.get('income_name', '')
 
-                    # Skip Social Security - handled separately
-                    if asset_type == 'social_security':
+                    # Skip Social Security and synthetic Roth - they're handled separately
+                    if asset_type == 'social_security' or asset.get('is_synthetic_roth'):
                         continue
 
-                    # Get income amount from baseline's income_by_source
-                    # Try both integer and string keys since baseline might use either
-                    asset_income = 0
-                    if asset_id_raw in baseline_income_by_source:
-                        asset_income = float(baseline_income_by_source[asset_id_raw])
-                    elif asset_id in baseline_income_by_source:
-                        asset_income = float(baseline_income_by_source[asset_id])
-                    else:
-                        asset_income = 0
+                    # Get the income that was already calculated by _calculate_asset_balances_with_growth
+                    asset_income = retirement_row.get(f"{asset_id}_income", 0)
+                    asset_balance = retirement_row.get(f"{asset_id}_balance", 0)
+
+                    # OVERWRITE this asset's income in income_by_source with conversion scenario value
+                    if asset_id_raw is not None:
+                        income_by_source[asset_id_raw] = float(asset_income)
+                        print(f"Year {year}: Overwriting asset {asset_id_raw} ({income_name}) in income_by_source: baseline had ${baseline_row.get('income_by_source', {}).get(asset_id_raw, 0):,.2f}, conversion has ${asset_income:,.2f}, balance = ${asset_balance:,.2f}")
 
                     if asset_income > 0:
                         gross_income += asset_income
-                        print(f"Year {year}: Asset {asset_id} ({income_name}/{asset_type}) income from baseline = ${asset_income:,.2f}")
+                    elif asset_balance == 0:
+                        print(f"Year {year}: Asset {asset_id} ({income_name}) fully converted - income = $0, balance = $0")
 
-                    # Create {asset_type}_income field for frontend columns
-                    if asset_type:
-                        retirement_row[f"{asset_type}_income"] = asset_income
+                # Set income_by_source with conversion scenario values (baseline + overwritten converted assets)
+                retirement_row['income_by_source'] = income_by_source
 
-                    # Create {income_name}_income field
-                    if income_name:
-                        retirement_row[f"{income_name}_income"] = asset_income
-
-                    # Create {asset_id}_income field
-                    retirement_row[f"{asset_id}_income"] = asset_income
-
-                print(f"Total gross_income (before SS): ${gross_income:,.2f}")
+                print(f"Total gross_income from converted assets: ${gross_income:,.2f}")
+                print(f"Final income_by_source: {income_by_source}")
                 print(f"=== END DEBUG ===\n")
 
                 # Add tax-free income from Roth (doesn't count toward gross for tax purposes)
@@ -2168,8 +2182,13 @@ class RothConversionProcessor:
                 retirement_row['agi'] = agi
                 retirement_row['magi'] = magi
 
-                # Calculate taxes with conversion
-                standard_deduction = self._get_standard_deduction()
+                # Calculate taxes with conversion - respect apply_standard_deduction setting
+                apply_deduction = self.scenario.get('apply_standard_deduction', False)
+                if apply_deduction:
+                    standard_deduction = self._get_standard_deduction()
+                else:
+                    standard_deduction = 0
+                    print(f"Year {year}: Standard deduction NOT applied (apply_standard_deduction=False)")
 
                 # Regular income tax: Tax on income WITHOUT conversion
                 # Use taxable_gross_income (gross minus tax-free income) for tax calculations
