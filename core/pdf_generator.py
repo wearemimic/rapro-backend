@@ -100,54 +100,64 @@ class ScenarioPDFGenerator:
                 logger.info(f"Set authentication cookie for PDF generation")
             
             # Wait for specific elements that indicate data has loaded
-            # Let's try simpler selectors first
-            # Just wait for any table with data
-            wait_selector = "table"  # Just wait for ANY table to appear
+            # Wait for table cells with actual data (not just empty tables)
+            # This ensures Vue has finished rendering the data from the API
+            wait_selector = "td:not(:empty)"  # Wait for table cells with content
             self.client.setWaitForElement(wait_selector)
             logger.info(f"Waiting for element: {wait_selector}")
-            
-            # Also set JavaScript delay as a fallback (max is 2000ms)
-            # This runs AFTER the element is found
+
+            # Set JavaScript delay to maximum (2000ms = 2 seconds)
+            # This additional delay runs AFTER the element is found
+            # to ensure all data is fully rendered
             self.client.setJavascriptDelay(2000)  # 2 seconds max allowed
             
             # Set a longer max loading time (in seconds, range 10-30)
             # This is the overall timeout for the page load
             self.client.setMaxLoadingTime(30)
             
-            # Run JavaScript after load to check what's on the page
+            # Run JavaScript after load to ensure all data is rendered
             self.client.setOnLoadJavascript("""
                 // Debug: Check if we have localStorage token
                 var token = localStorage.getItem('token');
                 console.log('Token in localStorage:', token ? 'Present' : 'Missing');
-                
+
                 // Debug: Check for Vue app
                 var vueApp = document.getElementById('app');
                 console.log('Vue app element:', vueApp ? 'Found' : 'Not found');
-                
-                // Debug: Count tables on page
-                var tables = document.querySelectorAll('table');
-                console.log('Number of tables found:', tables.length);
-                
-                // Debug: Check for any error messages
-                var errors = document.querySelectorAll('.error, .alert-danger');
-                console.log('Error messages found:', errors.length);
-                
-                // Try to wait for Vue to mount
-                setTimeout(function() {
-                    // Check again after delay
-                    var tablesAfter = document.querySelectorAll('table');
-                    console.log('Tables after delay:', tablesAfter.length);
-                    
-                    // Add a visible marker to the page for debugging
-                    var marker = document.createElement('div');
-                    marker.innerHTML = 'PDF Generation Debug - Tables: ' + tablesAfter.length;
-                    marker.style.cssText = 'position:fixed;top:0;left:0;background:red;color:white;padding:10px;z-index:9999';
-                    document.body.appendChild(marker);
-                    
-                    // Scroll to trigger lazy loading
-                    window.scrollTo(0, document.body.scrollHeight);
-                    window.scrollTo(0, 0);
-                }, 1500);
+
+                // Wait for Vue to fully render and all API calls to complete
+                // We'll check multiple times to ensure stability
+                var checkCount = 0;
+                var maxChecks = 10;
+                var checkInterval = 300; // Check every 300ms
+
+                function waitForData() {
+                    checkCount++;
+                    console.log('Data check attempt:', checkCount);
+
+                    // Count table cells with actual data
+                    var tableCells = document.querySelectorAll('td:not(:empty)');
+                    console.log('Table cells with content:', tableCells.length);
+
+                    // Check if we have enough data (should have many cells if data is loaded)
+                    if (tableCells.length > 50 || checkCount >= maxChecks) {
+                        console.log('Data appears loaded or max checks reached');
+
+                        // Scroll to trigger any lazy loading
+                        window.scrollTo(0, document.body.scrollHeight);
+                        setTimeout(function() {
+                            window.scrollTo(0, 0);
+                        }, 100);
+
+                        return; // Data is loaded
+                    }
+
+                    // Not enough data yet, check again
+                    setTimeout(waitForData, checkInterval);
+                }
+
+                // Start checking after a brief initial delay
+                setTimeout(waitForData, 500);
             """)
             
             # Convert the actual page to PDF
@@ -812,15 +822,25 @@ new Chart(ctxSS, {{
                     
                     ss_primary = float(year_data.get("ss_income_primary_gross", 0))
                     ss_spouse = float(year_data.get("ss_income_spouse_gross", 0))
+                    total_ssi = ss_primary + ss_spouse
                     medicare = float(year_data.get("total_medicare", 0))
-                    ssi_taxed = float(year_data.get("ssi_taxed", 0))
-                    remaining_ssi = ss_primary + ss_spouse - medicare - ssi_taxed
-                    
+
+                    # FIX: Use correct field name 'taxable_ss' not 'ssi_taxed'
+                    taxable_ss = float(year_data.get("taxable_ss", 0))
+
+                    # Calculate percentage like the web UI does
+                    if total_ssi > 0:
+                        taxable_percentage = (taxable_ss / total_ssi) * 100
+                    else:
+                        taxable_percentage = 0
+
+                    remaining_ssi = total_ssi - medicare - taxable_ss
+
                     html.append(f'<td>${ss_primary:,.2f}</td>')
                     if hasattr(client, 'spouse') and client.spouse:
                         html.append(f'<td>${ss_spouse:,.2f}</td>')
                     html.append(f'<td>${medicare:,.2f}</td>')
-                    html.append(f'<td>${ssi_taxed:,.2f}</td>')
+                    html.append(f'<td>{taxable_percentage:.1f}%</td>')
                     html.append(f'<td>${remaining_ssi:,.2f}</td>')
                     html.append('</tr>')
             
