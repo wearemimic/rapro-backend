@@ -146,23 +146,25 @@ class TaxCSVLoader:
         
         return rates
     
-    def get_inflated_irmaa_thresholds(self, filing_status: str, target_year: int) -> List[Dict[str, Any]]:
+    def get_inflated_irmaa_thresholds(self, filing_status: str, target_year: int, part_b_inflation_rate: Decimal = None, part_d_inflation_rate: Decimal = None) -> List[Dict[str, Any]]:
         """Get IRMAA thresholds inflated to target year."""
         base_thresholds = self.get_irmaa_thresholds(filing_status)
         inflation_rates = self.get_inflation_rates()
-        
+
         # Get IRMAA threshold inflation rate (default 1% if not found)
         irmaa_inflation_rate = inflation_rates.get('irmaa_thresholds', Decimal('1.0')) / 100
-        
+
         # Calculate years to inflate from base year to target year
         years_to_inflate = target_year - self.tax_year
-        
+
         if years_to_inflate <= 0:
             return base_thresholds
-        
-        # Apply compound inflation to each threshold
-        # Use 5% medical inflation for surcharge amounts (matching Medicare base cost inflation)
-        medical_inflation_rate = Decimal('0.05')
+
+        # Use provided inflation rates or default to 5% medical inflation
+        if part_b_inflation_rate is None:
+            part_b_inflation_rate = Decimal('0.05')
+        if part_d_inflation_rate is None:
+            part_d_inflation_rate = Decimal('0.05')
 
         inflated_thresholds = []
         for threshold in base_thresholds:
@@ -173,31 +175,31 @@ class TaxCSVLoader:
             inflated_magi = original_magi * ((1 + irmaa_inflation_rate) ** years_to_inflate)
             inflated_threshold['magi_threshold'] = inflated_magi
 
-            # Inflate the IRMAA surcharge amounts using medical inflation (5%)
+            # Inflate the IRMAA surcharge amounts using provided inflation rates
             original_part_b = threshold['part_b_surcharge']
             original_part_d = threshold['part_d_surcharge']
-            inflated_part_b = original_part_b * ((1 + medical_inflation_rate) ** years_to_inflate)
-            inflated_part_d = original_part_d * ((1 + medical_inflation_rate) ** years_to_inflate)
+            inflated_part_b = original_part_b * ((1 + part_b_inflation_rate) ** years_to_inflate)
+            inflated_part_d = original_part_d * ((1 + part_d_inflation_rate) ** years_to_inflate)
             inflated_threshold['part_b_surcharge'] = inflated_part_b
             inflated_threshold['part_d_surcharge'] = inflated_part_d
 
             inflated_thresholds.append(inflated_threshold)
-        
+
         return inflated_thresholds
     
-    def calculate_irmaa_with_inflation(self, magi: Decimal, filing_status: str, target_year: int) -> tuple[Decimal, Decimal]:
+    def calculate_irmaa_with_inflation(self, magi: Decimal, filing_status: str, target_year: int, part_b_inflation_rate: Decimal = None, part_d_inflation_rate: Decimal = None) -> tuple[Decimal, Decimal]:
         """Calculate IRMAA surcharges using inflated thresholds for target year."""
-        thresholds = self.get_inflated_irmaa_thresholds(filing_status, target_year)
-        
+        thresholds = self.get_inflated_irmaa_thresholds(filing_status, target_year, part_b_inflation_rate, part_d_inflation_rate)
+
         part_b_surcharge = Decimal('0')
         part_d_surcharge = Decimal('0')
-        
+
         for threshold in reversed(thresholds):  # Start from highest
             if magi > threshold['magi_threshold']:
                 part_b_surcharge = threshold['part_b_surcharge']
                 part_d_surcharge = threshold['part_d_surcharge']
                 break
-        
+
         return part_b_surcharge, part_d_surcharge
     
     def get_state_tax_info(self, state_code: str) -> Dict[str, Any]:

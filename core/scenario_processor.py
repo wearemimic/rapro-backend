@@ -1761,11 +1761,19 @@ class ScenarioProcessor:
         else:
             filing_status = original_filing_status
 
+        # Retrieve inflation rates from the scenario
+        part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
+        part_d_inflation_rate = Decimal(self.scenario.part_d_inflation_rate) / 100
+
         # Calculate IRMAA surcharges using inflated thresholds for the target year
-        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
+        part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(
+            Decimal(magi), filing_status, year, part_b_inflation_rate, part_d_inflation_rate
+        )
 
         # Get the inflated IRMAA thresholds for this year to include in results
-        irmaa_thresholds_for_year = tax_loader.get_inflated_irmaa_thresholds(filing_status, year)
+        irmaa_thresholds_for_year = tax_loader.get_inflated_irmaa_thresholds(
+            filing_status, year, part_b_inflation_rate, part_d_inflation_rate
+        )
 
         # Find which IRMAA bracket we're in
         current_irmaa_bracket = None
@@ -1806,20 +1814,16 @@ class ScenarioProcessor:
             part_d_irmaa *= 2
             self._log_debug(f"Year {year}: Both spouses Medicare eligible (Primary: {primary_age}, Spouse: {spouse_age}) - Doubling base costs and IRMAA surcharges")
 
-        # Retrieve inflation rates from the scenario
-        part_b_inflation_rate = Decimal(self.scenario.part_b_inflation_rate) / 100
-        part_d_inflation_rate = Decimal(self.scenario.part_d_inflation_rate) / 100
-
         # Calculate the number of years until the current year
         current_year = datetime.datetime.now().year
         years_until_current = year - current_year
 
-        # Apply inflation for each year until the current year
+        # Apply inflation to base Medicare costs only (IRMAA surcharges are already inflated)
         for _ in range(years_until_current):
             base_part_b *= (1 + part_b_inflation_rate)
             base_part_d *= (1 + part_d_inflation_rate)
-            part_b_surcharge *= (1 + part_b_inflation_rate)  # Inflate the surcharge directly
-            part_d_irmaa *= (1 + part_d_inflation_rate)
+            # NOTE: Do NOT inflate part_b_surcharge and part_d_irmaa here
+            # They are already inflated by calculate_irmaa_with_inflation() above
 
         # IRMAA cost is just the inflated surcharge
         irmaa_cost = part_b_surcharge
