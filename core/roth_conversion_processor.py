@@ -218,15 +218,17 @@ class RothConversionProcessor:
         base_part_b = medicare_rates.get('part_b', Decimal('185'))
         base_part_d = medicare_rates.get('part_d', Decimal('71'))
 
-        # Inflate base Medicare costs year-over-year (default 5% medical inflation)
+        # Get inflation rates from scenario (default to 5% if not specified)
+        part_b_inflation_rate = Decimal(str(self.scenario.get('part_b_inflation_rate', 5.0))) / 100
+        part_d_inflation_rate = Decimal(str(self.scenario.get('part_d_inflation_rate', 5.0))) / 100
+
+        # Inflate base Medicare costs year-over-year
         if year:
             current_year = datetime.datetime.now().year
             years_from_now = year - current_year
             if years_from_now > 0:
-                medical_inflation_rate = Decimal('0.05')  # 5% annual medical inflation
-                inflation_factor = (1 + medical_inflation_rate) ** years_from_now
-                base_part_b = base_part_b * inflation_factor
-                base_part_d = base_part_d * inflation_factor
+                base_part_b = base_part_b * ((1 + part_b_inflation_rate) ** years_from_now)
+                base_part_d = base_part_d * ((1 + part_d_inflation_rate) ** years_from_now)
 
         # Normalize tax status for CSV lookup
         status_mapping = {
@@ -242,7 +244,9 @@ class RothConversionProcessor:
 
         # Calculate IRMAA surcharges (these are MONTHLY amounts) using inflation-adjusted thresholds if year is provided
         if year:
-            part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(Decimal(magi), filing_status, year)
+            part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(
+                Decimal(magi), filing_status, year, part_b_inflation_rate, part_d_inflation_rate
+            )
         else:
             # Fallback to non-inflated calculation if no year provided
             part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa(Decimal(magi), filing_status)

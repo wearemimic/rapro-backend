@@ -41,6 +41,7 @@ class RothMedicareCalculator:
             magi: float/Decimal - Modified Adjusted Gross Income
             year: int - Year for inflation-adjusted costs (optional)
             medical_inflation_rate: float - Annual medical inflation rate (default 5%)
+                Note: For backward compatibility, this single rate is applied to both Part B and Part D
 
         Returns:
             tuple: (total_medicare_annual, irmaa_surcharge_annual)
@@ -54,21 +55,25 @@ class RothMedicareCalculator:
         base_part_b = medicare_rates.get('part_b', Decimal('185'))
         base_part_d = medicare_rates.get('part_d', Decimal('71'))
 
+        # Convert medical_inflation_rate to Decimal
+        inflation_rate_decimal = Decimal(str(medical_inflation_rate))
+
         # Inflate base Medicare costs year-over-year if year is provided
         if year:
             current_year = datetime.datetime.now().year
             years_from_now = year - current_year
             if years_from_now > 0:
-                inflation_factor = (1 + Decimal(str(medical_inflation_rate))) ** years_from_now
+                inflation_factor = (1 + inflation_rate_decimal) ** years_from_now
                 base_part_b = base_part_b * inflation_factor
                 base_part_d = base_part_d * inflation_factor
 
         filing_status = self._get_filing_status()
 
         # Calculate IRMAA surcharges (monthly amounts) with inflation if year provided
+        # Pass the same inflation rate for both Part B and Part D (for backward compatibility)
         if year:
             part_b_surcharge, part_d_irmaa = tax_loader.calculate_irmaa_with_inflation(
-                Decimal(magi), filing_status, year
+                Decimal(magi), filing_status, year, inflation_rate_decimal, inflation_rate_decimal
             )
         else:
             # Fallback to non-inflated calculation
