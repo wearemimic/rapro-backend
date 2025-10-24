@@ -1545,22 +1545,32 @@ class RothConversionProcessor:
                     self._log_debug(f"  {k} = {enhanced_row[k]}")
 
             for asset in self.assets:
-                asset_id = str(asset.get('id', asset.get('income_type', '')))
+                asset_id_raw = asset.get('id')
+                asset_id = str(asset_id_raw) if asset_id_raw is not None else asset.get('income_type', '')
                 asset_type = asset.get('income_type', '')  # FIXED: Don't lowercase - match storage at line 723
                 income_name = asset.get('income_name', '')
 
                 # Look for RMD fields (check all possible key patterns)
-                # CRITICAL: Check asset_id FIRST because multiple assets can have the same income_type!
+                # CRITICAL: For assets with numeric IDs, ONLY check asset_id to avoid collisions
+                # when multiple assets share the same income_type (e.g., two "Qualified" 401ks)
                 rmd_value = 0
-                if f"{asset_id}_rmd" in enhanced_row:
-                    rmd_value = enhanced_row[f"{asset_id}_rmd"]
-                    self._log_debug(f"Found RMD via asset_id: {asset_id}_rmd = {rmd_value}")
-                elif income_name and f"{income_name}_rmd" in enhanced_row:
-                    rmd_value = enhanced_row[f"{income_name}_rmd"]
-                    self._log_debug(f"Found RMD via income_name: {income_name}_rmd = {rmd_value}")
-                elif f"{asset_type}_rmd" in enhanced_row:
-                    rmd_value = enhanced_row[f"{asset_type}_rmd"]
-                    self._log_debug(f"Found RMD via asset_type: {asset_type}_rmd = {rmd_value}")
+
+                # Check if this is a modern asset with a numeric ID
+                if asset_id_raw is not None:
+                    # Modern asset with ID - ONLY check asset_id key to prevent incorrect fallbacks
+                    if f"{asset_id}_rmd" in enhanced_row:
+                        rmd_value = enhanced_row[f"{asset_id}_rmd"]
+                        self._log_debug(f"Found RMD via asset_id: {asset_id}_rmd = {rmd_value}")
+                    # If asset has ID but no RMD stored, it means balance is $0 (fully converted)
+                    # DO NOT fall back to income_name or asset_type - those may contain OTHER assets' RMDs
+                else:
+                    # Legacy asset without ID - use fallback keys (backward compatibility)
+                    if income_name and f"{income_name}_rmd" in enhanced_row:
+                        rmd_value = enhanced_row[f"{income_name}_rmd"]
+                        self._log_debug(f"Found RMD via income_name: {income_name}_rmd = {rmd_value}")
+                    elif f"{asset_type}_rmd" in enhanced_row:
+                        rmd_value = enhanced_row[f"{asset_type}_rmd"]
+                        self._log_debug(f"Found RMD via asset_type: {asset_type}_rmd = {rmd_value}")
 
                 if rmd_value:
                     rmd_required[asset_id] = float(rmd_value)
