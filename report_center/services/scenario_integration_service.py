@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.db.models import Q, Sum, Avg
 
 from core.models import Scenario, Client, IncomeSource
+from core.scenario_processor import ScenarioProcessor
 from ..models import Report
 
 logger = logging.getLogger(__name__)
@@ -155,54 +156,79 @@ class ScenarioDataIntegrationService:
         }
     
     def _generate_financial_projections(self, scenario: Scenario) -> Dict[str, Any]:
-        """Generate financial projections based on scenario data"""
-        
+        """Generate financial projections using actual ScenarioProcessor calculations"""
+
         try:
-            # Calculate projection years from retirement to mortality
-            start_year = scenario.retirement_year or self.current_year
-            end_year = start_year + (scenario.mortality_age - scenario.retirement_age) if scenario.mortality_age and scenario.retirement_age else start_year + 25
-            
+            # Use ScenarioProcessor to get actual calculated results
+            processor = ScenarioProcessor(scenario_id=scenario.id, debug=False)
+            results = processor.process()
+
+            # Extract year-by-year data
             projections = {
-                'projection_years': list(range(start_year, end_year + 1)),
+                'projection_years': [],
                 'asset_projections': [],
                 'income_projections': [],
                 'expense_projections': [],
                 'tax_projections': [],
-                'net_cash_flow': []
+                'net_cash_flow': [],
+                'social_security_data': [],  # Add SS data for reports
+                'medicare_data': []  # Add Medicare data for reports
             }
-            
-            # Get initial values
-            initial_assets = float(scenario.income_sources.aggregate(total=Sum('current_asset_balance'))['total'] or 0)
-            annual_income = float(scenario.income_sources.aggregate(total=Sum('monthly_amount'))['total'] or 0) * 12
-            annual_expenses = 0  # No expense model in current schema
-            
-            # Simple projection logic (this would be enhanced with actual calculation engine)
-            current_assets = initial_assets
-            growth_rate = 0.07  # 7% annual growth assumption
-            inflation_rate = 0.03  # 3% inflation assumption
-            
-            for i, year in enumerate(projections['projection_years']):
-                # Asset growth with withdrawals
-                if i > 0:  # Skip first year
-                    investment_growth = current_assets * growth_rate
-                    net_withdrawal = max(0, annual_expenses - annual_income)
-                    current_assets = current_assets + investment_growth - net_withdrawal
-                
-                # Inflate income and expenses
-                inflated_income = annual_income * ((1 + inflation_rate) ** i)
-                inflated_expenses = annual_expenses * ((1 + inflation_rate) ** i)
-                
-                # Simple tax calculation (would use actual tax engine)
-                estimated_tax = inflated_income * 0.22  # 22% effective tax rate assumption
-                
-                projections['asset_projections'].append(round(current_assets, 0))
-                projections['income_projections'].append(round(inflated_income, 0))
-                projections['expense_projections'].append(round(inflated_expenses, 0))
-                projections['tax_projections'].append(round(estimated_tax, 0))
-                projections['net_cash_flow'].append(round(inflated_income - inflated_expenses - estimated_tax, 0))
-            
+
+            # Process each year from the actual calculation results
+            for year_data in results:
+                year = year_data.get('year')
+                projections['projection_years'].append(year)
+
+                # Asset values (total across all asset types)
+                total_assets = 0
+                for key, value in year_data.items():
+                    if key.endswith('_balance') and value:
+                        total_assets += float(value)
+                projections['asset_projections'].append(round(total_assets, 0))
+
+                # Income (gross income)
+                gross_income = float(year_data.get('gross_income', 0))
+                projections['income_projections'].append(round(gross_income, 0))
+
+                # Expenses (can be calculated from cash flow)
+                expenses = float(year_data.get('expenses', 0))
+                projections['expense_projections'].append(round(expenses, 0))
+
+                # Taxes (federal + state)
+                federal_tax = float(year_data.get('federal_tax', 0))
+                state_tax = float(year_data.get('state_tax', 0))
+                total_tax = federal_tax + state_tax
+                projections['tax_projections'].append(round(total_tax, 0))
+
+                # Net cash flow
+                net_cash = gross_income - expenses - total_tax
+                projections['net_cash_flow'].append(round(net_cash, 0))
+
+                # Social Security data for reports
+                ss_data = {
+                    'year': year,
+                    'ss_income': float(year_data.get('ss_income', 0)),
+                    'ss_income_primary': float(year_data.get('ss_income_primary_gross', 0)),
+                    'ss_income_spouse': float(year_data.get('ss_income_spouse_gross', 0)),
+                    'taxable_ss': float(year_data.get('taxable_ss', 0)),  # THIS IS THE KEY FIELD
+                    'ss_decrease_amount': float(year_data.get('ss_decrease_amount_actual', 0))
+                }
+                projections['social_security_data'].append(ss_data)
+
+                # Medicare data for reports
+                medicare_data = {
+                    'year': year,
+                    'part_b': float(year_data.get('part_b', 0)),
+                    'part_d': float(year_data.get('part_d', 0)),
+                    'irmaa_surcharge': float(year_data.get('irmaa_surcharge', 0)),
+                    'total_medicare': float(year_data.get('total_medicare', 0))
+                }
+                projections['medicare_data'].append(medicare_data)
+
+            logger.info(f"Successfully generated financial projections for scenario {scenario.id} using ScenarioProcessor")
             return projections
-            
+
         except Exception as e:
             logger.error(f"Financial projection generation failed for scenario {scenario.id}: {str(e)}")
             return {
@@ -211,7 +237,9 @@ class ScenarioDataIntegrationService:
                 'income_projections': [],
                 'expense_projections': [],
                 'tax_projections': [],
-                'net_cash_flow': []
+                'net_cash_flow': [],
+                'social_security_data': [],
+                'medicare_data': []
             }
     
     def _prepare_chart_data(self, scenario: Scenario) -> Dict[str, Any]:
