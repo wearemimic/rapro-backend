@@ -633,8 +633,20 @@ class RothConversionProcessor:
             self._log_debug(f"Year {target_year}: Starting with $0 Roth balance")
         total_rmd = Decimal('0')
 
-        # Calculate age for RMD calculations
+        # Calculate client (primary) age for reference
         target_year_age = target_year - client_birth_year
+
+        # Get spouse birth year for spouse-owned assets
+        spouse_birth_year = None
+        if self.spouse:
+            if isinstance(self.spouse.get('birthdate'), datetime.date):
+                spouse_birth_year = self.spouse['birthdate'].year
+            elif isinstance(self.spouse.get('birthdate'), str):
+                try:
+                    spouse_birthdate = datetime.datetime.strptime(self.spouse['birthdate'], '%Y-%m-%d').date()
+                    spouse_birth_year = spouse_birthdate.year
+                except:
+                    pass
 
         # Roth growth rate
         roth_growth_rate = Decimal(str(self.roth_growth_rate)) / 100
@@ -734,6 +746,11 @@ class RothConversionProcessor:
                     projection_year = projection_start_year + yr + 1  # +1 because we're calculating for next year
                     projection_age = projection_year - client_birth_year
 
+                    # Calculate owner-specific age for this projection year
+                    owner_projection_age = projection_age  # Default to primary
+                    if owner == 'spouse' and spouse_birth_year is not None:
+                        owner_projection_age = projection_year - spouse_birth_year
+
                     # DO NOT apply Roth growth here - it should only grow once per actual year
                     # The problem is this function is called separately for each year
                     # So we can't compound growth within this loop
@@ -781,7 +798,8 @@ class RothConversionProcessor:
                     # Step 4: Calculate RMD based on previous year's ending balance
                     # For the first iteration, previous_balance is the starting balance
                     # For subsequent iterations, it's the balance from the previous year (after growth, before RMD)
-                    rmd = self._calculate_rmd_for_asset(asset, projection_year, previous_balance, projection_age)
+                    # Use owner-specific age (not primary client's age!)
+                    rmd = self._calculate_rmd_for_asset(asset, projection_year, previous_balance, owner_projection_age)
                     if rmd > 0:
                         balance -= rmd
                         self._log_debug(f"Year {projection_year}: Applied RMD ${rmd:,.2f} (based on prev year balance ${previous_balance:,.2f}), balance after RMD: ${balance:,.2f}")
@@ -791,11 +809,17 @@ class RothConversionProcessor:
 
             # Calculate RMD for target year (using previous year's balance or current year balance for current year)
             # This is the RMD that would be required in the target year
+            # CRITICAL: Calculate owner-specific age (not primary client's age!)
+            owner_age_for_rmd = target_year_age  # Default to primary
+            if owner == 'spouse' and spouse_birth_year is not None:
+                owner_age_for_rmd = target_year - spouse_birth_year
+                self._log_debug(f"Asset {income_name} owned by spouse: Using spouse age {owner_age_for_rmd} instead of primary age {target_year_age}")
+
             if target_year > current_year:
-                rmd_for_target_year = self._calculate_rmd_for_asset(asset, target_year, previous_balance, target_year_age)
+                rmd_for_target_year = self._calculate_rmd_for_asset(asset, target_year, previous_balance, owner_age_for_rmd)
             else:
                 # For current year, use current balance as "previous year" balance
-                rmd_for_target_year = self._calculate_rmd_for_asset(asset, target_year, balance, target_year_age)
+                rmd_for_target_year = self._calculate_rmd_for_asset(asset, target_year, balance, owner_age_for_rmd)
 
             if rmd_for_target_year > 0:
                 total_rmd += rmd_for_target_year
