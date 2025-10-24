@@ -35,16 +35,33 @@ class RothConversionProcessor:
         self.client = client
         self.spouse = spouse
         self.assets = copy.deepcopy(assets)  # Deep copy to avoid modifying original
-        
+        self.debug = True  # Enable debug logging early
+
+        # Check for per-asset conversions (new format)
+        self.per_asset_conversions = conversion_params.get('per_asset_conversions', {})
+
+        # Debug: Log what we received
+        self._log_debug(f"Received conversion_params: {conversion_params}")
+        self._log_debug(f"Per-asset conversions: {self.per_asset_conversions}")
+
         # Set conversion parameters
-        self.conversion_start_year = conversion_params.get('conversion_start_year')
-        self.years_to_convert = conversion_params.get('years_to_convert', 1)
+        # For backward compatibility, support both old global format and new per-asset format
+        if self.per_asset_conversions and len(self.per_asset_conversions) > 0:
+            # Calculate global parameters from per-asset conversions
+            self._log_debug("Using per-asset conversion format")
+            self._calculate_global_params_from_per_asset()
+        else:
+            # Use legacy global parameters
+            self._log_debug("Using legacy global conversion format")
+            self.conversion_start_year = conversion_params.get('conversion_start_year')
+            self.years_to_convert = conversion_params.get('years_to_convert', 1)
+
         self.pre_retirement_income = conversion_params.get('pre_retirement_income', Decimal('0'))
         self.roth_growth_rate = conversion_params.get('roth_growth_rate', 5.0)
         self.max_annual_amount = conversion_params.get('max_annual_amount', Decimal('0'))
         self.roth_withdrawal_amount = conversion_params.get('roth_withdrawal_amount', Decimal('0'))
         self.roth_withdrawal_start_year = conversion_params.get('roth_withdrawal_start_year')
-        
+
         # Initialize other attributes
         self.annual_conversion = Decimal('0')
         self.total_conversion = Decimal('0')
@@ -70,7 +87,37 @@ class RothConversionProcessor:
 
         # Validate and prepare conversion parameters
         self._validate_conversion_params()
-        
+
+    def _calculate_global_params_from_per_asset(self):
+        """
+        Calculate global conversion parameters from per-asset conversion schedules.
+        Sets conversion_start_year and years_to_convert based on the range of all assets.
+        """
+        if not self.per_asset_conversions:
+            raise ValueError("No per-asset conversions provided")
+
+        # Find earliest start year and latest end year across all assets
+        start_years = []
+        end_years = []
+
+        for asset_key, params in self.per_asset_conversions.items():
+            start_year = params.get('start_year')
+            years = params.get('years')
+
+            if start_year and years:
+                start_years.append(int(start_year))
+                end_years.append(int(start_year) + int(years) - 1)
+
+        if not start_years or not end_years:
+            raise ValueError("Per-asset conversions must have start_year and years")
+
+        # Set global parameters
+        self.conversion_start_year = min(start_years)
+        latest_end_year = max(end_years)
+        self.years_to_convert = latest_end_year - self.conversion_start_year + 1
+
+        self._log_debug(f"Calculated global params from per-asset conversions: start={self.conversion_start_year}, years={self.years_to_convert}")
+
     def _calculate_retirement_year(self):
         """
         Calculate the retirement year based on client's birthdate and retirement age.
@@ -613,23 +660,26 @@ class RothConversionProcessor:
                 self._log_debug(f"Target year is current year, starting balance: ${balance}")
 
                 # Check if conversion happens in current year
-                # FIX: Check if THIS asset has a conversion amount in the map (don't filter by specific income_type values)
                 # Only convert assets that would normally require RMDs (tax-deferred accounts)
                 conversion_amount = Decimal('0')
                 if apply_conversions and self._requires_rmd(asset):
-                    if current_year >= self.conversion_start_year and current_year < self.conversion_start_year + self.years_to_convert:
-                        # FIX: Get THIS asset's specific conversion amount
-                        asset_id_str = str(asset_id)
-                        self._log_debug(f"  Checking map for asset_id='{asset_id_str}', map keys={list(self.asset_conversion_map.keys())}")
-                        if asset_id and asset_id_str in self.asset_conversion_map:
-                            # Get total conversion for THIS asset
-                            asset_total_conversion = self.asset_conversion_map[asset_id_str]
-                            # Calculate annual amount for THIS asset
-                            asset_annual_conversion = asset_total_conversion / Decimal(str(self.years_to_convert))
-                            conversion_amount = min(asset_annual_conversion, balance)
-                            self._log_debug(f"Year {current_year} (current): Asset {asset_id} (Owner: {owner}) converting ${conversion_amount} from ${balance}")
+                    asset_id_str = str(asset_id)
+                    self._log_debug(f"  Checking map for asset_id='{asset_id_str}', map keys={list(self.asset_conversion_map.keys())}")
+                    if asset_id and asset_id_str in self.asset_conversion_map:
+                        # Get THIS asset's specific conversion schedule
+                        schedule = self.asset_conversion_map[asset_id_str]
+                        start_year = schedule['start_year']
+                        years = schedule['years']
+                        annual_amount = schedule['annual_amount']
+
+                        # Check if current year falls within this asset's conversion schedule
+                        if current_year >= start_year and current_year < start_year + years:
+                            conversion_amount = min(annual_amount, balance)
+                            self._log_debug(f"Year {current_year} (current): Asset {asset_id} (Owner: {owner}) converting ${conversion_amount} from ${balance} (schedule: {start_year}-{start_year + years - 1})")
                         else:
-                            self._log_debug(f"  ⚠️ Asset {asset_id} NOT FOUND in conversion map!")
+                            self._log_debug(f"  Asset {asset_id} not converting this year (schedule: {start_year}-{start_year + years - 1})")
+                    else:
+                        self._log_debug(f"  ⚠️ Asset {asset_id} NOT FOUND in conversion map!")
 
                 # Subtract conversion from balance BEFORE growth
                 if conversion_amount > 0:
@@ -668,18 +718,23 @@ class RothConversionProcessor:
                     # Step 1: Check for conversion FIRST (before growth)
                     conversion_amount = Decimal('0')
                     if apply_conversions and self._requires_rmd(asset):
-                        if projection_year >= self.conversion_start_year and projection_year < self.conversion_start_year + self.years_to_convert:
-                            asset_id_str = str(asset_id)
-                            self._log_debug(f"  Checking map for asset_id='{asset_id_str}', map keys={list(self.asset_conversion_map.keys())}")
-                            if asset_id and asset_id_str in self.asset_conversion_map:
-                                # Get total conversion for THIS asset
-                                asset_total_conversion = self.asset_conversion_map[asset_id_str]
-                                # Calculate annual amount for THIS asset
-                                asset_annual_conversion = asset_total_conversion / Decimal(str(self.years_to_convert))
-                                conversion_amount = min(asset_annual_conversion, balance)
-                                self._log_debug(f"Year {projection_year}: Asset {asset_id} (Owner: {owner}) converting ${conversion_amount} from ${balance}")
+                        asset_id_str = str(asset_id)
+                        self._log_debug(f"  Checking map for asset_id='{asset_id_str}', map keys={list(self.asset_conversion_map.keys())}")
+                        if asset_id and asset_id_str in self.asset_conversion_map:
+                            # Get THIS asset's specific conversion schedule
+                            schedule = self.asset_conversion_map[asset_id_str]
+                            start_year = schedule['start_year']
+                            years = schedule['years']
+                            annual_amount = schedule['annual_amount']
+
+                            # Check if projection year falls within this asset's conversion schedule
+                            if projection_year >= start_year and projection_year < start_year + years:
+                                conversion_amount = min(annual_amount, balance)
+                                self._log_debug(f"Year {projection_year}: Asset {asset_id} (Owner: {owner}) converting ${conversion_amount} from ${balance} (schedule: {start_year}-{start_year + years - 1})")
                             else:
-                                self._log_debug(f"  ⚠️ Asset {asset_id} NOT FOUND in conversion map!")
+                                self._log_debug(f"  Asset {asset_id} not converting in year {projection_year} (schedule: {start_year}-{start_year + years - 1})")
+                        else:
+                            self._log_debug(f"  ⚠️ Asset {asset_id} NOT FOUND in conversion map!")
 
                     # Step 2: Subtract conversion from balance BEFORE growth
                     if conversion_amount > 0:
@@ -791,10 +846,18 @@ class RothConversionProcessor:
         # Get the beginning balance from previous year (before this year's conversions)
         beginning_roth_balance = self.roth_balance_by_year.get(target_year - 1, Decimal('0'))
 
-        # Calculate this year's total conversions
-        is_conversion_year = (target_year >= self.conversion_start_year and
-                             target_year < self.conversion_start_year + self.years_to_convert)
-        conversion_this_year = Decimal(str(self.annual_conversion)) if is_conversion_year else Decimal('0')
+        # Calculate this year's total conversions across all assets
+        conversion_this_year = Decimal('0')
+        for asset_key, schedule in self.asset_conversion_map.items():
+            start_year = schedule['start_year']
+            years = schedule['years']
+            annual_amount = schedule['annual_amount']
+
+            # Check if this asset is converting in the target year
+            if target_year >= start_year and target_year < start_year + years:
+                conversion_this_year += annual_amount
+
+        self._log_debug(f"Year {target_year}: Total conversions across all assets = ${conversion_this_year:,.2f}")
 
         if apply_conversions and beginning_roth_balance > 0:
             # Apply growth to ONLY the beginning balance (not the new conversion)
@@ -838,25 +901,60 @@ class RothConversionProcessor:
 
         return balances
 
+    def _calculate_max_annual_conversion(self, asset_conversion_map):
+        """
+        Calculate the maximum annual conversion amount across all years.
+        This handles per-asset schedules that may overlap.
+
+        Parameters:
+        - asset_conversion_map: Dict mapping asset keys to conversion schedules
+
+        Returns:
+        - max_annual: Decimal - Maximum conversion amount in any single year
+        """
+        year_totals = {}
+
+        for asset_key, schedule in asset_conversion_map.items():
+            start_year = schedule['start_year']
+            years = schedule['years']
+            annual_amount = schedule['annual_amount']
+
+            # Add this asset's annual amount to each year in its schedule
+            for year_offset in range(years):
+                year = start_year + year_offset
+                year_totals[year] = year_totals.get(year, Decimal('0')) + annual_amount
+
+        if not year_totals:
+            return Decimal('0')
+
+        max_annual = max(year_totals.values())
+        self._log_debug(f"Year-by-year conversion totals: {dict((y, float(a)) for y, a in sorted(year_totals.items()))}")
+
+        return max_annual
+
     def _prepare_assets_for_conversion(self):
         """
         Prepare assets for conversion by calculating conversion amounts and creating a synthetic Roth asset.
-        
+
         Returns:
-        - annual_conversion: Decimal - The annual conversion amount
+        - annual_conversion: Decimal - The annual conversion amount (max across all years)
         - total_conversion: Decimal - The total conversion amount
         """
         total_conversion = Decimal('0')
         asset_conversion_map = {}
-        
+
         self._log_debug(f"Preparing assets for conversion. Years to convert: {self.years_to_convert}")
-        
-        # Calculate total conversion amount from assets
+        self._log_debug(f"Per-asset conversions provided: {bool(self.per_asset_conversions)}")
+
+        # Calculate total conversion amount from assets and build conversion map
         for asset in self.assets:
             max_to_convert = asset.get('max_to_convert')
             asset_id = asset.get('id')
             asset_name = asset.get('income_name', asset.get('income_type'))
-            self._log_debug(f"Asset {asset_name} (ID: {asset_id}): max_to_convert = {max_to_convert}")
+            asset_id_key = str(asset_id) if asset_id else asset.get('income_type')
+
+            self._log_debug(f"Asset {asset_name} (ID: {asset_id}, key: {asset_id_key}): max_to_convert = {max_to_convert}")
+
             if max_to_convert:
                 if not isinstance(max_to_convert, Decimal):
                     max_to_convert = Decimal(str(max_to_convert))
@@ -867,37 +965,47 @@ class RothConversionProcessor:
                     asset_balance = Decimal(str(asset_balance))
 
                 if max_to_convert > asset_balance:
-                    raise ValueError(f"Conversion amount ({max_to_convert}) exceeds asset balance ({asset_balance}) for asset {asset.get('id') or asset.get('income_type')}")
+                    raise ValueError(f"Conversion amount ({max_to_convert}) exceeds asset balance ({asset_balance}) for asset {asset_id_key}")
 
                 # Add to total conversion amount
                 total_conversion += max_to_convert
 
-                # Store in asset conversion map using string of asset_id
-                asset_id_key = str(asset_id) if asset_id else asset.get('income_type')
-                asset_conversion_map[asset_id_key] = max_to_convert
-                self._log_debug(f"  -> Added to map: key='{asset_id_key}', value=${max_to_convert:,.2f}")
-        
-        # Calculate annual conversion amount
+                # Build asset conversion map with schedule information
+                if self.per_asset_conversions and asset_id_key in self.per_asset_conversions:
+                    # Use per-asset schedule
+                    schedule = self.per_asset_conversions[asset_id_key]
+                    asset_conversion_map[asset_id_key] = {
+                        'total_amount': max_to_convert,
+                        'start_year': int(schedule.get('start_year')),
+                        'years': int(schedule.get('years')),
+                        'annual_amount': max_to_convert / Decimal(str(schedule.get('years')))
+                    }
+                    self._log_debug(f"  -> Per-asset schedule: start={schedule.get('start_year')}, years={schedule.get('years')}, annual=${asset_conversion_map[asset_id_key]['annual_amount']:,.2f}")
+                else:
+                    # Backward compatibility: use global schedule
+                    asset_conversion_map[asset_id_key] = {
+                        'total_amount': max_to_convert,
+                        'start_year': self.conversion_start_year,
+                        'years': self.years_to_convert,
+                        'annual_amount': max_to_convert / Decimal(str(self.years_to_convert))
+                    }
+                    self._log_debug(f"  -> Using global schedule: start={self.conversion_start_year}, years={self.years_to_convert}")
+
+        # Calculate max annual conversion amount across all years
+        # This is used for reporting purposes
+        max_annual_conversion = self._calculate_max_annual_conversion(asset_conversion_map)
+
         self._log_debug(f"Total conversion amount: ${total_conversion:,.2f}")
-        annual_conversion = total_conversion / Decimal(str(self.years_to_convert))
-        self._log_debug(f"Annual conversion amount: ${annual_conversion:,.2f}")
-        
-        # Cap annual conversion at max_annual_amount if specified
-        if self.max_annual_amount > 0 and annual_conversion > self.max_annual_amount:
-            annual_conversion = self.max_annual_amount
-            # Recalculate years to convert based on max annual amount
-            years_to_convert = int((total_conversion / annual_conversion).quantize(Decimal('1')))
-            if years_to_convert > self.years_to_convert:
-                self.years_to_convert = years_to_convert
-        
+        self._log_debug(f"Max annual conversion amount: ${max_annual_conversion:,.2f}")
+
         # Store values for later use
-        self.annual_conversion = annual_conversion
+        self.annual_conversion = max_annual_conversion
         self.total_conversion = total_conversion
         self.asset_conversion_map = asset_conversion_map
 
         self._log_debug(f"Stored annual_conversion: ${self.annual_conversion:,.2f}, total_conversion: ${self.total_conversion:,.2f}")
-        self._log_debug(f"Final asset_conversion_map: {dict((k, float(v)) for k, v in self.asset_conversion_map.items())}")
-        
+        self._log_debug(f"Final asset_conversion_map keys: {list(self.asset_conversion_map.keys())}")
+
         # Create a synthetic Roth asset
         roth_asset = {
             'id': 'synthetic_roth',
@@ -917,11 +1025,11 @@ class RothConversionProcessor:
             'withdrawal_start_year': self.roth_withdrawal_start_year,
             'withdrawal_amount': self.roth_withdrawal_amount
         }
-        
+
         # Add the synthetic Roth asset to the assets list
         self.assets.append(roth_asset)
-        
-        return annual_conversion, total_conversion
+
+        return self.annual_conversion, self.total_conversion
     
     def _prepare_baseline_scenario(self):
         """
@@ -1355,25 +1463,27 @@ class RothConversionProcessor:
                 enhanced_row['part_d'] = enhanced_row['medicare_base'] * 0.28
 
             # Build income_by_source structure from flat fields
-            income_by_source = {}
-            for asset in self.assets:
-                asset_id = str(asset.get('id', asset.get('income_type', '')))
-                asset_type = asset.get('income_type', '')  # FIXED: Don't lowercase - match storage
+            # CRITICAL: If income_by_source already exists (copied from baseline), preserve it
+            if 'income_by_source' not in enhanced_row:
+                income_by_source = {}
+                for asset in self.assets:
+                    asset_id = str(asset.get('id', asset.get('income_type', '')))
+                    asset_type = asset.get('income_type', '')  # FIXED: Don't lowercase - match storage
 
-                # Look for income fields in the row
-                # CRITICAL: Check asset_id FIRST because multiple assets can have the same income_type!
-                income_value = 0
-                if f"{asset_id}_income" in enhanced_row:
-                    income_value = enhanced_row[f"{asset_id}_income"]
-                elif asset_type.lower() == 'social_security' and 'ss_income' in enhanced_row:
-                    income_value = enhanced_row['ss_income']
-                elif f"{asset_type}_income" in enhanced_row:
-                    income_value = enhanced_row[f"{asset_type}_income"]
+                    # Look for income fields in the row
+                    # CRITICAL: Check asset_id FIRST because multiple assets can have the same income_type!
+                    income_value = 0
+                    if f"{asset_id}_income" in enhanced_row:
+                        income_value = enhanced_row[f"{asset_id}_income"]
+                    elif asset_type.lower() == 'social_security' and 'ss_income' in enhanced_row:
+                        income_value = enhanced_row['ss_income']
+                    elif f"{asset_type}_income" in enhanced_row:
+                        income_value = enhanced_row[f"{asset_type}_income"]
 
-                if income_value:
-                    income_by_source[asset_id] = float(income_value)
+                    if income_value:
+                        income_by_source[asset_id] = float(income_value)
 
-            enhanced_row['income_by_source'] = income_by_source
+                enhanced_row['income_by_source'] = income_by_source
 
             # Build asset_balances structure from flat fields
             # ONLY include assets that have non-zero balances in THIS year OR are in asset_names
@@ -1834,7 +1944,14 @@ class RothConversionProcessor:
 
                     # Calculate gross income
                     gross_income = self._calculate_gross_income_for_year(year, primary_age, spouse_age)
-                    conversion_amount = float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0
+
+                    # Calculate actual conversion amount for this year from per-asset schedules
+                    conversion_amount = 0
+                    for asset_key, schedule in self.asset_conversion_map.items():
+                        start_year = schedule['start_year']
+                        years = schedule['years']
+                        if year >= start_year and year < start_year + years:
+                            conversion_amount += float(schedule['annual_amount'])
 
                     # Create row
                     pre_retirement_row = {
@@ -1894,6 +2011,8 @@ class RothConversionProcessor:
                         lookback_year = year - 2
                         lookback_magi = self.magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
 
+                        print(f"Year {year} IRMAA Calculation (Pre-Retirement): Looking back to year {lookback_year}, MAGI = ${lookback_magi:,.2f} (current year MAGI = ${magi:,.2f})")
+
                         total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
                         pre_retirement_row['medicare_base'] = total_medicare - irmaa_surcharge
                         pre_retirement_row['irmaa_surcharge'] = irmaa_surcharge
@@ -1919,8 +2038,13 @@ class RothConversionProcessor:
 
                 year = baseline_row['year']
 
-                # Check if this year is still within the conversion period
-                conversion_amount = float(self.annual_conversion) if year >= self.conversion_start_year and year < self.conversion_start_year + self.years_to_convert else 0
+                # Calculate actual conversion amount for this year from per-asset schedules
+                conversion_amount = 0
+                for asset_key, schedule in self.asset_conversion_map.items():
+                    start_year = schedule['start_year']
+                    years = schedule['years']
+                    if year >= start_year and year < start_year + years:
+                        conversion_amount += float(schedule['annual_amount'])
 
                 # PHASE 2: Build retirement_row from scratch - DON'T copy baseline_row!
                 # Only take fields that are NOT affected by conversion
@@ -1940,35 +2064,65 @@ class RothConversionProcessor:
                 # CRITICAL: Also create social_security_income for frontend column display
                 retirement_row['social_security_income'] = ss_income
 
+                # CRITICAL: Copy income_by_source from baseline to preserve SS breakdown for display
+                if 'income_by_source' in baseline_row:
+                    retirement_row['income_by_source'] = baseline_row['income_by_source']
+
                 # PHASE 3: Get asset balances with conversions applied
                 # This returns {asset_id}_balance, {asset_id}_rmd, {asset_id}_income fields
                 asset_balances = self._calculate_asset_balances_with_growth(year, apply_conversions=True)
                 retirement_row.update(asset_balances)
 
-                # Calculate gross income from conversion data (NOT baseline!)
-                # Gross income = all asset incomes (NOT including SS - that's handled separately)
+                # CRITICAL: Use baseline income amounts for withdrawal strategy
+                # The conversion scenario should have the SAME withdrawal amounts as baseline
+                # Only the asset balances and tax consequences change, not the withdrawal strategy
+                # This ensures voluntary distributions (before RMD age) are properly included in AGI
+
                 gross_income = 0  # Start with 0, will add asset incomes
+
+                # Use income_by_source from baseline to get actual withdrawal amounts
+                baseline_income_by_source = baseline_row.get('income_by_source', {})
+
+                print(f"\n=== DEBUG Year {year} Income Calculation ===")
+                print(f"Baseline income_by_source: {baseline_income_by_source}")
+
                 for asset in self.assets:
-                    asset_id = str(asset.get('id'))
+                    asset_id_raw = asset.get('id')
+                    asset_id = str(asset_id_raw) if asset_id_raw is not None else None
                     asset_type = asset.get('income_type', '').lower()
                     income_name = asset.get('income_name', '')
 
-                    # Get income from {asset_id}_income field
-                    asset_income_key = f"{asset_id}_income"
-                    asset_income = 0
-                    if asset_income_key in retirement_row:
-                        asset_income = float(retirement_row[asset_income_key])
-                        gross_income += asset_income
-                        self._log_debug(f"Year {year}: Asset {asset_id} income = ${asset_income:,.2f}")
+                    # Skip Social Security - handled separately
+                    if asset_type == 'social_security':
+                        continue
 
-                    # CRITICAL: Also create {asset_type}_income field for frontend columns
-                    # This allows the frontend to display "Social Security", "401k" etc. as columns
-                    if asset_type and asset_type != 'social_security':  # SS already has ss_income
+                    # Get income amount from baseline's income_by_source
+                    # Try both integer and string keys since baseline might use either
+                    asset_income = 0
+                    if asset_id_raw in baseline_income_by_source:
+                        asset_income = float(baseline_income_by_source[asset_id_raw])
+                    elif asset_id in baseline_income_by_source:
+                        asset_income = float(baseline_income_by_source[asset_id])
+                    else:
+                        asset_income = 0
+
+                    if asset_income > 0:
+                        gross_income += asset_income
+                        print(f"Year {year}: Asset {asset_id} ({income_name}/{asset_type}) income from baseline = ${asset_income:,.2f}")
+
+                    # Create {asset_type}_income field for frontend columns
+                    if asset_type:
                         retirement_row[f"{asset_type}_income"] = asset_income
 
-                    # Also create {income_name}_income if different from asset_type
-                    if income_name and f"{income_name}_income" not in retirement_row:
+                    # Create {income_name}_income field
+                    if income_name:
                         retirement_row[f"{income_name}_income"] = asset_income
+
+                    # Create {asset_id}_income field
+                    retirement_row[f"{asset_id}_income"] = asset_income
+
+                print(f"Total gross_income (before SS): ${gross_income:,.2f}")
+                print(f"=== END DEBUG ===\n")
 
                 # Add tax-free income from Roth (doesn't count toward gross for tax purposes)
                 tax_free_income = float(retirement_row.get('tax_free_income', 0))
@@ -2059,6 +2213,8 @@ class RothConversionProcessor:
                     lookback_year = year - 2
                     lookback_magi = self.magi_history.get(lookback_year, magi)  # Use current MAGI if no history yet
 
+                    print(f"Year {year} IRMAA Calculation: Looking back to year {lookback_year}, MAGI = ${lookback_magi:,.2f} (current year MAGI = ${magi:,.2f})")
+
                     total_medicare, irmaa_surcharge = self._calculate_medicare_costs(lookback_magi, year)
                     medicare_base = total_medicare - irmaa_surcharge
 
@@ -2133,6 +2289,24 @@ class RothConversionProcessor:
         baseline_comprehensive = self._transform_to_comprehensive_format(baseline_results, "Before Conversion")
         conversion_comprehensive = self._transform_to_comprehensive_format(conversion_results, "After Conversion")
 
+        # Add per-asset conversion data to comprehensive format with asset names
+        conversion_comprehensive['per_asset_conversions'] = {}
+        for asset_key, schedule in self.asset_conversion_map.items():
+            # Find the asset to get its name
+            asset = next((a for a in self.assets if str(a.get('id')) == str(asset_key) or a.get('income_type') == asset_key), None)
+            asset_name = 'Unknown Asset'
+            if asset:
+                asset_name = asset.get('income_name') or asset.get('investment_name') or asset.get('income_type') or 'Unknown Asset'
+
+            conversion_comprehensive['per_asset_conversions'][asset_key] = {
+                'asset_name': asset_name,
+                'start_year': schedule['start_year'],
+                'end_year': schedule['start_year'] + schedule['years'] - 1,
+                'years': schedule['years'],
+                'total_amount': float(schedule['total_amount']),
+                'annual_amount': float(schedule['annual_amount'])
+            }
+
         # Prepare result
         result = {
             'baseline_results': baseline_results,
@@ -2152,7 +2326,16 @@ class RothConversionProcessor:
                 'pre_retirement_income': float(self.pre_retirement_income),
                 'roth_growth_rate': self.roth_growth_rate,
                 'roth_withdrawal_amount': float(self.roth_withdrawal_amount),
-                'roth_withdrawal_start_year': self.roth_withdrawal_start_year
+                'roth_withdrawal_start_year': self.roth_withdrawal_start_year,
+                'per_asset_conversions': {
+                    asset_key: {
+                        'start_year': schedule['start_year'],
+                        'years': schedule['years'],
+                        'total_amount': float(schedule['total_amount']),
+                        'annual_amount': float(schedule['annual_amount'])
+                    }
+                    for asset_key, schedule in self.asset_conversion_map.items()
+                }
             },
             'conversion_cost_metrics': conversion_cost_metrics,
             'asset_balances': asset_balances,
